@@ -15,46 +15,80 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { confirmSeasonSync } from "./detail-season-sync.js";
 import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
 import type { SeasonSyncEpisode } from "./detail-season-sync.js";
-import type { SyncAudioResponse } from "./wire/types.gen.js";
+import type { SyncAccepted, SyncDoneEvent } from "./wire/types.gen.js";
 
 // audioSyncAction is a module-scope const in the real module, so the double is
 // an object literal (plain functions, immune to mockReset) over a hoisted
 // record. `defer` holds every dispatch open so a test can observe how many
-// workers are in flight.
+// workers are in flight. A dispatch answers a 202 whose job settles through
+// the mocked watchSyncJob with the scripted result: null = dispatch failure,
+// { applied } = the job's terminal.
 const sync = vi.hoisted(() => ({
   args: [] as unknown[],
   silent: [] as (boolean | undefined)[],
   defer: false,
   releases: [] as (() => void)[],
-  results: [] as (SyncAudioResponse | null)[],
+  results: [] as ({ applied: boolean } | null)[],
+  nextJob: 0,
+  settlements: new Map<number, { applied: boolean }>(),
 }));
 vi.mock("./sync-actions.js", () => ({
   audioSyncAction: {
     dispatch: (args: unknown, opts?: { silent?: boolean }) => {
       sync.args.push(args);
       sync.silent.push(opts?.silent);
-      const next = (): SyncAudioResponse | null =>
-        sync.results.length > 0
-          ? (sync.results.shift() ?? null)
-          : { method: "audio", offset_ms: 120, confidence: 0.9, applied: true };
+      const next = (): { applied: boolean } | null =>
+        sync.results.length > 0 ? (sync.results.shift() ?? null) : { applied: true };
+      const accept = (): SyncAccepted | null => {
+        const r = next();
+        if (r === null) {
+          return null;
+        }
+        sync.nextJob++;
+        sync.settlements.set(sync.nextJob, r);
+        return { activity_id: `act-${String(sync.nextJob)}`, job_id: sync.nextJob };
+      };
       if (sync.defer) {
-        return new Promise<SyncAudioResponse | null>((resolve) => {
+        return new Promise<SyncAccepted | null>((resolve) => {
           sync.releases.push(() => {
-            resolve(next());
+            resolve(accept());
           });
         });
       }
-      return Promise.resolve(next());
+      return Promise.resolve(accept());
     },
   },
 }));
 
-function applied(): SyncAudioResponse {
-  return { method: "audio", offset_ms: 120, confidence: 0.9, applied: true };
+// The settlement registry: each watched job answers its scripted terminal on
+// the next microtask, the way a live sync:done would.
+vi.mock("./sync-jobs.js", () => ({
+  watchSyncJob: (jobId: number, cb: (ev: SyncDoneEvent | null) => void) => {
+    const r = sync.settlements.get(jobId);
+    queueMicrotask(() => {
+      cb(
+        r
+          ? ({
+              job_id: jobId,
+              applied: r.applied,
+              offset_ms: 120,
+              confidence: r.applied ? 0.9 : 0.1,
+            } as SyncDoneEvent)
+          : null,
+      );
+    });
+    return () => {
+      /* unwatch */
+    };
+  },
+}));
+
+function applied(): { applied: boolean } {
+  return { applied: true };
 }
 
-function lowConfidence(): SyncAudioResponse {
-  return { method: "audio", offset_ms: 0, confidence: 0.1, applied: false };
+function lowConfidence(): { applied: boolean } {
+  return { applied: false };
 }
 
 function episodes(n: number): SeasonSyncEpisode[] {
@@ -110,6 +144,8 @@ beforeEach(() => {
   sync.releases.length = 0;
   sync.results.length = 0;
   sync.defer = false;
+  sync.nextJob = 0;
+  sync.settlements.clear();
   dlg = mountDialogHost();
 });
 

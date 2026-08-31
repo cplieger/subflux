@@ -190,6 +190,18 @@ func (a *Log) Start(action, detail string, source Source) string {
 	return a.startLocked(&n, Entry{Action: action, Detail: detail, Source: source})
 }
 
+// StartQueued records a new activity BORN in the queued state and returns
+// its ID: one upsert carrying Queued=true, where a Start followed by
+// SetQueued would publish a running-looking snapshot first. Sync jobs enter
+// here; the admission hook flips them running via SetQueued(id, false).
+func (a *Log) StartQueued(action, detail string, source Source) string {
+	var n notify
+	defer n.fire()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.startLocked(&n, Entry{Action: action, Detail: detail, Source: source, Queued: true})
+}
+
 // StartScan records a new scan activity carrying its structured scope and
 // the role required to cancel it. Idempotent same-scope start: when an
 // active (not done, not cancelled) entry with the same scope already exists,

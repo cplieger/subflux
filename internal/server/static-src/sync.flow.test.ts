@@ -21,6 +21,9 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } 
 
 const dispatchAudio = vi.hoisted(() => vi.fn());
 const dispatchOffset = vi.hoisted(() => vi.fn());
+const attachMock = vi.hoisted(() => vi.fn());
+const watchMock = vi.hoisted(() => vi.fn());
+const unwatchMock = vi.hoisted(() => vi.fn());
 
 // Mocked as whole modules because these are the two the dialog dispatches
 // through; a partial factory that stopped matching the export set would fail
@@ -28,6 +31,15 @@ const dispatchOffset = vi.hoisted(() => vi.fn());
 vi.mock("./sync-actions.js", () => ({
   audioSyncAction: { dispatch: dispatchAudio },
   saveManualOffsetAction: { dispatch: dispatchOffset },
+}));
+
+// The settlement registry is the dialog's other network edge: watch/attach
+// are captured so tests deliver sync:done results and reload states.
+vi.mock("./sync-jobs.js", () => ({
+  attachSyncJob: attachMock,
+  watchSyncJob: watchMock,
+  syncDoneFromEvent: vi.fn(),
+  clearSyncCorrelation: vi.fn(),
 }));
 
 vi.mock("./notify.js", () => ({
@@ -40,6 +52,53 @@ vi.mock("./notify.js", () => ({
 import { openSyncDialog, consumeSyncClosing } from "./sync.js";
 import * as notify from "./notify.js";
 import type { SubtitleEntry, MediaType } from "./api-types.js";
+import type { SyncDoneEvent } from "./wire/types.gen.js";
+
+/** A dispatch handle whose outcome resolves a 202 with the given job id. */
+function acceptedHandle(jobId: number): { outcome: Promise<unknown> } {
+  return {
+    outcome: Promise.resolve({
+      status: "success",
+      value: { activity_id: `act-${String(jobId)}`, job_id: jobId },
+    }),
+  };
+}
+
+/** A dispatch handle whose outcome resolves a typed error. */
+function errorHandle(err: unknown): { outcome: Promise<unknown> } {
+  return { outcome: Promise.resolve({ status: "error", error: err }) };
+}
+
+/** The sync:done payload for the harness entry's FileRef. */
+function doneFor(jobId: number, over: Partial<SyncDoneEvent> = {}): SyncDoneEvent {
+  return {
+    job_id: jobId,
+    file_ref: {
+      media_type: "episode",
+      media_id: "tvdb-1-s01e05",
+      language: "en",
+      variant: "standard",
+      source: "external",
+    },
+    offset_ms: -750,
+    confidence: 0.93,
+    method: "audio",
+    applied: true,
+    dry_run: true,
+    ...over,
+  };
+}
+
+/** The callback the dialog registered for jobId (fails loudly when absent). */
+function watcherFor(jobId: number): (ev: SyncDoneEvent | null) => void {
+  const call = watchMock.mock.calls.find((c) => c[0] === jobId);
+  if (!call) {
+    throw new Error(
+      `no watcher registered for job ${String(jobId)}; calls: ${String(watchMock.mock.calls.length)}`,
+    );
+  }
+  return call[1] as (ev: SyncDoneEvent | null) => void;
+}
 
 /** A subtitle entry with only the fields the dialog reads. */
 function entry(over: Partial<SubtitleEntry> = {}): SubtitleEntry {
@@ -105,6 +164,11 @@ beforeEach(() => {
   history.replaceState(null, "", "/series/42");
   dispatchAudio.mockReset();
   dispatchOffset.mockReset();
+  attachMock.mockReset();
+  attachMock.mockResolvedValue({ kind: "none" });
+  watchMock.mockReset();
+  unwatchMock.mockReset();
+  watchMock.mockReturnValue(unwatchMock);
 });
 
 afterEach(() => {
@@ -236,25 +300,28 @@ describe("saving a manual offset", () => {
   });
 });
 
-describe("sync to audio", () => {
-  it("applies a confident result to the offset", async () => {
-    dispatchAudio.mockResolvedValue({ applied: true, offset_ms: -750, confidence: 0.93 });
+describe("sync to audio (async job)", () => {
+  it("dispatches once, resolves fast, and shows the analyzing state", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
     open();
 
     button(/Sync to Audio/).click();
     await vi.waitFor(() => {
-      expect(dispatchAudio).toHaveBeenCalled();
+      expect(dispatchAudio).toHaveBeenCalledTimes(1);
     });
 
-    // The reported confidence is what tells the user whether to trust it.
+    // The 202 hands over the job; the dialog watches it and says so.
     await vi.waitFor(() => {
-      expect(dlg().textContent).toContain("93%");
+      expect(watchMock).toHaveBeenCalledWith(7, expect.any(Function));
+      expect(dlg().textContent).toContain("Analyzing audio");
     });
-    expect(notify.success).toHaveBeenCalled();
+    // The dispatch is instant, so the button is usable again while the
+    // analysis runs server-side.
+    expect(button(/Sync to Audio/).disabled).toBe(false);
   });
 
   it("asks the server for a dry run, never a blind write", async () => {
-    dispatchAudio.mockResolvedValue({ applied: true, offset_ms: 0, confidence: 1 });
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
     open();
     button(/Sync to Audio/).click();
     await vi.waitFor(() => {
@@ -263,30 +330,133 @@ describe("sync to audio", () => {
     expect(dispatchAudio.mock.calls[0]?.[0]).toMatchObject({ dry_run: true });
   });
 
-  it("reports low confidence and changes nothing", async () => {
-    dispatchAudio.mockResolvedValue({ applied: false, offset_ms: 4000, confidence: 0.12 });
+  it("applies a confident result when ITS sync:done arrives (matched on job_id)", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
     open();
-
     button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    watcherFor(7)(doneFor(7));
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("93%");
+    });
+    expect(notify.success).toHaveBeenCalled();
+  });
+
+  it("reports low confidence and changes nothing", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
+    open();
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    watcherFor(7)(doneFor(7, { applied: false, confidence: 0.12, offset_ms: 4000 }));
+
     await vi.waitFor(() => {
       expect(dlg().textContent).toMatch(/Low confidence/);
     });
     expect(notify.success).not.toHaveBeenCalled();
   });
 
-  it("restores the button after a failure rather than leaving it spinning", async () => {
-    dispatchAudio.mockResolvedValue(null);
+  it("renders a failed job's error inline", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
     open();
-    const btn = button(/Sync to Audio/);
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
 
-    btn.click();
+    watcherFor(7)(doneFor(7, { applied: false, error: "analysis exceeded 15m0s" }));
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("did not complete");
+    });
+    expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it("renders the capacity 429 inline — exactly ONE visible surface, one dispatch", async () => {
+    // The typed cap refusal displaces the failure toast for the 429 arm: the
+    // dialog's inline result path is the only place the message appears.
+    dispatchAudio.mockReturnValue(errorHandle({ status: 429, message: "sync queue is full" }));
+    open();
+
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Sync queue is full");
+    });
+    expect(dispatchAudio).toHaveBeenCalledTimes(1);
+    expect(notify.error).not.toHaveBeenCalled();
+    expect(notify.success).not.toHaveBeenCalled();
+    // Usable again: the user retries when a slot frees, by clicking.
+    expect(button(/Sync to Audio/).disabled).toBe(false);
+  });
+
+  it("keeps the failure toast for NON-capacity errors", async () => {
+    dispatchAudio.mockReturnValue(errorHandle({ status: 500 }));
+    open();
+    button(/Sync to Audio/).click();
     await vi.waitFor(() => {
       expect(notify.error).toHaveBeenCalled();
     });
-    // The finally block owns this: a permanently disabled button would strand
-    // the user with no way to retry.
     await vi.waitFor(() => {
       expect(button(/Sync to Audio/).disabled).toBe(false);
+    });
+  });
+
+  it("close-dialog drops the WATCH, not the job — the analysis continues", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
+    open();
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    dlg().dispatchEvent(new Event("cancel", { cancelable: true }));
+
+    // The dialog unwatches (nothing renders into a closed dialog) and never
+    // cancels the dispatch or the job: there is no abort surface at all.
+    await vi.waitFor(() => {
+      expect(unwatchMock).toHaveBeenCalled();
+    });
+    consumeSyncClosing();
+  });
+
+  it("reload re-attach: a QUEUED job renders the queued state", async () => {
+    attachMock.mockResolvedValue({
+      kind: "live",
+      job: { job_id: 9, state: "queued" },
+    });
+    open();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Queued for analysis");
+    });
+    expect(watchMock).toHaveBeenCalledWith(9, expect.any(Function));
+  });
+
+  it("reload re-attach: a RUNNING job renders the analyzing state", async () => {
+    attachMock.mockResolvedValue({
+      kind: "live",
+      job: { job_id: 9, state: "running" },
+    });
+    open();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Analyzing audio");
+    });
+    expect(watchMock).toHaveBeenCalledWith(9, expect.any(Function));
+  });
+
+  it("reload re-attach: a completed-while-away outcome renders from the record", async () => {
+    attachMock.mockResolvedValue({
+      kind: "done",
+      job: { job_id: 9, state: "done", applied: true, offset_ms: -750, confidence: 0.93 },
+    });
+    open();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("93%");
     });
   });
 });

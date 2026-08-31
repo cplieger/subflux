@@ -33,8 +33,10 @@ import (
 	"github.com/cplieger/subflux/internal/server/mediahandlers"
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/wiregen/v3"
 )
@@ -102,6 +104,7 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[events.EpochEvent](),
 		wiregen.TypeRef[events.ActivityEvent](),
 		wiregen.TypeRef[events.AlertEvent](),
+		wiregen.TypeRef[events.SyncDoneEvent](),
 		wiregen.TypeRef[events.ProviderEvent](),
 		wiregen.TypeRef[events.ProviderTimeoutEntry](),
 		// The sealed SSE union (//wiregen:union on the interface): emits the
@@ -140,7 +143,9 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[filehandlers.BulkDeleteRequest](),
 		wiregen.TypeRef[synchandlers.SyncAudioRequest](),
 		wiregen.TypeRef[synchandlers.SyncOffsetRequest](),
-		wiregen.TypeRef[synchandlers.SyncAudioResponse](),
+		wiregen.TypeRef[synchandlers.SyncAccepted](),
+		wiregen.TypeRef[syncjobs.Job](),
+		wiregen.TypeRef[resolve.FileRef](),
 		wiregen.TypeRef[previewhandlers.PreviewStartResponse](),
 		wiregen.TypeRef[scanning.ScanAccepted](),
 	}
@@ -159,6 +164,9 @@ func Registry() *wiregen.Registry {
 		// Scan scope kind + four-valued scan outcome (background scans S12);
 		// both auto-discovered from the activity package's const blocks.
 		"ScanKind": {}, "Outcome": {},
+		// Sync job lifecycle + outcome (async sync D1), auto-discovered from
+		// the syncjobs package's const blocks.
+		"JobState": {}, "JobOutcome": {},
 		// SSE event names (events.EventType consts) and the error-code
 		// catalog (subflux.ErrorCode consts) — both auto-discovered, so a new
 		// code/event lands in TS on the next generate.
@@ -219,6 +227,7 @@ func Registry() *wiregen.Registry {
 			"activity":   "ActivityEvent",
 			"alert":      "AlertEvent",
 			"provider":   "ProviderEvent",
+			"sync:done":  "SyncDoneEvent",
 		},
 	}
 
@@ -542,11 +551,18 @@ func Endpoints() []wiregen.Endpoint {
 		{
 			Name: "syncAudio", Method: http.MethodPost, Path: "/api/sync/audio", AuthGroup: GroupUserConfigured,
 			Request:  wiregen.TypeRef[synchandlers.SyncAudioRequest](),
-			Response: wiregen.TypeRef[synchandlers.SyncAudioResponse](),
+			Response: wiregen.TypeRef[synchandlers.SyncAccepted](),
+			Doc:      "Dispatch one async audio-sync job: 202 {activity_id, job_id} after validation; the terminal result rides the sync:done event (matched on job_id) and the jobs read. Same-file dispatch answers the existing job's ids; a full admission lease answers 429.",
 		},
 		{
 			Name: "syncOffset", Method: http.MethodPost, Path: "/api/sync/offset", AuthGroup: GroupUserConfigured,
 			Request: wiregen.TypeRef[synchandlers.SyncOffsetRequest](),
+		},
+		{
+			Name: "syncJobs", Method: http.MethodGet, Path: "/api/sync/jobs", AuthGroup: GroupUserConfigured,
+			Query:    true,
+			Response: wiregen.TypeRef[syncjobs.Job](), RespShape: wiregen.RespArray,
+			Doc: "Sync job registry in total order (accepted_at DESC, job_id DESC), filterable by batch_activity_id; the reload path re-attaches through it.",
 		},
 		{
 			Name: "previewStart", Method: http.MethodGet, Path: "/api/preview/start",

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 )
 
 // The server's prune ticker is the one owner of activity retention: a
@@ -19,7 +20,9 @@ import (
 func TestRunActivityPrune_prunes_on_ticker_and_fires_remove(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		s := &Server{activity: activity.New(10)}
+		// syncJobs rides the same ticker (one retention owner); an empty
+		// dispatcher keeps the tick's job-prune arm a no-op here.
+		s := &Server{activity: activity.New(10), syncJobs: syncjobs.New(syncjobs.Deps{})}
 		var (
 			mu      sync.Mutex
 			removed []activity.Entry

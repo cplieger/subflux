@@ -4,6 +4,7 @@ package synchandlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,8 +15,8 @@ import (
 	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -26,10 +27,10 @@ type SyncStore interface {
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 }
 
-// SubtitleProcessor is the SRT surface the sync verbs drive: decode to UTF-8,
-// parse to cues, shift and re-serialize, and run audio-based alignment. All
-// four of the processor's methods, because applying an offset is exactly
-// parse-shift-write and the audio path adds the fourth.
+// SubtitleProcessor is the SRT surface the sync verbs drive: decode to
+// UTF-8, parse to cues, and re-serialize. The heavy audio analysis is NOT
+// here — the async job executor drives the typed sync core directly
+// (AudioJobRunner), and cues arrive in its result.
 //
 // Exported because the server names it: WithSubtitleProc carries the processor
 // from the composition root to here, and naming this type is what stops a
@@ -38,17 +39,17 @@ type SubtitleProcessor interface {
 	NormalizeEncoding(data []byte) []byte
 	ParseSRT(data []byte) ([]subflux.SubtitleCue, error)
 	WriteSRT(cues []subflux.SubtitleCue) ([]byte, error)
-	SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) subflux.AudioSyncResult
 }
 
 // Deps holds all dependencies for the sync handler family. Resolve is the
 // S7 typed-reference resolver: sync verbs address the subtitle by FileRef
 // and the server resolves both the subtitle path (store row) and the video
-// path (same media) — no client-supplied paths.
+// path (same media) — no client-supplied paths. Jobs is the async sync
+// dispatcher POST /api/sync/audio hands accepted work to.
 type Deps struct {
 	Store        SyncStore
 	SubtitleProc SubtitleProcessor
-	Activity     *activity.Log
+	Jobs         *syncjobs.Dispatcher
 	Resolve      *resolve.Resolver
 }
 
@@ -56,7 +57,7 @@ type Deps struct {
 type Handler struct {
 	store        SyncStore
 	subtitleProc SubtitleProcessor
-	activity     *activity.Log
+	jobs         *syncjobs.Dispatcher
 	resolve      *resolve.Resolver
 }
 
@@ -65,7 +66,7 @@ func New(d Deps) *Handler {
 	return &Handler{
 		store:        d.Store,
 		subtitleProc: d.SubtitleProc,
-		activity:     d.Activity,
+		jobs:         d.Jobs,
 		resolve:      d.Resolve,
 	}
 }
@@ -91,12 +92,11 @@ type SyncAudioRequest struct {
 	DryRun    bool              `json:"dry_run,omitempty"`
 }
 
-// SyncAudioResponse is the typed response for POST /api/sync/audio.
-type SyncAudioResponse struct {
-	Method     string  `json:"method"`
-	OffsetMs   int64   `json:"offset_ms"`
-	Confidence float64 `json:"confidence"`
-	Applied    bool    `json:"applied"`
+// SyncAccepted is the 202 body for POST /api/sync/audio: the activity entry
+// id and the numeric job id the dialog correlates sync:done on.
+type SyncAccepted struct {
+	ActivityID string `json:"activity_id"`
+	JobID      int64  `json:"job_id"`
 }
 
 // SyncOffsetRequest is the typed body for POST /api/sync/offset: the FileRef
@@ -141,106 +141,96 @@ type syncAudioPaths struct {
 // decodeSyncAudioRequest decodes and gates a sync-audio request: POST only,
 // JSON body, FileRef resolving to a stored subtitle whose media has a known
 // video path, and the ASS/SSA apply refusal. ok=false means the response has
-// already been written.
+// already been written. Validation is synchronous and path-resolving only —
+// the subtitle READ happens inside the accepted job, so an unreadable file
+// is a failed job (202 then done(crash)), not a 4xx.
 //
 // The ASS/SSA gate exists because the writeback path serializes cues as SRT
 // dialogue only, which would silently destroy styling, signs, and karaoke
 // and leave SRT content under an .ass name. Dry-run is still allowed so the
 // computed offset can be inspected. Lift the gate only when a
 // format-preserving ASS writer exists. The gate runs on the RESOLVED path.
-func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (req SyncAudioRequest, paths syncAudioPaths, ok bool) {
+func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (req SyncAudioRequest, ref *resolve.FileRef, paths syncAudioPaths, ok bool) {
 	if !httpapi.RequirePOST(w, r) {
-		return req, paths, false
+		return req, nil, paths, false
 	}
 	if !httpapi.DecodeJSONBody(w, r, &req, maxBodySize) {
-		return req, paths, false
+		return req, nil, paths, false
 	}
-	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
+	ref = fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
 	if err := ref.Validate(); err != nil {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, err.Error())
-		return req, paths, false
+		return req, nil, paths, false
 	}
 	subPath, err := h.resolve.SubtitlePath(r.Context(), ref)
 	if err != nil {
 		resolve.WriteError(w, r, err)
-		return req, paths, false
+		return req, nil, paths, false
 	}
 	videoPath, err := h.resolve.VideoPathForFile(r.Context(), ref)
 	if err != nil {
 		resolve.WriteError(w, r, err)
-		return req, paths, false
+		return req, nil, paths, false
 	}
 	if !req.DryRun && isASSSubtitlePath(subPath) {
 		httpapi.BadRequestC(w, r, subflux.CodeSyncUnsupportedFormat,
 			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
-		return req, paths, false
+		return req, nil, paths, false
 	}
-	return req, syncAudioPaths{subtitle: subPath, video: videoPath}, true
+	return req, ref, syncAudioPaths{subtitle: subPath, video: videoPath}, true
 }
 
-// HandleSyncAudio handles POST /api/sync/audio.
+// HandleSyncAudio handles POST /api/sync/audio: validate, then hand the job
+// to the dispatcher and answer 202 {activity_id, job_id}. The dialog matches
+// the terminal sync:done event on job_id; a same-file dispatch answers the
+// EXISTING job's ids (even at capacity), and a full admission lease answers
+// a typed 429 the client renders inline and never auto-retries.
 func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	req, paths, ok := h.decodeSyncAudioRequest(w, r)
+	req, ref, paths, ok := h.decodeSyncAudioRequest(w, r)
 	if !ok {
 		return
 	}
 
-	data, err := atomicfile.ReadBounded(ctx, paths.subtitle, MaxSyncSubSize)
-	if err != nil {
-		slog.Warn("sync audio: read subtitle failed",
-			"path", paths.subtitle, "error", err)
-		httpapi.BadRequestC(w, r, subflux.CodeSyncUnsupportedFormat, "failed to read subtitle")
+	acc, err := h.jobs.Dispatch(&syncjobs.ExecInput{
+		Ref:          *ref,
+		SubtitlePath: paths.subtitle,
+		VideoPath:    paths.video,
+		DryRun:       req.DryRun,
+	})
+	switch {
+	case errors.Is(err, syncjobs.ErrCapacity):
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited,
+			"sync queue is full; wait for a running sync to finish")
+		return
+	case errors.Is(err, syncjobs.ErrShuttingDown):
+		httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable,
+			"server is shutting down")
+		return
+	case err != nil:
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError)
 		return
 	}
 
-	data = h.subtitleProc.NormalizeEncoding(data)
-
-	actID := h.activity.Start("Audio Sync",
-		filepath.Base(paths.subtitle), activity.SourceManual)
-	defer h.activity.End(actID)
-
-	slog.Info("audio sync requested",
+	slog.Info("audio sync accepted",
 		"subtitle", filepath.Base(paths.subtitle),
-		"video", filepath.Base(paths.video))
+		"video", filepath.Base(paths.video),
+		"job_id", acc.JobID, "activity_id", acc.ActivityID,
+		"existing", acc.Existing, "dry_run", req.DryRun)
 
-	result := h.subtitleProc.SyncFromAudio(ctx, data, paths.video, paths.subtitle)
+	httpapi.WriteJSONStatus(w, http.StatusAccepted, SyncAccepted{
+		ActivityID: acc.ActivityID,
+		JobID:      acc.JobID,
+	})
+}
 
-	resp := SyncAudioResponse{
-		OffsetMs:   result.Offset,
-		Confidence: result.Confidence,
-		Method:     result.Method,
-		Applied:    result.Applied,
+// HandleSyncJobs handles GET /api/sync/jobs: the job registry in its total
+// order (accepted_at DESC, job_id DESC), optionally filtered by
+// batch_activity_id. The reload path re-attaches through this read.
+func (h *Handler) HandleSyncJobs(w http.ResponseWriter, r *http.Request) {
+	if !httpapi.RequireGET(w, r) {
+		return
 	}
-
-	if !resp.Applied || req.DryRun {
-		slog.Debug("audio sync not applied",
-			"applied", resp.Applied,
-			"dry_run", req.DryRun,
-			"offset_ms", resp.OffsetMs,
-			"confidence", resp.Confidence,
-			"method", resp.Method,
-			"path", filepath.Base(paths.subtitle))
-	}
-
-	if resp.Applied && result.Cues != nil && !req.DryRun {
-		cumOffset, err := h.applySyncResult(ctx, paths.subtitle, result.Cues, result.Offset, result.Confidence)
-		if err != nil {
-			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "path", paths.subtitle)
-			return
-		}
-		resp.OffsetMs = cumOffset
-	}
-
-	slog.Info("audio sync completed",
-		"subtitle", filepath.Base(paths.subtitle),
-		"offset_ms", resp.OffsetMs,
-		"confidence", resp.Confidence,
-		"method", resp.Method,
-		"applied", resp.Applied,
-		"dry_run", req.DryRun)
-
-	httpapi.WriteJSON(w, resp)
+	httpapi.WriteJSON(w, h.jobs.Jobs(r.URL.Query().Get("batch_activity_id")))
 }
 
 // HandleSyncOffset handles POST /api/sync/offset.
@@ -277,7 +267,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	}
 	delta := req.OffsetMs - currentOffset
 
-	_, cues, parseErr := h.readAndParseSRT(subtitlePath)
+	_, cues, parseErr := h.readAndParseSRT(ctx, subtitlePath)
 	if parseErr != nil || len(cues) == 0 {
 		slog.Debug("sync offset: read/parse failed",
 			"path", subtitlePath, "error", parseErr, "cues", len(cues))
@@ -361,8 +351,9 @@ func ShiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []
 }
 
 // readAndParseSRT reads a subtitle file, normalizes encoding, and parses SRT.
-func (h *Handler) readAndParseSRT(path string) ([]byte, []subflux.SubtitleCue, error) {
-	data, err := atomicfile.ReadBounded(context.Background(), path, MaxSyncSubSize)
+// The caller's context bounds the read.
+func (h *Handler) readAndParseSRT(ctx context.Context, path string) ([]byte, []subflux.SubtitleCue, error) {
+	data, err := atomicfile.ReadBounded(ctx, path, MaxSyncSubSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read subtitle: %w", err)
 	}
@@ -372,55 +363,4 @@ func (h *Handler) readAndParseSRT(path string) ([]byte, []subflux.SubtitleCue, e
 		return data, nil, fmt.Errorf("failed to parse subtitle: %w", err)
 	}
 	return data, cues, nil
-}
-
-// applySyncResult writes the synced subtitle to disk and records the
-// cumulative offset in the DB.
-func (h *Handler) applySyncResult(ctx context.Context, path string, cues []subflux.SubtitleCue, audioOffset int64, confidence float64) (int64, error) {
-	srtData, err := h.subtitleProc.WriteSRT(cues)
-	if err != nil {
-		return 0, fmt.Errorf("write SRT: %w", err)
-	}
-
-	// WithMaxBytes mirrors the read bound: readAndParseSRT and the sync-audio
-	// read cap at MaxSyncSubSize, so the staged write must refuse to cross it.
-	pf, err := atomicfile.NewPendingFile(ctx, path, atomicfile.WithMaxBytes(MaxSyncSubSize))
-	if err != nil {
-		return 0, fmt.Errorf("save (prepare): %w", err)
-	}
-	defer func() { _ = pf.Cleanup() }()
-	if _, err := pf.Write(srtData); err != nil {
-		return 0, fmt.Errorf("save (write): %w", err)
-	}
-
-	prevOffset, offsetErr := h.store.SyncOffset(ctx, path)
-	if offsetErr != nil {
-		slog.Debug("no previous sync offset, starting from zero", "path", path)
-	}
-	cumulativeOffset := prevOffset + audioOffset
-
-	// Commit the file BEFORE recording the offset (same order as the manual
-	// offset handler): if the commit fails the DB still holds the old offset,
-	// so the next delta is computed against what is actually on disk. The
-	// reverse order could persist an offset for a write that never landed and
-	// silently mis-shift the next sync.
-	if _, err := pf.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("save (commit): %w", err)
-	}
-
-	if err := h.store.SetSyncOffset(ctx, path, cumulativeOffset); err != nil {
-		// The 500 writer logs this at the boundary; the cumulative offset is
-		// what it cannot reconstruct, so it rides the error. The text stays in
-		// the log — the client gets the writer's generic envelope.
-		return 0, fmt.Errorf("file saved but offset tracking failed at %dms cumulative "+
-			"(re-open the sync dialog to verify): %w", cumulativeOffset, err)
-	}
-
-	slog.Info("audio sync applied",
-		"offset_ms", audioOffset,
-		"cumulative_offset_ms", cumulativeOffset,
-		"confidence", confidence,
-		"path", filepath.Base(path))
-
-	return cumulativeOffset, nil
 }

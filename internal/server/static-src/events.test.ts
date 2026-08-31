@@ -10,6 +10,10 @@ import type * as BusModule from "./bus.js";
 import { FakeEventSource, lastFakeES } from "./events-fakes.js";
 
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
+vi.mock("./sync-jobs.js", () => ({
+  syncDoneFromEvent: vi.fn(),
+  clearSyncCorrelation: vi.fn(),
+}));
 vi.mock("./coverage-heal.js", () => ({
   healFromCoverageEvent: vi.fn(),
   resetCoverageHeal: vi.fn(),
@@ -44,6 +48,7 @@ vi.mock("./wire/client.gen.js", () => ({
 
 import * as notify from "./notify.js";
 import { healFromCoverageEvent } from "./coverage-heal.js";
+import { syncDoneFromEvent } from "./sync-jobs.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { emit, BusEvent } from "./bus.js";
 
@@ -61,6 +66,23 @@ async function openWithEpoch(head = 0): Promise<void> {
   lastFakeES().epoch("boot-a", false, head);
   await vi.runOnlyPendingTimersAsync();
 }
+
+/** A decodable sync:done payload (job 7). */
+const syncDonePayload = {
+  job_id: 7,
+  file_ref: {
+    media_type: "movie",
+    media_id: "tmdb-1",
+    language: "en",
+    variant: "standard",
+    source: "external",
+  },
+  offset_ms: 250,
+  confidence: 0.9,
+  method: "audio",
+  applied: true,
+  dry_run: true,
+};
 
 beforeEach(() => {
   vi.stubGlobal("EventSource", FakeEventSource);
@@ -342,6 +364,26 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
 
     expect(pollStatus).toHaveBeenCalled();
     expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+  });
+
+  it("sync:done routes its decoded payload to the settlement registry", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    lastFakeES().frame("sync:done", syncDonePayload, 6);
+
+    expect(syncDoneFromEvent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ job_id: 7, applied: true, offset_ms: 250 }),
+    );
+  });
+
+  it("an undecodable sync:done frame is dropped without a settlement", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    lastFakeES().frame("sync:done", { job_id: "not-a-number" }, 6);
+
+    expect(syncDoneFromEvent).not.toHaveBeenCalled();
   });
 
   it("malformed frames are dropped without side effects", async () => {

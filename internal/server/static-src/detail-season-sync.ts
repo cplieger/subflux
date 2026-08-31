@@ -1,9 +1,17 @@
 // detail-season-sync.ts — Season audio sync dialog extracted from detail.ts.
+//
+// Interim shape for the async single-file sync: each pool worker dispatches
+// one job (an instant 202) and awaits ITS settlement via the sync:done
+// registry before taking the next episode, so at most SEASON_SYNC_CONCURRENCY
+// jobs occupy the server's admission lease (capacity 8) at a time. The
+// server-owned season batch replaces this module entirely.
 
 import { el, dialog, closeDialog, dialogHead, pad } from "./dom.js";
 import { createDialog } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
 import { audioSyncAction } from "./sync-actions.js";
+import { watchSyncJob } from "./sync-jobs.js";
+import type { SyncDoneEvent } from "./wire/types.gen.js";
 import type { FileRefArgs } from "./file-ref.js";
 import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
 
@@ -117,6 +125,22 @@ async function runSeasonAudioSync(
   let applied = 0;
   let failed = 0;
 
+  // Await one dispatched job's terminal sync:done, giving up on abort (the
+  // job itself is server-owned and continues; only the WAIT stops).
+  function awaitSettlement(jobId: number): Promise<SyncDoneEvent | null> {
+    return new Promise((resolve) => {
+      const unwatch = watchSyncJob(jobId, resolve);
+      signal.addEventListener(
+        "abort",
+        () => {
+          unwatch();
+          resolve(null);
+        },
+        { once: true },
+      );
+    });
+  }
+
   // Bounded-concurrency runner with abort.
   const queue = [...episodes];
   async function worker(): Promise<void> {
@@ -139,7 +163,16 @@ async function runSeasonAudioSync(
         failed++;
         continue;
       }
-      if (r.applied) {
+      const ev = await awaitSettlement(r.job_id);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
+      if (signal.aborted) {
+        return;
+      }
+      if (ev === null || ev.error) {
+        failed++;
+        continue;
+      }
+      if (ev.applied) {
         applied++;
       }
     }

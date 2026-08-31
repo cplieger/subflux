@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -10,14 +11,14 @@ type EventType string
 
 // EventData is a sealed interface restricting Event.Data to known payload types.
 // Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent, ActivityEvent,
-// AlertEvent, ProviderEvent.
+// AlertEvent, ProviderEvent, SyncDoneEvent.
 //
 // The wiregen directive below emits the TS union
-// (export type EventData = CoverageEvent | NotifyEvent | ... | ProviderEvent)
+// (export type EventData = CoverageEvent | NotifyEvent | ... | SyncDoneEvent)
 // plus its runtime decoders; the discriminator is the SSE envelope's "type" key
 // (Event.Type), which is also the named SSE event the browser dispatches on.
 //
-//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent,EpochEvent,ActivityEvent,AlertEvent,ProviderEvent
+//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent,EpochEvent,ActivityEvent,AlertEvent,ProviderEvent,SyncDoneEvent
 type EventData interface{ eventData() }
 
 // Event is a server-sent event pushed to connected browsers.
@@ -36,6 +37,7 @@ const (
 	ActivityDelta  EventType = "activity"   // activity log delta (upsert/remove)
 	AlertDelta     EventType = "alert"      // alert raised or dismissed
 	ProviderDelta  EventType = "provider"   // provider timeout raised or cleared
+	SyncDone       EventType = "sync:done"  // one sync job's terminal result
 )
 
 // CoverageEvent is the data payload for coverage updates. It deliberately
@@ -175,3 +177,23 @@ type ProviderEvent struct {
 }
 
 func (ProviderEvent) eventData() {}
+
+// SyncDoneEvent is the data payload for sync:done (D1): one sync job's
+// terminal result, published when the job's worker ran (a queued
+// cancellation publishes nothing). JobID is the dialog's correlation key —
+// the 202 handed it over, and replay is idempotent per job_id. OffsetMs is
+// the CUMULATIVE offset (stored plus this run's correction); Error is set
+// for timeout/crash/cancelled outcomes.
+type SyncDoneEvent struct {
+	BatchActivityID string          `json:"batch_activity_id,omitempty"`
+	Method          string          `json:"method,omitempty"`
+	Error           string          `json:"error,omitempty"`
+	FileRef         resolve.FileRef `json:"file_ref"`
+	JobID           int64           `json:"job_id"`
+	OffsetMs        int64           `json:"offset_ms"`
+	Confidence      float64         `json:"confidence"`
+	Applied         bool            `json:"applied"`
+	DryRun          bool            `json:"dry_run"`
+}
+
+func (SyncDoneEvent) eventData() {}

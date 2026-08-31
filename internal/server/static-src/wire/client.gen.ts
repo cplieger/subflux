@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAudioResponse, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -103,6 +103,7 @@ export const PATH_DELETE_FILE = "/api/files";
 export const PATH_BULK_DELETE_FILES = "/api/files/bulk";
 export const PATH_SYNC_AUDIO = "/api/sync/audio";
 export const PATH_SYNC_OFFSET = "/api/sync/offset";
+export const PATH_SYNC_JOBS = "/api/sync/jobs";
 export const PATH_PREVIEW_START = "/api/preview/start";
 export const PATH_PREVIEW_SUBTITLE = "/api/preview/subtitle";
 export const PATH_PREVIEW_VIDEO = "/api/preview/video";
@@ -618,12 +619,13 @@ export function bulkDeleteFilesRaw(body: BulkDeleteRequest, opts?: ClientOpts): 
   return clientRequestRaw("DELETE", "/api/files/bulk", body, undefined, opts?.signal);
 }
 
-export function syncAudio(body: SyncAudioRequest, opts?: ClientOpts): Promise<SyncAudioResponse | null> {
-  return clientRequest("POST", "/api/sync/audio", body, decodeSyncAudioResponse, opts?.signal);
+/** Dispatch one async audio-sync job: 202 {activity_id, job_id} after validation; the terminal result rides the sync:done event (matched on job_id) and the jobs read. Same-file dispatch answers the existing job's ids; a full admission lease answers 429. */
+export function syncAudio(body: SyncAudioRequest, opts?: ClientOpts): Promise<SyncAccepted | null> {
+  return clientRequest("POST", "/api/sync/audio", body, decodeSyncAccepted, opts?.signal);
 }
 
-export function syncAudioRaw(body: SyncAudioRequest, opts?: ClientOpts): Promise<ApiResult<SyncAudioResponse>> {
-  return clientRequestRaw("POST", "/api/sync/audio", body, decodeSyncAudioResponse, opts?.signal);
+export function syncAudioRaw(body: SyncAudioRequest, opts?: ClientOpts): Promise<ApiResult<SyncAccepted>> {
+  return clientRequestRaw("POST", "/api/sync/audio", body, decodeSyncAccepted, opts?.signal);
 }
 
 export function syncOffset(body: SyncOffsetRequest, opts?: ClientOpts): Promise<boolean> {
@@ -632,6 +634,15 @@ export function syncOffset(body: SyncOffsetRequest, opts?: ClientOpts): Promise<
 
 export function syncOffsetRaw(body: SyncOffsetRequest, opts?: ClientOpts): Promise<ApiResult<unknown>> {
   return clientRequestRaw("POST", "/api/sync/offset", body, undefined, opts?.signal);
+}
+
+/** Sync job registry in total order (accepted_at DESC, job_id DESC), filterable by batch_activity_id; the reload path re-attaches through it. */
+export function syncJobs(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<Job[] | null> {
+  return clientRequest("GET", "/api/sync/jobs" + qs(query), undefined, (v) => decodeArray(v, decodeJob, "$"), opts?.signal);
+}
+
+export function syncJobsRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<Job[]>> {
+  return clientRequestRaw("GET", "/api/sync/jobs" + qs(query), undefined, (v) => decodeArray(v, decodeJob, "$"), opts?.signal);
 }
 
 export function previewStart(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<PreviewStartResponse | null> {

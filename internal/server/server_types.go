@@ -29,6 +29,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/storeops"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/wiring"
 	"github.com/cplieger/webhttp/v2"
@@ -220,6 +221,15 @@ type Server struct {
 	activityH  *activityhandlers.Handler
 	storeOps   *storeops.Runner
 	syncH      *synchandlers.Handler
+	// syncJobs is the async sync dispatcher (D1): the FIFO + admission lease
+	// + job registry POST /api/sync/audio dispatches into. Built by
+	// initHandlers; its Run loop starts with Start on bgWg.
+	syncJobs *syncjobs.Dispatcher
+	// syncRunner is the typed sync core (the syncworker client) the audio
+	// executor drives. The composition root supplies the SAME client the
+	// engine's SyncExec uses, so the single execution slot is shared;
+	// New defaults it in-process for directly-constructed servers.
+	syncRunner synchandlers.AudioJobRunner
 	fileH      *filehandlers.Handler
 	mediaH     *mediahandlers.Handler
 	scanSubsystem
@@ -302,6 +312,14 @@ func WithConfigLoader(l confighandlers.ConfigLoader) Option {
 // previewhandlers takes a narrower view of the same value.
 func WithSubtitleProc(p synchandlers.SubtitleProcessor) Option {
 	return func(s *Server) { s.subtitleProc = p }
+}
+
+// WithSyncRunner injects the typed sync core the async job executor drives.
+// The composition root passes the SAME syncworker client the engine's
+// SyncExec uses, so dispatched jobs and automatic syncs share the one
+// execution slot (a second client would double the alignment concurrency).
+func WithSyncRunner(r synchandlers.AudioJobRunner) Option {
+	return func(s *Server) { s.syncRunner = r }
 }
 
 // WithMetrics sets the metrics recorder. REQUIRED despite being an Option:

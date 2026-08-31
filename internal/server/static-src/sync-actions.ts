@@ -16,9 +16,8 @@
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { join } from "@cplieger/keyenc";
 import { PATH_SYNC_AUDIO, PATH_SYNC_OFFSET } from "./wire/client.gen.js";
-import { decodeSyncAudioResponse } from "./wire/decoders.gen.js";
-import type { SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
-import type { SyncAudioResponse } from "./api-types.js";
+import { decodeSyncAccepted } from "./wire/decoders.gen.js";
+import type { SyncAccepted, SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
 import { refKey } from "./file-ref.js";
 
 // Both dedupe keys nest `refKey(args)`, which is itself a keyenc value, so the
@@ -32,16 +31,18 @@ import { refKey } from "./file-ref.js";
 // from a definition's separate `idempotencyKey` field, which subflux sets on no
 // action, and the Go server has no Idempotency-Key middleware to read one.
 
-/** Audio-sync analysis. Long-running (FFmpeg + correlation), retryable on
- *  network failures. dedupe by FileRef so a second click on the same row
- *  collapses onto the first dispatch instead of running twice. */
-export const audioSyncAction = apiAction<SyncAudioRequest, SyncAudioResponse>({
+/** Dispatch one async audio-sync job: an instant 202 {activity_id, job_id};
+ *  the analysis result arrives via the sync:done event matched on job_id.
+ *  Carries NO retry: the server's capacity refusal is a 429, which the
+ *  framework's network classifier would auto-retry — the refusal must stay
+ *  visible (the dialog renders it inline) and must cost exactly one request.
+ *  dedupe by FileRef so a second click collapses onto the first dispatch
+ *  (the server's same-file dedupe answers the same ids anyway). */
+export const audioSyncAction = apiAction<SyncAudioRequest, SyncAccepted>({
   name: "sync.audio",
   request: (args) => ({ method: "POST", path: PATH_SYNC_AUDIO, body: args }),
-  decode: (data) => decodeSyncAudioResponse(data),
+  decode: (data) => decodeSyncAccepted(data),
   dedupe: (args) => join("sync.audio", refKey(args)),
-  retryable: retryNetwork,
-  retry: RETRY_STANDARD,
   error: false, // callers handle inline result UI; toast would be redundant
 });
 

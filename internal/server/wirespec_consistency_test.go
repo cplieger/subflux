@@ -111,6 +111,7 @@ func TestWirespec_query_flags(t *testing.T) {
 		"backoffPrefix":      true,
 		"listFiles":          true,
 		"previewStart":       true,
+		"syncJobs":           true,
 	}
 	seen := 0
 	for _, e := range wirespec.Endpoints() {

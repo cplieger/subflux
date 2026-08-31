@@ -146,6 +146,12 @@ func (eb *EventBus) PublishProvider(op ProviderOp, entry *ProviderTimeoutEntry) 
 	eb.Publish(Event{Type: ProviderDelta, Data: ProviderEvent{Op: op, Entry: entry}})
 }
 
+// PublishSyncDone publishes one sync job's terminal result. The event is
+// dereferenced into the payload and never retained.
+func (eb *EventBus) PublishSyncDone(ev *SyncDoneEvent) {
+	eb.Publish(Event{Type: SyncDone, Data: *ev})
+}
+
 // ClientCount returns the number of connected SSE clients.
 func (eb *EventBus) ClientCount() int {
 	return eb.hub.ClientCount()

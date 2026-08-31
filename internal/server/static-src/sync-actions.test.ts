@@ -1,4 +1,5 @@
-// Tests for the sync actions' dedupe keys (site: sync-actions.ts).
+// Tests for the sync actions' dedupe keys and the audio dispatch's retry
+// posture (site: sync-actions.ts).
 //
 // The dedupe key is not readable from an Action (the framework exposes only
 // name/dispatch/cancel), so these drive the real framework and count the
@@ -10,21 +11,21 @@ import { resetActionFramework } from "@cplieger/actions/testing";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
 import type { SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
 
-const AUDIO_OK = { method: "audio", offset_ms: 250, confidence: 0.9, applied: true };
+const AUDIO_ACCEPTED = { activity_id: "act-1", job_id: 7 };
 
 let requests: string[] = [];
+let respondWith: () => Response = () =>
+  new Response(JSON.stringify(AUDIO_ACCEPTED), {
+    status: 202,
+    headers: { "content-type": "application/json" },
+  });
 
-/** Records every request and answers a valid decodable body. Dispatches are
+/** Records every request and answers the configured response. Dispatches are
  *  issued back-to-back synchronously, so the in-flight dedupe slot of the first
  *  is always visible to the second regardless of how fast this resolves. */
 const recordingFetch: typeof fetch = (_input, init) => {
   requests.push(String(init?.body ?? ""));
-  return Promise.resolve(
-    new Response(JSON.stringify(AUDIO_OK), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
-  );
+  return Promise.resolve(respondWith());
 };
 
 function audioArgs(over: Partial<SyncAudioRequest> = {}): SyncAudioRequest {
@@ -57,6 +58,11 @@ describe("sync action dedupe keys", () => {
     resetActionFramework(); // clears the in-flight dedupe map between tests
     configureApi({ baseUrl: "http://localhost", fetchFn: recordingFetch });
     requests = [];
+    respondWith = () =>
+      new Response(JSON.stringify(AUDIO_ACCEPTED), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
   });
 
   it("collapses two concurrent dispatches of the SAME ref onto one request", () => {
@@ -105,5 +111,49 @@ describe("sync action dedupe keys", () => {
 
     expect(requests.length).toBe(2);
     return Promise.all([first, second]);
+  });
+});
+
+describe("the audio dispatch's retry posture (D3)", () => {
+  beforeEach(() => {
+    resetActionFramework();
+    configureApi({ baseUrl: "http://localhost", fetchFn: recordingFetch });
+    requests = [];
+  });
+
+  it("resolves the 202's ids", async () => {
+    const outcome = await audioSyncAction.dispatch(audioArgs()).outcome;
+    expect(outcome.status).toBe("success");
+    if (outcome.status === "success") {
+      expect(outcome.value).toEqual(AUDIO_ACCEPTED);
+    }
+  });
+
+  it("the capacity 429 costs exactly ONE request and surfaces its status", async () => {
+    // The framework's network classifier treats 429 as retryable; this
+    // action carries NO retry, so the refusal must reach the dialog on the
+    // first receipt — visible, never auto-retried.
+    respondWith = () =>
+      new Response(JSON.stringify({ error: "sync queue is full", code: "rate_limited" }), {
+        status: 429,
+        headers: { "content-type": "application/json" },
+      });
+    const outcome = await audioSyncAction.dispatch(audioArgs()).outcome;
+    expect(requests.length).toBe(1);
+    expect(outcome.status).toBe("error");
+    if (outcome.status === "error") {
+      expect((outcome.error as { status?: number }).status).toBe(429);
+    }
+  });
+
+  it("a transient 5xx is not retried either — no timeout-retryable classification remains", async () => {
+    respondWith = () =>
+      new Response(JSON.stringify({ error: "boom" }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
+    const outcome = await audioSyncAction.dispatch(audioArgs()).outcome;
+    expect(requests.length).toBe(1);
+    expect(outcome.status).toBe("error");
   });
 });

@@ -69,7 +69,9 @@ describe("refKey", () => {
   it("round-trips every field through split, whatever the fields contain", () => {
     // split is join's exact inverse, so recovering the six fields byte-for-byte
     // proves the encoding is injective — no field content can forge another
-    // field's boundary at any position.
+    // field's boundary at any position. Variant and source normalize EMPTY to
+    // the server's defaults (standard/external) before encoding, so a local
+    // entry's key matches a server-echoed FileRef's for the same file.
     fc.assert(
       fc.property(
         fc.string({ maxLength: 40 }),
@@ -83,8 +85,8 @@ describe("refKey", () => {
             "episode",
             mediaID,
             language,
-            variant,
-            source,
+            variant === "" ? "standard" : variant,
+            source === "" ? "external" : source,
             String(ordinal),
           ]);
         },

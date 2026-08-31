@@ -15,7 +15,6 @@ export type {
   SeasonGroup,
   SeriesItem,
   SubtitleEntry,
-  SyncAudioResponse,
 } from "./wire/types.gen.js";
 
 import type { MovieItem, CoverageTarget } from "./wire/types.gen.js";

@@ -43,6 +43,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/webhttp/v2"
 	"golang.org/x/sync/semaphore"
 )
@@ -228,6 +229,13 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	// instead of preventing it. Same shape as search.New's five required options.
 	if s.metrics == nil {
 		panic("server.New: WithMetrics is required")
+	}
+	// The typed sync core: the composition root passes the shared syncworker
+	// client (WithSyncRunner) so dispatched jobs and automatic syncs contend
+	// on ONE execution slot; a directly-constructed server without the
+	// option gets the in-process fallback so the sync surface still works.
+	if s.syncRunner == nil {
+		s.syncRunner = syncworker.NewInProcess()
 	}
 	// Apply the configured SSE client cap when a config option supplied one
 	// (hot reload re-applies later changes).
