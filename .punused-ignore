@@ -394,3 +394,27 @@ constant TransformNone
 #     would be a fake one.
 method (*Store).UserByWebAuthnHandle is used in test only
 method UserByWebAuthnHandle is used in test only
+
+# --- An override the compiler CANNOT protect, reached via an ad-hoc interface --
+# (*CachedSonarr).Close and (*CachedRadarr).Close override the Close promoted
+# from the embedded *Sonarr/*Radarr so that BOTH transports are released: the
+# shipped 3-attempt client and the wrapper's own single-attempt wave client
+# (NewCachedSonarr builds them together and sets waveClose). Production reaches
+# them from activation, through the anonymous `interface{ Close() }` assertion in
+# server/reload.go's closeArrClient — an ad-hoc interface, so gopls attributes the
+# reference to its member and the concrete override reads as test-only.
+#
+# This entry is not the usual interface-hop case, and the difference is why it is
+# adjudicated rather than wired. Deleting either override is a SILENT
+# degradation, not a compile error: the promoted embedded Close still satisfies
+# the same assertion, so activation keeps closing the shipped transport and
+# leaks the wave one, with nothing red anywhere. No interface assertion can
+# catch a shadowing question. MEASURED 2026-08-31: with both overrides removed,
+# `go build ./...` stays green.
+#
+# So the guard is a test, and it is named here because it is the only one there
+# can be: TestNewCachedSonarr_Close_releases_the_wave_transport and its Radarr
+# twin (arrsvc/cachedarr_test.go) assert NewCached* wires waveClose and that
+# Close invokes it. Both go red on the deletion above.
+method (*CachedSonarr).Close
+method (*CachedRadarr).Close
