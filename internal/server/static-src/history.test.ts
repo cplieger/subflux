@@ -77,6 +77,7 @@ import {
   _resetHistoryForTest,
 } from "./history.js";
 import { SUMMARY_COALESCE_MS } from "./constants.js";
+import { beginTransaction, settleTransaction } from "./transaction.js";
 import type { ParsedConfig } from "./wire/types.gen.js";
 import { historyView } from "./view-scope.js";
 
@@ -1123,6 +1124,129 @@ function showMoreBtn(): HTMLButtonElement {
   }
   return btn;
 }
+
+// --- The transaction leg's JOIN of an in-flight route reload ---
+//
+// /history boot dispatches the route's page-0 reload from the gate release,
+// before the transaction's page leg is asked for one. That read was issued after
+// the epoch head, so the leg has no reason to pay for a second: it joins the run
+// and resolves on its settlement. What makes the join safe is the stamp — the
+// transaction a run was dispatched under, and the depth it asked for.
+
+describe("history: the transaction leg's join (task 12)", () => {
+  beforeEach(() => {
+    _resetHistoryForTest();
+    mountShell();
+    store.set("config", null);
+    store.set("currentPage", "history");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    settleTransaction();
+    _resetHistoryForTest();
+    vi.useRealTimers();
+  });
+
+  it("JOINS the route's in-flight reload at boot: ONE list read, not two", async () => {
+    beginTransaction();
+    const release = deferOnePage();
+    reloadHistory(); // the gate release's page-0 reload
+    await flushFake();
+
+    const leg = reloadHistoryForTransaction();
+    release(entries(1, 2));
+    await flushFake();
+
+    expect(await leg).toBe("applied");
+    expect(dispatch.mock.calls.length).toBe(1);
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("latches instead when NO transaction is open, so an idle-page reload is never joined", async () => {
+    const release = deferOnePage();
+    reloadHistory();
+    await flushFake();
+
+    const leg = reloadHistoryForTransaction();
+    dispatch.mockResolvedValueOnce(entries(1, 2)); // the drained latch's own read
+    release(entries(1, 2));
+    await flushFake();
+
+    // The latch's own generation lands, so the leg's chain ends in ITS apply.
+    expect(await leg).toBe("superseded");
+    expect(dispatch.mock.calls.length).toBe(2);
+  });
+
+  it("does not join a run stamped with an EARLIER transaction", async () => {
+    beginTransaction();
+    const release = deferOnePage();
+    reloadHistory(); // stamped with the first transaction
+    await flushFake();
+
+    // The first transaction aborted and a second opened: the in-flight read
+    // predates the second one's mutations, so it cannot answer for it.
+    settleTransaction();
+    beginTransaction();
+    const leg = reloadHistoryForTransaction();
+    dispatch.mockResolvedValueOnce(entries(1, 2));
+    release(entries(1, 2));
+    await flushFake();
+
+    expect(await leg).toBe("superseded");
+    expect(dispatch.mock.calls.length).toBe(2);
+  });
+
+  it("does not join a SHALLOWER window than the leg would ask for", async () => {
+    await loadDepth(100);
+    const baseline = dispatch.mock.calls.length;
+
+    // A filter-change reload reads one page; the leg owes 100 rows, so joining
+    // would silently shorten the table it promised to preserve.
+    beginTransaction();
+    const release = deferOnePage();
+    reloadHistory();
+    await flushFake();
+
+    const leg = reloadHistoryForTransaction();
+    dispatch.mockResolvedValueOnce(entries(1, PAGE));
+    release(entries(1, PAGE));
+    await flushFake();
+
+    expect(await leg).toBe("superseded");
+    expect(dispatch.mock.calls.length).toBe(baseline + 2);
+  });
+
+  it("reports 'rerouted' when the route leaves during a JOINED run", async () => {
+    beginTransaction();
+    const release = deferOnePage();
+    reloadHistory();
+    await flushFake();
+
+    const ctrl = new AbortController();
+    const leg = reloadHistoryForTransaction(ctrl.signal);
+    ctrl.abort(); // abortPageLeg: the route left, the next dispatch owns it
+    release(entries(1, 2));
+    await flushFake();
+
+    expect(await leg).toBe("rerouted");
+  });
+
+  it("REJECTS when the JOINED run fails, so the transaction aborts", async () => {
+    beginTransaction();
+    const release = deferOnePage();
+    reloadHistory();
+    await flushFake();
+
+    const leg = reloadHistoryForTransaction();
+    const outcome = expect(leg).rejects.toThrow("history load failed");
+    release(null); // the raw read answers non-2xx
+    await flushFake();
+
+    await outcome;
+    expect(dispatch.mock.calls.length).toBe(1);
+  });
+});
 
 describe("history: the event trigger (task 12)", () => {
   beforeEach(() => {

@@ -12,6 +12,7 @@
 import { createCollection, type ReadonlySignal } from "@cplieger/reactive";
 import { join } from "@cplieger/keyenc";
 import { coverageMediaId } from "./utils.js";
+import { openTransaction } from "./transaction.js";
 import type { CoverageItem } from "./api-types.js";
 import type { SeriesItem, MovieItem } from "./wire/types.gen.js";
 
@@ -39,12 +40,11 @@ const registeredCollectionNames = new Set<string>();
 
 // --- Task 9 transaction seams: tombstones, covered writers, the leg join ---
 
-// Whether an SSE transaction is open (events.ts brackets it). While open, a
-// heal 404-delete records its root as a TOMBSTONE, and every full-pair
-// snapshot application drops tombstoned rows — the pair may have been read
-// before the arr delete, so an un-dropped row would resurrect what the heal
-// already removed.
-let coverageTransactionOpen = false;
+// Whether an SSE transaction is open is transaction.ts's fact (events.ts
+// brackets it). While one is open, a heal 404-delete records its root as a
+// TOMBSTONE, and every full-pair snapshot application drops tombstoned rows —
+// the pair may have been read before the arr delete, so an un-dropped row would
+// resurrect what the heal already removed.
 const tombstones = new Set<string>();
 // Full-pair writers whose fetch began while the transaction was open
 // ("covered" writers). Tombstones clear at settle only when none is in
@@ -58,16 +58,17 @@ let coveredPairWriters = 0;
 type CollectionLegJoin = "landed" | "failed" | "uncovered";
 let pendingLeg: Promise<CollectionLegJoin> | null = null;
 
-/** Task 9: bracket an SSE transaction (events.ts). */
-export function beginCoverageTransaction(): void {
-  coverageTransactionOpen = true;
+/** Task 9: settle (commit or abort) — tombstones clear only when no covered
+ *  full-pair writer is still in flight. Idempotent, and safe in either order
+ *  against `settleTransaction`: an open transaction keeps them. */
+export function releaseCoverageTombstones(): void {
+  maybeClearTombstones();
 }
 
-/** Task 9: settle (commit or abort) — tombstones clear only when no covered
- *  full-pair writer is still in flight. Idempotent. */
-export function settleCoverageTransaction(): void {
-  coverageTransactionOpen = false;
-  if (coveredPairWriters === 0) {
+/** Tombstones outlive the transaction exactly as long as a covered writer
+ *  could still apply a pre-delete snapshot. */
+function maybeClearTombstones(): void {
+  if (openTransaction() === null && coveredPairWriters === 0) {
     tombstones.clear();
   }
 }
@@ -86,7 +87,7 @@ export function pendingCollectionLeg(): Promise<CollectionLegJoin> | null {
 /** Task 9: mark a full-pair write in flight; returns the matching end call.
  *  Only a write that BEGINS during an open transaction is covered. */
 export function beginCoveredPairWrite(): () => void {
-  if (!coverageTransactionOpen) {
+  if (openTransaction() === null) {
     return () => {
       /* not covered */
     };
@@ -94,9 +95,7 @@ export function beginCoveredPairWrite(): () => void {
   coveredPairWriters += 1;
   return () => {
     coveredPairWriters -= 1;
-    if (!coverageTransactionOpen && coveredPairWriters === 0) {
-      tombstones.clear();
-    }
+    maybeClearTombstones();
   };
 }
 
@@ -135,7 +134,7 @@ export function applyHealedRow(item: CoverageItem): void {
  *  During a transaction the root is TOMBSTONED so a full-pair snapshot read
  *  before the delete cannot resurrect it (task 9). */
 export function removeCoverageRow(rootKey: string): void {
-  if (coverageTransactionOpen) {
+  if (openTransaction() !== null) {
     tombstones.add(rootKey);
   }
   coverage.remove(rootKey);
@@ -225,12 +224,12 @@ export function setCoveragePair(
 }
 
 /** Test-only: drop all rows, close the heal gate, forget registrations, and
- *  clear the transaction seams. */
+ *  clear the transaction seams. The open-transaction flag is not ours to
+ *  reset — `settleTransaction` owns it. */
 export function _resetCoverageStoreForTest(): void {
   coverage.clear();
   pairLanded = false;
   registeredCollectionNames.clear();
-  coverageTransactionOpen = false;
   tombstones.clear();
   coveredPairWriters = 0;
   pendingLeg = null;

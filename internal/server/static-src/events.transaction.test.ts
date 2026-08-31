@@ -98,13 +98,13 @@ vi.mock("./coverage.js", () => ({
     cov.aborts += 1;
   },
 }));
-// The transaction seams live on the row-store leaf.
+// The row-store's own transaction seams (the open-transaction flag itself is
+// transaction.ts's, a leaf this suite lets run for real).
 vi.mock("./coverage-store.js", () => ({
-  beginCoverageTransaction: vi.fn(),
   beginCoveredPairWrite: vi.fn(() => vi.fn()),
   registeredCollections: () => cov.registered,
   setCollectionLegJoin: vi.fn(),
-  settleCoverageTransaction: vi.fn(),
+  releaseCoverageTombstones: vi.fn(),
 }));
 
 // The page leg: scripted outcomes; records each dispatch's recovery flag.

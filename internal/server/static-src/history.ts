@@ -20,6 +20,7 @@ import { signal, effect, createCollection, bindList, patch, batch } from "@cplie
 import { historyView } from "./view-scope.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { HISTORY_DEPTH_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
+import { openTransaction } from "./transaction.js";
 import * as store from "./store.js";
 
 const PAGE_SIZE = 50;
@@ -58,7 +59,16 @@ let liveGen = 0;
 // The in-flight run (at most one) and the ONE latched pending reload.
 // Invariant: pendingReload !== null implies a run is in flight (the latch
 // drains when the slot closes, and a route leave drops it).
-let running: { gen: number; kind: "reload" | "gesture" } | null = null;
+//
+// A reload carries what a transaction leg needs to decide whether the run
+// already answers its question: the transaction it was dispatched under (so a
+// leg can tell its own transaction's read from an older one's) and the depth it
+// asked for. A gesture carries neither, because a page-N append can never
+// answer for the newest window — the union is what keeps that unrepresentable.
+type Run =
+  | { readonly kind: "reload"; readonly limit: number; readonly txn: number | null }
+  | { readonly kind: "gesture" };
+let running: (Run & { readonly gen: number }) | null = null;
 let pendingReload: number | null = null;
 // The trailing event-trigger window (the A6 window): notes arriving inside
 // one window share one reload.
@@ -171,8 +181,18 @@ async function chainSettlement(g: number): Promise<"applied" | "superseded" | "r
 
 // --- Run lifecycle: the slot, the latch, the trigger ---
 
-function beginRun(g: number, kind: "reload" | "gesture"): void {
-  running = { gen: g, kind };
+/** Take the slot for a reload of the newest `limit` rows, stamping the
+ *  transaction open at DISPATCH — which is also when the fetch is issued, since
+ *  runReload's query is built synchronously. Called by runReload itself, so the
+ *  recorded depth cannot disagree with the depth requested. */
+function beginReload(g: number, limit: number): void {
+  running = { gen: g, kind: "reload", limit, txn: openTransaction() };
+  liveGen = g;
+}
+
+/** Take the slot for a "Show more" append. */
+function beginGesture(g: number): void {
+  running = { gen: g, kind: "gesture" };
   liveGen = g;
 }
 
@@ -225,7 +245,6 @@ function drainPending(): void {
   const g = allocGeneration();
   supersedePriors(g); // the latch settles superseded(next: g) — its dispatch started
   pendingReload = null;
-  beginRun(g, "reload");
   void runReload(g, eventDepth());
 }
 
@@ -253,7 +272,6 @@ function requestEventReload(): void {
   }
   const g = allocGeneration();
   supersedePriors(g);
-  beginRun(g, "reload");
   void runReload(g, eventDepth());
 }
 
@@ -461,17 +479,19 @@ function showError(e: unknown): void {
   }
 }
 
-// runReload is the reload internals behind every reload dispatch: ONE fetch
-// of the newest window (`limit` rows from offset 0) through the RAW list
-// read (a transaction leg must observe a non-2xx — the null-collapsing read
-// maps failure to an empty page and no wrapper can see it), applied as a
-// keyed setAll — COUNT preserved at the fetched depth, surviving rows keep
-// identity, displaced rows drop off the bottom — and the generation's
-// settlement published. An abort by the dispatcher's re-route settles
-// superseded(next: null); a genuine failure settles failed with prior rows
-// intact. Filters and depth are captured at dispatch: buildQuery reads the
-// controls synchronously, before the first await.
+// runReload is the reload internals behind every reload dispatch: it TAKES THE
+// SLOT (stamping the run with the depth it asks for and the transaction it was
+// dispatched under), then ONE fetch of the newest window (`limit` rows from
+// offset 0) through the RAW list read (a transaction leg must observe a
+// non-2xx — the null-collapsing read maps failure to an empty page and no
+// wrapper can see it), applied as a keyed setAll — COUNT preserved at the
+// fetched depth, surviving rows keep identity, displaced rows drop off the
+// bottom — and the generation's settlement published. An abort by the
+// dispatcher's re-route settles superseded(next: null); a genuine failure
+// settles failed with prior rows intact. Filters and depth are captured at
+// dispatch: buildQuery reads the controls synchronously, before the first await.
 async function runReload(g: number, limit: number, signal?: AbortSignal): Promise<void> {
+  beginReload(g, limit);
   // Design-system skeleton (same anti-flicker timing as the library table)
   // for the first mount only: previously the panel stayed BLANK for the whole
   // fetch. Filter-change reloads keep the current rows until data lands
@@ -560,7 +580,7 @@ async function loadMore(): Promise<void> {
   }
   const g = allocGeneration();
   supersedePriors(g, pendingReload);
-  beginRun(g, "gesture");
+  beginGesture(g);
   const scrollPos = window.scrollY;
   try {
     const res = await listStateRaw(buildQuery(history.size, PAGE_SIZE));
@@ -619,36 +639,66 @@ export function reloadHistory(): void {
   pendingReload = null; // its generation settles superseded(next: g) below
   const g = allocGeneration();
   supersedePriors(g);
-  beginRun(g, "reload");
   void runReload(g, PAGE_SIZE);
   chainSettlement(g).catch((e: unknown) => {
     showError(e);
   });
 }
 
-/** Task 9's REQUIRED EXTRACTION: the transaction's history page leg. Latches
- *  like any event reload — behind an in-flight gesture too, so COMMIT WAITS
- *  for the depth-preserving reload that runs after the append commits —
- *  and resolves once this generation's settlement chain terminates:
- *  "applied" (this run landed), "superseded" (a superseder applied),
- *  "rerouted" (a route leave re-routed the leg; the dispatcher
- *  re-dispatches). REJECTS when the chain ends failed or abandoned (prior
- *  rows intact, watermark untouched; the transaction aborts). */
+/** Task 9's REQUIRED EXTRACTION: the transaction's history page leg. JOINS a
+ *  reload this same transaction already has in flight (the /history boot case:
+ *  gate release dispatches the route's page-0 reload before this leg is asked,
+ *  and that read was issued after the epoch head). Otherwise latches like any
+ *  event reload — behind an in-flight gesture too, so COMMIT WAITS for the
+ *  depth-preserving reload that runs after the append commits — and resolves
+ *  once this generation's settlement chain terminates: "applied" (this run
+ *  landed), "superseded" (a superseder applied), "rerouted" (a route leave
+ *  re-routed the leg; the dispatcher re-dispatches). REJECTS when the chain ends
+ *  failed or abandoned (prior rows intact, watermark untouched; the transaction
+ *  aborts). */
 export function reloadHistoryForTransaction(
   signal?: AbortSignal,
 ): Promise<"applied" | "superseded" | "rerouted"> {
+  // A latch already queued is strictly fresher than anything in flight, so it
+  // wins over a join.
+  const joinable = pendingReload === null ? joinableRun() : null;
+  if (joinable !== null) {
+    return joinRun(joinable, signal);
+  }
   if (running !== null || pendingReload !== null) {
-    // A /history boot pays two list reads here (the route's page-0 reload,
-    // then this latched depth-preserving one): accepted — only a post-latch
-    // fetch is provably epoch-fresh, and the serializer does not track a
-    // run's dispatch time against the epoch.
     return chainSettlement(ensurePendingLatch());
   }
   const g = allocGeneration();
   supersedePriors(g);
-  beginRun(g, "reload");
   void runReload(g, eventDepth(), signal);
   return chainSettlement(g);
+}
+
+/** The in-flight run's generation when it already answers a transaction leg's
+ *  question, else null. Three conditions, each load-bearing: a transaction must
+ *  be open (there is no epoch to be fresh against otherwise); the run must be a
+ *  RELOAD of the newest window this same transaction dispatched, since a run
+ *  stamped with an older transaction read data the current one's mutations
+ *  postdate; and its window must be at least as deep as this leg would ask for,
+ *  or joining would silently shorten the table the leg promised to preserve. */
+function joinableRun(): number | null {
+  const txn = openTransaction();
+  if (txn === null || running?.kind !== "reload") {
+    return null;
+  }
+  return running.txn === txn && running.limit >= eventDepth() ? running.gen : null;
+}
+
+/** Await a run the leg JOINED rather than dispatched. The run belongs to the
+ *  route loader, so the leg's signal cannot abort it — a route leave is read
+ *  here instead and reported as the re-route the dispatcher re-dispatches from,
+ *  exactly as an aborted own-run settles. */
+async function joinRun(
+  g: number,
+  signal?: AbortSignal,
+): Promise<"applied" | "superseded" | "rerouted"> {
+  const r = await chainSettlement(g);
+  return signal?.aborted ? "rerouted" : r;
 }
 
 on(BusEvent.LoadHistory, () => {
