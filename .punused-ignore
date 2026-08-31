@@ -332,6 +332,19 @@ function ResetPreserving
 function Suite
 constant CookieNameSecure
 
+# --- Cross-language stress fixture (EU1001 by design) -----------------------
+# internal/testsupport/reffixture.go is the deterministic reference-library
+# generator for the task-19 stress lane (500 series / ~10k episodes / 4,360
+# movies), consumed ONLY by test files across packages — the coveragehandlers
+# payload stress test and the arrsvc list-fetch stress test — and mirrored
+# byte-for-byte by static-src/reference-fixture.ts, whose consumers gopls
+# cannot see. The cross-language sync pin (reffixture_test.go and
+# reference-fixture.test.ts sharing hardcoded aggregates) is what keeps the
+# two generators honest. Adjudicated as a unit: every export exists for the
+# stress lane, and punused's per-run file resolution makes the flagged-symbol
+# subset unstable (three of ten exports reported at adjudication time).
+internal/testsupport/reffixture.go:
+
 # --- Test-only injection points and observation points (EU1001 by design) ---
 #   WithTimeout (search) — the only way to inject a provider-health tracker;
 #     search.go:110's doc states the engine builds one from config when unset,
