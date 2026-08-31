@@ -100,6 +100,10 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[events.NotifyEvent](),
 		wiregen.TypeRef[events.ScanEvent](),
 		wiregen.TypeRef[events.EpochEvent](),
+		wiregen.TypeRef[events.ActivityEvent](),
+		wiregen.TypeRef[events.AlertEvent](),
+		wiregen.TypeRef[events.ProviderEvent](),
+		wiregen.TypeRef[events.ProviderTimeoutEntry](),
 		// The sealed SSE union (//wiregen:union on the interface): emits the
 		// TS union type + the discriminator decoders. This was the founding
 		// use case for wiregen's AST engine.
@@ -159,6 +163,9 @@ func Registry() *wiregen.Registry {
 		// catalog (subflux.ErrorCode consts) — both auto-discovered, so a new
 		// code/event lands in TS on the next generate.
 		"EventType": {}, "ErrorCode": {},
+		// The status-delta op discriminators (activity/alert/provider events),
+		// auto-discovered from the events package's const blocks.
+		"ActivityOp": {}, "AlertOp": {}, "ProviderOp": {},
 	}
 
 	// Wire DTOs are named as their TS interface, so no overrides are needed
@@ -209,6 +216,9 @@ func Registry() *wiregen.Registry {
 			"scan:start": "ScanEvent",
 			"scan:done":  "ScanEvent",
 			"epoch":      "EpochEvent",
+			"activity":   "ActivityEvent",
+			"alert":      "AlertEvent",
+			"provider":   "ProviderEvent",
 		},
 	}
 

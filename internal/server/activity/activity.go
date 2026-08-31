@@ -74,6 +74,8 @@ const DefaultPruneAge = 15 * time.Minute
 // Log tracks recent actions for the UI status indicator.
 type Log struct {
 	index    map[string]int
+	onUpsert func(Entry)
+	onRemove func(Entry)
 	entries  []Entry
 	maxItems int
 	nextID   int
@@ -114,11 +116,78 @@ func New(maxItems int) *Log {
 	return &Log{maxItems: maxItems, index: make(map[string]int, maxItems)}
 }
 
-// Start records a new activity and returns its ID.
-func (a *Log) Start(action, detail string, source Source) string {
+// SetOnUpsert installs the observer called with the post-mutation entry
+// snapshot after every entry mutation (start, queue flip, progress, terminal
+// transition, queued-cancel). The hook is fired AFTER the log's lock is
+// released, so it may safely re-enter the log; the Log cannot import the
+// events bus, which is why the server injects the publisher here.
+func (a *Log) SetOnUpsert(fn func(Entry)) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.startLocked(Entry{Action: action, Detail: detail, Source: source})
+	a.onUpsert = fn
+}
+
+// SetOnRemove installs the observer called once per entry removed from the
+// log — dismiss, prune, and cap eviction alike — with the under-lock entry
+// snapshot, fired AFTER the lock is released (removals are collected under
+// the lock). Like SetOnUpsert, the hook may re-enter the log.
+func (a *Log) SetOnRemove(fn func(Entry)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onRemove = fn
+}
+
+// notify collects the hook calls a mutation decides under the Log's lock and
+// fires them once the lock is released: callers defer fire BEFORE taking the
+// lock, so the LIFO defer order runs it after the deferred unlock. The hook
+// funcs are captured under the same lock, so a concurrent SetOn* cannot race
+// the read.
+type notify struct {
+	onUpsert func(Entry)
+	onRemove func(Entry)
+	upserts  []Entry
+	removes  []Entry
+}
+
+// fire invokes the collected hook calls, upserts before removes (a start's
+// own upsert precedes the eviction removes it caused; per-entry ordering is
+// unaffected — an evicted entry's upserts all predate its eviction).
+func (n *notify) fire() {
+	for i := range n.upserts {
+		n.onUpsert(n.upserts[i])
+	}
+	for i := range n.removes {
+		n.onRemove(n.removes[i])
+	}
+}
+
+// noteUpsertLocked queues the post-mutation snapshot of entries[i] for the
+// upsert hook. Caller must hold the write lock.
+func (a *Log) noteUpsertLocked(n *notify, i int) {
+	if a.onUpsert == nil {
+		return
+	}
+	n.onUpsert = a.onUpsert
+	n.upserts = append(n.upserts, snapshotEntry(&a.entries[i]))
+}
+
+// noteRemoveLocked queues e's snapshot for the remove hook, taken under the
+// lock before the entry leaves the slice. Caller must hold the write lock.
+func (a *Log) noteRemoveLocked(n *notify, e *Entry) {
+	if a.onRemove == nil {
+		return
+	}
+	n.onRemove = a.onRemove
+	n.removes = append(n.removes, snapshotEntry(e))
+}
+
+// Start records a new activity and returns its ID.
+func (a *Log) Start(action, detail string, source Source) string {
+	var n notify
+	defer n.fire()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.startLocked(&n, Entry{Action: action, Detail: detail, Source: source})
 }
 
 // StartScan records a new scan activity carrying its structured scope and
@@ -130,12 +199,14 @@ func (a *Log) Start(action, detail string, source Source) string {
 func (a *Log) StartScan(action, detail string, source Source,
 	scope ScanScope, role auth.Role,
 ) (id string, existing bool) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if activeID, ok := a.activeScanLocked(scope); ok {
 		return activeID, true
 	}
-	id = a.startLocked(Entry{
+	id = a.startLocked(&n, Entry{
 		Action: action, Detail: detail, Source: source,
 		Kind: scope.Kind, MediaType: scope.MediaType, MediaID: scope.MediaID,
 		Season: scope.Season, Episode: scope.Episode,
@@ -167,19 +238,20 @@ func (a *Log) activeScanLocked(scope ScanScope) (string, bool) {
 	return "", false
 }
 
-// startLocked assigns the next ID, stamps StartedAt, and appends the entry.
-// Capacity pressure evicts the OLDEST COMPLETED entry; running (not-done)
+// startLocked assigns the next ID, stamps StartedAt, appends the entry, and
+// queues its upsert plus any eviction removes on n. Capacity pressure evicts
+// the OLDEST COMPLETED entry; running (not-done)
 // entries are never evicted — a busy system must not hide a live cancellable
 // scan (the log may temporarily exceed maxItems when every entry is live).
 // Caller must hold the write lock.
-func (a *Log) startLocked(e Entry) string { //nolint:gocritic // hugeParam: single construction site
+func (a *Log) startLocked(n *notify, e Entry) string { //nolint:gocritic // hugeParam: single construction site
 	a.nextID++
 	id := strconv.Itoa(a.nextID)
 	e.ID = id
 	e.StartedAt = time.Now()
 	a.entries = append(a.entries, e)
 	if len(a.entries) > a.maxItems {
-		a.evictCompletedLocked()
+		a.evictCompletedLocked(n)
 		a.rebuildIndex()
 	} else {
 		if a.index == nil {
@@ -187,17 +259,21 @@ func (a *Log) startLocked(e Entry) string { //nolint:gocritic // hugeParam: sing
 		}
 		a.index[id] = len(a.entries) - 1
 	}
+	if i, ok := a.findEntry(id); ok {
+		a.noteUpsertLocked(n, i)
+	}
 	return id
 }
 
 // evictCompletedLocked removes oldest-first completed entries until the log
-// fits maxItems or only running entries remain. Caller must hold the write
-// lock and rebuild the index afterwards.
-func (a *Log) evictCompletedLocked() {
+// fits maxItems or only running entries remain, queueing each eviction on n.
+// Caller must hold the write lock and rebuild the index afterwards.
+func (a *Log) evictCompletedLocked(n *notify) {
 	for len(a.entries) > a.maxItems {
 		evicted := false
 		for i := range a.entries {
 			if a.entries[i].Done {
+				a.noteRemoveLocked(n, &a.entries[i])
 				a.entries = append(a.entries[:i], a.entries[i+1:]...)
 				evicted = true
 				break
@@ -211,6 +287,8 @@ func (a *Log) evictCompletedLocked() {
 
 // SetQueued marks an activity as queued (waiting to run).
 func (a *Log) SetQueued(id string, queued bool) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if i, ok := a.findEntry(id); ok {
@@ -218,25 +296,32 @@ func (a *Log) SetQueued(id string, queued bool) {
 		if !queued {
 			a.entries[i].StartedAt = time.Now()
 		}
+		a.noteUpsertLocked(&n, i)
 	}
 }
 
 // End marks an activity as done.
 func (a *Log) End(id string) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if i, ok := a.findEntry(id); ok {
 		a.finishLocked(i)
+		a.noteUpsertLocked(&n, i)
 	}
 }
 
 // Fail marks an activity as done with failure.
 func (a *Log) Fail(id string) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if i, ok := a.findEntry(id); ok {
 		a.finishLocked(i)
 		a.entries[i].Failed = true
+		a.noteUpsertLocked(&n, i)
 	}
 }
 
@@ -245,11 +330,14 @@ func (a *Log) Fail(id string) {
 // user-stopped scan reaches — unlike the queued-dismiss Cancel flag alone,
 // the entry stops rendering as running and becomes prunable.
 func (a *Log) FinishCancelled(id string) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if i, ok := a.findEntry(id); ok {
 		a.finishLocked(i)
 		a.entries[i].Cancelled = true
+		a.noteUpsertLocked(&n, i)
 	}
 }
 
@@ -279,6 +367,8 @@ func (a *Log) Get(id string) (Entry, bool) {
 
 // Progress updates the current/total counters and detail for an activity.
 func (a *Log) Progress(id string, current, total int, detail string) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if i, ok := a.findEntry(id); ok {
@@ -287,17 +377,21 @@ func (a *Log) Progress(id string, current, total int, detail string) {
 		if detail != "" {
 			a.entries[i].Detail = detail
 		}
+		a.noteUpsertLocked(&n, i)
 	}
 }
 
 // Dismiss removes a completed activity by ID.
 func (a *Log) Dismiss(id string) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	i, ok := a.findEntry(id)
 	if !ok || !a.entries[i].Done {
 		return
 	}
+	a.noteRemoveLocked(&n, &a.entries[i])
 	a.entries = append(a.entries[:i], a.entries[i+1:]...)
 	delete(a.index, id)
 	for k, idx := range a.index {
@@ -309,6 +403,8 @@ func (a *Log) Dismiss(id string) {
 
 // Cancel marks a queued activity as cancelled. Returns true if found and cancelled.
 func (a *Log) Cancel(id string) bool {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	i, ok := a.findEntry(id)
@@ -317,6 +413,7 @@ func (a *Log) Cancel(id string) bool {
 	}
 	if a.entries[i].Queued && !a.entries[i].Done {
 		a.entries[i].Cancelled = true
+		a.noteUpsertLocked(&n, i)
 		return true
 	}
 	return false
@@ -332,20 +429,26 @@ func (a *Log) IsCancelled(id string) bool {
 	return false
 }
 
-// PruneCompleted removes completed activities older than maxAge.
+// PruneCompleted removes completed activities older than maxAge. The prune
+// POLICY lives here; the 60s ticker goroutine driving it is the server's
+// (runActivityPrune), and it is the ONE owner of pruning — the activity GET
+// no longer prunes on read.
 func (a *Log) PruneCompleted(maxAge time.Duration) {
+	var n notify
+	defer n.fire()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	cutoff := time.Now().Add(-maxAge)
-	n := 0
+	kept := 0
 	for i := range a.entries {
 		if a.entries[i].Done && a.entries[i].EndedAt != nil && a.entries[i].EndedAt.Before(cutoff) {
+			a.noteRemoveLocked(&n, &a.entries[i])
 			continue
 		}
-		a.entries[n] = a.entries[i]
-		n++
+		a.entries[kept] = a.entries[i]
+		kept++
 	}
-	a.entries = a.entries[:n]
+	a.entries = a.entries[:kept]
 	a.rebuildIndex()
 }
 

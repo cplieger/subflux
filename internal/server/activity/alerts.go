@@ -7,10 +7,12 @@ import (
 
 // AlertLog tracks actionable errors for the UI.
 type AlertLog struct {
-	alerts []Alert
-	nextID int
-	max    int
-	mu     sync.RWMutex
+	onRaise   func(Alert)
+	onDismiss func(Alert)
+	alerts    []Alert
+	nextID    int
+	max       int
+	mu        sync.RWMutex
 }
 
 // AlertKind controls how an alert is displayed and dismissed.
@@ -53,6 +55,49 @@ func NewAlertLog(capacity int) *AlertLog {
 	return &AlertLog{max: capacity}
 }
 
+// SetOnRaise installs the observer called with the recorded alert snapshot
+// after every raise — a new alert and a refreshed persistent one alike. The
+// hook is fired AFTER the log's lock is released (the AlertLog cannot import
+// the events bus; the server injects the publisher here). TTL expiry and cap
+// eviction fire nothing: both stay reconcile-only on the client.
+func (al *AlertLog) SetOnRaise(fn func(Alert)) {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+	al.onRaise = fn
+}
+
+// SetOnDismiss installs the observer called with the dismissed alert
+// snapshot for every dismissal — the by-id endpoint and DismissBySource
+// alike — fired AFTER the lock is released, like SetOnRaise.
+func (al *AlertLog) SetOnDismiss(fn func(Alert)) {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+	al.onDismiss = fn
+}
+
+// alertNotify collects one hook's calls decided under the AlertLog's lock
+// and fires them after the lock is released (deferred before the lock, so
+// the LIFO defer order runs it outside the critical section).
+type alertNotify struct {
+	fn     func(Alert)
+	queued []Alert
+}
+
+func (n *alertNotify) fire() {
+	for i := range n.queued {
+		n.fn(n.queued[i])
+	}
+}
+
+// queue records one alert snapshot for fn; a nil fn queues nothing.
+func (n *alertNotify) queue(fn func(Alert), a *Alert) {
+	if fn == nil {
+		return
+	}
+	n.fn = fn
+	n.queued = append(n.queued, *a)
+}
+
 // Record adds a transient error alert.
 func (al *AlertLog) Record(source, message string) {
 	al.AddAlert(source, message, AlertTransient, LevelError, 0)
@@ -75,6 +120,8 @@ func (al *AlertLog) RecordPersistent(source, message string) {
 
 // AddAlert appends an alert with the given level and optional TTL override.
 func (al *AlertLog) AddAlert(source, message string, kind AlertKind, level AlertLevel, ttl time.Duration) {
+	var n alertNotify
+	defer n.fire()
 	al.mu.Lock()
 	defer al.mu.Unlock()
 
@@ -85,6 +132,7 @@ func (al *AlertLog) AddAlert(source, message string, kind AlertKind, level Alert
 				!al.alerts[i].Dismissed {
 				al.alerts[i].Message = message
 				al.alerts[i].Time = time.Now()
+				n.queue(al.onRaise, &al.alerts[i])
 				return
 			}
 		}
@@ -96,17 +144,23 @@ func (al *AlertLog) AddAlert(source, message string, kind AlertKind, level Alert
 		Message: message, Kind: kind, TTL: ttl, Time: time.Now(),
 	})
 	if len(al.alerts) > al.max {
+		// Cap eviction is deliberately event-less (reconcile-only), like TTL
+		// expiry: the raise below is the only delta this mutation publishes.
 		al.alerts = al.alerts[len(al.alerts)-al.max:]
 	}
+	n.queue(al.onRaise, &al.alerts[len(al.alerts)-1])
 }
 
 // Dismiss marks an alert as dismissed by ID.
 func (al *AlertLog) Dismiss(id int) bool {
+	var n alertNotify
+	defer n.fire()
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	for i := range al.alerts {
 		if al.alerts[i].ID == id {
 			al.alerts[i].Dismissed = true
+			n.queue(al.onDismiss, &al.alerts[i])
 			return true
 		}
 	}
@@ -115,6 +169,8 @@ func (al *AlertLog) Dismiss(id int) bool {
 
 // DismissBySource dismisses all undismissed persistent alerts from a source.
 func (al *AlertLog) DismissBySource(source string) {
+	var n alertNotify
+	defer n.fire()
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	for i := range al.alerts {
@@ -122,6 +178,7 @@ func (al *AlertLog) DismissBySource(source string) {
 			al.alerts[i].Kind == AlertPersistent &&
 			!al.alerts[i].Dismissed {
 			al.alerts[i].Dismissed = true
+			n.queue(al.onDismiss, &al.alerts[i])
 		}
 	}
 }

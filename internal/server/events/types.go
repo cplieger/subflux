@@ -9,14 +9,15 @@ import (
 type EventType string
 
 // EventData is a sealed interface restricting Event.Data to known payload types.
-// Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent.
+// Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent, ActivityEvent,
+// AlertEvent, ProviderEvent.
 //
 // The wiregen directive below emits the TS union
-// (export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent)
+// (export type EventData = CoverageEvent | NotifyEvent | ... | ProviderEvent)
 // plus its runtime decoders; the discriminator is the SSE envelope's "type" key
 // (Event.Type), which is also the named SSE event the browser dispatches on.
 //
-//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent,EpochEvent
+//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent,EpochEvent,ActivityEvent,AlertEvent,ProviderEvent
 type EventData interface{ eventData() }
 
 // Event is a server-sent event pushed to connected browsers.
@@ -32,6 +33,9 @@ const (
 	ScanStart      EventType = "scan:start" // scan activity started (any scope)
 	ScanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
 	Epoch          EventType = "epoch"      // per-connection handshake (never replayed, no id)
+	ActivityDelta  EventType = "activity"   // activity log delta (upsert/remove)
+	AlertDelta     EventType = "alert"      // alert raised or dismissed
+	ProviderDelta  EventType = "provider"   // provider timeout raised or cleared
 )
 
 // CoverageEvent is the data payload for coverage updates. It deliberately
@@ -99,3 +103,75 @@ type EpochEvent struct {
 }
 
 func (EpochEvent) eventData() {}
+
+// ActivityOp discriminates an activity event: an entry changed or appeared
+// (upsert) or left the log (remove).
+type ActivityOp string
+
+// Activity event operations.
+const (
+	ActivityUpsert ActivityOp = "upsert"
+	ActivityRemove ActivityOp = "remove"
+)
+
+// ActivityEvent is the data payload for activity log deltas (E1). Upserts
+// carry the post-mutation entry snapshot; removes carry the entry as it was
+// when it left the log, on every removal path (dismiss, prune, cap
+// eviction). Terminal transitions are published immediately; non-terminal
+// progress coalesces per activity (see ActivityPublisher).
+type ActivityEvent struct {
+	Entry *activity.Entry `json:"entry,omitempty"`
+	Op    ActivityOp      `json:"op"`
+}
+
+func (ActivityEvent) eventData() {}
+
+// AlertOp discriminates an alert event: raised (new or refreshed) or
+// dismissed. TTL expiry publishes nothing — the client's reconcile poll owns
+// it, matching the lazy expiry in AlertLog.VisibleAlerts.
+type AlertOp string
+
+// Alert event operations.
+const (
+	AlertRaise   AlertOp = "raise"
+	AlertDismiss AlertOp = "dismiss"
+)
+
+// AlertEvent is the data payload for alert deltas (E1): a raise carries the
+// alert as recorded (a persistent re-raise carries the refreshed snapshot),
+// a dismiss carries the dismissed alert so the client can drop it by id.
+type AlertEvent struct {
+	Alert *activity.Alert `json:"alert,omitempty"`
+	Op    AlertOp         `json:"op"`
+}
+
+func (AlertEvent) eventData() {}
+
+// ProviderOp discriminates a provider event: a provider tripped into timeout
+// cooldown (raise) or left it (clear).
+type ProviderOp string
+
+// Provider event operations.
+const (
+	ProviderRaise ProviderOp = "raise"
+	ProviderClear ProviderOp = "clear"
+)
+
+// ProviderTimeoutEntry pairs a provider with its timeout status, the same
+// per-provider shape GET /api/providers/timeout serves in ProvidersResponse.
+type ProviderTimeoutEntry struct {
+	Provider subflux.ProviderID     `json:"provider"`
+	Status   subflux.ProviderStatus `json:"status"`
+}
+
+// ProviderEvent is the data payload for provider timeout deltas (E1): raise
+// when a provider trips into cooldown (Status carries the trip snapshot),
+// clear when it leaves it — expiry observed, success reset, or operator
+// reset. A cooldown nobody asks about expires silently; the client's
+// reconcile poll converges that case.
+type ProviderEvent struct {
+	Entry *ProviderTimeoutEntry `json:"entry,omitempty"`
+	Op    ProviderOp            `json:"op"`
+}
+
+func (ProviderEvent) eventData() {}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search/providerhealth"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -18,6 +19,7 @@ func (fakeHealth) RecordSuccess(subflux.ProviderID)                      {}
 func (fakeHealth) RecordFailure(subflux.ProviderID, error)               {}
 func (fakeHealth) Status() map[subflux.ProviderID]subflux.ProviderStatus { return nil }
 func (fakeHealth) Reset()                                                {}
+func (fakeHealth) SetOnChange(providerhealth.OnChange)                   {}
 
 // --- LangOutcome.Queried / SearchResult.ProviderQueried ---
 //

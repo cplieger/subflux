@@ -378,3 +378,104 @@ func TestAlertLog_VisibleAlerts_mixedTypesAndStates(t *testing.T) {
 		t.Error("expected old persistent alert from 'startup' to be visible")
 	}
 }
+
+// ---- raise / dismiss hooks (status events, E1) ----
+
+// The raise hook observes every recorded alert with its under-lock snapshot,
+// fired after the lock is released — proven by re-entering the log from
+// inside the hook.
+func TestAlertLog_onRaise_fires_after_unlock_with_snapshot(t *testing.T) {
+	al := NewAlertLog(10)
+	var raised []Alert
+	al.SetOnRaise(func(a Alert) {
+		_ = al.VisibleAlerts() // re-entry: deadlocks if fired under the write lock
+		raised = append(raised, a)
+	})
+
+	al.Record("sonarr", "search failed")
+
+	if len(raised) != 1 {
+		t.Fatalf("raise hook fired %d times, want 1", len(raised))
+	}
+	if raised[0].ID != 1 || raised[0].Message != "search failed" || raised[0].Kind != AlertTransient {
+		t.Errorf("raise snapshot = %+v, want id 1, message %q, transient", raised[0], "search failed")
+	}
+}
+
+// A persistent re-raise (same source, undismissed) refreshes the existing
+// alert and raises the REFRESHED snapshot under the same id.
+func TestAlertLog_onRaise_fires_for_persistent_refresh(t *testing.T) {
+	al := NewAlertLog(10)
+	var raised []Alert
+	al.SetOnRaise(func(a Alert) { raised = append(raised, a) })
+
+	al.RecordPersistent("config", "first")
+	al.RecordPersistent("config", "second")
+
+	if len(raised) != 2 {
+		t.Fatalf("raise hook fired %d times for record+refresh, want 2", len(raised))
+	}
+	if raised[1].ID != raised[0].ID {
+		t.Errorf("refresh raised id %d, want the original id %d", raised[1].ID, raised[0].ID)
+	}
+	if raised[1].Message != "second" {
+		t.Errorf("refresh raised message %q, want %q (the refreshed snapshot)", raised[1].Message, "second")
+	}
+}
+
+// The dismiss hook fires for the by-id dismissal with the dismissed
+// snapshot, and DismissBySource fires once per alert it dismisses. A miss
+// fires nothing.
+func TestAlertLog_onDismiss_fires_for_both_dismiss_paths(t *testing.T) {
+	al := NewAlertLog(10)
+	var dismissed []Alert
+	al.SetOnDismiss(func(a Alert) {
+		_ = al.VisibleAlerts() // re-entry: deadlocks if fired under the write lock
+		dismissed = append(dismissed, a)
+	})
+
+	al.Record("sonarr", "one")
+	al.RecordPersistent("startup", "p1")
+	al.RecordPersistent("webauthn", "p2")
+
+	al.Dismiss(1)
+	if len(dismissed) != 1 || dismissed[0].ID != 1 || !dismissed[0].Dismissed {
+		t.Fatalf("dismiss-by-id hook = %+v, want one snapshot with id 1, dismissed", dismissed)
+	}
+
+	al.Dismiss(999) // miss
+	if len(dismissed) != 1 {
+		t.Fatalf("dismiss hook fired on a miss; want no event")
+	}
+
+	al.DismissBySource("startup")
+	al.DismissBySource("webauthn")
+	if len(dismissed) != 3 {
+		t.Fatalf("dismiss hook fired %d times total, want 3 (by-id + two by-source)", len(dismissed))
+	}
+	if dismissed[1].Source != "startup" || dismissed[2].Source != "webauthn" {
+		t.Errorf("by-source dismiss snapshots = %q, %q, want startup, webauthn",
+			dismissed[1].Source, dismissed[2].Source)
+	}
+}
+
+// Cap eviction publishes nothing: the raise for the new alert is the only
+// delta (evicted alerts converge on the client's reconcile poll, like TTL
+// expiry, which also fires no event because VisibleAlerts never mutates).
+func TestAlertLog_cap_eviction_fires_no_dismiss(t *testing.T) {
+	al := NewAlertLog(2)
+	raises, dismisses := 0, 0
+	al.SetOnRaise(func(Alert) { raises++ })
+	al.SetOnDismiss(func(Alert) { dismisses++ })
+
+	al.Record("a", "1")
+	al.Record("b", "2")
+	al.Record("c", "3") // evicts "a"
+
+	if raises != 3 {
+		t.Errorf("raise hook fired %d times, want 3", raises)
+	}
+	if dismisses != 0 {
+		t.Errorf("dismiss hook fired %d times on cap eviction, want 0 (reconcile-only)", dismisses)
+	}
+}

@@ -42,6 +42,15 @@ const DefaultThreshold = 5
 // the magic number.
 const DefaultWindow = 10 * time.Minute
 
+// OnChange observes a provider's timeout transitions: raised=true when the
+// provider trips into cooldown, raised=false when it leaves it (expiry
+// observed, success reset, or operator reset). status is the under-lock
+// snapshot at the transition; the hook is fired after the tracker's lock is
+// released, so it may be slow (it publishes an SSE event) without holding up
+// the scan path. Set by the server via the engine — this package cannot
+// import the events bus.
+type OnChange func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool)
+
 // New creates a provider timeout tracker with the given config.
 func New(cfg Config) *Tracker {
 	if cfg.Threshold <= 0 {
@@ -77,10 +86,48 @@ type Tracker struct {
 	tripped   map[subflux.ProviderID]time.Time
 	lastError map[subflux.ProviderID]string
 	now       func() time.Time
+	onChange  OnChange
 	mu        sync.Mutex
 	window    time.Duration
 	cooldown  time.Duration
 	threshold int
+}
+
+// SetOnChange installs the timeout-transition observer (see OnChange).
+func (it *Tracker) SetOnChange(fn OnChange) {
+	it.mu.Lock()
+	defer it.mu.Unlock()
+	it.onChange = fn
+}
+
+// changeNotify collects the transitions a mutation decides under the
+// tracker's lock and fires the hook once the lock is released: callers defer
+// fire BEFORE taking the lock, so the LIFO defer order runs it after the
+// deferred unlock.
+type changeNotify struct {
+	fn      OnChange
+	changes []providerChange
+}
+
+type providerChange struct {
+	id     subflux.ProviderID
+	status subflux.ProviderStatus
+	raised bool
+}
+
+func (n *changeNotify) fire() {
+	for i := range n.changes {
+		n.fn(n.changes[i].id, n.changes[i].status, n.changes[i].raised)
+	}
+}
+
+// queueLocked records one transition. Caller must hold the tracker's lock.
+func (it *Tracker) queueLocked(n *changeNotify, id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+	if it.onChange == nil {
+		return
+	}
+	n.fn = it.onChange
+	n.changes = append(n.changes, providerChange{id: id, status: status, raised: raised})
 }
 
 // IsTimedOut reports whether the provider is currently in cooldown. Reaching
@@ -88,6 +135,8 @@ type Tracker struct {
 // past it clears the provider's failure history and logs the expiry, so a
 // provider nobody asks about stays timed out at no cost.
 func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
+	var n changeNotify
+	defer n.fire()
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	trippedAt, ok := it.tripped[provider]
@@ -98,6 +147,7 @@ func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 		delete(it.tripped, provider)
 		delete(it.failures, provider)
 		delete(it.lastError, provider)
+		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
 		slog.Info("provider timeout expired", "provider", provider)
 		return false
 	}
@@ -108,8 +158,13 @@ func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 // enough: the window counts CONSECUTIVE trouble, so a provider that answers has
 // no history worth carrying.
 func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
+	var n changeNotify
+	defer n.fire()
 	it.mu.Lock()
 	defer it.mu.Unlock()
+	if _, wasTripped := it.tripped[provider]; wasTripped {
+		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
+	}
 	delete(it.failures, provider)
 	delete(it.tripped, provider)
 	delete(it.lastError, provider)
@@ -118,9 +173,12 @@ func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
 // RecordFailure adds one failure at the current time, drops the ones that have
 // fallen out of the window, and trips the cooldown when the survivors reach the
 // threshold. A provider already tripped is not re-tripped, so the cooldown runs
-// from the first failure that crossed the line rather than from the latest one.
+// from the first failure that crossed the line rather than from the latest one
+// — and only the crossing itself raises a timeout transition.
 // err may be nil; its text is kept for Status and is never used to classify.
 func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
+	var n changeNotify
+	defer n.fire()
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
@@ -151,6 +209,13 @@ func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	if len(pruned) >= it.threshold {
 		if _, already := it.tripped[provider]; !already {
 			it.tripped[provider] = now
+			it.queueLocked(&n, provider, subflux.ProviderStatus{
+				TimedOut:          true,
+				CooldownRemaining: it.cooldown,
+				RecentFailures:    len(pruned),
+				Threshold:         it.threshold,
+				LastError:         it.lastError[provider],
+			}, true)
 			slog.Warn("provider timed out",
 				"provider", provider,
 				"failures", len(pruned),
@@ -160,10 +225,16 @@ func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 }
 
 // Reset re-enables every provider and discards all failure history. This is the
-// operator's escape hatch, not part of the normal cycle.
+// operator's escape hatch, not part of the normal cycle. Each provider that was
+// in cooldown raises one clear transition.
 func (it *Tracker) Reset() {
+	var n changeNotify
+	defer n.fire()
 	it.mu.Lock()
 	defer it.mu.Unlock()
+	for provider := range it.tripped {
+		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
+	}
 	clear(it.failures)
 	clear(it.tripped)
 	clear(it.lastError)

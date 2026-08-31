@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/webhttp/v2/sse"
 )
 
@@ -130,6 +131,19 @@ func (eb *EventBus) PublishScanDone(ev *ScanEvent) {
 // types, so a transposition does not compile.
 func (eb *EventBus) PublishNotify(level NotifyLevel, text string) {
 	eb.Publish(Event{Type: Notify, Data: NotifyEvent{Level: level, Text: text}})
+}
+
+// PublishAlert publishes an alert delta: raised (new or refreshed) or
+// dismissed. The alert is the under-lock snapshot the AlertLog hook carried;
+// it is dereferenced into the payload and never retained.
+func (eb *EventBus) PublishAlert(op AlertOp, a *activity.Alert) {
+	eb.Publish(Event{Type: AlertDelta, Data: AlertEvent{Op: op, Alert: a}})
+}
+
+// PublishProvider publishes a provider timeout delta: raise when a provider
+// trips into cooldown, clear when it leaves it.
+func (eb *EventBus) PublishProvider(op ProviderOp, entry *ProviderTimeoutEntry) {
+	eb.Publish(Event{Type: ProviderDelta, Data: ProviderEvent{Op: op, Entry: entry}})
 }
 
 // ClientCount returns the number of connected SSE clients.
