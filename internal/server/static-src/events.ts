@@ -31,15 +31,14 @@ import {
   pollStatus,
   setStatusDegraded,
 } from "./status.js";
+import { applyCoveragePair, abortInFlightPairFetch } from "./coverage.js";
 import {
-  applyCoveragePair,
-  abortInFlightPairFetch,
   beginCoverageTransaction,
   beginCoveredPairWrite,
   registeredCollections,
   setCollectionLegJoin,
   settleCoverageTransaction,
-} from "./coverage.js";
+} from "./coverage-store.js";
 import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
 import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
 import { armDownloadRestartSweep } from "./search.js";

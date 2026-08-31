@@ -47,7 +47,8 @@ vi.mock("./status.js", () => ({
 import * as store from "./store.js";
 import { SUMMARY_COALESCE_MS } from "./constants.js";
 import { _resetHealForTest, healFromCoverageEvent } from "./coverage-heal.js";
-import { _resetCoverageForTest, coverageRow, filterCoverage, loadCoverage } from "./coverage.js";
+import { _resetCoverageForTest, filterCoverage, loadCoverage } from "./coverage.js";
+import { coverageRow } from "./coverage-store.js";
 import { refMovieWire, refSeriesWire } from "./reference-fixture.js";
 import type { CoverageEvent, MediaType, MovieItem, SeriesItem } from "./wire/types.gen.js";
 

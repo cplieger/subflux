@@ -3,14 +3,8 @@
 import * as store from "./store.js";
 import { $, el, errDiv, icon, input, select } from "./dom.js";
 import { openConfig } from "./config.js";
-import {
-  loadCoverage,
-  configurePanel,
-  renderCoverage,
-  applyHealedRow,
-  coverageItems,
-  libraryLoaded,
-} from "./coverage.js";
+import { loadCoverage, configurePanel, renderCoverage } from "./coverage.js";
+import { applyHealedRow, coverageItems, libraryLoaded } from "./coverage-store.js";
 import { coverageMovieSummaryRaw, coverageSeriesSummaryRaw } from "./wire/client.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";

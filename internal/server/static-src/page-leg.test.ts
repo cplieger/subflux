@@ -1,7 +1,9 @@
 // page-leg.test.ts — B2: the page-leg dispatcher. Driven against the REAL
-// store and bus; the wire client and the route renderers (detail, coverage,
-// history) are replaced so the assertions are about dispatch, supersession,
-// and abort — never about rendering, which each renderer's own suite pins.
+// store and bus; the wire client, the route renderers (detail, coverage,
+// history) and the coverage row store are replaced so the assertions are about
+// dispatch, supersession, and abort — never about rendering, which each
+// renderer's own suite pins. The heal double captures the detail refresher this
+// module registers with it, which is how the coupling is driven here.
 import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 
 // Plain factories over hoisted mutable records (mockReset strips vi.fn
@@ -120,6 +122,20 @@ vi.mock("./coverage.js", () => ({
     return Promise.resolve();
   },
 }));
+// page-leg registers its detail refresher with the heal at module load; the
+// capture is a PLAIN function so mockReset cannot strip it before the tests
+// that drive it (see the header note).
+const heal = vi.hoisted(() => ({ refresh: null as null | ((root: unknown) => void) }));
+vi.mock("./coverage-heal.js", () => ({
+  setDetailRefresher: (fn: (root: unknown) => void) => {
+    heal.refresh = fn;
+  },
+}));
+// The row store the movie arm reads its freshly healed row from.
+const rows = vi.hoisted(() => ({ byKey: new Map<string, unknown>() }));
+vi.mock("./coverage-store.js", () => ({
+  coverageRow: (key: string) => rows.byKey.get(key),
+}));
 vi.mock("./history.js", () => ({
   reloadHistory: () => {
     rendered.reloadHistory++;
@@ -169,6 +185,15 @@ function onLibrary(): void {
   store.set("detailCtx", null);
 }
 
+/** Hand a flushed root to the refresher page-leg registered with the heal. */
+function coupleDetail(kind: "series" | "movie", numericID: number): void {
+  const prefix = kind === "series" ? "tvdb" : "tmdb";
+  if (!heal.refresh) {
+    throw new Error("page-leg registered no detail refresher");
+  }
+  heal.refresh({ kind, numericID, rootKey: `${prefix}-${String(numericID)}` });
+}
+
 /** Drain the dispatch chain (mock fetches settle on the microtask queue). */
 async function settle(): Promise<void> {
   await new Promise((r) => setTimeout(r, 0));
@@ -198,6 +223,7 @@ beforeEach(() => {
   rendered.disposeCalls = 0;
   rendered.historyLeg = [];
   rendered.historyLegCalls = [];
+  rows.byKey.clear();
   onLibrary();
 });
 
@@ -320,7 +346,7 @@ describe("page-leg: the series detail-coupling refresh pair (R1.2)", () => {
     wire.subFiles = subFiles;
     wire.historyIDs = ["tvdb-42-s01e01"];
 
-    emit(BusEvent.RefreshSeriesDetail);
+    coupleDetail("series", 42);
     await settle();
 
     expect(calls("mediaEpisodes")).toHaveLength(0);
@@ -342,7 +368,7 @@ describe("page-leg: the series detail-coupling refresh pair (R1.2)", () => {
   it("no-op off a series detail", async () => {
     onLibrary();
 
-    emit(BusEvent.RefreshSeriesDetail);
+    coupleDetail("series", 42);
     await settle();
 
     expect(wire.calls).toStrictEqual([]);
@@ -354,7 +380,7 @@ describe("page-leg: the series detail-coupling refresh pair (R1.2)", () => {
     onSeriesDetail();
     wire.defer = true;
 
-    emit(BusEvent.RefreshSeriesDetail);
+    coupleDetail("series", 42);
     await settle();
     const pending = wire.pending.splice(0);
     const signals = wire.calls.map((c) => c.signal);
@@ -368,6 +394,30 @@ describe("page-leg: the series detail-coupling refresh pair (R1.2)", () => {
     }
     await settle();
     expect(rendered.series).toHaveLength(0);
+  });
+});
+
+describe("page-leg: the movie detail-coupling (A6's other arm)", () => {
+  it("re-opens the detail from the healed row, with no history push and no fetch", async () => {
+    onMovieDetail();
+    rows.byKey.set("tmdb-7", MOVIE_ROW);
+
+    coupleDetail("movie", 7);
+    await settle();
+
+    // openMovieDetail runs the detail's own on-demand reads under its own
+    // controller, so this arm issues nothing itself and pushes no history.
+    expect(rendered.movies).toStrictEqual([{ m: MOVIE_ROW, skipPush: true, signal: undefined }]);
+    expect(wire.calls).toStrictEqual([]);
+  });
+
+  it("a root with no row opens nothing", async () => {
+    onMovieDetail();
+
+    coupleDetail("movie", 7);
+    await settle();
+
+    expect(rendered.movies).toStrictEqual([]);
   });
 });
 

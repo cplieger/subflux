@@ -30,16 +30,6 @@ interface EventMap {
   // Request a refresh of the current view (replaces the old needsRefresh
   // store pulse — this is an event, not state).
   "data:invalidate": undefined;
-  // A6's series detail-coupling (R1.2): refresh the open series detail's
-  // REFRESH PAIR (episode coverage + history ids) — never the full triple,
-  // whose episodes read is arr-backed. Bus-routed because coverage-heal.ts
-  // and page-leg.ts would otherwise chain heavy module graphs.
-  "refresh:series-detail": undefined;
-  // A full coverage pair snapshot is about to overwrite the collection's rows
-  // (the library route loader / a refresh). The heal coalescer runs A6's reset
-  // rule on it; bus-routed because coverage.ts and coverage-heal.ts would
-  // otherwise import each other.
-  "coverage:overwrite": undefined;
 }
 
 // Event name constants — use these instead of string literals.
@@ -54,8 +44,6 @@ export const BusEvent = {
   ScanMovie: "scan:movie",
   OpenSecurity: "open:security",
   DataInvalidate: "data:invalidate",
-  RefreshSeriesDetail: "refresh:series-detail",
-  CoverageOverwrite: "coverage:overwrite",
 } as const;
 
 const bus = createBus<EventMap>();
