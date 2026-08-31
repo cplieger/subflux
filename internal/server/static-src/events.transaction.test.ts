@@ -65,6 +65,17 @@ vi.mock("./status.js", () => ({
 }));
 
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
+
+// The download-tracking seam: search.ts's tracked in-flight downloads outlive
+// the process that owned their activity ids, so a boot change has to tell it.
+const dl = vi.hoisted(() => ({ arms: 0 }));
+vi.mock("./search.js", () => ({
+  armDownloadRestartSweep: () => {
+    dl.arms += 1;
+    seq.log.push("armDownloadSweep");
+  },
+}));
+
 vi.mock("./bus.js", async (importOriginal) => ({
   ...(await importOriginal<typeof BusModule>()),
   emit: vi.fn(),
@@ -179,6 +190,7 @@ beforeEach(() => {
   syncReg.settled = [];
   syncReg.clears = 0;
   status.polls = 0;
+  dl.arms = 0;
   cov.registered = new Set<string>();
   cov.applied = [];
   cov.aborts = 0;
@@ -862,6 +874,52 @@ describe("boot-change application", () => {
     await bootCommitted(5);
     expect(cov.aborts).toBe(1);
     expect(cov.applied).toHaveLength(1);
+  });
+});
+
+describe("the download restart belt", () => {
+  /** Restart the server: drop the connection, reconnect, announce a new boot. */
+  async function restartTo(bootId: string, head: number): Promise<void> {
+    reconnect();
+    lastFakeES().open();
+    lastFakeES().epoch(bootId, false, head);
+    await settle();
+  }
+
+  it("a boot change arms the download restart sweep", async () => {
+    await bootCommitted(5, "boot-a");
+    expect(dl.arms).toBe(0);
+
+    await restartTo("boot-b", 2);
+
+    expect(dl.arms).toBe(1);
+  });
+
+  it("arms the sweep BEFORE the transaction's authoritative status read", async () => {
+    // The poll's render pass is what consumes the sweep, so an arm that landed
+    // after it would wait for an unrelated status change to fire.
+    await bootCommitted(5, "boot-a");
+    await restartTo("boot-b", 2);
+
+    const iArm = seq.log.indexOf("armDownloadSweep");
+    expect(iArm).toBeGreaterThanOrEqual(0);
+    expect(seq.log.lastIndexOf("pollStatus")).toBeGreaterThan(iArm);
+  });
+
+  it("boot itself does not arm the sweep", async () => {
+    // Nothing can be tracked before the first epoch of a page load.
+    await bootCommitted(5, "boot-a");
+
+    expect(dl.arms).toBe(0);
+  });
+
+  it("a SAME-boot reconnect does not arm the sweep", async () => {
+    // The process lived, so every tracked activity id is still valid.
+    await bootCommitted(5, "boot-a");
+
+    await restartTo("boot-a", 9);
+
+    expect(dl.arms).toBe(0);
   });
 });
 

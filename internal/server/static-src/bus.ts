@@ -13,8 +13,6 @@ export interface DetailConfig {
   backPath?: string;
   arrLink?: string | null;
   arrName?: string;
-  historyAction?: (() => void) | null;
-  filesAction?: (() => void) | null;
 }
 
 // Single-payload event map (one payload object per event). Events whose

@@ -61,12 +61,9 @@ vi.mock("./detail-scan.js", () => ({
   },
 }));
 
-const storeState = vi.hoisted(() => ({ isAdmin: false, isUnconfigured: false }));
+const storeState = vi.hoisted(() => ({ isUnconfigured: false }));
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => {
-    if (k === "isAdmin") {
-      return storeState.isAdmin;
-    }
     if (k === "isUnconfigured") {
       return storeState.isUnconfigured;
     }
@@ -128,7 +125,6 @@ beforeEach(async () => {
   await fetchAndMergeCoverage();
   document.body.innerHTML = FIXTURE;
   bus.emitted = [];
-  storeState.isAdmin = false;
   storeState.isUnconfigured = false;
   scanState.running = false;
   filterCoverage();
@@ -321,21 +317,17 @@ describe("coverage: row scan button", () => {
 });
 
 describe("coverage: nav button labels", () => {
-  it("wraps every detail nav button's label in the span the narrow layout hides", () => {
-    storeState.isAdmin = true;
-
+  it("wraps the Back button's label in the span the narrow layout hides", () => {
     configurePanel(true, {
       title: "The Wire",
       arrLink: "https://sonarr.example/series/1",
-      historyAction: () => undefined,
-      filesAction: () => undefined,
     });
 
     // Below the mobile breakpoint `.card-head .btn-text` is display:none, so a
-    // label outside that span cannot be hidden and overflows the header.
+    // label outside that span cannot be hidden and overflows the header. Back
+    // is the only labelled button configurePanel builds — the detail nav
+    // buttons are detail.ts's own, and pinned there.
     expect(reqEl('[data-nav="back"] .btn-text').textContent).toBe(" Back");
-    expect(reqEl('[data-nav="hist"] .btn-text').textContent).toBe(" History");
-    expect(reqEl('[data-nav="files"] .btn-text').textContent).toBe(" Files");
   });
 });
 

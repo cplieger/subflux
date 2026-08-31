@@ -42,6 +42,7 @@ import {
 } from "./coverage.js";
 import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
 import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
+import { armDownloadRestartSweep } from "./search.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   EPOCH_TIMEOUT_MS,
@@ -605,9 +606,13 @@ async function handleEpoch(epoch: EpochEvent): Promise<void> {
     // The dedupe namespace resets with the boot — after the old namespace's
     // payloads applied. Sync correlation is per boot too: the dialog's
     // job_id match clears WITH the namespace (the held settlement landed
-    // first, above), and pending watchers re-attach via the jobs read.
+    // first, above), and pending watchers re-attach via the jobs read. The
+    // download tracking is the same rule: its activity ids are per process,
+    // and the sweep is armed HERE so this transaction's own status read is
+    // the snapshot that resolves them.
     appliedToastKeys.clear();
     clearSyncCorrelation();
+    armDownloadRestartSweep();
   }
   bootID = epoch.boot_id; // stores on epoch arrival
 

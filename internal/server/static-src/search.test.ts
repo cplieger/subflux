@@ -103,16 +103,31 @@ vi.mock("./store.js", () => ({
   set: () => undefined,
 }));
 
-const toasts = vi.hoisted(() => ({ errors: [] as string[] }));
+// success/info are recorded, not dropped: a neutral resolve must announce NO
+// outcome, and an assertion on an absence needs the channel to be observable.
+const toasts = vi.hoisted(() => ({
+  errors: [] as string[],
+  successes: [] as string[],
+  infos: [] as string[],
+}));
 vi.mock("./notify.js", () => ({
   error: (msg: string) => {
     toasts.errors.push(msg);
   },
-  success: () => undefined,
-  info: () => undefined,
+  success: (msg: string) => {
+    toasts.successes.push(msg);
+  },
+  info: (msg: string) => {
+    toasts.infos.push(msg);
+  },
 }));
 
-import { openSearchPopup, closeSearchPopup, _resetSearchForTest } from "./search.js";
+import {
+  openSearchPopup,
+  closeSearchPopup,
+  armDownloadRestartSweep,
+  _resetSearchForTest,
+} from "./search.js";
 import type { SearchResult } from "./wire/types.gen.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
@@ -230,6 +245,8 @@ beforeEach(() => {
   actions.outcomes = [{ status: "success", value: { activity_id: "act-1", status: "accepted" } }];
   storeState.config = { languages: ["en", "fr"] };
   toasts.errors = [];
+  toasts.successes = [];
+  toasts.infos = [];
 });
 
 afterEach(() => {
@@ -1137,6 +1154,75 @@ describe("downloadFromPopup", () => {
     feedActivities([]);
 
     expect(btn.dataset["status"]).toBeUndefined();
+    expect(btn.querySelector(".spinner")).toBeTruthy();
+  });
+
+  // --- The restart belt ---
+  //
+  // A server restart drops the activity log with the process, so the event
+  // task 12 relies on for completion can never arrive for a download tracked
+  // across it. events.ts arms the sweep on a boot_id change; the first
+  // snapshot after it — the recovery transaction's own authoritative status
+  // read — decides every tracked download.
+
+  it("returns a download the restarted server does not report to an idle button", async () => {
+    const btn = await clickDownload();
+
+    armDownloadRestartSweep();
+    feedActivities([]);
+
+    expect(btn.disabled).toBe(false);
+    expect(btn.querySelector(".icon-download")).toBeTruthy();
+  });
+
+  it("claims no outcome for a download resolved by the restart sweep", async () => {
+    const btn = await clickDownload();
+
+    armDownloadRestartSweep();
+    feedActivities([]);
+
+    expect(btn.dataset["status"]).toBeUndefined();
+    expect([...toasts.successes, ...toasts.infos, ...toasts.errors]).toEqual([]);
+  });
+
+  it("drops the activity id when the restart sweep resolves a download", async () => {
+    // The id belonged to the dead process; leaving it on the button would let
+    // a new boot's colliding id settle a button nothing is tracking.
+    const btn = await clickDownload();
+
+    armDownloadRestartSweep();
+    feedActivities([]);
+
+    expect(btn.hasAttribute("data-activity-id")).toBe(false);
+  });
+
+  it("still settles a tracked download the restarted server reports done", async () => {
+    const btn = await clickDownload();
+
+    armDownloadRestartSweep();
+    feedActivities([activityEntry({ done: true })]);
+
+    expect(btn.dataset["status"]).toBe("ok");
+  });
+
+  it("keeps waiting on a tracked download the restarted server reports running", async () => {
+    const btn = await clickDownload();
+
+    armDownloadRestartSweep();
+    feedActivities([activityEntry({ done: false })]);
+
+    expect(btn.querySelector(".spinner")).toBeTruthy();
+  });
+
+  it("does not sweep a download dispatched after the restart", async () => {
+    // The sweep is one-shot and must be consumed even with nothing tracked,
+    // or it outlives the restart and neutralizes a healthy download.
+    armDownloadRestartSweep();
+    feedActivities([]);
+
+    const btn = await clickDownload();
+    feedActivities([]);
+
     expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
