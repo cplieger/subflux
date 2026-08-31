@@ -129,6 +129,24 @@ export default [
       ],
       // Console policy.
       "no-console": ["warn", { allow: ["warn", "error"] }],
+      // R9 DOM-safety pin: no innerHTML/outerHTML/insertAdjacentHTML sinks
+      // in production sources — dom.ts factories + textContent /
+      // replaceChildren are the pattern. Test fixtures are exempt below.
+      "no-restricted-properties": [
+        "error",
+        {
+          property: "innerHTML",
+          message: "DOM-safety (R9): use textContent/replaceChildren or the dom.ts factories.",
+        },
+        {
+          property: "outerHTML",
+          message: "DOM-safety (R9): use textContent/replaceChildren or the dom.ts factories.",
+        },
+        {
+          property: "insertAdjacentHTML",
+          message: "DOM-safety (R9): use textContent/replaceChildren or the dom.ts factories.",
+        },
+      ],
       // Equality: enforce strict ===.
       eqeqeq: ["error", "always", { null: "ignore" }],
       curly: ["error", "all"],
@@ -158,6 +176,9 @@ export default [
       "@typescript-eslint/unbound-method": "off",
       "@typescript-eslint/require-await": "off",
       "no-console": "off",
+      // Tests write document.body.innerHTML fixtures and read outerHTML for
+      // parity pins; the R9 sink ban is a production-source rule.
+      "no-restricted-properties": "off",
     },
   },
 

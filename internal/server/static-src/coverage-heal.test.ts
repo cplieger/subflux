@@ -598,7 +598,7 @@ describe("coverage-heal: failure escalation", () => {
 // --- Detail couplings ---
 
 describe("coverage-heal: detail couplings", () => {
-  it("a series event with that detail open runs the refresh pair once per window", async () => {
+  it("a series event with that detail open requests the refresh pair once per window", async () => {
     await load([seriesWire(1)]);
     const s = coverageRow("tvdb-1");
     if (!s) {
@@ -606,18 +606,18 @@ describe("coverage-heal: detail couplings", () => {
     }
     store.set("detailCtx", { series: s as never, seasons: [], tvdbId: 1 });
     wire.summaries.set("series:1", okRes(seriesWire(1, { targets: [target("en", 2, 3)] })));
-    const invalidates: number[] = [];
-    const off = on(BusEvent.DataInvalidate, () => invalidates.push(1));
+    const pairRefreshes: number[] = [];
+    const off = on(BusEvent.RefreshSeriesDetail, () => pairRefreshes.push(1));
 
     healFromCoverageEvent(ev("tvdb-1-s01e01"));
     healFromCoverageEvent(ev("tvdb-1-s01e02"));
     healFromCoverageEvent(ev("tvdb-1-s01e03"));
     await window_();
-    expect(invalidates).toHaveLength(1);
+    expect(pairRefreshes).toHaveLength(1);
 
     healFromCoverageEvent(ev("tvdb-1-s01e04"));
     await window_();
-    expect(invalidates).toHaveLength(2);
+    expect(pairRefreshes).toHaveLength(2);
     off();
   });
 
@@ -644,15 +644,15 @@ describe("coverage-heal: detail couplings", () => {
     await load([seriesWire(1)], [movieWire(2)]);
     store.set("detailCtx", { movie: true, tmdbId: 2 });
     wire.summaries.set("series:1", okRes(seriesWire(1, { title: "X" })));
-    const invalidates: number[] = [];
+    const pairRefreshes: number[] = [];
     const opened: number[] = [];
-    const offA = on(BusEvent.DataInvalidate, () => invalidates.push(1));
+    const offA = on(BusEvent.RefreshSeriesDetail, () => pairRefreshes.push(1));
     const offB = on(BusEvent.OpenMovie, () => opened.push(1));
 
     healFromCoverageEvent(ev("tvdb-1-s01e01"));
     await window_();
 
-    expect(invalidates).toHaveLength(0);
+    expect(pairRefreshes).toHaveLength(0);
     expect(opened).toHaveLength(0);
     offA();
     offB();

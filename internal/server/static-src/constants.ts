@@ -39,9 +39,6 @@ export const DEFAULT_VARIANT = "standard" as const;
 // (mirrors Go's subflux.SourceEmbedded; persisted in subtitle_files rows).
 export const EMBEDDED_PROVIDER = "embedded" as const;
 
-// Concurrency limit for season audio sync (parallel requests).
-export const SEASON_SYNC_CONCURRENCY = 3;
-
 // Debounce delay for SSE reconnect on visibility change.
 export const VISIBILITY_DEBOUNCE_MS = 2_000;
 

@@ -116,7 +116,12 @@ vi.mock("./store.js", () => ({
   },
 }));
 
-import { renderSeriesDetail, openMovieDetail, disposeDetailBindings } from "./detail.js";
+import {
+  renderSeriesDetail,
+  renderMovieDetailFromLeg,
+  openMovieDetail,
+  disposeDetailBindings,
+} from "./detail.js";
 import { split } from "@cplieger/keyenc";
 import { openSyncDialog } from "./sync.js";
 import { openFileManager } from "./files.js";
@@ -1517,6 +1522,56 @@ describe("detail: openMovieDetail", () => {
     expect(btn?.textContent).toBe("Open Settings");
     (btn as HTMLButtonElement | null)?.click();
     expect(openConfig).toHaveBeenCalled();
+  });
+});
+
+describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    storeState.sets = [];
+    clientState.stateIDs = null;
+    clientState.movieSubs = [];
+    clientState.movieSubsCalls = 0;
+    clientState.subsDefer = false;
+    clientState.subsPending = [];
+    history.replaceState(null, "", "/");
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("paints from the leg's pre-fetched reads — no fetch of its own, context set", () => {
+    renderMovieDetailFromLeg(makeMovie(90), [movieSub("en", 88)], []);
+
+    expect(document.querySelector('table.movie-detail[data-movie-id="90"]')).not.toBeNull();
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}88`);
+    expect(clientState.movieSubsCalls).toBe(0); // the LEG owned the /subs read
+    expect(storeState.sets).toContainEqual(["detailCtx", { movie: true, tmdbId: 90 }]);
+    expect(document.querySelector('[data-nav="hist"]')).toBeNull(); // no history rows
+  });
+
+  it("adds the History button from the leg's own stateIDs read", () => {
+    renderMovieDetailFromLeg(makeMovie(91), [], ["tmdb-91"]);
+
+    expect(document.querySelector('[data-nav="hist"]')).not.toBeNull();
+  });
+
+  it("supersedes an in-flight plain open: the stale /subs landing paints nothing", async () => {
+    clientState.subsDefer = true;
+    openMovieDetail(makeMovie(92));
+    expect(clientState.subsPending).toHaveLength(1);
+
+    renderMovieDetailFromLeg(makeMovie(92), [movieSub("en", 77)], []);
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}77`);
+
+    clientState.subsPending[0]?.([movieSub("en", 10)]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The superseded open landed as a no-op: the leg's paint stands.
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}77`);
   });
 });
 

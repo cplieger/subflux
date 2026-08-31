@@ -5,7 +5,12 @@
 // modules are real in events.integration.test.ts; here every seam is
 // scripted so each fixture controls one variable.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EPOCH_TIMEOUT_MS, SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS } from "./constants.js";
+import {
+  EPOCH_TIMEOUT_MS,
+  REPLAY_BUDGET,
+  SSE_RECONNECT_MS,
+  SSE_MAX_RECONNECT_MS,
+} from "./constants.js";
 import type * as BusModule from "./bus.js";
 import { FakeEventSource, lastFakeES } from "./events-fakes.js";
 
@@ -455,6 +460,25 @@ describe("the trigger truth table and the synthetic cursor", () => {
     expect(reconnect()).toBe("/api/events?last_id=5");
   });
 
+  it("the pre-filter BLOCKS with both counters known past the budget: the recreate presents NO cursor", async () => {
+    await bootCommitted(100);
+    // One live frame advances appliedHigh past the budget (never the
+    // watermark: it is commit-only).
+    lastFakeES().frame("notify", { level: "info", text: "live" }, 100 + REPLAY_BUDGET + 1);
+    expect(events._stateForTest().appliedHigh).toBe(100 + REPLAY_BUDGET + 1);
+    expect(events._stateForTest().watermark).toBe(100);
+
+    expect(reconnect()).toBe("/api/events");
+  });
+
+  it("the pre-filter boundary: a distance of exactly REPLAY_BUDGET presents the cursor", async () => {
+    await bootCommitted(100);
+    lastFakeES().frame("notify", { level: "info", text: "live" }, 100 + REPLAY_BUDGET);
+    expect(events._stateForTest().appliedHigh).toBe(100 + REPLAY_BUDGET);
+
+    expect(reconnect()).toBe("/api/events?last_id=100");
+  });
+
   it("a cursor-less non-boot connect with BOTH counters unknown transacts", async () => {
     await bootCommitted(5, "boot-a");
 
@@ -554,6 +578,31 @@ describe("abort, the latch, and the ladder", () => {
     expect(FakeEventSource.instances).toHaveLength(count + 1);
   });
 
+  it("COMMIT resets the attempt counter: the climbed ladder starts over", async () => {
+    wire.result = { ok: false, status: 502, error: "down" };
+    events.connect();
+    lastFakeES().open();
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+    vi.advanceTimersByTime(10 * SSE_MAX_RECONNECT_MS);
+    lastFakeES().open(); // LATCHED open: no reset
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+    expect(events._stateForTest().reconnectAttempt).toBe(2);
+
+    // The next latched epoch COMMITS: the counter resets on commit, not on
+    // the (latched) open that preceded it.
+    wire.result = { ok: true, status: 200, data: [] };
+    vi.advanceTimersByTime(10 * SSE_MAX_RECONNECT_MS);
+    lastFakeES().open();
+    expect(events._stateForTest().reconnectAttempt).toBe(2);
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+
+    expect(events._stateForTest().watermark).toBe(5);
+    expect(events._stateForTest().reconnectAttempt).toBe(0);
+  });
+
   it("latches COALESCE into one transaction", async () => {
     await bootCommitted(5);
 
@@ -591,6 +640,51 @@ describe("abort, the latch, and the ladder", () => {
 });
 
 describe("boot-change application", () => {
+  it("SAME-boot abort: held frames apply IN FULL at the next epoch (payloads + counters)", async () => {
+    wire.defer = true;
+    events.connect();
+    lastFakeES().open();
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+    // Two held frames > head, one state-bearing: the boot-change arm would
+    // SKIP the coverage frame and advance nothing — the same-boot arm must
+    // apply both and advance appliedHigh.
+    lastFakeES().frame(
+      "coverage",
+      {
+        media_type: "episode",
+        media_id: "tvdb-42-s01e01",
+        language: "en",
+        variant: "standard",
+        source: "auto",
+      },
+      8,
+    );
+    lastFakeES().frame("notify", { level: "info", text: "held toast" }, 9);
+    expect(events._stateForTest().holdQueueLength).toBe(2);
+
+    // A leg fails: the abort KEEPS the queue for the next epoch.
+    lastFakeES().fail();
+    await settle();
+    expect(events._stateForTest().forceLatch).toBe(true);
+    expect(events._stateForTest().holdQueueLength).toBe(2);
+    wire.defer = false;
+
+    vi.advanceTimersByTime(10 * SSE_MAX_RECONNECT_MS);
+    expect(lastFakeES().url).toBe("/api/events"); // latched: no cursor
+    lastFakeES().open();
+    lastFakeES().epoch("boot-a", false, 9); // SAME boot
+    await settle();
+
+    // Applied once each, in full: the coverage payload healed, the toast
+    // showed, the counters advanced, and the forced transaction committed.
+    expect(seq.log).toContain("heal:tvdb-42-s01e01");
+    expect(toasts.infos).toStrictEqual(["held toast"]);
+    expect(events._stateForTest().appliedHigh).toBe(9);
+    expect(events._stateForTest().watermark).toBe(9);
+    expect(events._stateForTest().holdQueueLength).toBe(0);
+  });
+
   it("restart mid-transaction: held notify applies once from the old namespace, counters restart", async () => {
     wire.defer = true;
     events.connect();
