@@ -99,6 +99,7 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[events.CoverageEvent](),
 		wiregen.TypeRef[events.NotifyEvent](),
 		wiregen.TypeRef[events.ScanEvent](),
+		wiregen.TypeRef[events.EpochEvent](),
 		// The sealed SSE union (//wiregen:union on the interface): emits the
 		// TS union type + the discriminator decoders. This was the founding
 		// use case for wiregen's AST engine.
@@ -207,6 +208,7 @@ func Registry() *wiregen.Registry {
 			"notify":     "NotifyEvent",
 			"scan:start": "ScanEvent",
 			"scan:done":  "ScanEvent",
+			"epoch":      "EpochEvent",
 		},
 	}
 

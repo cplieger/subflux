@@ -117,7 +117,13 @@ void configParsed().then((pc) => {
 });
 
 // Route-based initialization: render the correct view for the current URL.
-void applyRoute();
+// Boot page loads are epoch-gated on EVERY route (E3): the apply waits for
+// the first epoch or the gate's degrade (refusal/failure/deadline — refusals
+// fail fast, so a 401 redirect never waits out the deadline). On a clean
+// epoch the boot transaction's legs cover the loads (the route loader joins
+// the collection leg); a degraded boot's ungated load is superseded later
+// under the page-leg generation guard.
+void events.bootGate().then(() => applyRoute());
 
 // Listen for browser back/forward.
 window.addEventListener("popstate", () => {

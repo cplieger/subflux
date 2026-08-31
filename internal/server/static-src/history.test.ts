@@ -7,7 +7,19 @@ import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 const { dispatch, emit } = vi.hoisted(() => ({ dispatch: vi.fn(), emit: vi.fn() }));
 
 vi.mock("./wire/client.gen.js", () => ({
-  listState: dispatch,
+  // history.ts reads pages through the RAW list read now (task 9); the shim
+  // keeps this suite's queue-a-page-of-items pattern: an array resolves ok,
+  // null resolves a non-2xx envelope, a rejection propagates to the catch,
+  // and an aborted signal reports status 0 like the transport does.
+  listStateRaw: async (query?: unknown, opts?: { signal?: AbortSignal }) => {
+    const items = (await dispatch(query, opts)) as unknown;
+    if (opts?.signal?.aborted) {
+      return { ok: false, status: 0, error: "aborted" };
+    }
+    return items === null
+      ? { ok: false, status: 502, error: "history load failed" }
+      : { ok: true, status: 200, data: items };
+  },
 }));
 vi.mock("./bus.js", () => ({
   on: vi.fn(() => () => {
@@ -18,7 +30,7 @@ vi.mock("./bus.js", () => ({
 }));
 
 import * as store from "./store.js";
-import { reloadHistory } from "./history.js";
+import { reloadHistory, reloadHistoryForTransaction, _resetHistoryForTest } from "./history.js";
 import type { ParsedConfig } from "./wire/types.gen.js";
 
 // Mirrors the wire StateEntry fields buildHistoryRow reads (only those matter
@@ -867,5 +879,122 @@ describe("history: superseded reloads", () => {
 
     release([makeEntry(1)]);
     await vi.advanceTimersByTimeAsync(500);
+  });
+});
+
+// --- Task 9: the settlement model behind reloadHistoryForTransaction ---
+//
+// Every created generation settles exactly once as applied | failed |
+// superseded(next) | abandoned; a superseded run resolves "superseded" only
+// by chaining to a generation that APPLIES, and a chain ending failed leaves
+// the transaction leg rejecting (prior rows intact). The dispatcher's
+// re-route (an abort) settles superseded(next: null) → "rerouted".
+
+describe("history: the settlement model (task 9)", () => {
+  beforeEach(() => {
+    _resetHistoryForTest();
+    mountShell();
+    store.set("config", null);
+  });
+
+  /** Queue one page that stays in flight until the returned release runs. */
+  function deferPage(): (items: unknown) => void {
+    let release!: (v: unknown) => void;
+    dispatch.mockImplementationOnce(
+      () =>
+        new Promise((res) => {
+          release = res;
+        }),
+    );
+    return (items: unknown) => {
+      release(items);
+    };
+  }
+
+  it("an applied run resolves 'applied' and lands its rows", async () => {
+    dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
+
+    const r = await reloadHistoryForTransaction();
+
+    expect(r).toBe("applied");
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("a current-run 502 REJECTS with prior rows intact and no error panel", async () => {
+    dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
+    await reloadHistoryForTransaction();
+
+    dispatch.mockResolvedValueOnce(null); // the raw read answers non-2xx
+
+    await expect(reloadHistoryForTransaction()).rejects.toThrow("history load failed");
+    // Prior rows intact; the transaction owns recovery, so the leg painted
+    // no error panel over them.
+    expect(reqTbody().children.length).toBe(2);
+    expect(document.querySelector('#historyContent [data-status="err"]')).toBeNull();
+  });
+
+  it("a superseded run whose superseder APPLIES resolves 'superseded'", async () => {
+    const releaseT = deferPage();
+    const t = reloadHistoryForTransaction();
+    await Promise.resolve();
+
+    // S starts (bumps the generation) and applies a fresh page.
+    dispatch.mockResolvedValueOnce([makeEntry(9)]);
+    reloadHistory();
+    await tick();
+
+    // T lands late: its landing is discarded, its chain ends in S's apply.
+    releaseT([makeEntry(1)]);
+    expect(await t).toBe("superseded");
+    expect(reqTbody().children.length).toBe(1);
+    expect(cellText()[1]).toBe("Title 9"); // S's row, not T's
+  });
+
+  it("the SUPERSEDED-CHAIN: T lands, S starts and 502s — the leg REJECTS", async () => {
+    dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
+    await reloadHistoryForTransaction(); // prior rows
+
+    const releaseT = deferPage();
+    const t = reloadHistoryForTransaction();
+    // Attach the rejection expectation before S settles the chain, so the
+    // rejection never sits unhandled across a macrotask.
+    const tOutcome = expect(t).rejects.toThrow("history load failed");
+    await Promise.resolve();
+
+    // S starts (bumps gen) and fails — a second transaction dispatch, so no
+    // adapter error panel competes with the prior-rows assertion.
+    dispatch.mockResolvedValueOnce(null);
+    const sOutcome = expect(reloadHistoryForTransaction()).rejects.toThrow("history load failed");
+    await tick();
+
+    releaseT([makeEntry(7)]); // T's landing: discarded (g !== gen)
+
+    await tOutcome;
+    await sOutcome;
+    // Prior rows unchanged: T never applied, S never applied.
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("the dispatcher's RE-ROUTE (abort) settles 'rerouted' — no latch, no rejection", async () => {
+    const release = deferPage();
+    const ctrl = new AbortController();
+    const t = reloadHistoryForTransaction(ctrl.signal);
+    await Promise.resolve();
+
+    ctrl.abort(); // the route left; the re-routed leg owns the continuation
+    release([makeEntry(1)]);
+
+    expect(await t).toBe("rerouted");
+    expect(document.querySelector("table.history tbody")?.children.length ?? 0).toBe(0);
+  });
+
+  it("the UI adapter routes a chain-final failure to the error panel", async () => {
+    dispatch.mockResolvedValueOnce(null);
+
+    reloadHistory();
+    await tick();
+
+    const err = document.querySelector('#historyContent [data-status="err"]');
+    expect(err?.textContent).toBe("history load failed");
   });
 });

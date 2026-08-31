@@ -6,7 +6,7 @@ export type AlertLevel = "error" | "warn" | "info";
 
 export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
 
-export type EventType = "coverage" | "notify" | "scan:start" | "scan:done";
+export type EventType = "coverage" | "notify" | "scan:start" | "scan:done" | "epoch";
 
 export type MediaType = "movie" | "episode" | "series";
 
@@ -26,15 +26,15 @@ export type Variant = "standard" | "hi" | "forced";
 
 /**
  * EventData is a sealed interface restricting Event.Data to known payload types.
- * Implementors: CoverageEvent, NotifyEvent, ScanEvent.
+ * Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent.
  * //
  * The wiregen directive below emits the TS union
- * (export type EventData = CoverageEvent | NotifyEvent | ScanEvent) plus its
- * runtime decoders; the discriminator is the SSE envelope's "type" key
+ * (export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent)
+ * plus its runtime decoders; the discriminator is the SSE envelope's "type" key
  * (Event.Type), which is also the named SSE event the browser dispatches on.
  * //
  */
-export type EventData = CoverageEvent | NotifyEvent | ScanEvent;
+export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent;
 
 /** APIKeyInfo is one entry of the GET /api/auth/apikeys response. */
 export interface APIKeyInfo {
@@ -221,6 +221,24 @@ export interface EpisodeItem {
   scene_episode?: number;
   absolute_episode?: number;
   has_file: boolean;
+}
+
+/**
+ * EpochEvent is the per-connection SSE handshake, written exactly once per
+ * connection by the events handler: after any Last-Event-ID replay, before
+ * live delivery, with NO id field (it must never become a resume cursor).
+ * BootID identifies the server process (one random id per process start), so
+ * the client can tell a restart from a reconnect. Gap is the server's
+ * authoritative replay verdict: true means the presented cursor could not be
+ * covered (above head, below the ring floor, or past the replay budget) and
+ * the replay was withheld. Head is the newest event id the connection's
+ * replay covered; every id at or below it was either replayed or predates
+ * the client's cursor.
+ */
+export interface EpochEvent {
+  boot_id: string;
+  head: number;
+  gap: boolean;
 }
 
 /**

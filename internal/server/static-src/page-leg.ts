@@ -19,13 +19,19 @@ import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
 import {
   coverageMovieSummary,
+  coverageMovieSummaryRaw,
   coverageSeriesDetail,
+  coverageSeriesDetailRaw,
   mediaEpisodes,
+  mediaEpisodesRaw,
   stateIDs,
+  stateIDsRaw,
 } from "./wire/client.gen.js";
+import type { QueryValue } from "./wire/client.gen.js";
+import type { ApiResult } from "./api-client.js";
 import { loadCoverage } from "./coverage.js";
 import { openMovieDetail, renderSeriesDetail } from "./detail.js";
-import { reloadHistory } from "./history.js";
+import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
  *  a route leave superseded it and the results were discarded. */
@@ -39,7 +45,9 @@ const controllers = new Map<string, AbortController>();
 
 // The dispatcher's route identity, in the order refreshCurrentPage always
 // branched: history page, files view, series detail, movie detail, library.
-function currentRouteKey(): string {
+// Exported for task 9's transaction (the collection leg's routeRequired
+// check reads it).
+export function currentRouteKey(): string {
   if (store.get("currentPage") === "history") {
     return "history";
   }
@@ -151,3 +159,125 @@ async function dispatchLeg(
 on(BusEvent.DataInvalidate, () => {
   void refreshCurrentPage();
 });
+
+// --- Task 9: the transaction's PAGE leg ---
+
+/** How the transaction's page leg landed: this dispatch applied, or a newer
+ *  same-route dispatch superseded it (whose own landing satisfies the leg). */
+export type TransactionLegOutcome = "applied" | "superseded";
+
+/** Dispatch the transaction's PAGE leg (E3 step 3). Differences from the
+ *  plain dispatcher: the library arm is EMPTY (the transaction's collection
+ *  leg owns the pair — it settles applied immediately on dispatch), history
+ *  runs task 9's settlement-aware extraction, recovery transactions send
+ *  ?recovery=1 on the honoring endpoints, every fetch runs on the RAW
+ *  generated client with zero automatic retries, and a genuine transport
+ *  failure or typed 429 refusal REJECTS (the transaction aborts). A
+ *  route-leave mid-leg RE-ROUTES: the loop's next dispatch IS the new
+ *  route's page leg (an empty leg applies immediately, so it terminates),
+ *  and commit waits for the re-routed leg. */
+export async function dispatchTransactionPageLeg(
+  recovery: boolean,
+): Promise<TransactionLegOutcome> {
+  for (;;) {
+    const r = await runTransactionLeg(recovery);
+    if (r !== "rerouted") {
+      return r;
+    }
+  }
+}
+
+async function runTransactionLeg(recovery: boolean): Promise<TransactionLegOutcome | "rerouted"> {
+  const key = currentRouteKey();
+  const gen = (generations.get(key) ?? 0) + 1;
+  generations.set(key, gen);
+  controllers.get(key)?.abort();
+  const ctrl = new AbortController();
+  controllers.set(key, ctrl);
+  try {
+    return await transactionArm(key, gen, ctrl, recovery);
+  } finally {
+    if (controllers.get(key) === ctrl) {
+      controllers.delete(key);
+    }
+  }
+}
+
+/** A superseded transaction leg run: outrun by a newer same-route dispatch
+ *  (its landing satisfies the leg) or re-routed by a route leave (the
+ *  dispatcher's next dispatch owns the continuation). */
+function outrunOrRerouted(key: string): "superseded" | "rerouted" {
+  return currentRouteKey() === key ? "superseded" : "rerouted";
+}
+
+/** The first genuine leg failure among the results, or null. An abort is
+ *  never a failure (the isCurrent check precedes this), and a 404 is a
+ *  definitive answer (a vanished item), not a transport failure — the arm
+ *  applies its fallback. A typed 429 refusal counts as a genuine failure. */
+function legFailure(...results: ApiResult<unknown>[]): Error | null {
+  for (const r of results) {
+    if (!r.ok && r.status !== 404) {
+      return new Error(r.error ?? `page leg failed (${String(r.status)})`);
+    }
+  }
+  return null;
+}
+
+async function transactionArm(
+  key: string,
+  gen: number,
+  ctrl: AbortController,
+  recovery: boolean,
+): Promise<TransactionLegOutcome | "rerouted"> {
+  if (key === "library" || key === "files") {
+    // Library: nothing extra — the collection leg owns the pair. Files owns
+    // its own refresh. An EMPTY leg settles applied immediately on dispatch,
+    // which is what makes the re-route chain terminate.
+    return "applied";
+  }
+  const { signal } = ctrl;
+  const rq: Record<string, QueryValue> | undefined = recovery ? { recovery: 1 } : undefined;
+  if (key === "history") {
+    const r = await reloadHistoryForTransaction(signal);
+    return r === "rerouted" ? "rerouted" : r;
+  }
+  const ctx = store.get("detailCtx");
+  if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
+    const [seasons, subFiles, historyIDs] = await Promise.all([
+      mediaEpisodesRaw(ctx.series.id, rq, { signal }),
+      coverageSeriesDetailRaw(ctx.tvdbId, { signal }),
+      stateIDsRaw({ type: "episode", prefix: `tvdb-${ctx.tvdbId}-` }, { signal }),
+    ]);
+    if (!isCurrent(key, gen, ctrl)) {
+      return outrunOrRerouted(key);
+    }
+    const failure = legFailure(seasons, subFiles, historyIDs);
+    if (failure) {
+      throw failure;
+    }
+    renderSeriesDetail(
+      ctx.series,
+      seasons.data ?? ctx.seasons,
+      subFiles.data ?? [],
+      new Set(historyIDs.data ?? []),
+    );
+    return "applied";
+  }
+  if (ctx && "movie" in ctx && ctx.movie) {
+    const row = await coverageMovieSummaryRaw(ctx.tmdbId, rq, { signal });
+    if (!isCurrent(key, gen, ctrl)) {
+      return outrunOrRerouted(key);
+    }
+    const failure = legFailure(row);
+    if (failure) {
+      throw failure;
+    }
+    if (row.ok && row.data !== undefined) {
+      openMovieDetail(row.data, true, signal);
+    }
+    return "applied";
+  }
+  // Route state moved between the key computation and the arm (a detail
+  // closing mid-dispatch): re-dispatch reads the fresh state.
+  return "rerouted";
+}

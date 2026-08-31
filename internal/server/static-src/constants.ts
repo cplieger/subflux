@@ -13,6 +13,16 @@ export const DOWNLOAD_POLL_MS = 2_000;
 export const DOWNLOAD_DEADLINE_MS = 5 * 60_000;
 export const SSE_RECONNECT_MS = 5_000;
 export const SSE_MAX_RECONNECT_MS = 60_000;
+// The epoch deadline prices a SILENT open stream only (refusals fail fast);
+// expiry is handled like an undecodable epoch.
+export const EPOCH_TIMEOUT_MS = 10_000;
+// Client-side mirror of the server's replay budget (the 4th gap disjunct).
+// The client pre-filter is a cheap gate on presenting a synthetic cursor;
+// the server disjunct is authoritative.
+export const REPLAY_BUDGET = 256;
+// Pre-epoch buffer cap: 2× the server's replay ring (a stated heuristic —
+// overflow degrades safely into a latched recovery).
+export const VERDICT_BUFFER_CAP = 2_048;
 export const YAML_TIMEOUT_MS = 15_000;
 export const ROUTE_TRANSITION_MS = 200;
 

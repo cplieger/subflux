@@ -95,7 +95,7 @@ func TestClientCountZeroInitially(t *testing.T) {
 func TestWireFormat(t *testing.T) {
 	bus := New(0)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
 	waitClients(t, bus, 1)
 
 	bus.Publish(Event{Type: CoverageUpdate, Data: CoverageEvent{
@@ -115,7 +115,7 @@ func TestWireFormat(t *testing.T) {
 func TestHandleClientCap(t *testing.T) {
 	bus := New(1)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
 	waitClients(t, bus, 1)
 
 	st2 := startStream(t, bus)
@@ -128,7 +128,7 @@ func TestHandleClientCap(t *testing.T) {
 	// not an unlimited hub.
 	bus.SetMaxClients(2)
 	st3 := startStream(t, bus)
-	readUntil(t, st3.sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st3.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
 	waitClients(t, bus, 2)
 
 	if st4 := startStream(t, bus); st4.status != http.StatusServiceUnavailable {
@@ -139,7 +139,7 @@ func TestHandleClientCap(t *testing.T) {
 func TestShutdownDrainsAndRefuses(t *testing.T) {
 	bus := New(0)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
 	waitClients(t, bus, 1)
 
 	bus.Shutdown()
@@ -165,5 +165,5 @@ func TestHandleHeaders(t *testing.T) {
 	if cc := st.header.Get("Cache-Control"); !strings.Contains(cc, "no-transform") {
 		t.Errorf("Cache-Control = %q, want no-transform (Caddy/nginx gzip defense)", cc)
 	}
-	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
 }
