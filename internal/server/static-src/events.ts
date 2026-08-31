@@ -41,7 +41,7 @@ import {
 import { beginTransaction, settleTransaction } from "./transaction.js";
 import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
 import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
-import { armDownloadRestartSweep } from "./search.js";
+import { noteServerRestart } from "./search.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   EPOCH_TIMEOUT_MS,
@@ -607,11 +607,12 @@ async function handleEpoch(epoch: EpochEvent): Promise<void> {
     // job_id match clears WITH the namespace (the held settlement landed
     // first, above), and pending watchers re-attach via the jobs read. The
     // download tracking is the same rule: its activity ids are per process,
-    // and the sweep is armed HERE so this transaction's own status read is
-    // the snapshot that resolves them.
+    // and the restart is reported HERE so this transaction's own status read is
+    // the snapshot that resolves the entries the dead boot issued — while a
+    // download dispatched from now on is stamped with the live boot instead.
     appliedToastKeys.clear();
     clearSyncCorrelation();
-    armDownloadRestartSweep();
+    noteServerRestart();
   }
   bootID = epoch.boot_id; // stores on epoch arrival
 

@@ -125,7 +125,7 @@ vi.mock("./notify.js", () => ({
 import {
   openSearchPopup,
   closeSearchPopup,
-  armDownloadRestartSweep,
+  noteServerRestart,
   _resetSearchForTest,
 } from "./search.js";
 import type { SearchResult } from "./wire/types.gen.js";
@@ -1161,14 +1161,15 @@ describe("downloadFromPopup", () => {
   //
   // A server restart drops the activity log with the process, so the event
   // task 12 relies on for completion can never arrive for a download tracked
-  // across it. events.ts arms the sweep on a boot_id change; the first
-  // snapshot after it — the recovery transaction's own authoritative status
-  // read — decides every tracked download.
+  // across it. events.ts reports the restart on a boot_id change; every tracked
+  // download carries the boot it was DISPATCHED under, so the snapshots that
+  // follow retire the dead boot's entries and leave a live one's alone
+  // regardless of when the snapshot was read.
 
   it("returns a download the restarted server does not report to an idle button", async () => {
     const btn = await clickDownload();
 
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([]);
 
     expect(btn.disabled).toBe(false);
@@ -1178,7 +1179,7 @@ describe("downloadFromPopup", () => {
   it("claims no outcome for a download resolved by the restart sweep", async () => {
     const btn = await clickDownload();
 
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([]);
 
     expect(btn.dataset["status"]).toBeUndefined();
@@ -1190,7 +1191,7 @@ describe("downloadFromPopup", () => {
     // a new boot's colliding id settle a button nothing is tracking.
     const btn = await clickDownload();
 
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([]);
 
     expect(btn.hasAttribute("data-activity-id")).toBe(false);
@@ -1199,7 +1200,7 @@ describe("downloadFromPopup", () => {
   it("still settles a tracked download the restarted server reports done", async () => {
     const btn = await clickDownload();
 
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([activityEntry({ done: true })]);
 
     expect(btn.dataset["status"]).toBe("ok");
@@ -1208,22 +1209,61 @@ describe("downloadFromPopup", () => {
   it("keeps waiting on a tracked download the restarted server reports running", async () => {
     const btn = await clickDownload();
 
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([activityEntry({ done: false })]);
 
     expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
   it("does not sweep a download dispatched after the restart", async () => {
-    // The sweep is one-shot and must be consumed even with nothing tracked,
-    // or it outlives the restart and neutralizes a healthy download.
-    armDownloadRestartSweep();
+    noteServerRestart();
     feedActivities([]);
 
     const btn = await clickDownload();
     feedActivities([]);
 
     expect(btn.querySelector(".spinner")).toBeTruthy();
+  });
+
+  it("keeps a post-restart download whose FIRST snapshot was read before it existed", async () => {
+    // The residual window a one-shot sweep flag could not close: the snapshot
+    // it consumed may predate the 202, and the server starts the activity
+    // before answering, so absence proves nothing about a download this boot
+    // issued. The entry's own boot stamp is what answers.
+    noteServerRestart();
+    const btn = await clickDownload();
+
+    feedActivities([]);
+
+    expect(btn.querySelector(".spinner")).toBeTruthy();
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("sweeps the dead boot's entry and leaves a live one tracked beside it", async () => {
+    actions.outcomes = [
+      { status: "success", value: { activity_id: "act-1", status: "accepted" } },
+      { status: "success", value: { activity_id: "act-2", status: "accepted" } },
+    ];
+    wire.searchResult = {
+      ok: true,
+      status: 200,
+      data: { results: [result(), result({ subtitle_id: "sub-2" })] },
+    };
+    await openEpisodePopup();
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".result-dl button")];
+    buttons[0]?.click();
+    await settle();
+
+    noteServerRestart();
+    buttons[1]?.click();
+    await settle();
+
+    // One snapshot, two verdicts: the first entry's process is gone, the
+    // second's is the one running.
+    feedActivities([]);
+
+    expect(buttons[0]?.querySelector(".icon-download")).toBeTruthy();
+    expect(buttons[1]?.querySelector(".spinner")).toBeTruthy();
   });
 
   it("TWO concurrent downloads resolve correctly, each from its own entry", async () => {
