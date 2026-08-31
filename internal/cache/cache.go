@@ -2,7 +2,6 @@
 package cache
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -13,8 +12,8 @@ import (
 // Used by providers that cache title/show ID lookups across scan cycles.
 const DefaultTTL = 6 * time.Hour
 
-// typedGroup wraps singleflight.Group to provide type-safe Do/DoChan
-// without requiring callers to perform unsafe type assertions.
+// typedGroup wraps singleflight.Group to provide a type-safe Do without
+// requiring callers to perform unsafe type assertions.
 type typedGroup[T any] struct {
 	g singleflight.Group
 }
@@ -29,17 +28,13 @@ func (tg *typedGroup[T]) Do(key string, fn func() (T, error)) (val T, shared boo
 	return val, shared, nil
 }
 
-func (tg *typedGroup[T]) DoChan(key string, fn func() (T, error)) <-chan singleflight.Result {
-	return tg.g.DoChan(key, func() (any, error) { return fn() })
-}
-
 // Cache is a generic TTL cache for provider lookups. Thread-safe.
 // Used to avoid redundant API calls when scanning multiple episodes
 // of the same series (e.g. title ID lookups, torrent ID lookups).
 //
 // The zero value is NOT usable: always construct with New. Two things are
 // missing from it, and only the first is a crash. The entries map is nil, so
-// Set (and every path through it, GetOrFetch and GetOrFetchCtx) panics on the
+// Set (and every path through it, GetOrFetch included) panics on the
 // write; Get and Clear happen to tolerate a nil map, which is what makes the
 // zero value look serviceable until the first store. The ttl is also 0, so
 // even with a map every entry would expire the instant it was written. A zero
@@ -105,35 +100,6 @@ func (c *Cache[T]) GetOrFetch(key string, fn func() (T, error)) (T, error) {
 		return result, err
 	})
 	return v, err
-}
-
-// GetOrFetchCtx is like GetOrFetch but accepts a context-aware fetch function.
-// Each caller's context is respected independently: if one caller's context
-// is cancelled, other coalesced waiters are not affected. The fetch itself
-// runs with a detached context so it completes for all waiters.
-func (c *Cache[T]) GetOrFetchCtx(ctx context.Context, key string, fn func(context.Context) (T, error)) (T, error) {
-	if v, ok := c.Get(key); ok {
-		return v, nil
-	}
-	ch := c.group.DoChan(key, func() (T, error) {
-		result, err := fn(context.WithoutCancel(ctx))
-		if err == nil {
-			c.Set(key, result)
-		}
-		return result, err
-	})
-	select {
-	case <-ctx.Done():
-		var zero T
-		return zero, ctx.Err()
-	case res := <-ch:
-		if res.Err != nil {
-			var zero T
-			return zero, res.Err
-		}
-		val, _ := res.Val.(T)
-		return val, nil
-	}
 }
 
 // Clear removes all entries.
