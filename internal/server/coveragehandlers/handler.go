@@ -434,7 +434,7 @@ func resolveExcludeTags(ctx context.Context, client tagResolver, tags []string) 
 // client's latch ladder is the retry policy), an arr read failure — a marked
 // exclude-tag leg's wave failure included — answers the family's
 // upstream-failure 502, and a store failure keeps the generic 500 arm.
-func writeCollectionFetchError(w http.ResponseWriter, r *http.Request, err error, fetchErr error, what string) {
+func writeCollectionFetchError(w http.ResponseWriter, r *http.Request, err, fetchErr error, what string) {
 	switch {
 	case errors.Is(err, arrsvc.ErrRecoveryRefused):
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "arr read refused, retry later")
