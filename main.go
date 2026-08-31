@@ -501,7 +501,7 @@ func serverOptions(reg *provider.Registry, syncExec *syncworker.Client) []server
 		server.WithWire(newWireFunc(reg, syncExec)),
 		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
-		server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec)),
+		server.WithSubtitleProc(syncing.SubtitleProcessor{}),
 		// The SAME client as the typed job runner: dispatched sync jobs and
 		// automatic syncs contend on its one execution slot.
 		server.WithSyncRunner(syncExec),

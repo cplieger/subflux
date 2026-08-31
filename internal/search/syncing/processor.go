@@ -2,28 +2,20 @@ package syncing
 
 import (
 	"bytes"
-	"context"
-	"io"
 
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
-// SubtitleProcessor implements the SRT surface synchandlers declares, using subsync,
-// without an intermediate backend interface. The lightweight operations
-// (parse/write/shift/normalize) always run in-process; the heavy audio sync
-// routes through the configured SyncExec.
-type SubtitleProcessor struct {
-	exec SyncExec
-}
-
-// NewSubtitleProcessorWithExec creates a SubtitleProcessor whose audio sync
-// runs through the given executor (server mode: the syncworker client). The
-// zero SubtitleProcessor runs audio sync in-process.
-func NewSubtitleProcessorWithExec(exec SyncExec) SubtitleProcessor {
-	return SubtitleProcessor{exec: exec}
-}
+// SubtitleProcessor implements the SRT surface both handler families declare,
+// using subsync, without an intermediate backend interface. Every operation
+// (parse/write/shift/normalize) runs in-process; audio sync is a server-owned
+// job and does not come through here.
+// SubtitleProcessor is the SRT text surface both handler families declare:
+// encoding normalization, parsing and serialization. Stateless, so the zero
+// value is the only one anyone needs.
+type SubtitleProcessor struct{}
 
 // Compile-time check.
 
@@ -83,22 +75,3 @@ func (SubtitleProcessor) WriteSRT(cues []subflux.SubtitleCue) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-
-// SyncFromAudio runs audio-based sync on subtitle data.
-func (p SubtitleProcessor) SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) subflux.AudioSyncResult {
-	exec := p.exec
-	if exec == nil {
-		exec = InProcessExec{}
-	}
-	result := exec.Audio(ctx, data, videoPath, subtitlePath)
-	return subflux.AudioSyncResult{
-		Method:     string(result.Method),
-		Cues:       apiCuesFromSubsync(result.Cues),
-		Offset:     result.Offset,
-		Confidence: float64(result.Confidence),
-		Applied:    result.Applied() && result.ShouldApply(),
-	}
-}
-
-// Ensure io is used (ParseSRT uses bytes.NewReader which implements io.Reader).
-var _ io.Reader = (*bytes.Reader)(nil)

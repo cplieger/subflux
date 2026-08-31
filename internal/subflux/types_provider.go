@@ -43,12 +43,3 @@ type SubtitleCue struct {
 	Start time.Duration
 	End   time.Duration
 }
-
-// AudioSyncResult holds the output of an audio-based sync operation.
-type AudioSyncResult struct {
-	Method     string
-	Cues       []SubtitleCue
-	Offset     int64   // milliseconds
-	Confidence float64 // 0.0 to 1.0
-	Applied    bool    // true if sync was applied and should be saved
-}
