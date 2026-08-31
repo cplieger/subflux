@@ -248,14 +248,16 @@ func markRecovery(r *http.Request) context.Context {
 // wrapper's refusal sentinel answers 429 (a refusal to keep waiting, never a
 // 500; deliberately no Retry-After — the client's latch ladder is the retry
 // policy), the ordered gate's post-wave miss answers 404 with no upstream
-// call made, and everything else — wave execution failures included — keeps
-// the family's upstream-failure 502.
+// call made, a client walk-away (only r.Context().Err() reports it) gets no
+// error log and no write, and everything else — wave execution failures
+// included — keeps the family's upstream-failure 502.
 func writeEpisodesReadError(w http.ResponseWriter, r *http.Request, err error, seriesID int) {
 	switch {
 	case errors.Is(err, arrsvc.ErrRecoveryRefused):
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "arr read refused, retry later")
 	case errors.Is(err, arrsvc.ErrUnknownSeries):
 		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "unknown series")
+	case r.Context().Err() != nil:
 	default:
 		slog.Error("media browser: failed to fetch episodes",
 			"series_id", seriesID, "error", err)

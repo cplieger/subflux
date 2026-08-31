@@ -77,12 +77,13 @@ func acceptsGzip(r *http.Request) bool {
 
 // encodingOffer parses one Accept-Encoding list element into its coding name
 // and whether that coding is offered: false only for a well-formed q=0
-// refusal.
+// refusal. The weight scan is case-insensitive (RFC 9110 parameter names:
+// Q=0 refuses like q=0).
 func encodingOffer(part string) (name string, offered bool) {
 	token, qual := part, "1"
 	if i := strings.IndexByte(part, ';'); i >= 0 {
 		token = part[:i]
-		if j := strings.Index(part[i:], "q="); j >= 0 {
+		if j := strings.Index(strings.ToLower(part[i:]), "q="); j >= 0 {
 			qual = part[i+j+2:]
 			// A q-value may be followed by further parameters; cut at the
 			// next ';' so a well-formed q=0 is not misread as malformed.

@@ -37,6 +37,11 @@ type AudioExecutor struct {
 func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hook func() bool) syncjobs.ExecResult {
 	data, err := atomicfile.ReadBounded(ctx, in.SubtitlePath, MaxSyncSubSize)
 	if err != nil {
+		if ctx.Err() != nil {
+			// A queued-DELETE race conversion cancels the job context during
+			// this pre-hook read: that is a cancellation, not a crash.
+			return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: ctx.Err()}
+		}
 		return syncjobs.ExecResult{
 			Outcome: syncjobs.OutcomeCrash,
 			Err:     fmt.Errorf("read subtitle: %w", err),

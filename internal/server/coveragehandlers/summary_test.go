@@ -1,9 +1,11 @@
 package coveragehandlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -685,4 +687,49 @@ func TestHandleCoverageSeriesSummary_store_error_returns_500(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("series summary (store error) status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
+}
+
+// TestCoverageHandlers_client_abort_is_silent pins the walk-away arm on both
+// coverage error writers: a read aborted by the client (waveRead returns the
+// request context's error, and only r.Context().Err() reports the walk-away)
+// produces no ERROR-level log and no 502 write — nobody is left to read
+// either. Serial: captures the process-global slog default.
+func TestCoverageHandlers_client_abort_is_silent(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the client walked away mid-wave-wait
+
+	t.Run("summary", func(t *testing.T) {
+		buf.Reset()
+		sonarr := &summarySonarrFake{byIDErr: ctx.Err()}
+		h := newCoverageHandler(&prefixStore{}, summarySeriesCfg(), sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleCoverageSeriesSummary(rec,
+			summaryRequest("/api/coverage/series/81189/summary?recovery=1", "tvdbId", "81189").WithContext(ctx))
+		if buf.Len() != 0 {
+			t.Errorf("aborted summary request logged: %s", buf.String())
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("aborted summary request got %d %q written, want nothing", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("collection", func(t *testing.T) {
+		buf.Reset()
+		sonarr := &summarySonarrFake{listErr: ctx.Err()}
+		h := newCoverageHandler(&prefixStore{}, summarySeriesCfg(), sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleCoverageSeries(rec,
+			httptest.NewRequest(http.MethodGet, "/api/coverage/series", nil).WithContext(ctx))
+		if buf.Len() != 0 {
+			t.Errorf("aborted collection request logged: %s", buf.String())
+		}
+		if rec.Body.Len() != 0 {
+			t.Errorf("aborted collection request got %d %q written, want nothing", rec.Code, rec.Body.String())
+		}
+	})
 }

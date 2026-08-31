@@ -170,11 +170,13 @@ func (d *Dispatcher) cancelBatchLocked(b *batch) CancelOutcome {
 
 // settleBatchItemsLocked settles every still-queued item of b as
 // done(cancelled) with cause err — settle, never execute; no sync:done (a
-// never-admitted cancellation publishes nothing). Caller holds mu.
+// never-admitted cancellation publishes nothing). Caller holds mu. The
+// nil-guard is defense in depth: retention skips a live batch's items, so a
+// missing id would mean that invariant broke, not a normal state.
 func (d *Dispatcher) settleBatchItemsLocked(b *batch, err error) {
 	for _, id := range b.itemIDs {
-		j := d.jobs[id]
-		if j.record.State == StateDone {
+		j, ok := d.jobs[id]
+		if !ok || j.record.State == StateDone {
 			continue
 		}
 		d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: err})
@@ -312,10 +314,16 @@ func (d *Dispatcher) runBatchItem(ctx context.Context, id int64) {
 }
 
 // batchOutcomesLocked folds the settled items into the aggregate counts the
-// terminal summary reports. Caller holds mu.
+// terminal summary reports. Caller holds mu. A missing id counts as failed
+// (defense in depth beside settleBatchItemsLocked's guard).
 func (d *Dispatcher) batchOutcomesLocked(itemIDs []int64) (applied, failed, low int) {
 	for _, id := range itemIDs {
-		rec := &d.jobs[id].record
+		j, ok := d.jobs[id]
+		if !ok {
+			failed++
+			continue
+		}
+		rec := &j.record
 		switch {
 		case rec.Outcome == OutcomeResult && rec.Applied:
 			applied++

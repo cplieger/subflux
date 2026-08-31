@@ -76,6 +76,9 @@ func (f *fakeExec) exec(ctx context.Context, in *syncjobs.ExecInput, hook func()
 	f.mu.Lock()
 	f.order = append(f.order, in.SubtitlePath)
 	started := f.started[in.SubtitlePath]
+	// One close per registration: a post-terminal re-dispatch of the same
+	// path (the dedupe test's third job) must not re-close started.
+	delete(f.started, in.SubtitlePath)
 	release := f.release[in.SubtitlePath]
 	f.mu.Unlock()
 	if started != nil {
@@ -604,5 +607,82 @@ func TestRetention_and_cap(t *testing.T) {
 
 		release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
 		synctest.Wait()
+	})
+}
+
+// TestRetention_never_evicts_a_live_batchs_done_items pins the prune/batch
+// seam: an early-done item of a still-running batch crosses retention while
+// a sibling item wedges, and the server's prune tick fires mid-batch. The
+// done record must survive — the batch finalizers dereference every item id
+// and the batch_activity_id read lists the full set — and the batch must
+// finalize with complete counts. Once the batch is terminal, its aged items
+// go on the next tick.
+func TestRetention_never_evicts_a_live_batchs_done_items(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		exec := newFakeExec()
+		log := activity.New(50)
+		d := syncjobs.New(syncjobs.Deps{
+			Exec:        exec.exec,
+			Log:         log,
+			Stops:       &activity.StopRegistry{},
+			PublishDone: func(*events.SyncDoneEvent) {},
+		})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			d.Run(ctx)
+		}()
+		defer func() {
+			cancel()
+			<-done
+		}()
+
+		// Item 1 settles immediately with the canned applied result; item 2
+		// wedges until released.
+		wedgedStarted, release := exec.blockOn("/e2.srt")
+		acc, err := d.DispatchBatch(batchInput(7, 1, "/e1.srt", "/e2.srt"))
+		if err != nil {
+			t.Fatalf("DispatchBatch() error = %v", err)
+		}
+		<-wedgedStarted
+
+		// The wedged item consumes more than the retention window; the prune
+		// tick fires mid-batch. Both item records must survive it.
+		time.Sleep(activity.DefaultPruneAge + time.Minute)
+		d.Prune(activity.DefaultPruneAge)
+		jobs := d.Jobs(acc.ActivityID)
+		if len(jobs) != 2 {
+			t.Fatalf("Jobs(%q) after a mid-batch prune = %d records, want the full item set: %+v",
+				acc.ActivityID, len(jobs), jobs)
+		}
+		doneCount := 0
+		for _, j := range jobs {
+			if j.State == syncjobs.StateDone {
+				doneCount++
+			}
+		}
+		if doneCount != 1 {
+			t.Fatalf("done items after prune = %d, want the early item retained as done: %+v", doneCount, jobs)
+		}
+
+		// Releasing the wedged item finalizes the batch: no panic, and the
+		// aggregate counts fold BOTH items (a pruned id would miscount).
+		release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true}
+		synctest.Wait()
+		entry, ok := log.Get(acc.ActivityID)
+		if !ok || !entry.Done || entry.Failed || entry.Cancelled {
+			t.Fatalf("batch activity after finalize = %+v, want a clean terminal", entry)
+		}
+		if entry.Detail != "Fixture S01 · 2 files · 2 synced" {
+			t.Errorf("terminal detail = %q, want the full 2-item aggregate", entry.Detail)
+		}
+
+		// Terminal batch: the aged early item now goes; the fresh one stays.
+		d.Prune(activity.DefaultPruneAge)
+		jobs = d.Jobs(acc.ActivityID)
+		if len(jobs) != 1 || jobs[0].Ordinal != 2 {
+			t.Errorf("Jobs(%q) after the post-terminal prune = %+v, want only the fresh item", acc.ActivityID, jobs)
+		}
 	})
 }

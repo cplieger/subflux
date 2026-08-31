@@ -548,13 +548,18 @@ func (d *Dispatcher) Jobs(batchActivityID string) []Job {
 
 // Prune removes done records older than maxAge (retention =
 // activity.DefaultPruneAge, one owner: the server's prune ticker drives
-// both). Queued and running records are never evicted. Terminal batch
+// both). Queued and running records are never evicted, and neither is a
+// done item of a still-live batch — the batch finalizers dereference every
+// item id, and the reload read lists the full item set. Terminal batch
 // entries age out with their items.
 func (d *Dispatcher) Prune(maxAge time.Duration) {
 	cutoff := time.Now().Add(-maxAge)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for id, j := range d.jobs {
+		if j.batch != nil && j.batch.state != StateDone {
+			continue
+		}
 		if j.record.State == StateDone && j.record.EndedAt != nil && j.record.EndedAt.Before(cutoff) {
 			delete(d.jobs, id)
 			delete(d.byActivity, j.record.ActivityID)
@@ -569,8 +574,9 @@ func (d *Dispatcher) Prune(maxAge time.Duration) {
 
 // evictLocked enforces the registry cap: when the registry exceeds it, the
 // oldest done records PAST RETENTION are evicted — never queued or running
-// records, and never a record still inside the retention window (the cap
-// bounds between-tick growth without shortening the visibility promise).
+// records, never an item of a still-live batch, and never a record still
+// inside the retention window (the cap bounds between-tick growth without
+// shortening the visibility promise).
 func (d *Dispatcher) evictLocked() {
 	if len(d.jobs) <= d.cap {
 		return
@@ -582,6 +588,9 @@ func (d *Dispatcher) evictLocked() {
 	}
 	var evictable []candidate
 	for id, j := range d.jobs {
+		if j.batch != nil && j.batch.state != StateDone {
+			continue
+		}
 		if j.record.State == StateDone && j.record.EndedAt != nil && j.record.EndedAt.Before(cutoff) {
 			evictable = append(evictable, candidate{ended: *j.record.EndedAt, id: id})
 		}

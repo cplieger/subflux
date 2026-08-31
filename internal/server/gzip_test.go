@@ -450,6 +450,7 @@ func TestAcceptsGzip(t *testing.T) {
 		{"gzip", true},
 		{"GZIP", true},
 		{"gzip;q=0", false},
+		{"gzip;Q=0", false}, // parameter names are case-insensitive (RFC 9110)
 		{"gzip;q=0.5", true},
 		{"gzip;q=zz", true}, // malformed q on a named coding reads as accepting
 		{"br", false},
