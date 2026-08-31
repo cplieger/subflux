@@ -1,10 +1,12 @@
 package mediahandlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -491,5 +493,31 @@ func TestHandleMediaEpisodes_sentinel_mapping(t *testing.T) {
 				t.Errorf("episodes status = %d, want %d (err %v)", rec.Code, tc.want, tc.err)
 			}
 		})
+	}
+}
+
+// TestHandleMediaEpisodes_client_abort_is_silent pins the walk-away arm: a
+// recovery leg aborted by the client (waveRead returns the request context's
+// error, and only r.Context().Err() reports the walk-away) produces no
+// ERROR-level log and no 502 write — nobody is left to read either. Serial:
+// captures the process-global slog default.
+func TestHandleMediaEpisodes_client_abort_is_silent(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the client walked away mid-wave-wait
+	h := newMediaHandler(&fakeSonarr{err: ctx.Err()}, nil)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/media/series/1/episodes?recovery=1", nil).WithContext(ctx)
+	h.HandleMediaEpisodes(rec, req)
+
+	if buf.Len() != 0 {
+		t.Errorf("aborted request logged: %s", buf.String())
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("aborted request got %d %q written, want nothing", rec.Code, rec.Body.String())
 	}
 }

@@ -352,6 +352,42 @@ func TestWaveRead_heldPermitJoin(t *testing.T) {
 	})
 }
 
+// TestWaveRead_preStartPartialDetachKeepsTheWaveForCoWaiters pins the
+// pre-start half of the CONTEXT clause: a waiter's cancellation removes it
+// from the wave and never discards a wave that still has co-waiters. Under
+// held permits, A creates the wave and B joins pre-start; A cancels and gets
+// its own cancellation, B stays pending, and the released permit serves B
+// from the ONE surviving pass.
+func TestWaveRead_preStartPartialDetachKeepsTheWaveForCoWaiters(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tbl := newTestTable(t.Context())
+		releases := holdPermits(t, t.Context(), tbl, maxConcurrentWaves)
+		stub := callIndexFetch()
+
+		ctxA, cancelA := context.WithCancel(t.Context())
+		a := goMarkedRead(ctxA, tbl, "k", stub.fn) // creates the wave, permit withheld
+		synctest.Wait()
+		b := goMarkedRead(t.Context(), tbl, "k", stub.fn) // joins pre-start
+		synctest.Wait()
+
+		cancelA()
+		outA := <-a
+		if !errors.Is(outA.err, context.Canceled) {
+			t.Errorf("A's outcome = (%v, %v), want its own cancellation", outA.val, outA.err)
+		}
+		assertPending(t, b, "B after A's pre-start cancel")
+
+		close(releases[0])
+		if got := mustValue(t, <-b); got != 0 {
+			t.Errorf("B value = %v, want 0 from the surviving wave", got)
+		}
+		if stub.calls() != 1 {
+			t.Errorf("upstream calls = %d, want exactly 1 (the wave survived A's detach)", stub.calls())
+		}
+		close(releases[1])
+	})
+}
+
 func TestWaveRead_secondTabAfterReadBeginCostsSecondPass(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tbl := newTestTable(t.Context())

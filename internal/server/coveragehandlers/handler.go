@@ -431,13 +431,16 @@ func resolveExcludeTags(ctx context.Context, client tagResolver, tags []string) 
 // writeCollectionFetchError maps a collection fetch failure onto the wire the
 // way the summaries do (A3): the wrapper's refusal sentinel answers 429 (a
 // refusal to keep waiting, never a 500; deliberately no Retry-After — the
-// client's latch ladder is the retry policy), an arr read failure — a marked
-// exclude-tag leg's wave failure included — answers the family's
-// upstream-failure 502, and a store failure keeps the generic 500 arm.
+// client's latch ladder is the retry policy), a client walk-away (only
+// r.Context().Err() reports it) gets no error log and no write, an arr read
+// failure — a marked exclude-tag leg's wave failure included — answers the
+// family's upstream-failure 502, and a store failure keeps the generic 500
+// arm.
 func writeCollectionFetchError(w http.ResponseWriter, r *http.Request, err, fetchErr error, what string) {
 	switch {
 	case errors.Is(err, arrsvc.ErrRecoveryRefused):
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "arr read refused, retry later")
+	case r.Context().Err() != nil:
 	case errors.Is(err, fetchErr), errors.Is(err, arrsvc.ErrRecoveryFailed):
 		slog.Error("coverage: failed to fetch "+what, "error", err)
 		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch "+what)
