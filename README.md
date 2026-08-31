@@ -9,6 +9,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/subflux/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/subflux)
 [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/subflux/releases)
 
+<!-- hub-overview BEGIN -->
 A fast, small subtitle search, download, and sync engine for Sonarr and Radarr. A Go-based Bazarr alternative that ships as a ~14 MB container.
 
 ## ⚠️ Alpha software
@@ -18,6 +19,7 @@ Subflux is pre-1.0 and under active development. It is functional and runs a 52,
 ## What it does
 
 Subflux finds, scores, downloads, and time-syncs subtitles for your Sonarr/Radarr library. It watches the \*arr import history (default 30 s poll) so new downloads get subtitles within moments of importing, and runs scheduled full-library scans (default 24 h) to fill gaps and upgrade what's already there. Every result passes an identity check and a release-quality score; the best one is downloaded, synced against the video's own timing, cleaned up, and saved next to the media file. A web UI shows per-show coverage at a glance and lets you search, pick, and visually sync subtitles by hand when you want control.
+<!-- hub-overview END -->
 
 ## Why subflux
 
