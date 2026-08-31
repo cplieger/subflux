@@ -30,7 +30,7 @@ import {
 import type { QueryValue } from "./wire/client.gen.js";
 import type { ApiResult } from "./api-client.js";
 import { loadCoverage } from "./coverage.js";
-import { openMovieDetail, renderSeriesDetail } from "./detail.js";
+import { disposeDetailBindings, openMovieDetail, renderSeriesDetail } from "./detail.js";
 import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
@@ -71,14 +71,16 @@ function isCurrent(key: string, gen: number, ctrl: AbortController): boolean {
 }
 
 /** The ROUTER's leave path: abort the departing route's in-flight page leg,
- *  so the detail refresh pair dies on leave. (C2's dispose joins this path
- *  in a later task.) */
+ *  so the detail refresh pair dies on leave, and release the detail bindings
+ *  beside it (C2) — the departing view's row effects must not outlive the
+ *  view. One owner: every route leave funnels through here. */
 export function abortPageLeg(): void {
   for (const [key, ctrl] of controllers) {
     generations.set(key, (generations.get(key) ?? 0) + 1);
     ctrl.abort();
   }
   controllers.clear();
+  disposeDetailBindings();
 }
 
 /** THE page-leg dispatcher. Runs the current route's page leg under the

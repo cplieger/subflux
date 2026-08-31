@@ -85,6 +85,7 @@ const rendered = vi.hoisted(() => ({
   movies: [] as { m: unknown; skipPush: boolean | undefined; signal: AbortSignal | undefined }[],
   loadCoverage: [] as (boolean | undefined)[],
   reloadHistory: 0,
+  disposeCalls: 0,
   // The transaction history leg's scripted outcomes, consumed in order; an
   // Error entry rejects; a Promise entry defers until the test resolves it.
   historyLeg: [] as (string | Error | Promise<string>)[],
@@ -101,6 +102,9 @@ vi.mock("./detail.js", () => ({
   },
   openMovieDetail: (m: unknown, skipPush?: boolean, signal?: AbortSignal) => {
     rendered.movies.push({ m, skipPush, signal });
+  },
+  disposeDetailBindings: () => {
+    rendered.disposeCalls++;
   },
 }));
 vi.mock("./coverage.js", () => ({
@@ -177,6 +181,7 @@ beforeEach(() => {
   rendered.movies = [];
   rendered.loadCoverage = [];
   rendered.reloadHistory = 0;
+  rendered.disposeCalls = 0;
   rendered.historyLeg = [];
   rendered.historyLegCalls = [];
   onLibrary();
@@ -380,6 +385,18 @@ describe("page-leg: abort + generation guards", () => {
     }
     expect(await d1).toBe("superseded");
     expect(rendered.series).toHaveLength(0);
+  });
+
+  it("the leave path releases the detail bindings beside the abort (C2)", () => {
+    // One owner: the router's applyRoute funnels every route leave through
+    // abortPageLeg, which drops the departing view's row effects. The
+    // dispose behavior itself is pinned in detail.test.ts; this pins the
+    // wiring.
+    expect(rendered.disposeCalls).toBe(0);
+
+    abortPageLeg();
+
+    expect(rendered.disposeCalls).toBe(1);
   });
 
   it("a landing for a route no longer on screen is discarded", async () => {

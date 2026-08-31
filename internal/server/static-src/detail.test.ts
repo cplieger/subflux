@@ -47,6 +47,16 @@ vi.mock("./wire/client.gen.js", () => ({
   stateIDs: () => Promise.resolve(clientState.stateIDs),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
+// The ui-primitives view-transition wrapper: renders and in-place heals must
+// NEVER invoke it (navigation-only view transitions — the router owns the
+// only call site, pinned in router.test.ts).
+const uipViewTransition = vi.hoisted(() => ({ calls: 0 }));
+vi.mock("@cplieger/ui-primitives/view-transition", () => ({
+  viewTransition: () => {
+    uipViewTransition.calls += 1;
+    return Promise.resolve();
+  },
+}));
 // The bus handlers detail.ts registers at import time are the only entry point
 // to openSeriesDetail; capturing them lets a test drive that path the way
 // coverage.ts does, while `emit` stays a spy for the panel assertions.
@@ -83,6 +93,7 @@ vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: () => undefined }
 // flag or the ignored-codec set without re-mocking the module.
 const storeState = vi.hoisted(() => ({
   ignoredCodecs: new Set<string>(),
+  ignoredCodecsReads: 0,
   isAdmin: false,
   config: null as { sonarr_url?: string; radarr_url?: string } | null,
   sets: [] as [string, unknown][],
@@ -90,6 +101,7 @@ const storeState = vi.hoisted(() => ({
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => {
     if (k === "ignoredCodecs") {
+      storeState.ignoredCodecsReads += 1;
       return storeState.ignoredCodecs;
     }
     if (k === "isAdmin") {
@@ -105,7 +117,7 @@ vi.mock("./store.js", () => ({
   },
 }));
 
-import { renderSeriesDetail, openMovieDetail } from "./detail.js";
+import { renderSeriesDetail, openMovieDetail, disposeDetailBindings } from "./detail.js";
 import { split } from "@cplieger/keyenc";
 import { openSyncDialog } from "./sync.js";
 import { openFileManager } from "./files.js";
@@ -264,6 +276,24 @@ function pipeJoinedEntryBlock(entries: SubtitleEntry[]): string {
   return entries
     .map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}:${e.ordinal ?? 0}`)
     .join(",");
+}
+
+/** A history set that counts its own traversals: the C3 hoists are pinned by
+ *  EXECUTION COUNT (one walk per rebuild, point lookups per row), which no
+ *  output assertion can observe. */
+class CountingSet extends Set<string> {
+  iterations = 0;
+  hasCalls = 0;
+
+  override [Symbol.iterator](): SetIterator<string> {
+    this.iterations += 1;
+    return super[Symbol.iterator]();
+  }
+
+  override has(v: string): boolean {
+    this.hasCalls += 1;
+    return super.has(v);
+  }
 }
 
 describe("detail: renderSeriesDetail", () => {
@@ -1501,7 +1531,7 @@ describe("detail: renderSeriesDetail table chrome", () => {
       '<div id="coverageContent"></div></div>';
   });
 
-  it("frames the table with a four-column layout, column headers and a season gap", () => {
+  it("frames the table with explicit table semantics, column headers and a season gap", () => {
     renderSeriesDetail(
       makeSeries(335, "Show AJ"),
       makeSeasons("Pilot", "Second", "Return"),
@@ -1509,12 +1539,17 @@ describe("detail: renderSeriesDetail table chrome", () => {
       new Set(),
     );
 
-    // The <colgroup> is the whole column layout: without it every column
-    // negotiates its own width and the action column collapses.
-    const widths = [...document.querySelectorAll("table.series-detail colgroup col")].map((c) =>
-      c.getAttribute("style"),
-    );
-    expect(widths).toEqual(["width: 8%", "width: 34%", "width: 34%", "width: 24%"]);
+    // RETIRED: the <colgroup> pin (the widths' owner until C1). The desktop
+    // tree left the table formatting context; the widths live in ONE shared
+    // grid-template-columns custom property, asserted with computed styles
+    // in detail-table-layout.test.ts (the shared-template pin).
+    expect(document.querySelector("table.series-detail colgroup")).toBeNull();
+
+    // Leaving the table formatting context strips the implicit table
+    // semantics, so the tree carries them explicitly.
+    const table = document.querySelector("table.series-detail");
+    expect(table?.getAttribute("role")).toBe("table");
+    expect(table?.getAttribute("aria-labelledby")).toBe("lib-heading");
 
     const tbody = seriesTbody();
     // S1 -> head(0), cols(1), ep01(2), ep02(3) ; S2 -> gap(4), head(5), ...
@@ -1530,8 +1565,50 @@ describe("detail: renderSeriesDetail table chrome", () => {
     const gap = reqRow(tbody.children.item(4));
     expect(gap.className).toBe("season-gap");
     const gapCell = gap.children.item(0) as HTMLTableCellElement | null;
-    // A spacer must span every column, however many the layout grows to.
-    expect(gapCell?.colSpan).toBe(999);
+    // RETIRED with the colgroup: colSpan 999. The spacer spans every grid
+    // column via grid-column: 1 / -1 (geometry pinned in the layout suite).
+    expect(gapCell?.hasAttribute("colspan")).toBe(false);
+  });
+
+  it("carries the full row semantics on every row kind (rowgroup/row/columnheader/cell)", () => {
+    // The harness populates the heading BEFORE the render, the order the
+    // panel-configure path guarantees, so the accessible name has a source.
+    const heading = document.getElementById("lib-heading");
+    if (!heading) {
+      throw new Error("lib-heading missing");
+    }
+    heading.textContent = "Show AV";
+
+    renderSeriesDetail(
+      makeSeries(344, "Show AV"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [],
+      new Set(),
+    );
+
+    const tbody = seriesTbody();
+    expect(tbody.getAttribute("role")).toBe("rowgroup");
+    const trs = [...tbody.querySelectorAll("tr")];
+    expect(trs.length).toBeGreaterThan(0);
+    for (const tr of trs) {
+      expect(tr.getAttribute("role")).toBe("row");
+    }
+    const ths = [...tbody.querySelectorAll("th")];
+    expect(ths).toHaveLength(8); // one 4-column header row per season
+    for (const th of ths) {
+      expect(th.getAttribute("role")).toBe("columnheader");
+    }
+    const tds = [...tbody.querySelectorAll("td")];
+    expect(tds.length).toBeGreaterThan(0);
+    for (const td of tds) {
+      expect(td.getAttribute("role")).toBe("cell");
+    }
+    // The accessible name resolves through aria-labelledby to the populated
+    // panel heading.
+    const table = document.querySelector("table.series-detail");
+    const labelledBy = table?.getAttribute("aria-labelledby");
+    const nameSource = labelledBy ? document.getElementById(labelledBy) : null;
+    expect(nameSource?.textContent).toBe("Show AV");
   });
 
   it("labels the episode cells with the aired number, the title and the episode key", () => {
@@ -1551,6 +1628,47 @@ describe("detail: renderSeriesDetail table chrome", () => {
     // data-ep is how the CSS labels a narrow-viewport row with its episode.
     expect(titleCell?.getAttribute("data-ep")).toBe("E01");
     expect(titleCell?.textContent).toBe("Pilot");
+  });
+
+  it("derives the codec signature and history membership once per rebuild, not per row", () => {
+    // C3 hoists, pinned by execution count: 2 seasons and 3 episode rows must
+    // cost ONE ignored-codec read (was one per episode row) and ONE history
+    // walk (was one full scan per season); per-episode membership stays a
+    // point lookup.
+    const historySet = new CountingSet(["tvdb-342-s01e01"]);
+    storeState.ignoredCodecsReads = 0;
+
+    renderSeriesDetail(
+      makeSeries(342, "Show AT"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [],
+      historySet,
+    );
+
+    expect(storeState.ignoredCodecsReads).toBe(1);
+    expect(historySet.iterations).toBe(1);
+    expect(historySet.hasCalls).toBe(3);
+    // The hoisted membership answers exactly as the per-season scan did.
+    const s1Head = reqRow(seriesTbody().children.item(0));
+    expect(
+      s1Head.querySelector('[data-tip="View download history for this season"]'),
+    ).not.toBeNull();
+    const s2Head = reqRow(seriesTbody().children.item(5));
+    expect(s2Head.querySelector('[data-tip="View download history for this season"]')).toBeNull();
+  });
+
+  it("paints renders and in-place heals without invoking a view transition", () => {
+    // Navigation-only view transitions (R9): the router wraps route changes;
+    // a detail rebuild or a coverage heal repainting rows in place never
+    // queues one.
+    const series = makeSeries(343, "Show AU");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    uipViewTransition.calls = 0;
+
+    renderSeriesDetail(series, seasons, [], new Set()); // REBUILD
+    renderSeriesDetail(series, seasons, [epSub("tvdb-343-s01e01", 80)], new Set()); // REUSE heal
+
+    expect(uipViewTransition.calls).toBe(0);
   });
 
   it("keeps the aired number beside an absolute label as its own element", () => {
@@ -1867,5 +1985,72 @@ describe("detail: openMovieDetail chrome", () => {
 
     expect(covText(movieTbody().children.item(1))).toBe(`srt: ext ${STAR}85`);
     expect(reqRow(movieTbody().children.item(0)).getAttribute("data-probe")).toBe("kept");
+  });
+
+  it("renders the exact markup shipped before the series-detail conversion (no-change control)", async () => {
+    // C1 converts the SERIES detail out of the table formatting context;
+    // movie-detail stays a real table. This pins the movie table's whole
+    // rendered artifact so any drift the conversion causes here fails loudly.
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(98));
+
+    const table = document.querySelector("table.movie-detail");
+    if (!table) {
+      throw new Error("movie table missing");
+    }
+    expect(table.outerHTML).toMatchInlineSnapshot(
+      `"<table class="movie-detail" data-movie-id="98"><thead><tr><th>Language</th><th>Subtitles</th><th></th></tr></thead><tbody><tr data-sig="external\\\\\\:srt\\\\\\:90:" data-reconcile-key="en:standard"><td>English</td><td class="ep-coverage"><span class="badge" data-status="ok">srt: ext ★90</span></td><td data-col="actions"><button type="button" class="ghost" data-tip="Search English subtitles"><span class="icon icon-search"></span><span class="btn-text"> Search</span></button></td></tr><tr data-sig=":" data-reconcile-key="fr:standard"><td>French</td><td class="ep-coverage"><span class="badge" data-status="err">—</span></td><td data-col="actions"><button type="button" class="ghost" data-tip="Search French subtitles"><span class="icon icon-search"></span><span class="btn-text"> Search</span></button></td></tr></tbody></table>"`,
+    );
+  });
+});
+
+describe("detail: release on leave (C2)", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    clientState.movieSubs = [];
+    clientState.subsDefer = false;
+    clientState.subsPending = [];
+    clientState.stateIDs = null;
+    history.replaceState(null, "", "/");
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("a disposed series binding never reuses: the next render rebuilds fresh row effects", () => {
+    const series = makeSeries(345, "Show AW");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    renderSeriesDetail(series, seasons, [], new Set());
+    const before = seriesTbody();
+
+    // Same series, still-connected tbody: the render path REUSES the binding.
+    renderSeriesDetail(series, seasons, [], new Set());
+    expect(seriesTbody()).toBe(before);
+
+    disposeDetailBindings();
+
+    // The leave path dropped the binding (page-leg's abortPageLeg owns the
+    // call): nothing stays subscribed to the departed view, so an identical
+    // render REBUILDS instead of feeding the released collection.
+    renderSeriesDetail(series, seasons, [], new Set());
+    expect(seriesTbody()).not.toBe(before);
+  });
+
+  it("a disposed movie binding never reuses either", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(99));
+    const before = movieTbody();
+
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(99), true);
+    expect(movieTbody()).toBe(before);
+
+    disposeDetailBindings();
+
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(99), true);
+    expect(movieTbody()).not.toBe(before);
   });
 });

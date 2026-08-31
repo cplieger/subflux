@@ -222,10 +222,11 @@ const routes: Route[] = [
 // Read location.pathname and render the matching view.
 // This is called on initial load, pushState navigation, and popstate.
 export async function applyRoute(): Promise<void> {
-  // THE LEAVE PATH (B2): the view on screen is being left or re-applied, so
-  // any in-flight page-leg work belongs to a departed view — abort its
-  // controller before the new route renders. (C2's detail dispose joins this
-  // path in a later task.)
+  // THE LEAVE PATH (B2 + C2): the view on screen is being left or re-applied,
+  // so any in-flight page-leg work belongs to a departed view — abort its
+  // controller and release the detail bindings before the new route renders
+  // (abortPageLeg owns both; detail-coupled dirty heal entries clear on the
+  // detailCtx change, coverage-heal.ts).
   abortPageLeg();
   const path = location.pathname;
 

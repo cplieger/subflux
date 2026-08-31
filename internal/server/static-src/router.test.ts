@@ -104,9 +104,13 @@ vi.mock("./page-leg.js", () => ({
 
 // The view transition is cosmetic and asynchronous; running the callback
 // straight through keeps the assertions about routing. Only the primitive is
-// replaced, so utils.ts (setDocTitle included) stays real.
+// replaced, so utils.ts (setDocTitle included) stays real. The call count
+// backs the navigation-only pin: route changes queue through this wrapper
+// (heals never do — pinned from the render side in detail.test.ts).
+const viewTransitions = vi.hoisted(() => ({ calls: 0 }));
 vi.mock("@cplieger/ui-primitives/view-transition", () => ({
   viewTransition: (fn: () => void) => {
+    viewTransitions.calls++;
     fn();
     return Promise.resolve();
   },
@@ -211,6 +215,7 @@ beforeEach(() => {
   collaborators.searchCalls.length = 0;
   collaborators.fileManagerCalls.length = 0;
   pageLeg.abortCalls = 0;
+  viewTransitions.calls = 0;
   const f = filters();
   f.type.value = "all";
   f.q.value = "";
@@ -629,6 +634,16 @@ describe("route leave", () => {
     router.navigate("/history", true);
 
     expect(pageLeg.abortCalls).toBe(1);
+  });
+
+  it("navigation queues through the view-transition wrapper (navigation-only transitions)", () => {
+    // The router is the ONE caller of the queued wrapper: every navigate()
+    // rides a view transition, and nothing else does (heals are pinned
+    // transition-free from the render side in detail.test.ts).
+    at("/history");
+    router.navigate("/history", true);
+
+    expect(viewTransitions.calls).toBe(1);
   });
 });
 

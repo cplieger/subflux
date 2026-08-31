@@ -244,19 +244,15 @@ td[data-col="actions"] {
     text-align: end;
   }
 
-  /* Shared desktop table reset for detail views */
-  .movie-detail tbody tr,
-  .series-detail tbody tr {
+  /* Movie detail desktop reset: back to a real table. The series detail
+     leaves the table formatting context below and no longer shares these. */
+  .movie-detail tbody tr {
     display: table-row;
   }
 
-  .movie-detail tbody td,
-  .series-detail tbody td {
+  .movie-detail tbody td {
     display: table-cell;
     padding: var(--sp-4);
-  }
-
-  .movie-detail tbody td {
     grid-row: unset;
   }
 
@@ -264,34 +260,78 @@ td[data-col="actions"] {
     display: inline-flex;
   }
 
+  /* Series detail desktop (C1): OUT of the table formatting context. Every
+     row kind — episode, season-head, column-header, season-gap — is a grid
+     reading ONE shared column template; the <colgroup> that owned these
+     widths is gone. */
   table.series-detail {
-    display: table;
+    --series-detail-cols: 8% 34% 34% 24%;
+
+    display: block;
     width: 100%;
   }
 
-  .series-detail :where(colgroup) {
-    display: table-column-group;
-  }
-
   .series-detail :where(tbody) {
-    display: table-row-group;
+    display: block;
   }
 
-  .series-detail .season-head,
-  .series-detail .season-head:has(th),
-  .series-detail .season-gap {
-    display: table-row;
+  /* One grid per row. The mobile card grid's template/gap/padding reset so
+     the cells own the spacing, matching the old table rows. */
+  .series-detail :where(tbody) tr {
+    display: grid;
+    grid-template-columns: var(--series-detail-cols);
+    grid-template-rows: none;
+    gap: 0;
+    padding: 0;
+    align-items: center;
   }
 
-  .series-detail .season-head td,
+  /* Same specificity as the old shared cell reset on purpose: this shorthand
+     must keep beating .season-head td's padding-block and .season-gap td's
+     padding, as it did as a table, or the row geometry shifts. */
+  .series-detail tbody td,
+  .series-detail tbody th {
+    display: block;
+    padding: var(--sp-4);
+  }
+
+  /* The actions cell auto-places into the last column; the mobile base's
+     explicit card placement does not apply to the desktop grid. */
+  .series-detail :where(tbody) td[data-col="actions"] {
+    grid-area: auto;
+    place-self: auto;
+  }
+
+  /* The season-head label SPANS the data columns instead of overflowing its
+     old 8% table column; its two empty layout cells stay hidden. */
+  .series-detail .season-head td:first-child {
+    grid-column: 1 / -2;
+  }
+
+  .series-detail .season-head td:empty {
+    display: none;
+  }
+
+  .series-detail .season-head td[data-col="actions"] {
+    grid-column: -2 / -1;
+  }
+
+  /* The season-gap spacer spans every column (was colSpan 999). */
   .series-detail .season-gap td {
-    display: table-cell;
+    grid-column: 1 / -1;
   }
 
   .series-detail .ep-coverage {
     display: inline-flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  /* Episode rows render on demand: an off-screen row skips layout and paint
+     and stands in at the measured desktop row height. */
+  .series-detail :where(tbody) tr:not(.season-head, .season-gap) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 2.9375rem;
   }
 }
 
@@ -452,10 +492,6 @@ td[data-col="actions"] {
     width: 100%;
   }
 
-  .series-detail :where(colgroup) {
-    display: none;
-  }
-
   .series-detail :where(tbody) {
     display: block;
   }
@@ -468,6 +504,13 @@ td[data-col="actions"] {
     padding: var(--sp-4);
     align-items: center;
     border-block-end: 1px solid var(--border);
+  }
+
+  /* Episode rows render on demand, as on desktop, at the mobile card
+     height (two grid rows + gap inside the row's own padding). */
+  .series-detail :where(tbody) tr:not(.season-head, .season-gap) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 3.375rem;
   }
 
   .series-detail .season-head + .season-head + tr {
