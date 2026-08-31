@@ -436,27 +436,3 @@ method (*CachedRadarr).Close
 #           added beside it is the only guard there can be.
 method (*gzipResponseWriter).Flush
 method (*gzipResponseWriter).Unwrap
-
-# --- PENDING USER DECISION: a vestigial audio-sync path ---------------------
-# (SubtitleProcessor).SyncFromAudio is reported EU1002 — ZERO references, not
-# even a test. It is whitelisted only to keep the gate at zero while the removal
-# decision is open; it is NOT healthy.
-#
-# It is the head of a chain, which is why it is a decision rather than a
-# deletion. The method is the only reader of SubtitleProcessor.exec, so removing
-# it also strands `exec`, `NewSubtitleProcessorWithExec`, and main.go:504's
-# `server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec))` —
-# the composition root threads the syncworker executor into a processor that no
-# longer uses it. The LIVE audio-sync path is the server-owned job dispatcher
-# reaching the same executor through search.WithSyncExec (main.go:566), and both
-# consumer interfaces (previewhandlers.SubtitleProcessor,
-# synchandlers.SubtitleProcessor) declare only NormalizeEncoding / ParseSRT /
-# WriteSRT. So this reads as residue from the D1-D3 move to background jobs.
-# Resolve by deleting the method, the field, the constructor and the main.go
-# option together.
-#
-# NOTE: punused's reported subset is unstable per run (this file's reffixture
-# entry records the same effect), so this finding and the two above surfaced on
-# a PR that touches neither package. GetOrFetchCtx, reported in the same run,
-# WAS deleted rather than whitelisted — it had zero callers and no cascade.
-method (SubtitleProcessor).SyncFromAudio
