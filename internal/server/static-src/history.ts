@@ -640,6 +640,10 @@ export function reloadHistoryForTransaction(
   signal?: AbortSignal,
 ): Promise<"applied" | "superseded" | "rerouted"> {
   if (running !== null || pendingReload !== null) {
+    // A /history boot pays two list reads here (the route's page-0 reload,
+    // then this latched depth-preserving one): accepted — only a post-latch
+    // fetch is provably epoch-fresh, and the serializer does not track a
+    // run's dispatch time against the epoch.
     return chainSettlement(ensurePendingLatch());
   }
   const g = allocGeneration();

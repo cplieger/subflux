@@ -27,6 +27,7 @@ import {
   PATH_PREVIEW_VIDEO,
 } from "./wire/client.gen.js";
 import { bindLoadingState, registerCleanup } from "@cplieger/actions";
+import { observeActivities } from "./status.js";
 import { langName } from "./utils.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";
 import type { TimecodeInput } from "./sync-timecode.js";
@@ -1314,6 +1315,30 @@ async function renderSeasonBatch(
       }
     });
     seasonUnwatchers.push(unwatch);
+  }
+
+  if (!allDone()) {
+    // Batch terminals that publish no per-item sync:done — a popup stop
+    // landing between items, a queued batch cancelled outright — settle the
+    // remaining rows server-side in silence. The batch ACTIVITY's terminal
+    // transition (or its removal, once seen) is the delivery: re-read the
+    // registry then. The re-render skips this registration once every row
+    // is done, so a settled batch's lingering activity re-reads nothing.
+    let seen = false;
+    const unobserve = observeActivities((activities) => {
+      if (!dlg.open) {
+        return;
+      }
+      const entry = activities.find((a) => a.id === batchId);
+      if (entry && !entry.done) {
+        seen = true;
+        return;
+      }
+      if (entry?.done || (seen && !entry)) {
+        refresh();
+      }
+    });
+    seasonUnwatchers.push(unobserve);
   }
 }
 

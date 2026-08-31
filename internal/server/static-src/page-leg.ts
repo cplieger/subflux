@@ -2,8 +2,9 @@
 //
 // ONE place enumerates what refreshing the current route means (E3 step 3):
 // library reloads the pair, series detail runs the triple (episodes, episode
-// coverage, history ids), movie detail reads its summary and lets
-// openMovieDetail run the /subs + movie stateIDs pair, history reloads, and
+// coverage, history ids), movie detail runs its own triple (summary + /subs
+// + movie stateIDs — the plain dispatcher delegates the latter two to
+// openMovieDetail, the transaction awaits all three), history reloads, and
 // files is an empty leg (the files page owns its refresh). Task 9's
 // transactions dispatch their page leg through refreshCurrentPage, so this
 // per-route enumeration is the shared seam.
@@ -18,6 +19,7 @@
 import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
 import {
+  coverageMovieSubsRaw,
   coverageMovieSummary,
   coverageMovieSummaryRaw,
   coverageSeriesDetail,
@@ -30,7 +32,12 @@ import {
 import type { QueryValue } from "./wire/client.gen.js";
 import type { ApiResult } from "./api-client.js";
 import { loadCoverage } from "./coverage.js";
-import { disposeDetailBindings, openMovieDetail, renderSeriesDetail } from "./detail.js";
+import {
+  disposeDetailBindings,
+  openMovieDetail,
+  renderMovieDetailFromLeg,
+  renderSeriesDetail,
+} from "./detail.js";
 import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
@@ -61,7 +68,27 @@ export function currentRouteKey(): string {
   if (ctx && "movie" in ctx && ctx.movie) {
     return `movie:${ctx.tmdbId}`;
   }
-  return "library";
+  // No landed detail context: the URL classifies, not the transient
+  // currentPage value. A detail path IS a detail route at boot (R2.3/A7) —
+  // the router sets currentPage="library" synchronously while detailCtx
+  // lands only with the summary, so store state alone misreads a deep-link
+  // boot as the library and the collection leg fetches the pair.
+  return routeKeyFromPath(location.pathname);
+}
+
+// URL → route identity for the window before any detail context lands,
+// mirroring the router's own table (same key space as the ctx-derived arms,
+// so a landing context is a no-op key change). Unknown paths are the
+// library — applyRoute's default arm.
+function routeKeyFromPath(path: string): string {
+  if (path === "/history") {
+    return "history";
+  }
+  if (/^\/(?:series|movie)\/\d+\/files$/.test(path)) {
+    return "files";
+  }
+  const m = /^\/(series|movie)\/(\d+)(?:\/sync|\/search\/[a-z]{2,3})?$/.exec(path);
+  return m ? `${m[1] ?? ""}:${m[2] ?? ""}` : "library";
 }
 
 // A run may apply only while un-aborted, newest for its route, and its route
@@ -151,7 +178,12 @@ async function dispatchLeg(
     }
     return "applied";
   }
-  await loadCoverage(true);
+  if (key === "library") {
+    await loadCoverage(true);
+    return "applied";
+  }
+  // A pending detail (the URL names a detail route whose context has not
+  // landed): the route loader owns the fetch — an empty leg.
   return "applied";
 }
 
@@ -160,6 +192,44 @@ async function dispatchLeg(
 // steady-state emitter and it is not bursty).
 on(BusEvent.DataInvalidate, () => {
   void refreshCurrentPage();
+});
+
+/** A6's series detail-coupling (R1.2): a healed series root whose own detail
+ *  is open refreshes the REFRESH PAIR — episode coverage + history ids —
+ *  rendering with the cached seasons. Never mediaEpisodes: the event path is
+ *  specified to cost no arr-backed read; the transaction/page-leg triple
+ *  keeps it. Runs under the route's controller and a fresh generation like
+ *  any dispatch, superseding an older run. */
+async function refreshSeriesDetailPair(): Promise<void> {
+  const ctx = store.get("detailCtx");
+  if (!ctx || !("tvdbId" in ctx) || !ctx.tvdbId) {
+    return;
+  }
+  const key = currentRouteKey();
+  const gen = (generations.get(key) ?? 0) + 1;
+  generations.set(key, gen);
+  controllers.get(key)?.abort();
+  const ctrl = new AbortController();
+  controllers.set(key, ctrl);
+  try {
+    const { signal } = ctrl;
+    const [subFiles, historyIDs] = await Promise.all([
+      coverageSeriesDetail(ctx.tvdbId, { signal }),
+      stateIDs({ type: "episode", prefix: `tvdb-${ctx.tvdbId}-` }, { signal }),
+    ]);
+    if (!isCurrent(key, gen, ctrl)) {
+      return;
+    }
+    renderSeriesDetail(ctx.series, ctx.seasons, subFiles ?? [], new Set(historyIDs ?? []));
+  } finally {
+    if (controllers.get(key) === ctrl) {
+      controllers.delete(key);
+    }
+  }
+}
+
+on(BusEvent.RefreshSeriesDetail, () => {
+  void refreshSeriesDetailPair();
 });
 
 // --- Task 9: the transaction's PAGE leg ---
@@ -266,17 +336,35 @@ async function transactionArm(
     return "applied";
   }
   if (ctx && "movie" in ctx && ctx.movie) {
-    const row = await coverageMovieSummaryRaw(ctx.tmdbId, rq, { signal });
+    // E3 step 3: the movie leg is the summary + /subs + movie stateIDs
+    // TRIPLE, all awaited on the raw client — commit waits for all three,
+    // and a genuinely failed read aborts the transaction instead of
+    // painting an empty subs table. /subs and stateIDs are store-only reads
+    // and never carry ?recovery=1; a 404 is a definitive answer (vanished
+    // item), rendered as the shipped fallback.
+    const [row, subs, historyIDs] = await Promise.all([
+      coverageMovieSummaryRaw(ctx.tmdbId, rq, { signal }),
+      coverageMovieSubsRaw(ctx.tmdbId, { signal }),
+      stateIDsRaw({ type: "movie", prefix: `tmdb-${ctx.tmdbId}` }, { signal }),
+    ]);
     if (!isCurrent(key, gen, ctrl)) {
       return outrunOrRerouted(key);
     }
-    const failure = legFailure(row);
+    const failure = legFailure(row, subs, historyIDs);
     if (failure) {
       throw failure;
     }
     if (row.ok && row.data !== undefined) {
-      openMovieDetail(row.data, true, signal);
+      renderMovieDetailFromLeg(row.data, subs.data ?? [], historyIDs.data ?? []);
     }
+    return "applied";
+  }
+  if (currentRouteKey() === key) {
+    // A PENDING detail: the URL still names this route but its context has
+    // not landed (a deep-link boot resolving its item). The ROUTE LOADER
+    // owns the item-grain resolution (R2.3), so the leg is EMPTY and
+    // settles applied immediately — which keeps the re-route chain
+    // terminating.
     return "applied";
   }
   // Route state moved between the key computation and the arm (a detail

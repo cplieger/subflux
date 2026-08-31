@@ -29,6 +29,21 @@ vi.mock("./sync-jobs.js", () => ({
   clearSyncCorrelation: vi.fn(),
 }));
 
+// The activity store (task 11): sync.ts watches the BATCH activity's
+// terminal transition for the no-event terminal arms. Captured observers
+// are fired by hand with scripted snapshots.
+const activityObs = vi.hoisted(() => ({
+  fns: new Set<(activities: readonly unknown[]) => void>(),
+}));
+vi.mock("./status.js", () => ({
+  observeActivities: (fn: (activities: readonly unknown[]) => void) => {
+    activityObs.fns.add(fn);
+    return () => {
+      activityObs.fns.delete(fn);
+    };
+  },
+}));
+
 vi.mock("./wire/client.gen.js", () => ({
   previewStart: vi.fn(),
   syncJobs: syncJobsMock,
@@ -109,10 +124,19 @@ afterAll(() => {
   host.remove();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   if (dlg().open) {
+    // Chromium QUEUES the close event as a task instead of dispatching it
+    // synchronously, on a different task queue than timers — so wait for
+    // the event itself. An undrained stale close lands mid-test and
+    // consumes the next dialog's once-close teardown listener.
+    const closed = new Promise((r) => {
+      dlg().addEventListener("close", r, { once: true });
+    });
     dlg().close();
+    await closed;
   }
+  activityObs.fns.clear();
   dispatchSeason.mockReset();
   dispatchAudio.mockReset();
   syncJobsMock.mockReset();
@@ -325,5 +349,69 @@ describe("stopping the batch", () => {
     await vi.waitFor(() => {
       expect(dlg().textContent).toContain("Done: 0 synced, 2 failed");
     });
+  });
+
+  it("a popup stop landing between items reconciles the OPEN dialog via the batch activity terminal", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    let stopped = false;
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) => {
+      if (!query || query["batch_activity_id"] !== "act-7") {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve(
+        stopped
+          ? [
+              job(11, 1, "done", {
+                outcome: "result",
+                applied: true,
+                offset_ms: 420,
+                confidence: 0.9,
+              }),
+              job(12, 2, "done", { outcome: "cancelled", error: "context canceled" }),
+            ]
+          : [
+              job(11, 1, "done", {
+                outcome: "result",
+                applied: true,
+                offset_ms: 420,
+                confidence: 0.9,
+              }),
+              job(12, 2, "queued"),
+            ],
+      );
+    });
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Syncing 1/2");
+    });
+
+    // The stop was dispatched from the ACTIVITY POPUP and landed BETWEEN
+    // items: the queued sibling settles cancelled server-side with no
+    // sync:done of its own. The batch activity's terminal upsert is the
+    // only delivery the open dialog gets.
+    stopped = true;
+    const terminal = {
+      started_at: "2026-08-31T09:00:00Z",
+      id: "act-7",
+      action: "Season Sync",
+      detail: "Breaking Bad S01",
+      source: "manual",
+      done: true,
+      cancelled: true,
+    };
+    for (const fn of [...activityObs.fns]) {
+      fn([terminal]);
+    }
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("stopped");
+    });
+    expect(dlg().textContent).toContain("Done: 1 synced, 1 failed");
+    // The dialog's own Stop button was never the trigger.
+    expect(cancelActivityMock).not.toHaveBeenCalled();
   });
 });

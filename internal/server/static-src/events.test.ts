@@ -201,6 +201,21 @@ describe("events: SSE connection", () => {
     expect(FakeEventSource.instances).toHaveLength(4);
   });
 
+  it("a deliberate disconnect leaves the attempt counter untouched", () => {
+    events.connect();
+    lastFakeES().fail();
+    vi.advanceTimersByTime(SSE_RECONNECT_MS);
+    lastFakeES().fail();
+    expect(events._stateForTest().reconnectAttempt).toBe(2);
+
+    setHidden(true); // the production disconnect path
+
+    // The counter resets only on a non-latched open and on COMMIT — never
+    // on a deliberate teardown, so tab flapping cannot shortcut the ladder.
+    expect(events._stateForTest().reconnectAttempt).toBe(2);
+    setHidden(false);
+  });
+
   it("disconnects on visibilitychange hidden", () => {
     events.connect();
     const es = lastFakeES();

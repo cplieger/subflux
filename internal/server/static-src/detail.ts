@@ -1040,6 +1040,75 @@ const movieSpec: ListSpec<MovieRow> = {
   },
 };
 
+/** The movie detail's header: doc title + panel config from the cached row.
+ *  The buttons that depend on the subtitle rows (sync, Files) are added by
+ *  renderMovieDetail once the /subs rows are in hand, the way the series
+ *  path adds its Files button. */
+function configureMovieHeader(m: MovieDetail): void {
+  setDocTitle(m.title);
+  const targets = m.targets;
+  const subsInfo =
+    targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
+  const info = `${m.year} \u00B7 audio: ${langName(
+    m.rule,
+  )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
+  emit(BusEvent.PanelConfigure, {
+    visible: false,
+    detail: {
+      title: m.title,
+      info,
+      backPath: "/",
+      arrLink: buildRadarrLink(m),
+      arrName: "Radarr",
+    },
+  });
+}
+
+/** Add the History nav button (idempotent — at most one per header). */
+function addMovieHistoryButton(m: MovieDetail): void {
+  const headerEl = document.querySelector("#coveragePanel .card-head");
+  if (!headerEl || headerEl.querySelector('[data-nav="hist"]')) {
+    return;
+  }
+  const histBtn = el(
+    "button",
+    {
+      type: "button",
+      className: "ghost",
+      "data-nav": "hist",
+      onclick: () => {
+        emit(BusEvent.NavHistory, m.title);
+      },
+    },
+    icon("history"),
+    el("span", { className: "btn-text" }, " History"),
+  );
+  insertNavButton(histBtn);
+}
+
+/** The transaction page leg's movie render (E3 step 3): paint from the leg's
+ *  own pre-fetched triple. Everything openMovieDetail does except fetching —
+ *  the LEG owns the three reads on the raw client, so commit waits for them
+ *  and a failed read aborts the transaction instead of painting an empty
+ *  subs table. */
+export function renderMovieDetailFromLeg(
+  m: MovieDetail,
+  subs: SubtitleEntry[],
+  historyIDs: string[],
+): void {
+  // Supersede any in-flight plain open: this render owns the fresh paint.
+  if (detailAbort) {
+    detailAbort.abort();
+    detailAbort = null;
+  }
+  configureMovieHeader(m);
+  if (historyIDs.length > 0) {
+    addMovieHistoryButton(m);
+  }
+  store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
+  renderMovieDetail(m, subs);
+}
+
 export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: AbortSignal): void {
   // Abort any prior in-flight detail fetch.
   if (detailAbort) {
@@ -1053,26 +1122,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
   if (!skipPush) {
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
   }
-  setDocTitle(m.title);
-  const targets = m.targets;
-  const subsInfo =
-    targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
-  const info = `${m.year} \u00B7 audio: ${langName(
-    m.rule,
-  )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
-  // The header renders from the cached row alone; the buttons that depend on
-  // the subtitle rows (sync, Files) are added by renderMovieDetail once the
-  // on-demand /subs read lands, the way the series path adds its Files button.
-  emit(BusEvent.PanelConfigure, {
-    visible: false,
-    detail: {
-      title: m.title,
-      info,
-      backPath: "/",
-      arrLink: buildRadarrLink(m),
-      arrName: "Radarr",
-    },
-  });
+  configureMovieHeader(m);
 
   // Check history async and add button if found.
   stateIDs({ type: "movie", prefix: `tmdb-${m.tmdb_id}` }, { signal })
@@ -1081,23 +1131,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
         return;
       }
       if (ids && ids.length > 0) {
-        const headerEl = document.querySelector("#coveragePanel .card-head");
-        if (headerEl && !headerEl.querySelector('[data-nav="hist"]')) {
-          const histBtn = el(
-            "button",
-            {
-              type: "button",
-              className: "ghost",
-              "data-nav": "hist",
-              onclick: () => {
-                emit(BusEvent.NavHistory, m.title);
-              },
-            },
-            icon("history"),
-            el("span", { className: "btn-text" }, " History"),
-          );
-          insertNavButton(histBtn);
-        }
+        addMovieHistoryButton(m);
       }
     })
     .catch(() => {

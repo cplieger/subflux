@@ -2,7 +2,7 @@
 // store and bus; the wire client and the route renderers (detail, coverage,
 // history) are replaced so the assertions are about dispatch, supersession,
 // and abort — never about rendering, which each renderer's own suite pins.
-import { describe, it, vi, beforeEach, expect } from "vitest";
+import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 
 // Plain factories over hoisted mutable records (mockReset strips vi.fn
 // implementations between tests; see coverage.test.ts's header note).
@@ -11,6 +11,7 @@ const wire = vi.hoisted(() => ({
   subFiles: null as unknown,
   historyIDs: null as unknown,
   movieSummary: null as unknown,
+  movieSubs: null as unknown,
   calls: [] as { fn: string; args: unknown[]; signal: AbortSignal | undefined }[],
   // When true, wire reads hang until resolved by hand. The deferred promise
   // deliberately IGNORES its abort signal: resolving it late with real data
@@ -74,6 +75,8 @@ vi.mock("./wire/client.gen.js", () => ({
     wireCallRaw("stateIDsRaw", () => wire.historyIDs, [q], opts?.signal),
   coverageMovieSummaryRaw: (id: unknown, q?: unknown, opts?: { signal?: AbortSignal }) =>
     wireCallRaw("coverageMovieSummaryRaw", () => wire.movieSummary, [id, q], opts?.signal),
+  coverageMovieSubsRaw: (id: unknown, opts?: { signal?: AbortSignal }) =>
+    wireCallRaw("coverageMovieSubsRaw", () => wire.movieSubs, [id], opts?.signal),
   // The dispatcher must never read the collection (R1.2): present so a
   // regression that re-adds the call is recorded and fails the pin below.
   coverageMovies: (_q?: unknown, opts?: { signal?: AbortSignal }) =>
@@ -83,6 +86,7 @@ vi.mock("./wire/client.gen.js", () => ({
 const rendered = vi.hoisted(() => ({
   series: [] as { series: unknown; seasons: unknown; subFiles: unknown; historySet: unknown }[],
   movies: [] as { m: unknown; skipPush: boolean | undefined; signal: AbortSignal | undefined }[],
+  movieLegs: [] as { m: unknown; subs: unknown; historyIDs: unknown }[],
   loadCoverage: [] as (boolean | undefined)[],
   reloadHistory: 0,
   disposeCalls: 0,
@@ -102,6 +106,9 @@ vi.mock("./detail.js", () => ({
   },
   openMovieDetail: (m: unknown, skipPush?: boolean, signal?: AbortSignal) => {
     rendered.movies.push({ m, skipPush, signal });
+  },
+  renderMovieDetailFromLeg: (m: unknown, subs: unknown, historyIDs: unknown) => {
+    rendered.movieLegs.push({ m, subs, historyIDs });
   },
   disposeDetailBindings: () => {
     rendered.disposeCalls++;
@@ -126,7 +133,12 @@ vi.mock("./history.js", () => ({
 
 import * as store from "./store.js";
 import { emit, BusEvent } from "./bus.js";
-import { abortPageLeg, dispatchTransactionPageLeg, refreshCurrentPage } from "./page-leg.js";
+import {
+  abortPageLeg,
+  currentRouteKey,
+  dispatchTransactionPageLeg,
+  refreshCurrentPage,
+} from "./page-leg.js";
 import type { SeriesItem, SeasonGroup, MovieItem } from "./api-types.js";
 
 const SERIES = { id: 1042, tvdb_id: 42, title: "Show" } as unknown as SeriesItem;
@@ -173,12 +185,14 @@ beforeEach(() => {
   wire.subFiles = null;
   wire.historyIDs = null;
   wire.movieSummary = null;
+  wire.movieSubs = null;
   wire.calls = [];
   wire.defer = false;
   wire.pending = [];
   wire.failStatus = 502;
   rendered.series = [];
   rendered.movies = [];
+  rendered.movieLegs = [];
   rendered.loadCoverage = [];
   rendered.reloadHistory = 0;
   rendered.disposeCalls = 0;
@@ -296,6 +310,64 @@ describe("page-leg: DataInvalidate is a direct dispatch", () => {
     await settle();
 
     expect(rendered.loadCoverage).toStrictEqual([true, true]);
+  });
+});
+
+describe("page-leg: the series detail-coupling refresh pair (R1.2)", () => {
+  it("fetches the PAIR — never the arr-backed episodes read — and renders with cached seasons", async () => {
+    onSeriesDetail();
+    const subFiles = [{ media_id: "tvdb-42-s01e01" }];
+    wire.subFiles = subFiles;
+    wire.historyIDs = ["tvdb-42-s01e01"];
+
+    emit(BusEvent.RefreshSeriesDetail);
+    await settle();
+
+    expect(calls("mediaEpisodes")).toHaveLength(0);
+    expect(calls("mediaEpisodesRaw")).toHaveLength(0);
+    expect(calls("coverageSeriesDetail").map((c) => c.args)).toStrictEqual([[42]]);
+    expect(calls("stateIDs").map((c) => c.args)).toStrictEqual([
+      [{ type: "episode", prefix: "tvdb-42-" }],
+    ]);
+    expect(rendered.series).toStrictEqual([
+      {
+        series: SERIES,
+        seasons: CACHED_SEASONS,
+        subFiles,
+        historySet: new Set(["tvdb-42-s01e01"]),
+      },
+    ]);
+  });
+
+  it("no-op off a series detail", async () => {
+    onLibrary();
+
+    emit(BusEvent.RefreshSeriesDetail);
+    await settle();
+
+    expect(wire.calls).toStrictEqual([]);
+    expect(rendered.series).toHaveLength(0);
+    expect(rendered.loadCoverage).toHaveLength(0);
+  });
+
+  it("a route leave aborts the in-flight pair (same controller as any dispatch)", async () => {
+    onSeriesDetail();
+    wire.defer = true;
+
+    emit(BusEvent.RefreshSeriesDetail);
+    await settle();
+    const pending = wire.pending.splice(0);
+    const signals = wire.calls.map((c) => c.signal);
+    expect(pending).toHaveLength(2);
+
+    abortPageLeg();
+    expect(signals.every((s) => s?.aborted)).toBe(true);
+
+    for (const p of pending) {
+      p.resolve([]);
+    }
+    await settle();
+    expect(rendered.series).toHaveLength(0);
   });
 });
 
@@ -462,19 +534,102 @@ describe("page-leg: transaction dispatch", () => {
 
     onMovieDetail();
     wire.movieSummary = MOVIE_ROW;
+    wire.movieSubs = [];
     await dispatchTransactionPageLeg(true);
     expect(calls("coverageMovieSummaryRaw").map((c) => c.args)).toStrictEqual([
       [7, { recovery: 1 }],
     ]);
+    // The movie's /subs read never carries a query: it does not honor
+    // ?recovery=1 (a store-only read).
+    expect(calls("coverageMovieSubsRaw").map((c) => c.args)).toStrictEqual([[7]]);
   });
 
   it("a BOOT transaction reads plain (no recovery param)", async () => {
     onMovieDetail();
     wire.movieSummary = MOVIE_ROW;
+    wire.movieSubs = [];
+    wire.historyIDs = [];
 
     await dispatchTransactionPageLeg(false);
 
     expect(calls("coverageMovieSummaryRaw").map((c) => c.args)).toStrictEqual([[7, undefined]]);
+  });
+
+  it("movie detail: the transaction awaits the TRIPLE and renders from the leg's own reads", async () => {
+    onMovieDetail();
+    wire.movieSummary = MOVIE_ROW;
+    const subs = [{ media_id: "tmdb-7" }];
+    wire.movieSubs = subs;
+    wire.historyIDs = ["tmdb-7"];
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    expect(calls("coverageMovieSubsRaw").map((c) => c.args)).toStrictEqual([[7]]);
+    expect(calls("stateIDsRaw").map((c) => c.args)).toStrictEqual([
+      [{ type: "movie", prefix: "tmdb-7" }],
+    ]);
+    // The render is the leg's own (pre-fetched reads), never the plain
+    // openMovieDetail path with its fire-and-forget fetches.
+    expect(rendered.movieLegs).toStrictEqual([{ m: MOVIE_ROW, subs, historyIDs: ["tmdb-7"] }]);
+    expect(rendered.movies).toHaveLength(0);
+  });
+
+  it("commit WAITS for the movie triple: the leg settles only once /subs lands", async () => {
+    onMovieDetail();
+    wire.defer = true;
+
+    let settled = false;
+    const leg = dispatchTransactionPageLeg(false).then((r) => {
+      settled = true;
+      return r;
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    const pending = wire.pending.splice(0);
+    expect(pending.map((p) => p.fn).sort()).toStrictEqual([
+      "coverageMovieSubsRaw",
+      "coverageMovieSummaryRaw",
+      "stateIDsRaw",
+    ]);
+
+    // Summary + state ids land; /subs is still in flight — the leg (and so
+    // the transaction's commit) must keep waiting.
+    for (const p of pending) {
+      if (p.fn !== "coverageMovieSubsRaw") {
+        p.resolve(p.fn === "coverageMovieSummaryRaw" ? MOVIE_ROW : []);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+
+    pending.find((p) => p.fn === "coverageMovieSubsRaw")?.resolve([]);
+    expect(await leg).toBe("applied");
+    expect(rendered.movieLegs).toHaveLength(1);
+  });
+
+  it("a /subs failure during the movie transaction REJECTS (the transaction aborts)", async () => {
+    onMovieDetail();
+    wire.movieSummary = MOVIE_ROW;
+    wire.movieSubs = null; // 502 on the raw client
+    wire.historyIDs = [];
+
+    await expect(dispatchTransactionPageLeg(false)).rejects.toThrow("coverageMovieSubsRaw failed");
+    // The failure is preserved, never painted as an empty subs table.
+    expect(rendered.movieLegs).toHaveLength(0);
+    expect(rendered.movies).toHaveLength(0);
+  });
+
+  it("a movie summary 404 is definitive: no render, the leg applies", async () => {
+    onMovieDetail();
+    wire.failStatus = 404;
+    wire.movieSummary = null; // vanished movie
+    wire.movieSubs = null;
+    wire.historyIDs = [];
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    expect(rendered.movieLegs).toHaveLength(0);
   });
 
   it("a genuine leg failure REJECTS (the transaction aborts)", async () => {
@@ -577,5 +732,69 @@ describe("page-leg: transaction dispatch", () => {
     }
     expect(await leg).toBe("superseded");
     expect(await newer).toBe("applied");
+  });
+});
+
+// --- Deep-link boots: the URL classifies a pending detail (R2.3/A7) ---
+
+describe("page-leg: pending deep-link classification", () => {
+  // The runner's own URL, restored after each fixture (the suite drives the
+  // real History API — Chromium in browser mode).
+  const HOME = location.pathname + location.search;
+
+  afterEach(() => {
+    history.replaceState(null, "", HOME);
+  });
+
+  it("classifies from the URL when no detail context has landed, never from currentPage", () => {
+    // The router's prepareDetailView window: currentPage is already
+    // "library" while detailCtx lands only with the summary.
+    onLibrary();
+
+    history.replaceState(null, "", "/series/42");
+    expect(currentRouteKey()).toBe("series:42");
+    history.replaceState(null, "", "/series/42/search/en");
+    expect(currentRouteKey()).toBe("series:42");
+    history.replaceState(null, "", "/series/42/sync");
+    expect(currentRouteKey()).toBe("series:42");
+    history.replaceState(null, "", "/movie/7");
+    expect(currentRouteKey()).toBe("movie:7");
+    history.replaceState(null, "", "/series/42/files");
+    expect(currentRouteKey()).toBe("files");
+    history.replaceState(null, "", "/history");
+    expect(currentRouteKey()).toBe("history");
+    history.replaceState(null, "", "/");
+    expect(currentRouteKey()).toBe("library");
+    history.replaceState(null, "", "/settings");
+    expect(currentRouteKey()).toBe("library");
+  });
+
+  it("a landed context outranks the URL (a row click swaps views without the router)", () => {
+    history.replaceState(null, "", "/");
+    onSeriesDetail();
+
+    expect(currentRouteKey()).toBe("series:42");
+  });
+
+  it("a pending deep link's PLAIN dispatch is an empty leg — never the library pair", async () => {
+    onLibrary();
+    history.replaceState(null, "", "/series/42");
+
+    const r = await refreshCurrentPage();
+
+    expect(r).toBe("applied");
+    expect(rendered.loadCoverage).toStrictEqual([]);
+    expect(wire.calls).toStrictEqual([]);
+  });
+
+  it("a pending deep link's TRANSACTION leg is empty and settles applied (terminates)", async () => {
+    onLibrary();
+    history.replaceState(null, "", "/movie/7");
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    expect(wire.calls).toStrictEqual([]);
+    expect(rendered.loadCoverage).toStrictEqual([]);
   });
 });

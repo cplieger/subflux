@@ -208,9 +208,10 @@ function runDetailCouplings(outcomes: HealOutcome[]): void {
       continue;
     }
     if (heal.root.kind === "series") {
-      // The page refresh path runs the series detail's refresh pair
-      // (episodes coverage + history ids), which keeps historySet current.
-      emit(BusEvent.DataInvalidate);
+      // R1.2: a coverage event on an open series detail costs the refresh
+      // PAIR (episode coverage + history ids), never the arr-backed
+      // episodes read the transaction triple carries.
+      emit(BusEvent.RefreshSeriesDetail);
     } else {
       const row = coverageRow(heal.root.rootKey);
       if (row) {
