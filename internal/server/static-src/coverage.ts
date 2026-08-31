@@ -17,6 +17,7 @@ import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } f
 import { on, emit, BusEvent } from "./bus.js";
 import type { DetailConfig } from "./bus.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
+import type { SeriesItem, MovieItem } from "./wire/types.gen.js";
 import { applyScanButtonState } from "./detail-scan.js";
 import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
 import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
@@ -70,6 +71,71 @@ let pairLanded = false;
 // state — survives SSE boot_id changes.
 const registeredCollectionNames = new Set<string>();
 
+// --- Task 9 transaction seams: tombstones, covered writers, the leg join ---
+
+// Whether an SSE transaction is open (events.ts brackets it). While open, a
+// heal 404-delete records its root as a TOMBSTONE, and every full-pair
+// snapshot application drops tombstoned rows — the pair may have been read
+// before the arr delete, so an un-dropped row would resurrect what the heal
+// already removed.
+let coverageTransactionOpen = false;
+const tombstones = new Set<string>();
+// Full-pair writers whose fetch began while the transaction was open
+// ("covered" writers). Tombstones clear at settle only when none is in
+// flight — else when the last one lands, so a loader dispatched during the
+// transaction that lands after settle still drops.
+let coveredPairWriters = 0;
+
+// The transaction's in-flight collection leg (null when the leg is empty or
+// no transaction runs). A route loader arriving mid-transaction whose pair
+// the leg covers JOINS it instead of issuing a second read.
+type CollectionLegJoin = "landed" | "failed" | "uncovered";
+let pendingCollectionLeg: Promise<CollectionLegJoin> | null = null;
+
+/** Task 9: bracket an SSE transaction (events.ts). */
+export function beginCoverageTransaction(): void {
+  coverageTransactionOpen = true;
+}
+
+/** Task 9: settle (commit or abort) — tombstones clear only when no covered
+ *  full-pair writer is still in flight. Idempotent. */
+export function settleCoverageTransaction(): void {
+  coverageTransactionOpen = false;
+  if (coveredPairWriters === 0) {
+    tombstones.clear();
+  }
+}
+
+/** Task 9: register (or clear) the transaction's in-flight collection leg
+ *  for loaders to join. */
+export function setCollectionLegJoin(p: Promise<CollectionLegJoin> | null): void {
+  pendingCollectionLeg = p;
+}
+
+/** Task 9: mark a full-pair write in flight; returns the matching end call.
+ *  Only a write that BEGINS during an open transaction is covered. */
+export function beginCoveredPairWrite(): () => void {
+  if (!coverageTransactionOpen) {
+    return () => {
+      /* not covered */
+    };
+  }
+  coveredPairWriters += 1;
+  return () => {
+    coveredPairWriters -= 1;
+    if (!coverageTransactionOpen && coveredPairWriters === 0) {
+      tombstones.clear();
+    }
+  };
+}
+
+/** Task 9: supersede the in-flight plain pair fetch (the degraded boot's
+ *  ungated load) before a fresher full-pair application lands. */
+export function abortInFlightPairFetch(): void {
+  coverageAbort?.abort();
+  coverageAbort = null;
+}
+
 /** A6's heal gate: true once the full library pair has landed this tab. */
 export function libraryLoaded(): boolean {
   return pairLanded;
@@ -93,8 +159,13 @@ export function applyHealedRow(item: CoverageItem): void {
   coverage.upsert(item);
 }
 
-/** A6 heal delete: a summary 404 means the collection omits this row now. */
+/** A6 heal delete: a summary 404 means the collection omits this row now.
+ *  During a transaction the root is TOMBSTONED so a full-pair snapshot read
+ *  before the delete cannot resurrect it (task 9). */
 export function removeCoverageRow(rootKey: string): void {
+  if (coverageTransactionOpen) {
+    tombstones.add(rootKey);
+  }
   coverage.remove(rootKey);
 }
 
@@ -103,11 +174,18 @@ export function coverageRow(rootKey: string): CoverageItem | undefined {
   return coverage.get(rootKey);
 }
 
-/** Test-only: drop all rows, close the heal gate, forget registrations. */
+/** Test-only: drop all rows, close the heal gate, forget registrations, and
+ *  clear the transaction seams. */
 export function _resetCoverageForTest(): void {
   coverage.clear();
   pairLanded = false;
   registeredCollectionNames.clear();
+  coverageTransactionOpen = false;
+  tombstones.clear();
+  coveredPairWriters = 0;
+  pendingCollectionLeg = null;
+  coverageAbort?.abort();
+  coverageAbort = null;
 }
 
 /** Snapshot of the current coverage rows (for non-reactive lookups). */
@@ -151,32 +229,29 @@ function coverageItemSignature(item: CoverageItem): string {
   );
 }
 
-/** Fetch series and movies coverage, merge with _type discriminant, and load
- *  the collection identity-preservingly: a row whose signature is unchanged
- *  keeps its CURRENT object, so its per-row signal never fires (signals skip
- *  Object.is-equal writes) and unchanged rows never repaint — the filtered/
- *  sorted views recompute only when something real changed. Aborts any prior
- *  in-flight fetch — only the latest wins. */
-export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
-  coverageAbort?.abort();
-  coverageAbort = new AbortController();
-  const { signal: sig } = coverageAbort;
-  const [series, movies] = await Promise.all([
-    coverageSeries(undefined, { signal: sig }),
-    coverageMovies(undefined, { signal: sig }),
-  ]);
-  if (sig.aborted) {
-    return coverage.items();
-  }
+/** THE shared full-pair application site (E3, task 9's extraction): the
+ *  loader's null-collapsing read and the transaction's failure-preserving
+ *  collection leg both land here, so the tombstone drop and the A6 reset
+ *  rule cannot drift between writers. Rows are merged identity-preservingly
+ *  (an unchanged signature keeps the CURRENT object so nothing repaints);
+ *  tombstoned roots are DROPPED (a heal 404-delete during the transaction is
+ *  newer authority than a pair read before the arr delete); the pair opens
+ *  the heal gate and registers only when BOTH sides landed. */
+export function applyCoveragePair(
+  series: SeriesItem[] | null,
+  movies: MovieItem[] | null,
+): CoverageItem[] {
   const merged: CoverageItem[] = [
     ...(series ?? []).map((s) => ({ ...s, _type: "series" as const })),
     ...(movies ?? []).map((m) => ({ ...m, _type: "movie" as const })),
-  ].map((item) => {
-    const cur = coverage.get(coverageMediaId(item));
-    return cur !== undefined && coverageItemSignature(cur) === coverageItemSignature(item)
-      ? cur
-      : item;
-  });
+  ]
+    .filter((item) => !tombstones.has(coverageMediaId(item)))
+    .map((item) => {
+      const cur = coverage.get(coverageMediaId(item));
+      return cur !== undefined && coverageItemSignature(cur) === coverageItemSignature(item)
+        ? cur
+        : item;
+    });
   // A6 RESET RULE: every row is about to be overwritten, so the heal
   // coalescer aborts its in-flight per-root GETs and drops its pending window
   // before the snapshot lands.
@@ -184,12 +259,50 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   coverage.setAll(merged);
   if (series !== null && movies !== null) {
     // The pair LANDED: open A6's heal gate and register the pair for task 9's
-    // transaction collection legs. A null leg is a failed read (the generated
-    // client null-collapses), and a failed pair load must open nothing.
+    // transaction collection legs — set by WHICHEVER caller lands it. A null
+    // leg is a failed read (the generated client null-collapses), and a
+    // failed pair load must open nothing.
     pairLanded = true;
     registeredCollectionNames.add("series").add("movies");
   }
   return merged;
+}
+
+/** Fetch series and movies coverage and apply the pair through the shared
+ *  application site. A route loader arriving while a transaction's collection
+ *  leg covers the pair JOINS that leg (per-collection join, E3) instead of
+ *  issuing a second read; a joined loader whose leg FAILS performs only its
+ *  non-fetch duties — the pair registration that makes the latch's forced
+ *  transaction fetch it — and renders the route's normal loading/empty state.
+ *  Aborts any prior in-flight fetch — only the latest wins. */
+export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
+  const leg = pendingCollectionLeg;
+  if (leg) {
+    const joined = await leg;
+    if (joined !== "uncovered") {
+      if (joined === "failed") {
+        registeredCollectionNames.add("series").add("movies");
+      }
+      return coverage.items();
+    }
+    // "uncovered": the leg turned out empty — run the normal load below.
+  }
+  coverageAbort?.abort();
+  coverageAbort = new AbortController();
+  const { signal: sig } = coverageAbort;
+  const endWrite = beginCoveredPairWrite();
+  try {
+    const [series, movies] = await Promise.all([
+      coverageSeries(undefined, { signal: sig }),
+      coverageMovies(undefined, { signal: sig }),
+    ]);
+    if (sig.aborted) {
+      return coverage.items();
+    }
+    return applyCoveragePair(series, movies);
+  } finally {
+    endWrite();
+  }
 }
 
 /** Build the 8-row coverage-table loading skeleton fragment. */

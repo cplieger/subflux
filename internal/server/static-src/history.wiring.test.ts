@@ -17,7 +17,15 @@ import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 // fetches pages through; per-call pages are queued with mockResolvedValueOnce
 // or, for a page that must stay in flight, with deferPage().
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
-vi.mock("./wire/client.gen.js", () => ({ listState: dispatch }));
+vi.mock("./wire/client.gen.js", () => ({
+  // Same shim as history.test.ts: the RAW list read over the queued pages.
+  listStateRaw: async (query?: unknown, opts?: unknown) => {
+    const items = (await dispatch(query, opts)) as unknown;
+    return items === null
+      ? { ok: false, status: 502, error: "history load failed" }
+      : { ok: true, status: 200, data: items };
+  },
+}));
 
 // PLAIN functions, never vi.fn: history.ts registers its LoadHistory handler in
 // a module initializer, and vitest.config's mockReset would strip a vi.fn's

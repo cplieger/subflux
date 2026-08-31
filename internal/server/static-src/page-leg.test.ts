@@ -17,6 +17,8 @@ const wire = vi.hoisted(() => ({
   // is exactly the stale-response race the generation guard must discard.
   defer: false,
   pending: [] as { fn: string; resolve: (v: unknown) => void }[],
+  // The status a Raw read reports when its record is null (a failed read).
+  failStatus: 502,
 }));
 
 function wireCall(
@@ -34,6 +36,24 @@ function wireCall(
   return Promise.resolve(value());
 }
 
+/** The Raw flavor over the same records: null = a non-2xx envelope (status
+ *  wire.failStatus), anything else a 2xx with data. An aborted signal
+ *  reports status 0, matching the transport. */
+async function wireCallRaw(
+  fn: string,
+  value: () => unknown,
+  args: unknown[],
+  signal: AbortSignal | undefined,
+): Promise<unknown> {
+  const v = await wireCall(fn, value, args, signal);
+  if (signal?.aborted) {
+    return { ok: false, status: 0, error: "aborted" };
+  }
+  return v === null
+    ? { ok: false, status: wire.failStatus, error: `${fn} failed` }
+    : { ok: true, status: 200, data: v };
+}
+
 vi.mock("./wire/client.gen.js", () => ({
   mediaEpisodes: (id: unknown, _q?: unknown, opts?: { signal?: AbortSignal }) =>
     wireCall("mediaEpisodes", () => wire.episodes, [id], opts?.signal),
@@ -43,6 +63,17 @@ vi.mock("./wire/client.gen.js", () => ({
     wireCall("stateIDs", () => wire.historyIDs, [q], opts?.signal),
   coverageMovieSummary: (id: unknown, _q?: unknown, opts?: { signal?: AbortSignal }) =>
     wireCall("coverageMovieSummary", () => wire.movieSummary, [id], opts?.signal),
+  // The transaction arms run on the RAW client (zero automatic retries; a
+  // non-2xx surfaces on first receipt). The query arg is recorded so the
+  // ?recovery=1 pins can read it.
+  mediaEpisodesRaw: (id: unknown, q?: unknown, opts?: { signal?: AbortSignal }) =>
+    wireCallRaw("mediaEpisodesRaw", () => wire.episodes, [id, q], opts?.signal),
+  coverageSeriesDetailRaw: (id: unknown, opts?: { signal?: AbortSignal }) =>
+    wireCallRaw("coverageSeriesDetailRaw", () => wire.subFiles, [id], opts?.signal),
+  stateIDsRaw: (q: unknown, opts?: { signal?: AbortSignal }) =>
+    wireCallRaw("stateIDsRaw", () => wire.historyIDs, [q], opts?.signal),
+  coverageMovieSummaryRaw: (id: unknown, q?: unknown, opts?: { signal?: AbortSignal }) =>
+    wireCallRaw("coverageMovieSummaryRaw", () => wire.movieSummary, [id, q], opts?.signal),
   // The dispatcher must never read the collection (R1.2): present so a
   // regression that re-adds the call is recorded and fails the pin below.
   coverageMovies: (_q?: unknown, opts?: { signal?: AbortSignal }) =>
@@ -54,6 +85,10 @@ const rendered = vi.hoisted(() => ({
   movies: [] as { m: unknown; skipPush: boolean | undefined; signal: AbortSignal | undefined }[],
   loadCoverage: [] as (boolean | undefined)[],
   reloadHistory: 0,
+  // The transaction history leg's scripted outcomes, consumed in order; an
+  // Error entry rejects; a Promise entry defers until the test resolves it.
+  historyLeg: [] as (string | Error | Promise<string>)[],
+  historyLegCalls: [] as (AbortSignal | undefined)[],
 }));
 vi.mock("./detail.js", () => ({
   renderSeriesDetail: (
@@ -78,11 +113,16 @@ vi.mock("./history.js", () => ({
   reloadHistory: () => {
     rendered.reloadHistory++;
   },
+  reloadHistoryForTransaction: (signal?: AbortSignal) => {
+    rendered.historyLegCalls.push(signal);
+    const next = rendered.historyLeg.shift() ?? "applied";
+    return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
+  },
 }));
 
 import * as store from "./store.js";
 import { emit, BusEvent } from "./bus.js";
-import { abortPageLeg, refreshCurrentPage } from "./page-leg.js";
+import { abortPageLeg, dispatchTransactionPageLeg, refreshCurrentPage } from "./page-leg.js";
 import type { SeriesItem, SeasonGroup, MovieItem } from "./api-types.js";
 
 const SERIES = { id: 1042, tvdb_id: 42, title: "Show" } as unknown as SeriesItem;
@@ -132,10 +172,13 @@ beforeEach(() => {
   wire.calls = [];
   wire.defer = false;
   wire.pending = [];
+  wire.failStatus = 502;
   rendered.series = [];
   rendered.movies = [];
   rendered.loadCoverage = [];
   rendered.reloadHistory = 0;
+  rendered.historyLeg = [];
+  rendered.historyLegCalls = [];
   onLibrary();
 });
 
@@ -354,5 +397,168 @@ describe("page-leg: abort + generation guards", () => {
 
     expect(await d1).toBe("superseded");
     expect(rendered.series).toHaveLength(0);
+  });
+});
+
+// --- Task 9: the transaction dispatch ---
+
+describe("page-leg: transaction dispatch", () => {
+  it("library: the transaction page leg is EMPTY and applies immediately", async () => {
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    // Nothing extra: the collection leg owns the pair; no loader dispatch.
+    expect(rendered.loadCoverage).toStrictEqual([]);
+    expect(wire.calls).toStrictEqual([]);
+  });
+
+  it("series detail: runs the triple on the RAW client and renders on landing", async () => {
+    onSeriesDetail();
+    const seasons = [{ season: 2, episodes: [] }];
+    wire.episodes = seasons;
+    wire.subFiles = [];
+    wire.historyIDs = ["tvdb-42-s02e01"];
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    expect(calls("mediaEpisodesRaw").map((c) => c.args)).toStrictEqual([[1042, undefined]]);
+    expect(calls("coverageSeriesDetailRaw")).toHaveLength(1);
+    expect(calls("stateIDsRaw")).toHaveLength(1);
+    expect(rendered.series).toHaveLength(1);
+  });
+
+  it("a RECOVERY transaction sends ?recovery=1 on the honoring endpoints only", async () => {
+    onSeriesDetail();
+    wire.episodes = [];
+    wire.subFiles = [];
+    wire.historyIDs = [];
+
+    await dispatchTransactionPageLeg(true);
+
+    // mediaEpisodes honors ?recovery=1; the detail rows and state ids do not.
+    expect(calls("mediaEpisodesRaw").map((c) => c.args)).toStrictEqual([[1042, { recovery: 1 }]]);
+    expect(calls("coverageSeriesDetailRaw").map((c) => c.args)).toStrictEqual([[42]]);
+    expect(calls("stateIDsRaw").map((c) => c.args)).toStrictEqual([
+      [{ type: "episode", prefix: "tvdb-42-" }],
+    ]);
+
+    onMovieDetail();
+    wire.movieSummary = MOVIE_ROW;
+    await dispatchTransactionPageLeg(true);
+    expect(calls("coverageMovieSummaryRaw").map((c) => c.args)).toStrictEqual([
+      [7, { recovery: 1 }],
+    ]);
+  });
+
+  it("a BOOT transaction reads plain (no recovery param)", async () => {
+    onMovieDetail();
+    wire.movieSummary = MOVIE_ROW;
+
+    await dispatchTransactionPageLeg(false);
+
+    expect(calls("coverageMovieSummaryRaw").map((c) => c.args)).toStrictEqual([[7, undefined]]);
+  });
+
+  it("a genuine leg failure REJECTS (the transaction aborts)", async () => {
+    onSeriesDetail();
+    wire.episodes = null; // 502 on the raw client
+    wire.subFiles = [];
+    wire.historyIDs = [];
+
+    await expect(dispatchTransactionPageLeg(false)).rejects.toThrow("mediaEpisodesRaw failed");
+    expect(rendered.series).toHaveLength(0);
+  });
+
+  it("a typed 429 refusal is a genuine leg failure after exactly ONE request", async () => {
+    onSeriesDetail();
+    wire.failStatus = 429;
+    wire.episodes = null;
+    wire.subFiles = [];
+    wire.historyIDs = [];
+
+    await expect(dispatchTransactionPageLeg(true)).rejects.toThrow();
+    // Zero automatic retries: the refused endpoint saw exactly one request.
+    expect(calls("mediaEpisodesRaw")).toHaveLength(1);
+  });
+
+  it("a 404 is a definitive answer, not a failure: the arm applies its fallback", async () => {
+    onSeriesDetail();
+    wire.failStatus = 404;
+    wire.episodes = null; // vanished series: keep the cached seasons
+    wire.subFiles = [];
+    wire.historyIDs = [];
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("applied");
+    expect(rendered.series).toHaveLength(1);
+    expect(rendered.series[0]?.seasons).toBe(CACHED_SEASONS);
+  });
+
+  it("history: dispatches the settlement-aware extraction and lands on its chain", async () => {
+    store.set("currentPage", "history");
+    store.set("detailCtx", null);
+    rendered.historyLeg = ["superseded"];
+
+    const r = await dispatchTransactionPageLeg(false);
+
+    expect(r).toBe("superseded"); // chained-to-applied counts as landed
+    expect(rendered.historyLegCalls).toHaveLength(1);
+    expect(rendered.reloadHistory).toBe(0); // never the void UI adapter
+  });
+
+  it("history: a chain ending failed rejects the leg", async () => {
+    store.set("currentPage", "history");
+    rendered.historyLeg = [new Error("history load failed (502)")];
+
+    await expect(dispatchTransactionPageLeg(false)).rejects.toThrow("history load failed (502)");
+  });
+
+  it("the RE-ROUTE arm: a re-routed history run re-dispatches for the NEW route", async () => {
+    // Transaction on /history; the route leaves to the library mid-leg. The
+    // history run settles superseded(next = the new route's page leg); the
+    // re-dispatch finds the library, whose EMPTY leg applies immediately —
+    // no latch, no rejection.
+    store.set("currentPage", "history");
+    let reroute!: (v: string) => void;
+    rendered.historyLeg = [
+      new Promise<string>((res) => {
+        reroute = res;
+      }),
+    ];
+    const leg = dispatchTransactionPageLeg(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rendered.historyLegCalls).toHaveLength(1);
+
+    // The route leave (what the router's applyRoute does mid-transaction),
+    // then the aborted run settles as re-routed.
+    store.set("currentPage", "library");
+    store.set("detailCtx", null);
+    reroute("rerouted");
+
+    expect(await leg).toBe("applied");
+    expect(rendered.historyLegCalls).toHaveLength(1); // not re-run for history
+  });
+
+  it("an outrun transaction leg lands as superseded (the newer dispatch owns the route)", async () => {
+    onSeriesDetail();
+    wire.defer = true;
+    const leg = dispatchTransactionPageLeg(false);
+    await Promise.resolve();
+    const first = wire.pending.splice(0);
+
+    // A newer plain dispatch (a DataInvalidate refresh) outruns the leg.
+    wire.defer = false;
+    wire.episodes = [];
+    wire.subFiles = [];
+    wire.historyIDs = [];
+    const newer = refreshCurrentPage();
+
+    for (const p of first) {
+      p.resolve([]);
+    }
+    expect(await leg).toBe("superseded");
+    expect(await newer).toBe("applied");
   });
 });

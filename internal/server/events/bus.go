@@ -7,30 +7,57 @@
 package events
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 
 	"github.com/cplieger/webhttp/v2/sse"
 )
 
+// SSERing is the replay-ring capacity, sized at 4x ReplayBudget so the
+// below-floor and over-budget verdicts stay distinct and the budget can rise
+// without a server change.
+const SSERing = 1024
+
+// ReplayBudget is the largest replay a resume cursor may request; a cursor
+// further behind head answers a gap epoch instead (a refetch transaction is
+// cheaper than a bulk replay). It is the fourth disjunct of the handler's
+// pre-check and covers hidden-window growth and native retries alike.
+const ReplayBudget = 256
+
 // EventBus publishes subflux's typed events to connected SSE clients.
 // A nil *EventBus is safe to publish to (no-op), so optional wiring needs
 // no guards.
 type EventBus struct {
-	hub *sse.Hub
+	hub    *sse.Hub
+	bootID string
 }
 
 // New creates the event bus with the given concurrent-client cap (<= 0 means
-// DefaultMaxSSEClients). The underlying hub keeps a replay ring, so a browser
-// that reconnects after a transient drop resumes via the standard
+// DefaultMaxSSEClients). The underlying hub keeps a replay ring (SSERing), so
+// a browser that reconnects after a transient drop resumes via the standard
 // Last-Event-ID header instead of silently missing events. The cap is
 // enforced by the hub atomically at admission; SetMaxClients re-applies a
-// hot-reloaded value without rebuilding the hub.
+// hot-reloaded value without rebuilding the hub. The boot id is minted here,
+// once per process start, and rides every connection's epoch handshake so
+// clients can tell a server restart from a reconnect.
 func New(maxClients int) *EventBus {
 	if maxClients <= 0 {
 		maxClients = DefaultMaxSSEClients
 	}
-	return &EventBus{hub: sse.NewHub(sse.WithMaxClients(maxClients))}
+	return &EventBus{
+		hub:    sse.NewHub(sse.WithMaxClients(maxClients), sse.WithReplay(SSERing)),
+		bootID: newBootID(),
+	}
+}
+
+// newBootID returns a random 16-hex-char process identity. crypto/rand
+// cannot fail on Go >= 1.24.
+func newBootID() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
 
 // SetMaxClients applies a new client cap (<= 0 means DefaultMaxSSEClients) to

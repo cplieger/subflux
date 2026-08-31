@@ -9,14 +9,14 @@ import (
 type EventType string
 
 // EventData is a sealed interface restricting Event.Data to known payload types.
-// Implementors: CoverageEvent, NotifyEvent, ScanEvent.
+// Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent.
 //
 // The wiregen directive below emits the TS union
-// (export type EventData = CoverageEvent | NotifyEvent | ScanEvent) plus its
-// runtime decoders; the discriminator is the SSE envelope's "type" key
+// (export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent)
+// plus its runtime decoders; the discriminator is the SSE envelope's "type" key
 // (Event.Type), which is also the named SSE event the browser dispatches on.
 //
-//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent
+//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent,EpochEvent
 type EventData interface{ eventData() }
 
 // Event is a server-sent event pushed to connected browsers.
@@ -31,6 +31,7 @@ const (
 	Notify         EventType = "notify"     // toast notification for the UI
 	ScanStart      EventType = "scan:start" // scan activity started (any scope)
 	ScanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
+	Epoch          EventType = "epoch"      // per-connection handshake (never replayed, no id)
 )
 
 // CoverageEvent is the data payload for coverage updates. It deliberately
@@ -80,3 +81,21 @@ type ScanEvent struct {
 }
 
 func (ScanEvent) eventData() {}
+
+// EpochEvent is the per-connection SSE handshake, written exactly once per
+// connection by the events handler: after any Last-Event-ID replay, before
+// live delivery, with NO id field (it must never become a resume cursor).
+// BootID identifies the server process (one random id per process start), so
+// the client can tell a restart from a reconnect. Gap is the server's
+// authoritative replay verdict: true means the presented cursor could not be
+// covered (above head, below the ring floor, or past the replay budget) and
+// the replay was withheld. Head is the newest event id the connection's
+// replay covered; every id at or below it was either replayed or predates
+// the client's cursor.
+type EpochEvent struct {
+	BootID string `json:"boot_id"`
+	Head   uint64 `json:"head"`
+	Gap    bool   `json:"gap"`
+}
+
+func (EpochEvent) eventData() {}

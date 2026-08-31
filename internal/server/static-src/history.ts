@@ -7,7 +7,7 @@
 // (history is append-only display), so only the structure tier does work.
 
 import { el, input, select, option, errDiv } from "./dom.js";
-import { listState } from "./wire/client.gen.js";
+import { listStateRaw } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import type { StateEntry } from "./wire/types.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
@@ -36,6 +36,105 @@ const renderTick = signal(0);
 // on return, so the two never interleave into the collection.
 let gen = 0;
 
+// --- THE SETTLEMENT MODEL (E3, task 9) ---
+//
+// Every created or queued generation settles exactly once as
+// applied | failed | superseded(next) | abandoned, published through this
+// module-owned gen → settlement handle. A superseder settles its priors at
+// START (g !== gen proves it started, not that it applied), so a waiter
+// resolves "superseded" only by chaining superseded(next) links to a
+// generation that settles applied; a chain ending failed or abandoned leaves
+// the transaction leg REJECTING. `next: null` marks the dispatcher's
+// RE-ROUTE (route leave during a transaction): the continuation is the new
+// route's page leg, owned by the dispatcher's re-dispatch, never a latch.
+// `abandoned` is a DEFENSIVE terminal with no shipped producer — any
+// settlement path not otherwise named rejects loudly rather than hanging.
+// Task 12 replaces the reload internals behind this same seam and contract.
+
+type HistorySettlement =
+  | { kind: "applied" }
+  | { kind: "failed"; error: Error }
+  | { kind: "superseded"; next: number | null }
+  | { kind: "abandoned" };
+
+interface SettlementRecord {
+  promise: Promise<HistorySettlement>;
+  resolve: (s: HistorySettlement) => void;
+  settled: HistorySettlement | null;
+}
+
+const settlements = new Map<number, SettlementRecord>();
+// Ledger bound: settled records past the cap are dropped oldest-first (an
+// evicted generation can no longer be awaited — chains are short-lived).
+const SETTLEMENT_CAP = 64;
+
+/** Create the next generation; every prior UNSETTLED generation settles
+ *  superseded(next = the new one) — the superseder started. */
+function newGeneration(): number {
+  const g = gen + 1;
+  for (const [pg, rec] of settlements) {
+    if (rec.settled === null) {
+      settleGeneration(pg, { kind: "superseded", next: g });
+    }
+  }
+  gen = g;
+  let resolve!: (s: HistorySettlement) => void;
+  const promise = new Promise<HistorySettlement>((res) => {
+    resolve = res;
+  });
+  settlements.set(g, { promise, resolve, settled: null });
+  for (const [pg, rec] of settlements) {
+    if (settlements.size <= SETTLEMENT_CAP) {
+      break;
+    }
+    if (rec.settled !== null) {
+      settlements.delete(pg);
+    }
+  }
+  return g;
+}
+
+/** Publish a generation's settlement — exactly once; later calls no-op. */
+function settleGeneration(g: number, s: HistorySettlement): void {
+  const rec = settlements.get(g);
+  if (rec?.settled !== null) {
+    return;
+  }
+  rec.settled = s;
+  rec.resolve(s);
+}
+
+/** Resolve a generation's outcome through the settlement chain. Returns
+ *  "applied" (this run landed), "superseded" (a superseder's chain ended
+ *  applied), or "rerouted" (the dispatcher's re-route owns the
+ *  continuation); rejects when the chain ends failed or abandoned. */
+async function chainSettlement(g: number): Promise<"applied" | "superseded" | "rerouted"> {
+  let cur = g;
+  for (;;) {
+    const rec = settlements.get(cur);
+    if (!rec) {
+      // Evicted record: the chain outlived the ledger bound. Nothing left to
+      // await — treat the chain as landed.
+      return cur === g ? "applied" : "superseded";
+    }
+    const s = await rec.promise;
+    switch (s.kind) {
+      case "applied":
+        return cur === g ? "applied" : "superseded";
+      case "superseded":
+        if (s.next === null) {
+          return "rerouted";
+        }
+        cur = s.next;
+        break;
+      case "failed":
+        throw s.error;
+      case "abandoned":
+        throw new Error("history reload abandoned");
+    }
+  }
+}
+
 /** Query for a history page: limit always, offset only past page 0, and the
  *  filter params only when non-empty (undefined entries are skipped at
  *  serialization — exactly the params the hand-built URLSearchParams sent). */
@@ -52,16 +151,6 @@ function buildQuery(offset: number, limit: number): Record<string, QueryValue> {
     provider: prov || undefined,
     search: search || undefined,
   };
-}
-
-/** Fetch a page of history entries via the generated typed client. Failures
- *  collapse to an empty page (the empty-state IS the error UI). */
-async function fetchPage(
-  offset: number,
-  limit: number,
-): Promise<{ items: StateEntry[]; hasMore: boolean }> {
-  const items = (await listState(buildQuery(offset, limit))) ?? [];
-  return { items, hasMore: items.length >= limit };
 }
 
 function historyMediaHref(entry: StateEntry): string {
@@ -230,8 +319,13 @@ function showError(e: unknown): void {
   }
 }
 
-async function reload(): Promise<void> {
-  const g = ++gen;
+// runReload is the reload internals behind both entry points: fetch page 0
+// through the RAW list read (a transaction leg must observe a non-2xx — the
+// null-collapsing read maps failure to an empty page and no wrapper can see
+// it), apply on landing, and publish this generation's settlement. An abort
+// by the dispatcher's re-route settles superseded(next: null); a genuine
+// failure settles failed with prior rows intact.
+async function runReload(g: number, signal?: AbortSignal): Promise<void> {
   // Design-system skeleton (same anti-flicker timing as the library table)
   // for the first mount only: previously the panel stayed BLANK for the whole
   // fetch. Filter-change reloads keep the current rows until data lands
@@ -258,12 +352,28 @@ async function reload(): Promise<void> {
       )
     : null;
   try {
-    const page = await fetchPage(0, PAGE_SIZE);
+    const res = await listStateRaw(buildQuery(0, PAGE_SIZE), signal ? { signal } : undefined);
     if (g !== gen) {
-      return; // superseded by a newer reload/loadMore
+      timing?.cancel();
+      return; // superseded — the superseder settled this generation at start
     }
-    history.setAll(page.items);
-    hasMore.value = page.hasMore;
+    if (!res.ok) {
+      timing?.cancel();
+      if (res.status === 0 && signal?.aborted) {
+        // The dispatcher's RE-ROUTE aborted this run: the new route's page
+        // leg owns the continuation — no latch, nothing painted.
+        settleGeneration(g, { kind: "superseded", next: null });
+      } else {
+        settleGeneration(g, {
+          kind: "failed",
+          error: new Error(res.error ?? `history load failed (${String(res.status)})`),
+        });
+      }
+      return;
+    }
+    const items = res.data ?? [];
+    history.setAll(items);
+    hasMore.value = items.length >= PAGE_SIZE;
     updateHistoryFilters(history.items());
     const mount = (): void => {
       if (g !== gen) {
@@ -277,13 +387,15 @@ async function reload(): Promise<void> {
     } else {
       mount();
     }
+    settleGeneration(g, { kind: "applied" });
   } catch (e: unknown) {
     // Settle the anti-flicker controller on the failure path too: a pending
     // (not yet painted) skeleton must never land OVER the error panel.
     timing?.cancel();
-    if (g === gen) {
-      showError(e);
-    }
+    settleGeneration(g, {
+      kind: "failed",
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
   }
 }
 
@@ -291,31 +403,79 @@ async function loadMore(): Promise<void> {
   if (!hasMore.value) {
     return;
   }
-  const g = ++gen;
+  const g = newGeneration();
   const scrollPos = window.scrollY;
   try {
-    const page = await fetchPage(history.size, PAGE_SIZE);
+    const res = await listStateRaw(buildQuery(history.size, PAGE_SIZE));
     if (g !== gen) {
       return; // superseded (e.g. a filter-change reload won)
     }
-    for (const entry of page.items) {
+    if (!res.ok) {
+      // Keep today's visible degradation (the button hides; loaded rows
+      // stay); the settlement carries the failure so a transaction chained
+      // through this run rejects instead of committing on masked data.
+      hasMore.value = false;
+      renderTick.value += 1;
+      settleGeneration(g, {
+        kind: "failed",
+        error: new Error(res.error ?? `history load failed (${String(res.status)})`),
+      });
+      return;
+    }
+    const items = res.data ?? [];
+    for (const entry of items) {
       history.upsert(entry);
     }
-    hasMore.value = page.hasMore;
+    hasMore.value = items.length >= PAGE_SIZE;
     updateHistoryFilters(history.items());
     renderTick.value += 1;
     window.scrollTo(0, scrollPos);
+    settleGeneration(g, { kind: "applied" });
   } catch (e: unknown) {
+    settleGeneration(g, {
+      kind: "failed",
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
     if (g === gen) {
       showError(e);
     }
   }
 }
 
+/** The UI adapter (routes navigating to /history, filter changes): kick a
+ *  reload and route a chain-final rejection to the error panel. */
 export function reloadHistory(): void {
-  void reload();
+  const g = newGeneration();
+  void runReload(g);
+  chainSettlement(g).catch((e: unknown) => {
+    showError(e);
+  });
+}
+
+/** Task 9's REQUIRED EXTRACTION: the transaction's history page leg. Backed
+ *  by the raw list read; resolves once this run's settlement chain
+ *  terminates — "applied" (this run landed), "superseded" (a superseder
+ *  applied), "rerouted" (a route leave re-routed the leg; the dispatcher
+ *  re-dispatches) — and REJECTS when the chain ends failed or abandoned
+ *  (prior rows intact, watermark untouched; the transaction aborts). */
+export function reloadHistoryForTransaction(
+  signal?: AbortSignal,
+): Promise<"applied" | "superseded" | "rerouted"> {
+  const g = newGeneration();
+  void runReload(g, signal);
+  return chainSettlement(g);
 }
 
 on(BusEvent.LoadHistory, () => {
-  void reload();
+  reloadHistory();
 });
+
+/** Test-only: clear the collection, the ledger, and the generation counter. */
+export function _resetHistoryForTest(): void {
+  history.clear();
+  settlements.clear();
+  gen = 0;
+  hasMore.value = false;
+  renderTick.value = 0;
+  disposeBindings();
+}
