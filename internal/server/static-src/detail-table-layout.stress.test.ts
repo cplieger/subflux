@@ -16,8 +16,9 @@ import tableCSS from "./css/06-table.css?raw";
 vi.mock("./wire/client.gen.js", () => ({
   mediaEpisodes: () => Promise.resolve(null),
   coverageSeriesDetail: () => Promise.resolve([]),
-  coverageMovieSubs: () => Promise.resolve([]),
+  coverageMovieSubsRaw: () => Promise.resolve({ ok: true, status: 200, data: [] }),
   stateIDs: () => Promise.resolve(null),
+  stateIDsRaw: () => Promise.resolve({ ok: true, status: 200, data: null }),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
 vi.mock("./bus.js", () => ({

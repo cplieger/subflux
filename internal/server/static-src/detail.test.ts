@@ -35,16 +35,21 @@ vi.mock("./wire/client.gen.js", () => ({
       : Promise.resolve(clientState.seasons);
   },
   coverageSeriesDetail: () => Promise.resolve([]),
-  coverageMovieSubs: () => {
+  coverageMovieSubsRaw: () => {
     clientState.movieSubsCalls += 1;
     if (clientState.subsDefer) {
+      // The pending resolver still takes the bare rows; the envelope is put on
+      // here, so no extra microtask sits between the resolve and the paint.
       return new Promise((resolve) => {
-        clientState.subsPending.push(resolve as (v: unknown) => void);
+        clientState.subsPending.push((v: unknown) => {
+          resolve({ ok: true, status: 200, data: v });
+        });
       });
     }
-    return Promise.resolve(clientState.movieSubs);
+    return Promise.resolve({ ok: true, status: 200, data: clientState.movieSubs });
   },
   stateIDs: () => Promise.resolve(clientState.stateIDs),
+  stateIDsRaw: () => Promise.resolve({ ok: true, status: 200, data: clientState.stateIDs }),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
 // The ui-primitives view-transition wrapper: renders and in-place heals must
@@ -1563,7 +1568,7 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
   });
 
   it("paints from the leg's pre-fetched reads — no fetch of its own, context set", () => {
-    renderMovieDetailFromLeg(makeMovie(90), [movieSub("en", 88)], []);
+    renderMovieDetailFromLeg(makeMovie(90), { subs: [movieSub("en", 88)], historyIDs: [] });
 
     expect(document.querySelector('table.movie-detail[data-movie-id="90"]')).not.toBeNull();
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}88`);
@@ -1573,7 +1578,7 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
   });
 
   it("adds the History button from the leg's own stateIDs read", () => {
-    renderMovieDetailFromLeg(makeMovie(91), [], ["tmdb-91"]);
+    renderMovieDetailFromLeg(makeMovie(91), { subs: [], historyIDs: ["tmdb-91"] });
 
     expect(document.querySelector('[data-nav="hist"]')).not.toBeNull();
   });
@@ -1583,7 +1588,7 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
     openMovieDetail(makeMovie(92));
     expect(clientState.subsPending).toHaveLength(1);
 
-    renderMovieDetailFromLeg(makeMovie(92), [movieSub("en", 77)], []);
+    renderMovieDetailFromLeg(makeMovie(92), { subs: [movieSub("en", 77)], historyIDs: [] });
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}77`);
 
     clientState.subsPending[0]?.([movieSub("en", 10)]);
@@ -1643,7 +1648,7 @@ describe("detail: the movie-detail render seam", () => {
     contentView.clear();
     releaseRouteViews();
 
-    renderMovieDetailFromLeg(makeMovie(93), subs, historyIDs);
+    renderMovieDetailFromLeg(makeMovie(93), { subs, historyIDs });
 
     expect(movieViewSignature()).toStrictEqual(painted);
     // Still one: the leg was handed its payload and read nothing of its own.
@@ -2133,10 +2138,10 @@ describe("detail: openMovieDetail chrome", () => {
 
     clientState.movieSubs = [movieSub("en", 90)];
     (handler as (p: { item: MovieDetail }) => void)({ item: makeMovie(96) });
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.waitFor(() => {
+      expect(movieTbody().children.length).toBe(2); // en, fr (target order)
+    });
 
-    expect(movieTbody().children.length).toBe(2); // en, fr (target order)
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}90`);
   });
 

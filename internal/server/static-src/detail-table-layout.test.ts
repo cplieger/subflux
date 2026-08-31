@@ -29,8 +29,10 @@ const clientState = vi.hoisted(() => ({
 vi.mock("./wire/client.gen.js", () => ({
   mediaEpisodes: () => Promise.resolve(null),
   coverageSeriesDetail: () => Promise.resolve([]),
-  coverageMovieSubs: () => Promise.resolve(clientState.movieSubs),
+  coverageMovieSubsRaw: () =>
+    Promise.resolve({ ok: true, status: 200, data: clientState.movieSubs }),
   stateIDs: () => Promise.resolve(null),
+  stateIDsRaw: () => Promise.resolve({ ok: true, status: 200, data: null }),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
 vi.mock("./bus.js", () => ({

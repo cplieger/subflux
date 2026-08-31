@@ -34,9 +34,9 @@ vi.mock("./wire/client.gen.js", () => ({
     clientState.calls.push({ name: "coverageSeriesDetail", args });
     return Promise.resolve([]);
   },
-  coverageMovieSubs: (...args: unknown[]) => {
-    clientState.calls.push({ name: "coverageMovieSubs", args });
-    return Promise.resolve([]);
+  coverageMovieSubsRaw: (...args: unknown[]) => {
+    clientState.calls.push({ name: "coverageMovieSubsRaw", args });
+    return Promise.resolve({ ok: true, status: 200, data: [] });
   },
   stateIDs: (...args: unknown[]) => {
     clientState.calls.push({ name: "stateIDs", args });
@@ -46,6 +46,22 @@ vi.mock("./wire/client.gen.js", () => ({
       });
     }
     return Promise.resolve(clientState.stateIDs);
+  },
+  // The movie leg's history read: same records, raw envelope. Deferral is
+  // shared with the series form above, so a pending resolver still takes the
+  // bare id list and the envelope is put on here.
+  stateIDsRaw: (...args: unknown[]) => {
+    clientState.calls.push({ name: "stateIDsRaw", args });
+    if (clientState.deferStateIDs) {
+      // The pending resolver takes the bare id list; the envelope is put on
+      // here, so deferral costs no extra microtask.
+      return new Promise((resolve) => {
+        clientState.pendingStateIDs.push((v: unknown) => {
+          resolve({ ok: true, status: 200, data: v });
+        });
+      });
+    }
+    return Promise.resolve({ ok: true, status: 200, data: clientState.stateIDs });
   },
 }));
 // detail.ts registers ONE page-teardown hook at import time; capturing it is
@@ -556,10 +572,10 @@ describe("detail: navigation and cancellation", () => {
     openMovieDetail(makeMovie(99));
     await flush();
 
-    const subs = clientState.calls.find((c) => c.name === "coverageMovieSubs");
+    const subs = clientState.calls.find((c) => c.name === "coverageMovieSubsRaw");
     expect(subs?.args[0]).toBe(99);
     expect(subs?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
-    const ids = clientState.calls.find((c) => c.name === "stateIDs");
+    const ids = clientState.calls.find((c) => c.name === "stateIDsRaw");
     expect(ids?.args[0]).toEqual({ type: "movie", prefix: "tmdb-99" });
     expect(ids?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
 

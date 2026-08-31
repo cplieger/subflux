@@ -88,7 +88,7 @@ vi.mock("./wire/client.gen.js", () => ({
 const rendered = vi.hoisted(() => ({
   series: [] as { series: unknown; seasons: unknown; subFiles: unknown; historySet: unknown }[],
   movies: [] as { m: unknown; skipPush: boolean | undefined; signal: AbortSignal | undefined }[],
-  movieLegs: [] as { m: unknown; subs: unknown; historyIDs: unknown }[],
+  movieLegs: [] as { m: unknown; reads: unknown }[],
   loadCoverage: [] as (boolean | undefined)[],
   reloadHistory: 0,
   // The transaction history leg's scripted outcomes, consumed in order; an
@@ -108,8 +108,8 @@ vi.mock("./detail.js", () => ({
   openMovieDetail: (m: unknown, skipPush?: boolean, signal?: AbortSignal) => {
     rendered.movies.push({ m, skipPush, signal });
   },
-  renderMovieDetailFromLeg: (m: unknown, subs: unknown, historyIDs: unknown) => {
-    rendered.movieLegs.push({ m, subs, historyIDs });
+  renderMovieDetailFromLeg: (m: unknown, reads: unknown) => {
+    rendered.movieLegs.push({ m, reads });
   },
 }));
 vi.mock("./coverage.js", () => ({
@@ -632,7 +632,9 @@ describe("page-leg: transaction dispatch", () => {
     ]);
     // The render is the leg's own (pre-fetched reads), never the plain
     // openMovieDetail path with its fire-and-forget fetches.
-    expect(rendered.movieLegs).toStrictEqual([{ m: MOVIE_ROW, subs, historyIDs: ["tmdb-7"] }]);
+    expect(rendered.movieLegs).toStrictEqual([
+      { m: MOVIE_ROW, reads: { subs, historyIDs: ["tmdb-7"] } },
+    ]);
     expect(rendered.movies).toHaveLength(0);
   });
 
