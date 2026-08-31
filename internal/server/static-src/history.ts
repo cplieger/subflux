@@ -17,6 +17,7 @@ import type { StateEntry } from "./wire/types.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
 import { signal, effect, createCollection, bindList, patch, batch } from "@cplieger/reactive";
+import { historyView } from "./view-scope.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { HISTORY_DEPTH_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
 import * as store from "./store.js";
@@ -388,24 +389,20 @@ function anyFilterActive(): boolean {
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
 
-let bindings: (() => void)[] = [];
-
-function disposeBindings(): void {
-  for (const dispose of bindings) {
-    dispose();
-  }
-  bindings = [];
-}
+/** The history table's view id in the history-panel host. */
+const VIEW_HISTORY = "history";
 
 function ensureMounted(): void {
   const out = document.getElementById("historyContent");
   if (!out) {
     throw new Error("historyContent not found");
   }
-  if (out.querySelector("table.history") !== null) {
+  // Already the host's occupant, so the live binding renders the table on
+  // screen (view-scope.ts).
+  if (historyView.scopeFor(VIEW_HISTORY) !== null) {
     return;
   }
-  disposeBindings();
+  const scope = historyView.mount(VIEW_HISTORY);
 
   const tbody = el("tbody");
   const thead = el(
@@ -438,8 +435,8 @@ function ensureMounted(): void {
   );
   patch(out, el("div", { className: "hist-list" }, emptyNoData, emptyFiltered, tbl, showMore));
 
-  bindings.push(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
-  bindings.push(
+  scope.add(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
+  scope.add(
     effect(() => {
       void renderTick.value;
       const loaded = history.ids.value.length;
@@ -457,7 +454,7 @@ function ensureMounted(): void {
 }
 
 function showError(e: unknown): void {
-  disposeBindings();
+  historyView.clear();
   const out = document.getElementById("historyContent");
   if (out) {
     patch(out, errDiv(e instanceof Error ? e.message : String(e)));
@@ -480,13 +477,14 @@ async function runReload(g: number, limit: number, signal?: AbortSignal): Promis
   // fetch. Filter-change reloads keep the current rows until data lands
   // (patching a skeleton over a live reactive table would drop bindings).
   const out = document.getElementById("historyContent");
-  const firstMount = out !== null && out.querySelector("table.history") === null;
+  const firstMount = out !== null && historyView.scopeFor(VIEW_HISTORY) === null;
   const timing = firstMount
     ? skeletonTiming(
         () => {
           if (g !== liveGen) {
             return;
           }
+          historyView.clear();
           const skel = document.createDocumentFragment();
           for (let i = 0; i < 6; i++) {
             skel.appendChild(
@@ -672,5 +670,5 @@ export function _resetHistoryForTest(): void {
   }
   hasMore.value = false;
   renderTick.value = 0;
-  disposeBindings();
+  historyView.clear();
 }

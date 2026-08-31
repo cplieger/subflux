@@ -87,12 +87,16 @@ let windowTimer: ReturnType<typeof setTimeout> | null = null;
 const inflight = new Map<string, AbortController>();
 
 // Roots whose heal failed twice, retried at each reconcile tick. Insertion
-// order is the drop-oldest order for the cap. Scope decides persistence:
-// library entries persist until convergence or a committing transaction
-// subsumes them (task 9's seam); detail entries clear on route leave.
+// order is the drop-oldest order for the cap. Lifetime decides persistence: a
+// library entry persists until convergence or a committing transaction subsumes
+// it (task 9's seam); a detail entry lives in the mounted detail view's scope.
 interface DirtyRoot {
   root: CoverageRoot;
-  scope: "library" | "detail";
+  /** True while the ONLY renderer is the root's own detail view, so the entry
+   *  dies when that view is left (`dropDetailScopedDirtyRoots`). A later
+   *  library-scoped re-add clears the flag, which is what keeps a persisting
+   *  library entry out of that release. */
+  detailScoped: boolean;
 }
 const dirty = new Map<string, DirtyRoot>();
 let tickRegistered = false;
@@ -231,7 +235,7 @@ function markDirty(root: CoverageRoot): void {
   dirty.delete(root.rootKey); // re-adding moves it to the newest slot
   dirty.set(root.rootKey, {
     root,
-    scope: libraryLoaded() ? "library" : "detail",
+    detailScoped: !libraryLoaded(),
   });
   if (dirty.size > DIRTY_ROOT_CAP) {
     // Drop-oldest: a dropped root converges via the next event, replay, or
@@ -256,16 +260,18 @@ function retryDirtyRoots(): void {
   }
 }
 
-// A detail-coupled dirty entry is only worth retrying while its detail is on
-// screen: once the route is left (and the library was never loaded) nothing
-// renders the root, so the entry clears.
-store.subscribe("detailCtx", () => {
+/** Release the dirty entries whose only renderer was a detail view, called by
+ *  the router's leave path (page-leg's abortPageLeg) — once that view is gone a
+ *  retry could repaint nothing, so the entry is worthless rather than pending.
+ *  Library-scoped entries are untouched: a loaded library renders every root, so
+ *  they persist until convergence or a commit. */
+export function dropDetailScopedDirtyRoots(): void {
   for (const [rootKey, d] of dirty) {
-    if (d.scope === "detail" && !detailOpen(d.root)) {
+    if (d.detailScoped) {
       dirty.delete(rootKey);
     }
   }
-});
+}
 
 /** Task 9 seam: a COMMITTING transaction subsumes the dirty set — its
  *  collection leg just landed every row fresh, so nothing is left to retry.

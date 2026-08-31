@@ -11,6 +11,7 @@ import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
 import { abortPageLeg } from "./page-leg.js";
 import { viewTransition, setDocTitle, emptyState } from "./utils.js";
+import { contentView } from "./view-scope.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
 import type { CoverageItem } from "./api-types.js";
 
@@ -218,9 +219,9 @@ const routes: Route[] = [
 export async function applyRoute(): Promise<void> {
   // THE LEAVE PATH (B2 + C2): the view on screen is being left or re-applied,
   // so any in-flight page-leg work belongs to a departed view — abort its
-  // controller and release the detail bindings before the new route renders
-  // (abortPageLeg owns both; detail-coupled dirty heal entries clear on the
-  // detailCtx change, coverage-heal.ts).
+  // controller and release the views that route mounted before the new route
+  // renders (abortPageLeg owns both; a released detail view also drops the
+  // heal's detail-scoped dirty entries, coverage-heal.ts).
   abortPageLeg();
   const path = location.pathname;
 
@@ -356,6 +357,9 @@ async function findCoverageItem(
     applyHealedRow(row);
     return row;
   }
+  // Either way the pane is written with a state that owns no registrations, so
+  // it is released rather than mounted (view-scope.ts).
+  contentView.clear();
   if (status === 404) {
     $.coverageContent.replaceChildren(
       emptyState("Not found. This title is not in the library.", "Back to library", () => {

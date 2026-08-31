@@ -78,6 +78,7 @@ import {
 } from "./history.js";
 import { SUMMARY_COALESCE_MS } from "./constants.js";
 import type { ParsedConfig } from "./wire/types.gen.js";
+import { historyView } from "./view-scope.js";
 
 // Mirrors the wire StateEntry fields buildHistoryRow reads (only those matter
 // for the assertions here).
@@ -151,6 +152,7 @@ function mountShell(): void {
     '<input id="h-filter" />' +
     '<div id="historyContent"></div>' +
     "</div>";
+  historyView.clear();
 }
 
 function sel(id: string): HTMLSelectElement {
@@ -219,6 +221,7 @@ describe("history: renderItems", () => {
       '<input id="h-filter" />' +
       '<div id="historyContent"></div>' +
       "</div>";
+    historyView.clear();
   });
 
   it("rows are keyed by unique subtitle_state id", async () => {

@@ -116,12 +116,8 @@ vi.mock("./store.js", () => ({
   },
 }));
 
-import {
-  renderSeriesDetail,
-  renderMovieDetailFromLeg,
-  openMovieDetail,
-  disposeDetailBindings,
-} from "./detail.js";
+import { renderSeriesDetail, renderMovieDetailFromLeg, openMovieDetail } from "./detail.js";
+import { contentView, releaseRouteViews } from "./view-scope.js";
 import { split } from "@cplieger/keyenc";
 import { openSyncDialog } from "./sync.js";
 import { openFileManager } from "./files.js";
@@ -325,11 +321,12 @@ describe("detail: renderSeriesDetail", () => {
     storeState.config = null;
     // The real dom.js `$.coverageContent` getter reads #coverageContent; the
     // Files button (admin-gated, off here) targets #coveragePanel .card-head.
-    // Wiping innerHTML between tests detaches any previously-bound <tbody>, so
-    // the isConnected/contains guard correctly forces a REBUILD next render.
+    // A fresh document is a released pane: ownership decides reuse now, so the
+    // wipe is paired with the release a real view swap performs.
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("initial render builds season heads, column headers, and episode rows", () => {
@@ -785,6 +782,7 @@ describe("detail: renderSeriesDetail", () => {
 
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+    contentView.clear();
     renderSeriesDetail(
       series,
       makeSeasons("Pilot", "Second", "Return"),
@@ -908,6 +906,7 @@ describe("detail: renderSeriesDetail", () => {
     storeState.isAdmin = true;
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+    contentView.clear();
     renderSeriesDetail(makeSeries(321, "Show X"), makeSeasons("a", "b", "c"), [embedded]);
     expect(document.querySelector('[data-nav="files"]')).toBeNull();
   });
@@ -1028,6 +1027,7 @@ describe("detail: openSeriesDetail", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("pushes the series URL, titles the tab and summarises the item", () => {
@@ -1146,6 +1146,7 @@ describe("detail: openMovieDetail", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("coverage refresh repaints only the changed language row and keeps row identity", async () => {
@@ -1558,6 +1559,7 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("paints from the leg's pre-fetched reads — no fetch of its own, context set", () => {
@@ -1608,6 +1610,7 @@ describe("detail: the movie-detail render seam", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("paints the same view from the same payload whichever caller read it", async () => {
@@ -1637,7 +1640,8 @@ describe("detail: the movie-detail render seam", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
-    disposeDetailBindings();
+    contentView.clear();
+    releaseRouteViews();
 
     renderMovieDetailFromLeg(makeMovie(93), subs, historyIDs);
 
@@ -1690,6 +1694,7 @@ describe("detail: renderSeriesDetail table chrome", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("frames the table with explicit table semantics, column headers and a season gap", () => {
@@ -2048,6 +2053,7 @@ describe("detail: openSeriesDetail panel", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("configures the panel for a detail view with the library controls hidden", () => {
@@ -2096,6 +2102,7 @@ describe("detail: openMovieDetail chrome", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("offers the Files button when only SOME subtitles are embedded tracks", async () => {
@@ -2178,6 +2185,7 @@ describe("detail: release on leave (C2)", () => {
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("a disposed series binding never reuses: the next render rebuilds fresh row effects", () => {
@@ -2190,13 +2198,40 @@ describe("detail: release on leave (C2)", () => {
     renderSeriesDetail(series, seasons, [], new Set());
     expect(seriesTbody()).toBe(before);
 
-    disposeDetailBindings();
+    releaseRouteViews();
 
     // The leave path dropped the binding (page-leg's abortPageLeg owns the
     // call): nothing stays subscribed to the departed view, so an identical
     // render REBUILDS instead of feeding the released collection.
     renderSeriesDetail(series, seasons, [], new Set());
     expect(seriesTbody()).not.toBe(before);
+  });
+
+  it("a rebuild leaves the detached table frozen while the visible one updates", () => {
+    // The defect this pins (task 16): a rebuild patched the fresh table over
+    // the live one, so patch kept the OLD tbody on screen and left the fresh
+    // binding pointing at a detached copy — every later update then repainted a
+    // node nobody could see, while the visible table went stale forever.
+    const series = makeSeries(346, "Show AX");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    renderSeriesDetail(series, seasons, [epSub("tvdb-346-s01e01", 70)], new Set());
+    const first = seriesTbody();
+    const firstEp = reqRow(first.children.item(2));
+    expect(covText(firstEp)).toContain("70");
+
+    releaseRouteViews(); // the route leave
+    renderSeriesDetail(series, seasons, [epSub("tvdb-346-s01e01", 80)], new Set());
+    const rebuilt = seriesTbody();
+    expect(rebuilt).not.toBe(first);
+    expect(document.body.contains(first)).toBe(false);
+
+    // A coverage refresh reuses the live binding: it must land on the table
+    // that is ON SCREEN and never on the released one.
+    renderSeriesDetail(series, seasons, [epSub("tvdb-346-s01e01", 90)], new Set());
+
+    expect(seriesTbody()).toBe(rebuilt);
+    expect(covText(reqRow(rebuilt.children.item(2)))).toContain("90");
+    expect(covText(firstEp)).toContain("70");
   });
 
   it("a disposed movie binding never reuses either", async () => {
@@ -2208,7 +2243,7 @@ describe("detail: release on leave (C2)", () => {
     await openMovieSettled(makeMovie(99), true);
     expect(movieTbody()).toBe(before);
 
-    disposeDetailBindings();
+    releaseRouteViews();
 
     clientState.movieSubs = [movieSub("en", 90)];
     await openMovieSettled(makeMovie(99), true);

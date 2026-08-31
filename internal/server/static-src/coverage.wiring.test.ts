@@ -49,17 +49,35 @@ vi.mock("./bus.js", () => ({
   },
 }));
 
-// A faithful stand-in for detail-scan.ts: the real one disables the button and
-// swaps in a spinner when THIS row's scope is in the running set, so the double
-// derives the same thing from a per-test flag rather than answering a constant.
-const scanState = vi.hoisted(() => ({ running: false }));
+// A faithful stand-in for detail-scan.ts: the real one keeps a REGISTRY of the
+// buttons whose disposal scope is still open and repaints those on every
+// running-scans publish, so the double keeps the same membership rule — a
+// registration a render drops is observable here too — and derives the button
+// state from it rather than answering a constant.
+const scanState = vi.hoisted(() => ({
+  running: false,
+  buttons: [] as HTMLButtonElement[],
+}));
 vi.mock("./detail-scan.js", () => ({
-  registerScanButton: (btn: HTMLButtonElement) => {
+  registerScanButton: (btn: HTMLButtonElement, scope: { add: (fn: () => void) => void }) => {
+    scanState.buttons.push(btn);
+    scope.add(() => {
+      scanState.buttons = scanState.buttons.filter((b) => b !== btn);
+    });
     if (scanState.running) {
       btn.disabled = true;
     }
   },
 }));
+
+/** A running-scans publish, as the store effect delivers it: every REGISTERED
+ *  button repaints. */
+function publishScanRunning(): void {
+  scanState.running = true;
+  for (const btn of scanState.buttons) {
+    btn.disabled = true;
+  }
+}
 
 // coverage.ts calls the reset rule directly on every pair application; the
 // real heal would pull the status.ts graph and the summary endpoints, neither
@@ -79,6 +97,8 @@ vi.mock("./store.js", () => ({
 
 import { configurePanel, fetchAndMergeCoverage, filterCoverage, loadCoverage } from "./coverage.js";
 import type { CoverageItem, CoverageTarget } from "./api-types.js";
+import { contentView } from "./view-scope.js";
+import { seriesScopeKey } from "./scan-scope.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -129,9 +149,11 @@ beforeEach(async () => {
   clientState.next = [];
   await fetchAndMergeCoverage();
   document.body.innerHTML = FIXTURE;
+  contentView.clear();
   bus.emitted = [];
   storeState.isUnconfigured = false;
   scanState.running = false;
+  scanState.buttons = [];
   filterCoverage();
 });
 
@@ -319,6 +341,33 @@ describe("coverage: row scan button", () => {
 
     expect(reqEl<HTMLButtonElement>("[data-scan-scope]").disabled).toBe(false);
   });
+
+  it("answers a scan that starts after the row was painted", async () => {
+    // The button is driven by the shared running-scans map, so it has to stay
+    // in the registry for as long as it is on screen: a row's own scope is
+    // re-opened by the paint that DISCARDS its cells, never by an update that
+    // decides it has nothing to repaint.
+    await load([series(1, "Show")]);
+
+    publishScanRunning();
+
+    expect(reqEl<HTMLButtonElement>("[data-scan-scope]").disabled).toBe(true);
+  });
+
+  it("drops the button of a row that leaves the table", async () => {
+    await load([series(1, "Show"), series(2, "Other")]);
+    // Scoped by scan scope, not by DOM order: the table sorts by title, so
+    // "Other" is the first row and picking by index picks the survivor.
+    const departing = reqEl<HTMLButtonElement>(`[data-scan-scope="${seriesScopeKey(2)}"]`);
+
+    await load([series(1, "Show")]);
+    publishScanRunning();
+
+    expect(departing.disabled).toBe(false);
+    expect(reqEl<HTMLButtonElement>(`[data-scan-scope="${seriesScopeKey(1)}"]`).disabled).toBe(
+      true,
+    );
+  });
 });
 
 describe("coverage: nav button labels", () => {
@@ -343,29 +392,27 @@ describe("coverage: render disposal", () => {
     return Array.from(tbl.querySelectorAll('[data-col="title"]')).map((td) => td.textContent ?? "");
   }
 
-  it("a re-mounted table leaves its predecessor's bindings disposed", async () => {
+  it("a view taking the pane leaves the predecessor's bindings disposed", async () => {
     await load([series(1, "AA"), series(2, "BB")]);
     const discarded = reqEl<HTMLElement>("table.library");
     expect(titlesOf(discarded)).toEqual(["AA", "BB"]);
 
-    // Detail navigation replaces #coverageContent, so the next load re-mounts.
+    // Detail navigation takes the content host and replaces #coverageContent.
+    // Release is immediate — at the HANDOFF, not deferred to the next mount —
+    // so the discarded table is frozen from here on.
+    contentView.mount("series:1");
     reqEl("#coverageContent").replaceChildren();
     await load([series(3, "CC")]);
     const live = reqEl<HTMLElement>("table.library");
     expect(live).not.toBe(discarded);
-    // The re-mounting load writes the collection BEFORE ensureMounted
-    // disposes the old bindings, so the discarded table tracked that one
-    // last write...
-    expect(titlesOf(discarded)).toEqual(["CC"]);
+    expect(titlesOf(discarded)).toEqual(["AA", "BB"]);
 
     await load([series(4, "DD")]);
 
-    // ...and is frozen from the re-mount on: only the live render tracks the
-    // collection, while the discarded table's rows and visibility stay
-    // exactly as dropped — an undisposed structural binding would have
-    // reconciled its tbody to "DD" too.
+    // Only the live render tracks the collection; an undisposed structural
+    // binding would have reconciled the discarded tbody to "DD" too.
     expect(titlesOf(live)).toEqual(["DD"]);
-    expect(titlesOf(discarded)).toEqual(["CC"]);
+    expect(titlesOf(discarded)).toEqual(["AA", "BB"]);
 
     await load([]);
 

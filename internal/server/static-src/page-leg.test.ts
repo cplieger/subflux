@@ -91,7 +91,6 @@ const rendered = vi.hoisted(() => ({
   movieLegs: [] as { m: unknown; subs: unknown; historyIDs: unknown }[],
   loadCoverage: [] as (boolean | undefined)[],
   reloadHistory: 0,
-  disposeCalls: 0,
   // The transaction history leg's scripted outcomes, consumed in order; an
   // Error entry rejects; a Promise entry defers until the test resolves it.
   historyLeg: [] as (string | Error | Promise<string>)[],
@@ -112,9 +111,6 @@ vi.mock("./detail.js", () => ({
   renderMovieDetailFromLeg: (m: unknown, subs: unknown, historyIDs: unknown) => {
     rendered.movieLegs.push({ m, subs, historyIDs });
   },
-  disposeDetailBindings: () => {
-    rendered.disposeCalls++;
-  },
 }));
 vi.mock("./coverage.js", () => ({
   loadCoverage: (silent?: boolean) => {
@@ -125,10 +121,16 @@ vi.mock("./coverage.js", () => ({
 // page-leg registers its detail refresher with the heal at module load; the
 // capture is a PLAIN function so mockReset cannot strip it before the tests
 // that drive it (see the header note).
-const heal = vi.hoisted(() => ({ refresh: null as null | ((root: unknown) => void) }));
+const heal = vi.hoisted(() => ({
+  refresh: null as null | ((root: unknown) => void),
+  detailDirtyDrops: 0,
+}));
 vi.mock("./coverage-heal.js", () => ({
   setDetailRefresher: (fn: (root: unknown) => void) => {
     heal.refresh = fn;
+  },
+  dropDetailScopedDirtyRoots: () => {
+    heal.detailDirtyDrops++;
   },
 }));
 // The row store the movie arm reads its freshly healed row from.
@@ -156,6 +158,7 @@ import {
   refreshCurrentPage,
 } from "./page-leg.js";
 import type { SeriesItem, SeasonGroup, MovieItem } from "./api-types.js";
+import { contentView, ownedByRoute } from "./view-scope.js";
 
 const SERIES = { id: 1042, tvdb_id: 42, title: "Show" } as unknown as SeriesItem;
 const CACHED_SEASONS = [{ season: 1, episodes: [] }] as unknown as SeasonGroup[];
@@ -220,10 +223,10 @@ beforeEach(() => {
   rendered.movieLegs = [];
   rendered.loadCoverage = [];
   rendered.reloadHistory = 0;
-  rendered.disposeCalls = 0;
   rendered.historyLeg = [];
   rendered.historyLegCalls = [];
   rows.byKey.clear();
+  heal.detailDirtyDrops = 0;
   onLibrary();
 });
 
@@ -509,16 +512,24 @@ describe("page-leg: abort + generation guards", () => {
     expect(rendered.series).toHaveLength(0);
   });
 
-  it("the leave path releases the detail bindings beside the abort (C2)", () => {
+  it("the leave path releases the route's views and the heal's detail entries (C2)", () => {
     // One owner: the router's applyRoute funnels every route leave through
-    // abortPageLeg, which drops the departing view's row effects. The
-    // dispose behavior itself is pinned in detail.test.ts; this pins the
-    // wiring.
-    expect(rendered.disposeCalls).toBe(0);
+    // abortPageLeg, which releases everything the departing route mounted —
+    // the view's bindings, row effects and registry entries, plus the heal
+    // entries only that view rendered. The scope contract itself is pinned in
+    // view-scope.test.ts; this pins the wiring.
+    const view = contentView.mount("series:1");
+    ownedByRoute(view);
+    let released = false;
+    view.add(() => {
+      released = true;
+    });
+    expect(heal.detailDirtyDrops).toBe(0);
 
     abortPageLeg();
 
-    expect(rendered.disposeCalls).toBe(1);
+    expect(released).toBe(true);
+    expect(heal.detailDirtyDrops).toBe(1);
   });
 
   it("a landing for a route no longer on screen is discarded", async () => {

@@ -117,6 +117,7 @@ import {
   removeCoverageRow,
 } from "./coverage-store.js";
 import type { CoverageItem, CoverageTarget } from "./api-types.js";
+import { contentView } from "./view-scope.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -401,10 +402,12 @@ describe("coverage: loadCoverage", () => {
     expect(rowTitles()).toEqual(["Show"]);
   });
 
-  it("remounts the table on a refresh after the container was replaced", async () => {
-    // Detail navigation replaces #coverageContent; the next refresh has to
-    // mount the reactive table again rather than leave the view blank.
+  it("remounts the table on a refresh after another view took the pane", async () => {
+    // Detail navigation takes the content host and replaces #coverageContent;
+    // the next refresh has to mount the reactive table again rather than leave
+    // the view blank.
     await load([series(1, "Show")]);
+    contentView.mount("series:1");
     reqEl("#coverageContent").replaceChildren();
 
     await loadCoverage(true);
@@ -1304,6 +1307,7 @@ describe("coverage: renderCoverage", () => {
   it("shows the library chrome and mounts the table", async () => {
     await load([series(1, "Show")]);
     document.body.innerHTML = FIXTURE;
+    contentView.clear(); // a fresh document is a released pane
 
     renderCoverage();
 
@@ -1313,8 +1317,9 @@ describe("coverage: renderCoverage", () => {
     expect(rowTitles()).toEqual(["Show"]);
   });
 
-  it("remounts the table after the container was replaced", async () => {
+  it("remounts the table after another view took the pane", async () => {
     await load([series(1, "Show")]);
+    contentView.mount("series:1");
     reqEl("#coverageContent").replaceChildren();
 
     renderCoverage();

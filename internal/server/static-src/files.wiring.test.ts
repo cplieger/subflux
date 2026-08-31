@@ -78,6 +78,7 @@ vi.mock("./dom.js", async (importOriginal) => {
 import { openFileManager } from "./files.js";
 import { openSyncDialog } from "./sync.js";
 import * as store from "./store.js";
+import { contentView } from "./view-scope.js";
 
 // Mirrors the wire FileEntry fields files.ts consumes. No paths on the wire
 // (S7): ordinal separates manual siblings sharing a quad.
@@ -191,6 +192,7 @@ function resetEnv(): void {
   // appended to #coveragePanel .card-head, both of which must exist.
   document.body.innerHTML =
     '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+  contentView.clear();
 }
 
 describe("files: loading skeleton", () => {
@@ -303,14 +305,17 @@ describe("files: render disposal", () => {
     resetEnv();
   });
 
-  it("a re-mounted table leaves its predecessor's bindings disposed", async () => {
+  it("a view taking the pane leaves the predecessor's bindings disposed", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-63", "en"), extFile("tmdb-63", "fr")]);
     openFileManager("movie", "tmdb-63", "Movie", "/");
     await tick();
     const discarded = bulkLabel();
     expect(discarded.textContent).toBe(" Delete all (2)");
 
-    // Navigating away replaces the render target, so the next load re-mounts.
+    // Navigating away takes the content host and replaces the render target.
+    // Release is immediate — at the HANDOFF — so the discarded label is frozen
+    // from here on.
+    contentView.mount("series:1");
     document.getElementById("coverageContent")?.replaceChildren();
     mockListFiles.mockResolvedValueOnce([
       extFile("tmdb-63", "de"),
@@ -327,7 +332,7 @@ describe("files: render disposal", () => {
 
     // Only the live render tracks the collection now.
     expect(bulkLabel().textContent).toBe(" Delete all (1)");
-    expect(discarded.textContent).toBe(" Delete all (3)");
+    expect(discarded.textContent).toBe(" Delete all (2)");
   });
 
   it("a failed listing leaves the render it replaced disposed", async () => {
