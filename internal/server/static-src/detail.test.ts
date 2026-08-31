@@ -230,6 +230,24 @@ function movieTbody(): HTMLTableSectionElement {
   return tb;
 }
 
+/** Everything the movie-detail render entry decides from its payload: the
+ *  coverage text of each language row (from the subtitle rows) and each header
+ *  button the payload gates (History from the history ids, sync/Files from the
+ *  rows). The comparable view, for the two callers' shared-seam pin. */
+function movieViewSignature(): {
+  rows: string[];
+  history: boolean;
+  sync: boolean;
+  files: boolean;
+} {
+  return {
+    rows: [...movieTbody().children].map((r) => covText(r)),
+    history: document.querySelector('[data-nav="hist"]') !== null,
+    sync: document.querySelector('[data-nav="sync"]') !== null,
+    files: document.querySelector('[data-nav="files"]') !== null,
+  };
+}
+
 function covText(row: Element | null): string {
   if (!(row instanceof HTMLElement)) {
     throw new Error("row missing");
@@ -1572,6 +1590,95 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
 
     // The superseded open landed as a no-op: the leg's paint stands.
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}77`);
+  });
+});
+
+describe("detail: the movie-detail render seam", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    storeState.sets = [];
+    clientState.stateIDs = null;
+    clientState.movieSubs = [];
+    clientState.movieSubsCalls = 0;
+    clientState.subsDefer = false;
+    clientState.subsPending = [];
+    history.replaceState(null, "", "/");
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("paints the same view from the same payload whichever caller read it", async () => {
+    // The two callers read differently on purpose — the plain open on the
+    // null-collapsing client behind its skeleton, the leg on the raw client so
+    // a failure can refuse a commit — but everything DOWNSTREAM of the read is
+    // one entry taking one payload. Hand both the same rows and ids and the
+    // painted view has to be identical, so neither can grow a rule the other
+    // lacks (the History button was decided twice before this seam existed).
+    const subs = [movieSub("en", 90)];
+    const historyIDs = ["tmdb-93"];
+
+    clientState.movieSubs = subs;
+    clientState.stateIDs = historyIDs;
+    await openMovieSettled(makeMovie(93));
+    const painted = movieViewSignature();
+    // The rows and the ids both reached the paint, so the view is worth
+    // comparing: coverage from the rows, History from the ids.
+    expect(painted).toStrictEqual({
+      rows: [`srt: ext ${STAR}90`, DASH],
+      history: true,
+      sync: true,
+      files: false,
+    });
+    expect(clientState.movieSubsCalls).toBe(1);
+
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+    disposeDetailBindings();
+
+    renderMovieDetailFromLeg(makeMovie(93), subs, historyIDs);
+
+    expect(movieViewSignature()).toStrictEqual(painted);
+    // Still one: the leg was handed its payload and read nothing of its own.
+    expect(clientState.movieSubsCalls).toBe(1);
+  });
+
+  it("paints the shipped empty surface when the plain read fails, and never rejects", async () => {
+    // A navigation has no commit to refuse, so the plain caller maps a failed
+    // read to an empty payload: the language rows render uncovered and the page
+    // stays usable. It must NOT surface the failure — a rejection out of this
+    // path is what the transaction leg turns into a latch, and this open is not
+    // part of a transaction.
+    const rejected: unknown[] = [];
+    const onRejection = (e: PromiseRejectionEvent): void => {
+      rejected.push(e.reason);
+      e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    try {
+      // Both reads fail: the generated client collapses any non-2xx to null.
+      clientState.movieSubs = null;
+      clientState.stateIDs = null;
+
+      await openMovieSettled(makeMovie(94));
+      await new Promise((r) => setTimeout(r, 0)); // let a rejection surface
+
+      expect(movieViewSignature()).toStrictEqual({
+        rows: [DASH, DASH],
+        history: false,
+        sync: false,
+        files: false,
+      });
+      // The error panel is the series path's surface for a rejected read; a
+      // null-collapsed one is not a rejection and must not paint it.
+      expect(document.querySelector('#coverageContent div.empty[data-status="err"]')).toBeNull();
+      expect(rejected).toStrictEqual([]);
+    } finally {
+      window.removeEventListener("unhandledrejection", onRejection);
+    }
   });
 });
 

@@ -1086,8 +1086,33 @@ function addMovieHistoryButton(m: MovieDetail): void {
   insertNavButton(histBtn);
 }
 
-/** The transaction page leg's movie render (E3 step 3): paint from the leg's
- *  own pre-fetched triple. Everything openMovieDetail does except fetching —
+/** What a movie-detail READ hands the render: this movie's subtitle rows and
+ *  the media ids its download history holds. Everything downstream of the read
+ *  takes this one payload, so the plain open and the transaction leg cannot
+ *  drift in what they make of the same answers.
+ *
+ *  The reads themselves stay with each caller, because their failure policies
+ *  are opposites: a navigation paints what it can (the null-collapsing client),
+ *  while the leg reads the same pair plus the summary on the RAW client so a
+ *  failed read can refuse the commit instead of painting a half-answer. */
+interface MovieDetailReads {
+  readonly subs: SubtitleEntry[];
+  readonly historyIDs: string[];
+}
+
+/** Enter the movie-detail view for a row already in hand: tab title, panel
+ *  config, and the detail context every refresh path classifies the route
+ *  from. The plain open calls it BEFORE its reads — the header is known from
+ *  the cached row, so it must not wait on a fetch, and a refresh dispatched
+ *  mid-read has to classify as this movie — while the leg calls it after,
+ *  because its summary read is where the row comes from. */
+function enterMovieDetail(m: MovieDetail): void {
+  configureMovieHeader(m);
+  store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
+}
+
+/** The transaction page leg's movie entry (E3 step 3): paint from the leg's
+ *  own pre-fetched triple. Everything openMovieDetail does except reading —
  *  the LEG owns the three reads on the raw client, so commit waits for them
  *  and a failed read aborts the transaction instead of painting an empty
  *  subs table. */
@@ -1101,12 +1126,8 @@ export function renderMovieDetailFromLeg(
     detailAbort.abort();
     detailAbort = null;
   }
-  configureMovieHeader(m);
-  if (historyIDs.length > 0) {
-    addMovieHistoryButton(m);
-  }
-  store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
-  renderMovieDetail(m, subs);
+  enterMovieDetail(m);
+  renderMovieDetail(m, { subs, historyIDs });
 }
 
 export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: AbortSignal): void {
@@ -1122,31 +1143,14 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
   if (!skipPush) {
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
   }
-  configureMovieHeader(m);
-
-  // Check history async and add button if found.
-  stateIDs({ type: "movie", prefix: `tmdb-${m.tmdb_id}` }, { signal })
-    .then((ids: string[] | null) => {
-      if (signal.aborted) {
-        return;
-      }
-      if (ids && ids.length > 0) {
-        addMovieHistoryButton(m);
-      }
-    })
-    .catch(() => {
-      /* ignore */
-    });
-  // Mark as detail view so refreshCurrentPage doesn't replace with library.
-  store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
+  enterMovieDetail(m);
   const out = $.coverageContent;
 
-  // Anti-flicker loading skeleton for the on-demand /subs read (the series
-  // path's constants: 150ms show-delay + 300ms min-visible, abort-aware).
-  // The commit does NOT force-detach: renderMovieDetail's reuse check
-  // decides — a fast load leaves the bound <tbody> live, so a same-movie
-  // refresh repaints in place; a painted skeleton has already detached it,
-  // so the render rebuilds.
+  // Anti-flicker loading skeleton for the on-demand read (the series path's
+  // constants: 150ms show-delay + 300ms min-visible, abort-aware). The commit
+  // does NOT force-detach: renderMovieDetail's reuse check decides — a fast
+  // load leaves the bound <tbody> live, so a same-movie refresh repaints in
+  // place; a painted skeleton has already detached it, so the render rebuilds.
   const timing = skeletonTiming(
     () => {
       const skel = document.createDocumentFragment();
@@ -1160,14 +1164,23 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
     { minVisibleMs: 300, signal },
   );
 
-  coverageMovieSubs(m.tmdb_id, { signal })
-    .then((subs) => {
+  // The pair the render needs, read under ONE signal so the skeleton covers
+  // the whole load and the paint gets both answers at once (the leg awaits the
+  // same pair inside its triple). NULL-COLLAPSING on purpose, and that is the
+  // only difference from the leg: a navigation has no commit to refuse, so a
+  // failed read becomes an empty list and paints the shipped empty surface
+  // rather than latching a transaction.
+  Promise.all([
+    coverageMovieSubs(m.tmdb_id, { signal }),
+    stateIDs({ type: "movie", prefix: `tmdb-${m.tmdb_id}` }, { signal }),
+  ])
+    .then(([subs, historyIDs]) => {
       if (signal.aborted) {
         timing.cancel();
         return;
       }
       timing.commit(() => {
-        renderMovieDetail(m, subs ?? []);
+        renderMovieDetail(m, { subs: subs ?? [], historyIDs: historyIDs ?? [] });
       });
     })
     .catch((e: unknown) => {
@@ -1182,13 +1195,20 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
     });
 }
 
-/** Render the movie detail body from the cached row plus its fetched
- *  subtitle rows, and add the header buttons those rows decide (sync for
- *  external subs, Files for an admin). Split from openMovieDetail so the
- *  skeleton controller owns WHEN this runs. */
-function renderMovieDetail(m: MovieDetail, subs: SubtitleEntry[]): void {
+/** THE movie-detail render: paint the view from an already-read payload. Both
+ *  callers land here — the plain open with the pair it read behind the
+ *  skeleton, the transaction leg with the triple it awaited — so the History
+ *  button the ids decide, the sync/Files buttons the rows decide, and the
+ *  table are settled in ONE place rather than once per path. Split from
+ *  openMovieDetail so the skeleton controller owns WHEN this runs. */
+function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
+  const { subs, historyIDs } = reads;
   const targets = m.targets;
   const out = $.coverageContent;
+
+  if (historyIDs.length > 0) {
+    addMovieHistoryButton(m);
+  }
 
   // Collect all external subtitles for the sync button.
   const extSubs = subs.filter((s) => s.source !== EMBEDDED_PROVIDER);
