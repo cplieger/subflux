@@ -53,6 +53,32 @@ const toastedActivities = new Set<string>();
 let activitiesInitialized = false;
 const dismissedActivities = new Set<string>();
 
+// F2: both per-id memory sets prune on activity `remove` events (the server
+// pruned the row, so the memory goes with it), with a size cap as the belt
+// for ids that vanish without one (an SSE-down prune converges here). The
+// belt evicts only ids that already LEFT the ring: evicting a live done id
+// would make the next render re-toast it — and re-record it, evicting the
+// next live id, a toast storm over the whole snapshot. The cap is far above
+// the server's activity ring (a 20-row page plus running extras, 15-minute
+// prune), so the sets converge to the cap as soon as dead residue exists.
+const ACTIVITY_SET_CAP = 200;
+
+/** Record an id in one of the bounded memory sets: insertion-ordered, and
+ *  past the cap the oldest id no longer in the activity store is dropped. */
+function addBounded(set: Set<string>, id: string): void {
+  set.delete(id);
+  set.add(id);
+  if (set.size <= ACTIVITY_SET_CAP) {
+    return;
+  }
+  for (const oldest of set) {
+    if (!knownActivities.has(oldest)) {
+      set.delete(oldest);
+      return;
+    }
+  }
+}
+
 // Optimistic "stopping…" overlay: activity ids whose stop was dispatched but
 // whose terminal (cancelled) state has not arrived yet. Honesty note: a stop
 // ends the scan after the item IN FLIGHT completes — for single-item scopes
@@ -233,6 +259,9 @@ function seedToastHistory(activities: readonly ActivityEntry[]): void {
   activitiesInitialized = true;
   for (const a of activities) {
     if (a.done) {
+      // Plain add, no cap: the seed is a baseline, not growth — capping it
+      // would misread the evicted overflow of a large first snapshot as
+      // fresh completions. Growth paths use addBounded.
       toastedActivities.add(a.id);
     }
   }
@@ -247,7 +276,7 @@ function processActivitySideEffects(activities: readonly ActivityEntry[]): void 
   }
   for (const a of activities) {
     if (a.done && !toastedActivities.has(a.id)) {
-      toastedActivities.add(a.id);
+      addBounded(toastedActivities, a.id);
       if (
         a.action !== "Manual Search" &&
         a.action !== "Manual Download" &&
@@ -361,6 +390,11 @@ export function applyActivityEvent(ev: ActivityEvent): void {
     return;
   }
   if (ev.op === "remove") {
+    // F2: the server pruned the row — drop the per-id memory with it. The
+    // toast dedupe and the optimistic-dismiss filter both key off ids that
+    // can never reappear once removed.
+    toastedActivities.delete(entry.id);
+    dismissedActivities.delete(entry.id);
     if (!knownActivities.delete(entry.id)) {
       return;
     }
@@ -930,7 +964,7 @@ function animateDismiss(item: Element): void {
 }
 
 function dismissActivity(id: string): void {
-  dismissedActivities.add(id);
+  addBounded(dismissedActivities, id);
   // Play the exit animation for immediate feedback; the row is filtered from
   // subsequent renders by the dismissedActivities set.
   const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);

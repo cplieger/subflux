@@ -863,6 +863,28 @@ describe("coverage: pagination", () => {
 
     expect(tbody().children.length).toBe(50);
   });
+
+  it("a filter gesture from a deeper page reconciles once: surviving rows keep their nodes (R8.4)", async () => {
+    // 30 series then 30 movies; the titles sort every movie past the first
+    // page boundary, so with the window at 100 the probed movie row exists
+    // only because of the deeper page.
+    const movies = Array.from({ length: 30 }, (_unused, i) =>
+      movie(200 + i, `ZFilm ${String(i).padStart(2, "0")}`),
+    );
+    await load(manySeries().slice(0, 30), movies);
+    reqEl<HTMLButtonElement>(".more-btn").click();
+    expect(tbody().children.length).toBe(60);
+    const surviving = reqRow(55); // "ZFilm 25"
+
+    reqEl<HTMLSelectElement>("#cov-type-filter").value = "movies";
+    filterCoverage();
+
+    // One flush (R8.4): unbatched, the pageLimit reset alone reconciled the
+    // OLD view sliced to 50 — unmounting this row — before the filter pass
+    // remounted it as a fresh node.
+    expect(tbody().children.length).toBe(30);
+    expect(reqRow(25)).toBe(surviving);
+  });
 });
 
 describe("coverage: filtering", () => {

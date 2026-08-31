@@ -383,19 +383,29 @@ export function openSyncDialog(
     (timecode as TimecodeInput).handleKey(e);
   };
 
+  wireSyncDialogChrome(dlg);
+}
+
+// Whether the permanent dialog element's chrome (backdrop dismissal + the
+// Escape override) is wired. Once per dialog (F3): the sync elements resolve
+// lazily on first open — the module must import without a DOM — so "at boot"
+// is the first open here. The old per-open wiring leaked one `close` and one
+// `cancel` listener per open.
+let dialogChromeWired = false;
+
+function wireSyncDialogChrome(dlg: HTMLDialogElement): void {
+  if (dialogChromeWired) {
+    return;
+  }
+  dialogChromeWired = true;
   // Close on backdrop click.
   onBackdropClose(dlg, closeSyncDialog);
-
   // Close on Escape: prevent the browser's default close so
   // closeSyncDialog can run the animated close, video cleanup, and URL fixup.
-  dlg.addEventListener(
-    "cancel",
-    (e: Event) => {
-      e.preventDefault();
-      closeSyncDialog();
-    },
-    { once: true },
-  );
+  dlg.addEventListener("cancel", (e: Event) => {
+    e.preventDefault();
+    closeSyncDialog();
+  });
 }
 
 // Build the video preview container with poster background and play overlay.

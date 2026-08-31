@@ -38,6 +38,36 @@ vi.mock("./constants.js", async (importOriginal) => ({
   HISTORY_DEPTH_CAP: 250,
 }));
 
+// Structural-reconcile spy: bindList's structure tier reads `source.ids.value`
+// exactly once per pass, so wrapping the ListSource counts reconcile passes
+// without changing rendering (the getter delegates to the real signal, so
+// effect tracking is untouched).
+const structural = vi.hoisted(() => ({ runs: 0 }));
+import type * as ReactiveModule from "@cplieger/reactive";
+vi.mock("@cplieger/reactive", async (importOriginal) => {
+  const real = await importOriginal<typeof ReactiveModule>();
+  const bindList = <T>(
+    parent: ParentNode,
+    source: ReactiveModule.ListSource<T>,
+    spec: ReactiveModule.ListSpec<T>,
+  ): (() => void) =>
+    real.bindList<T>(
+      parent,
+      {
+        ids: {
+          get value(): readonly string[] {
+            structural.runs += 1;
+            return source.ids.value;
+          },
+          peek: (): readonly string[] => source.ids.peek(),
+        },
+        signalFor: (id: string) => source.signalFor(id),
+      },
+      spec,
+    );
+  return { ...real, bindList };
+});
+
 import * as store from "./store.js";
 import {
   reloadHistory,
@@ -231,6 +261,24 @@ describe("history: renderItems", () => {
     // Keyed reconcile reuses the already-mounted nodes rather than rebuilding.
     expect(tbody.children.item(0)).toBe(firstBefore);
     expect(tbody.children.item(1)).toBe(secondBefore);
+  });
+
+  it("Show More appends the page in ONE structural reconcile (R8.3)", async () => {
+    const page0 = Array.from({ length: 50 }, (_, i) => makeEntry(i + 1));
+    const page1 = Array.from({ length: 50 }, (_, i) => makeEntry(100 + i));
+    dispatch.mockResolvedValueOnce(page0).mockResolvedValueOnce(page1);
+    reloadHistory();
+    await tick();
+    expect(reqTbody().children.length).toBe(50);
+
+    const before = structural.runs;
+    clickShowMore();
+    await tick();
+
+    expect(reqTbody().children.length).toBe(100);
+    // Unbatched, every appended row's order write ran its own reconcile
+    // pass — 50 passes for this page.
+    expect(structural.runs - before).toBe(1);
   });
 
   it("loadMore re-serving a page-0 id stays one node", async () => {

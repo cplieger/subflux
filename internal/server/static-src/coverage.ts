@@ -20,7 +20,15 @@ import type { CoverageTarget, CoverageItem } from "./api-types.js";
 import type { SeriesItem, MovieItem } from "./wire/types.gen.js";
 import { registerScanButton } from "./detail-scan.js";
 import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
-import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import {
+  signal,
+  computed,
+  effect,
+  createCollection,
+  bindList,
+  patch,
+  batch,
+} from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { join } from "@cplieger/keyenc";
 
@@ -680,10 +688,16 @@ export function renderCoverage(): void {
   ensureMounted();
 }
 
-/** Called by the filter/sort controls — recompute the view from page 0. */
+/** Called by the filter/sort controls — recompute the view from page 0.
+ *  One flush (R8.4): unbatched, the pageLimit reset alone would reconcile
+ *  the table against the OLD filter sliced to page 0, and the tick bump
+ *  would reconcile it again — rows surviving the gesture were unmounted by
+ *  the first pass and remounted by the second. */
 export function filterCoverage(): void {
-  pageLimit.value = COV_PAGE_SIZE;
-  filterTick.value += 1;
+  batch(() => {
+    pageLimit.value = COV_PAGE_SIZE;
+    filterTick.value += 1;
+  });
 }
 
 function applyFilters(data: CoverageItem[]): CoverageItem[] {
