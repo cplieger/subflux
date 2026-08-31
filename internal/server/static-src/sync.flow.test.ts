@@ -31,6 +31,7 @@ const unwatchMock = vi.hoisted(() => vi.fn());
 vi.mock("./sync-actions.js", () => ({
   audioSyncAction: { dispatch: dispatchAudio },
   saveManualOffsetAction: { dispatch: dispatchOffset },
+  seasonSyncAction: { dispatch: vi.fn() },
 }));
 
 // The settlement registry is the dialog's other network edge: watch/attach

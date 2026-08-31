@@ -63,7 +63,12 @@ func (f *fakeExec) exec(ctx context.Context, in *syncjobs.ExecInput, hook func()
 	gate := f.preHook[in.SubtitlePath]
 	f.mu.Unlock()
 	if gate != nil {
-		<-gate
+		// ctx arm so a test failing before it releases the gate cannot
+		// wedge the harness cleanup; the hook below observes the cancel.
+		select {
+		case <-gate:
+		case <-ctx.Done():
+		}
 	}
 	if !hook() {
 		return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: context.Canceled}

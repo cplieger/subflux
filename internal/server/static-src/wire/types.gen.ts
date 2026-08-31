@@ -740,6 +740,15 @@ export interface SeasonGroup {
   season: number;
 }
 
+/**
+ * SeasonSyncAccepted is the 202 body for POST /api/sync/season: the batch
+ * activity id. Item job ids arrive via the registry read
+ * (GET /api/sync/jobs?batch_activity_id=) and the per-item sync:done events.
+ */
+export interface SeasonSyncAccepted {
+  activity_id: string;
+}
+
 /** SeriesItem is the coverage summary for one TV series. */
 export interface SeriesItem {
   title: string;
@@ -940,6 +949,15 @@ export interface SyncOffsetRequest {
   source?: string;
   ordinal?: number;
   offset_ms: number;
+}
+
+/**
+ * SyncSeasonRequest is the typed body for POST /api/sync/season: the Sonarr
+ * series id plus the season whose subtitle files the server enumerates.
+ */
+export interface SyncSeasonRequest {
+  series_id: number;
+  season: number;
 }
 
 /** UserInfo is one entry of the GET /api/auth/users response. */

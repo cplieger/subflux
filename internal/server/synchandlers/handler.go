@@ -45,29 +45,40 @@ type SubtitleProcessor interface {
 // S7 typed-reference resolver: sync verbs address the subtitle by FileRef
 // and the server resolves both the subtitle path (store row) and the video
 // path (same media) — no client-supplied paths. Jobs is the async sync
-// dispatcher POST /api/sync/audio hands accepted work to.
+// dispatcher POST /api/sync/audio and POST /api/sync/season hand accepted
+// work to; Files and SeasonState feed the season batch's enumeration.
 type Deps struct {
 	Store        SyncStore
+	Files        SeasonFileStore
 	SubtitleProc SubtitleProcessor
 	Jobs         *syncjobs.Dispatcher
 	Resolve      *resolve.Resolver
+	SeasonState  func() *SeasonState
 }
 
 // Handler holds all dependencies for the sync handler family.
 type Handler struct {
 	store        SyncStore
+	files        SeasonFileStore
 	subtitleProc SubtitleProcessor
 	jobs         *syncjobs.Dispatcher
 	resolve      *resolve.Resolver
+	seasonState  func() *SeasonState
 }
 
 // New creates a Handler with the given dependencies.
 func New(d Deps) *Handler {
+	seasonState := d.SeasonState
+	if seasonState == nil {
+		seasonState = func() *SeasonState { return nil }
+	}
 	return &Handler{
 		store:        d.Store,
+		files:        d.Files,
 		subtitleProc: d.SubtitleProc,
 		jobs:         d.Jobs,
 		resolve:      d.Resolve,
+		seasonState:  seasonState,
 	}
 }
 

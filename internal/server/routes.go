@@ -248,6 +248,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	// Sync endpoints.
 	userConfigured.Add("POST /api/sync/audio", s.syncH.HandleSyncAudio)
+	userConfigured.Add("POST /api/sync/season", s.syncH.HandleSyncSeason)
 	userConfigured.Add("POST /api/sync/offset", s.syncH.HandleSyncOffset)
 	userConfigured.Add("GET /api/sync/jobs", s.syncH.HandleSyncJobs)
 

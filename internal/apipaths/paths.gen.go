@@ -76,6 +76,7 @@ const (
 	PathDeleteFile             = "/api/files"
 	PathBulkDeleteFiles        = "/api/files/bulk"
 	PathSyncAudio              = "/api/sync/audio"
+	PathSyncSeason             = "/api/sync/season"
 	PathSyncOffset             = "/api/sync/offset"
 	PathSyncJobs               = "/api/sync/jobs"
 	PathPreviewStart           = "/api/preview/start"

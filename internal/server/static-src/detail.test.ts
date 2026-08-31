@@ -77,7 +77,7 @@ vi.mock("./bus.js", () => ({
   },
 }));
 vi.mock("./search.js", () => ({ openSearchPopup: () => undefined }));
-vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
+vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn(), confirmSeasonSync: vi.fn() }));
 vi.mock("./files.js", () => ({ openFileManager: vi.fn() }));
 // detail.ts imports openConfig (for the no-targets empty state); mock the
 // whole module so its transitive graph (status.ts actions) stays out.
@@ -88,7 +88,6 @@ vi.mock("./detail-scan.js", () => ({
   triggerMovieScan: vi.fn(),
   applyScanButtonState: () => undefined,
 }));
-vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: () => undefined }));
 // Mutable store state: the getters below read it, so a test can set the admin
 // flag or the ignored-codec set without re-mocking the module.
 const storeState = vi.hoisted(() => ({

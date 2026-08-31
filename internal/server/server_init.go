@@ -219,9 +219,23 @@ func (s *Server) initHandlers() {
 
 	s.syncH = synchandlers.New(synchandlers.Deps{
 		Store:        s.stores.sync,
+		Files:        s.db,
 		SubtitleProc: s.subtitleProc,
 		Jobs:         s.syncJobs,
 		Resolve:      resolver,
+		SeasonState: func() *synchandlers.SeasonState {
+			ls := s.state()
+			sst := &synchandlers.SeasonState{}
+			// Conditional assigns: a nil concrete pointer boxed into the
+			// interface field would defeat the handler's nil checks.
+			if ls.cfg != nil {
+				sst.Cfg = ls.cfg
+			}
+			if ls.sonarr != nil {
+				sst.Sonarr = ls.sonarr
+			}
+			return sst
+		},
 	})
 }
 

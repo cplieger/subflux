@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeasonSyncAccepted, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeasonSyncAccepted, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, SyncSeasonRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -102,6 +102,7 @@ export const PATH_LIST_FILES = "/api/files";
 export const PATH_DELETE_FILE = "/api/files";
 export const PATH_BULK_DELETE_FILES = "/api/files/bulk";
 export const PATH_SYNC_AUDIO = "/api/sync/audio";
+export const PATH_SYNC_SEASON = "/api/sync/season";
 export const PATH_SYNC_OFFSET = "/api/sync/offset";
 export const PATH_SYNC_JOBS = "/api/sync/jobs";
 export const PATH_PREVIEW_START = "/api/preview/start";
@@ -626,6 +627,15 @@ export function syncAudio(body: SyncAudioRequest, opts?: ClientOpts): Promise<Sy
 
 export function syncAudioRaw(body: SyncAudioRequest, opts?: ClientOpts): Promise<ApiResult<SyncAccepted>> {
   return clientRequestRaw("POST", "/api/sync/audio", body, decodeSyncAccepted, opts?.signal);
+}
+
+/** Dispatch one server-owned season sync batch: the season's subtitle files are enumerated server-side and answer 202 {activity_id}. Item job ids arrive via the jobs read filtered by batch_activity_id and the per-item sync:done events; a live batch for the same season answers its existing id; a full admission lease answers 429. */
+export function syncSeason(body: SyncSeasonRequest, opts?: ClientOpts): Promise<SeasonSyncAccepted | null> {
+  return clientRequest("POST", "/api/sync/season", body, decodeSeasonSyncAccepted, opts?.signal);
+}
+
+export function syncSeasonRaw(body: SyncSeasonRequest, opts?: ClientOpts): Promise<ApiResult<SeasonSyncAccepted>> {
+  return clientRequestRaw("POST", "/api/sync/season", body, decodeSeasonSyncAccepted, opts?.signal);
 }
 
 export function syncOffset(body: SyncOffsetRequest, opts?: ClientOpts): Promise<boolean> {

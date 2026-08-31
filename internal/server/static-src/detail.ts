@@ -22,7 +22,7 @@ import { openConfig } from "./config.js";
 import { DEFAULT_VARIANT, EMBEDDED_PROVIDER } from "./constants.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
-import { openSyncDialog } from "./sync.js";
+import { openSyncDialog, confirmSeasonSync } from "./sync.js";
 import { openFileManager } from "./files.js";
 import {
   triggerSeriesScan,
@@ -31,9 +31,6 @@ import {
   applyScanButtonState,
 } from "./detail-scan.js";
 import { seasonScopeKey } from "./scan-scope.js";
-import { confirmSeasonSync } from "./detail-season-sync.js";
-import type { SeasonSyncEpisode } from "./detail-season-sync.js";
-import { subtitleRef } from "./file-ref.js";
 import type {
   SubtitleEntry,
   MovieDetail,
@@ -299,14 +296,18 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
     });
 }
 
-/** Collect episodes with external subs + video for season audio sync. */
-function collectSeasonSyncEps(
+/** Count the season's syncable files (external subs on file-bearing
+ *  episodes matching a configured target pair) — the season-head Sync
+ *  button's visibility gate and the dialog's count HINT. The server
+ *  enumerates authoritatively at batch acceptance (D2); this count only
+ *  decides whether the affordance renders. */
+function countSeasonSyncFiles(
   sg: SeasonGroup,
   series: SeriesItem,
   subIdx: Record<string, Partial<Record<string, SubtitleEntry[]>>>,
   targetLangs: { lang: string; variant: string }[],
-): SeasonSyncEpisode[] {
-  const result: SeasonSyncEpisode[] = [];
+): number {
+  let count = 0;
   for (const ep of sg.episodes) {
     if (!ep.has_file) {
       continue;
@@ -319,16 +320,13 @@ function collectSeasonSyncEps(
       if (entries) {
         for (const sub of entries) {
           if (sub.source !== EMBEDDED_PROVIDER) {
-            result.push({
-              ref: subtitleRef("episode", sub),
-              label: fmtEpisode(sg.season, ep.episode),
-            });
+            count++;
           }
         }
       }
     }
   }
-  return result;
+  return count;
 }
 
 // --- Series row model (two-tier collection rows) ---
@@ -347,7 +345,7 @@ type DetailRow =
       season: number;
       label: string;
       series: SeriesItem;
-      syncEps: SeasonSyncEpisode[];
+      syncFiles: number;
       hasHistory: boolean;
       sig: string;
     }
@@ -593,7 +591,7 @@ function paintEpisodeRow(node: HTMLElement, row: DetailEpRow): void {
 
 /** Action-group children for a season-head row: [sync?, history?, search]. */
 function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
-  const { series, season, syncEps, hasHistory } = row;
+  const { series, season, syncFiles, hasHistory } = row;
 
   const searchBtn = el(
     "button",
@@ -625,7 +623,7 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
       )
     : null;
   const syncBtn =
-    syncEps.length > 0
+    syncFiles > 0
       ? el(
           "button",
           {
@@ -633,7 +631,7 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
             className: "ghost",
             "data-tip": "Audio sync all subtitles in this season",
             onclick: () => {
-              confirmSeasonSync(series.title, season, syncEps);
+              confirmSeasonSync(series.title, season, series.id, syncFiles);
             },
           },
           icon("sync"),
@@ -760,16 +758,16 @@ function buildSeriesRows(
       rows.push({ kind: "gap", season: sg.season });
     }
     first = false;
-    const syncEps = collectSeasonSyncEps(sg, series, subIdx, targetLangs);
+    const syncFiles = countSeasonSyncFiles(sg, series, subIdx, targetLangs);
     const hasHist = historySeasons.has(sg.season);
     rows.push({
       kind: "head",
       season: sg.season,
       label: sg.season === 0 ? "Specials" : `Season ${sg.season}`,
       series,
-      syncEps,
+      syncFiles,
       hasHistory: hasHist,
-      sig: `${syncEps.length}:${hasHist}`,
+      sig: `${syncFiles}:${hasHist}`,
     });
     rows.push({ kind: "cols", season: sg.season });
     for (const ep of sg.episodes) {
