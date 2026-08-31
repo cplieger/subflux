@@ -418,3 +418,45 @@ method UserByWebAuthnHandle is used in test only
 # Close invokes it. Both go red on the deletion above.
 method (*CachedSonarr).Close
 method (*CachedRadarr).Close
+
+# --- Stdlib response-writer protocol members (net/http calls them) ----------
+# gzipResponseWriter is the delayed-commit writer, so it must re-expose the
+# capabilities it wraps or every consumer that asserts for them silently loses
+# them. Neither is referenced from this repo, and both are pinned by the
+# compile-time assertion block at gzip.go:130 — the assertion names the TYPE, so
+# punused still reports the methods.
+#   Flush   http.Flusher. `var _ http.Flusher` makes its deletion a build
+#           failure. The ResponseController path uses FlushError instead (which
+#           Flush delegates to), so this is the classic-assertion half.
+#   Unwrap  net/http reaches it through an ANONYMOUS interface, so its deletion
+#           would be silent rather than a build error: a controller call on a
+#           wrapped writer would answer ErrNotSupported and previewhandlers'
+#           SetWriteDeadline would fall back to the 60s server timeout mid
+#           video stream. The `var _ interface{ Unwrap() http.ResponseWriter }`
+#           added beside it is the only guard there can be.
+method (*gzipResponseWriter).Flush
+method (*gzipResponseWriter).Unwrap
+
+# --- PENDING USER DECISION: a vestigial audio-sync path ---------------------
+# (SubtitleProcessor).SyncFromAudio is reported EU1002 — ZERO references, not
+# even a test. It is whitelisted only to keep the gate at zero while the removal
+# decision is open; it is NOT healthy.
+#
+# It is the head of a chain, which is why it is a decision rather than a
+# deletion. The method is the only reader of SubtitleProcessor.exec, so removing
+# it also strands `exec`, `NewSubtitleProcessorWithExec`, and main.go:504's
+# `server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec))` —
+# the composition root threads the syncworker executor into a processor that no
+# longer uses it. The LIVE audio-sync path is the server-owned job dispatcher
+# reaching the same executor through search.WithSyncExec (main.go:566), and both
+# consumer interfaces (previewhandlers.SubtitleProcessor,
+# synchandlers.SubtitleProcessor) declare only NormalizeEncoding / ParseSRT /
+# WriteSRT. So this reads as residue from the D1-D3 move to background jobs.
+# Resolve by deleting the method, the field, the constructor and the main.go
+# option together.
+#
+# NOTE: punused's reported subset is unstable per run (this file's reffixture
+# entry records the same effect), so this finding and the two above surfaced on
+# a PR that touches neither package. GetOrFetchCtx, reported in the same run,
+# WAS deleted rather than whitelisted — it had zero callers and no cascade.
+method (SubtitleProcessor).SyncFromAudio

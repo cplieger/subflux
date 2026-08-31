@@ -130,6 +130,12 @@ func addVaryAcceptEncoding(h http.Header) {
 var (
 	_ http.ResponseWriter = (*gzipResponseWriter)(nil)
 	_ http.Flusher        = (*gzipResponseWriter)(nil)
+	// net/http reaches Unwrap through an anonymous interface, so nothing in
+	// this repo references it and its deletion would be silent: a controller
+	// call on a wrapped writer would answer ErrNotSupported, and
+	// previewhandlers' SetWriteDeadline would fall back to the 60s server
+	// timeout mid-stream. This assertion is the only guard there can be.
+	_ interface{ Unwrap() http.ResponseWriter } = (*gzipResponseWriter)(nil)
 )
 
 // gzipResponseWriter is the delayed-commit writer: WriteHeader records status

@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -196,29 +195,6 @@ func TestCache_GetOrFetch_coalesces_concurrent(t *testing.T) {
 	}
 }
 
-// TestCache_GetOrFetchCtx_caches_result verifies a successful GetOrFetchCtx
-// result is cached, so a second lookup for the same key returns the cached
-// value without re-invoking the fetch function.
-func TestCache_GetOrFetchCtx_caches_result(t *testing.T) {
-	t.Parallel()
-	c := New[int](time.Minute)
-	calls := 0
-	fn := func(context.Context) (int, error) {
-		calls++
-		return 42, nil
-	}
-
-	if v, err := c.GetOrFetchCtx(t.Context(), "k", fn); err != nil || v != 42 {
-		t.Fatalf("first GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
-	}
-	if v, err := c.GetOrFetchCtx(t.Context(), "k", fn); err != nil || v != 42 {
-		t.Fatalf("second GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
-	}
-	if calls != 1 {
-		t.Errorf("fetch fn called %d times, want 1 (a successful result must be cached)", calls)
-	}
-}
-
 func BenchmarkCache_concurrent(b *testing.B) {
 	c := New[int](time.Hour)
 	for i := range 100 {
@@ -357,97 +333,5 @@ func BenchmarkCache_GetOrFetch(b *testing.B) {
 				})
 			}
 		})
-	})
-}
-
-func TestCache_GetOrFetchCtx(t *testing.T) {
-	t.Parallel()
-
-	t.Run("basic fetch", func(t *testing.T) {
-		t.Parallel()
-		c := New[string](time.Hour)
-		ctx := t.Context()
-		got, err := c.GetOrFetchCtx(ctx, "k1", func(ctx context.Context) (string, error) {
-			return "v1", nil
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if got != "v1" {
-			t.Errorf("got %q, want %q", got, "v1")
-		}
-	})
-
-	t.Run("initiator cancel does not kill shared fetch", func(t *testing.T) {
-		t.Parallel()
-		c := New[string](time.Hour)
-		fetchStarted := make(chan struct{})
-		fetchDone := make(chan struct{})
-
-		// Caller A: will be cancelled mid-flight.
-		// Parent stays context.Background(): only this test may cancel ctxA, mid-flight and at an instant it chooses.
-		ctxA, cancelA := context.WithCancel(context.Background())
-
-		var wg sync.WaitGroup
-
-		// Start caller A.
-		wg.Go(func() {
-			_, _ = c.GetOrFetchCtx(ctxA, "shared", func(ctx context.Context) (string, error) {
-				close(fetchStarted)
-				<-fetchDone
-				// The fetch context should NOT be cancelled even though ctxA is.
-				if ctx.Err() != nil {
-					t.Errorf("fetch context cancelled unexpectedly: %v", ctx.Err())
-				}
-				return "result", nil
-			})
-		})
-
-		// Wait for fetch to start, then cancel caller A.
-		<-fetchStarted
-		cancelA()
-
-		// Caller B: independent context, should get the result.
-		ctxB := t.Context()
-		var gotB string
-		var errB error
-		wg.Go(func() {
-			gotB, errB = c.GetOrFetchCtx(ctxB, "shared", func(ctx context.Context) (string, error) {
-				t.Error("caller B should coalesce, not start a new fetch")
-				return "wrong", nil
-			})
-		})
-
-		// Give B time to join the flight, then release A's fetch. Not a
-		// false-green risk: if B arrives late it starts its own fetch and the
-		// t.Error inside its fetch fn above fires, so this fails closed. Left
-		// as a sleep because the exact alternative (synctest.Wait) needs the
-		// whole subtest in a bubble, which is more churn than the guess costs.
-		time.Sleep(10 * time.Millisecond)
-		close(fetchDone)
-		wg.Wait()
-
-		if errB != nil {
-			t.Fatalf("caller B got error: %v", errB)
-		}
-		if gotB != "result" {
-			t.Errorf("caller B got %q, want %q", gotB, "result")
-		}
-	})
-
-	// Verify caller's own context cancellation returns ctx.Err().
-	t.Run("caller context respected", func(t *testing.T) {
-		t.Parallel()
-		c := New[string](time.Hour)
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // pre-cancel
-
-		_, err := c.GetOrFetchCtx(ctx, "k", func(ctx context.Context) (string, error) {
-			time.Sleep(time.Second) // slow fetch
-			return "late", nil
-		})
-		if err != context.Canceled {
-			t.Errorf("got err=%v, want context.Canceled", err)
-		}
 	})
 }
