@@ -71,18 +71,25 @@ export function pad(n: number): string {
 export { closeDialog } from "@cplieger/ui-primitives/dialog";
 
 // Drag-safe backdrop dismissal via the library's wireBackdropDismiss (a press
-// must both start and end on the dialog element itself, so a drag-select ending
-// on the backdrop doesn't count). Listeners are detached both after the first
-// dismissal and on the dialog's `close` event, matching the previous
-// AbortController-based cleanup so nothing leaks across reopens.
+// must both start and end on the dialog element itself, so a drag-select
+// ending on the backdrop doesn't count). Wire ONCE per dialog, at boot (F3):
+// the listeners live with the permanent element across every open. A
+// per-open-cycle latch, re-armed by the dialog's `close` event, keeps
+// closeFn to at most one call per open — a second press during the close
+// fade must not run a close routine (and its history.back()) twice. The old
+// shape detached itself on close, which forced callers to re-wire per open
+// and leaked one `close` listener per open.
 export function onBackdropClose(dlg: HTMLDialogElement, closeFn: () => void): void {
-  let cleanup: () => void = () => undefined;
-  cleanup = wireBackdropDismiss(dlg, () => {
-    cleanup();
+  let dismissed = false;
+  wireBackdropDismiss(dlg, () => {
+    if (dismissed) {
+      return;
+    }
+    dismissed = true;
     closeFn();
   });
   dlg.addEventListener("close", () => {
-    cleanup();
+    dismissed = false;
   });
 }
 

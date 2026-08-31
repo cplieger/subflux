@@ -16,7 +16,7 @@ import type { QueryValue } from "./wire/client.gen.js";
 import type { StateEntry } from "./wire/types.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
-import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import { signal, effect, createCollection, bindList, patch, batch } from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { HISTORY_DEPTH_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
 import * as store from "./store.js";
@@ -582,12 +582,18 @@ async function loadMore(): Promise<void> {
       return;
     }
     const items = res.data ?? [];
-    for (const entry of items) {
-      history.upsert(entry);
-    }
-    hasMore.value = items.length >= PAGE_SIZE;
-    updateHistoryFilters(history.items());
-    renderTick.value += 1;
+    // ONE structural reconcile per appended page (R8.3): each upsert of a new
+    // row writes the collection's order signal, so an unbatched loop costs a
+    // full reconcile pass per row. The batch coalesces the page into a single
+    // flush — the append commits as one structure change.
+    batch(() => {
+      for (const entry of items) {
+        history.upsert(entry);
+      }
+      hasMore.value = items.length >= PAGE_SIZE;
+      updateHistoryFilters(history.items());
+      renderTick.value += 1;
+    });
     window.scrollTo(0, scrollPos);
     settleGeneration(g, { kind: "applied" });
   } catch (e: unknown) {

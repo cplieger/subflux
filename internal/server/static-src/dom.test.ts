@@ -209,7 +209,7 @@ describe("dom: onBackdropClose()", () => {
     d.dispatchEvent(new MouseEvent("mouseup"));
   }
 
-  it("closes on a backdrop press, and only on the first one", () => {
+  it("closes on a backdrop press, and only on the first one per open", () => {
     const closeFn = vi.fn();
     const d = dlg();
     d.showModal();
@@ -218,20 +218,33 @@ describe("dom: onBackdropClose()", () => {
     press(d);
     expect(closeFn).toHaveBeenCalledTimes(1);
 
+    // A second press during the close fade must not run the close routine
+    // (and any history.back() inside it) twice.
     press(d);
     expect(closeFn).toHaveBeenCalledTimes(1);
   });
 
-  it("detaches its listeners when the dialog closes by another route", () => {
+  it("stays armed across close and reopen: one boot-time wiring serves every open (F3)", async () => {
     const closeFn = vi.fn();
     const d = dlg();
-    d.showModal();
     onBackdropClose(d, closeFn);
+    const listeners = vi.spyOn(d, "addEventListener");
 
-    d.dispatchEvent(new Event("close"));
+    d.showModal();
+    press(d);
+    expect(closeFn).toHaveBeenCalledTimes(1);
+
+    d.close();
+    // close() QUEUES its close event as a task; the latch re-arms when it
+    // lands.
+    await new Promise((r) => setTimeout(r, 0));
+    d.showModal();
     press(d);
 
-    expect(closeFn).not.toHaveBeenCalled();
+    expect(closeFn).toHaveBeenCalledTimes(2);
+    // The open/close cycles added nothing: the wiring is the boot-time one.
+    expect(listeners).not.toHaveBeenCalled();
+    listeners.mockRestore();
   });
 });
 

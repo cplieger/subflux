@@ -238,6 +238,41 @@ describe("openSyncDialog", () => {
     expect(dlg().textContent).toContain("Second");
     expect(dlg().textContent).not.toContain("First");
   });
+
+  it("re-opens add no dialog-chrome listeners: the chrome is wired once (F3)", () => {
+    open(); // whatever ran before, the chrome is wired by now
+    const listeners = vi.spyOn(dlg(), "addEventListener");
+
+    open();
+    open();
+
+    // Per-open wiring leaked one close and one cancel listener per open;
+    // the chrome (backdrop press pair, close re-arm, Escape override) now
+    // lives with the permanent element.
+    const chrome = listeners.mock.calls.filter(([type]) =>
+      ["mousedown", "mouseup", "close", "cancel"].includes(type),
+    );
+    expect(chrome).toEqual([]);
+    listeners.mockRestore();
+  });
+
+  it("a backdrop press closes the dialog, on the first open and on reopens alike", async () => {
+    const press = (): void => {
+      dlg().dispatchEvent(new MouseEvent("mousedown"));
+      dlg().dispatchEvent(new MouseEvent("mouseup"));
+    };
+    open();
+    press();
+    expect(consumeSyncClosing()).toBe(true);
+    await vi.waitFor(() => {
+      expect(location.pathname.endsWith("/sync")).toBe(false);
+    });
+
+    open();
+    press();
+
+    expect(consumeSyncClosing()).toBe(true);
+  });
 });
 
 describe("saving a manual offset", () => {

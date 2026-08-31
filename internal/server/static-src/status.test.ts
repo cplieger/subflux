@@ -1579,6 +1579,93 @@ describe("status: event-fed store", () => {
   });
 });
 
+describe("status: notification-set hygiene (F2)", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("an activity remove prunes the toast memory: the id completing again re-toasts", async () => {
+    await h.runPoll([]); // seed the toast baseline
+    const done = entry({ id: "p1", done: true, ended_at: "2026-07-19T10:01:00Z", detail: "one" });
+    h.status.applyActivityEvent({ op: "upsert", entry: done });
+    expect(h.notifyM.success).toHaveBeenCalledTimes(1);
+
+    h.status.applyActivityEvent({ op: "remove", entry: done });
+    h.status.applyActivityEvent({ op: "upsert", entry: { ...done, detail: "two" } });
+
+    expect(h.notifyM.success).toHaveBeenCalledTimes(2);
+    expect(h.notifyM.success).toHaveBeenLastCalledWith("two");
+  });
+
+  it("an activity remove prunes the dismissed set: the id renders again on reappearance", async () => {
+    h.status.initStatusPopover();
+    dispatchers.get("activity.dismiss")?.mockResolvedValue(undefined);
+    const done = entry({ id: "d1", done: true, ended_at: "2026-07-19T10:01:00Z" });
+    await h.runPoll([done]);
+    document
+      .querySelector('[data-act-id="d1"]')
+      ?.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')
+      ?.click();
+    await flush();
+    await h.runPoll([done]);
+    expect(document.querySelector('[data-act-id="d1"]')).toBeNull(); // stays hidden
+
+    h.status.applyActivityEvent({ op: "remove", entry: done });
+    h.status.applyActivityEvent({ op: "upsert", entry: done });
+
+    expect(document.querySelector('[data-act-id="d1"]')).not.toBeNull();
+  });
+
+  it("the toast memory respects its cap: dead ids are evicted, live ones never", async () => {
+    await h.runPoll([]); // baseline seeded empty — everything after is growth
+    const flood = Array.from({ length: 201 }, (_unused, i) =>
+      entry({ id: `c${String(i)}`, done: true, ended_at: "2026-07-19T10:01:00Z", detail: "new" }),
+    );
+    await h.runPoll(flood);
+    // Every completion toasts once; the over-cap set holds anyway, because
+    // every id is still live — evicting a live done id would re-toast it on
+    // the next render and cascade over the whole snapshot.
+    expect(h.notifyM.success).toHaveBeenCalledTimes(201);
+
+    // The ring empties WITHOUT remove events (the SSE-down prune case): the
+    // memory now holds 201 dead ids, and the next insertion evicts the
+    // oldest of them (c0).
+    await h.runPoll([]);
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "n1", done: true, ended_at: "2026-07-19T10:02:00Z", detail: "fresh" }),
+    });
+    expect(h.notifyM.success).toHaveBeenCalledTimes(202);
+
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({
+        id: "c0",
+        done: true,
+        ended_at: "2026-07-19T10:01:00Z",
+        detail: "evicted",
+      }),
+    });
+    expect(h.notifyM.success).toHaveBeenCalledTimes(203);
+    expect(h.notifyM.success).toHaveBeenLastCalledWith("evicted");
+
+    // c1 fell to the re-insertion above (each over-cap add evicts one dead
+    // id); c2 is still remembered, so its re-appearance stays silent.
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({
+        id: "c2",
+        done: true,
+        ended_at: "2026-07-19T10:01:00Z",
+        detail: "retained",
+      }),
+    });
+    expect(h.notifyM.success).toHaveBeenCalledTimes(203);
+  });
+});
+
 describe("status: the poll floor (E2)", () => {
   let h: PollHarness;
 
