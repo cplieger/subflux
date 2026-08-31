@@ -1,20 +1,22 @@
 // Client-side routing: URL-driven page navigation with view transitions.
 
 import * as store from "./store.js";
-import { $, el, icon, input, select } from "./dom.js";
+import { $, el, errDiv, icon, input, select } from "./dom.js";
 import { openConfig } from "./config.js";
 import {
   loadCoverage,
   configurePanel,
   renderCoverage,
-  coverageLoaded,
+  applyHealedRow,
   coverageItems,
+  libraryLoaded,
 } from "./coverage.js";
+import { coverageMovieSummaryRaw, coverageSeriesSummaryRaw } from "./wire/client.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
 import { abortPageLeg } from "./page-leg.js";
-import { viewTransition, setDocTitle } from "./utils.js";
+import { viewTransition, setDocTitle, emptyState } from "./utils.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
 import type { CoverageItem } from "./api-types.js";
 
@@ -278,8 +280,11 @@ function showPage(page: string, skipRender?: boolean): void {
   }
   if (page === "library") {
     configurePanel(true);
-    // Re-render from cache if available; otherwise fetch fresh data.
-    if (coverageLoaded()) {
+    // Re-render from cache only when the full pair has landed (a deep-link
+    // insert leaves rows behind without completing the library); otherwise
+    // the ROUTE LOADER fetches the pair — the load that sets libraryLoaded
+    // and opens the heal gate.
+    if (libraryLoaded()) {
       renderCoverage();
     } else {
       void loadCoverage();
@@ -320,21 +325,52 @@ function setHistoryHeader(): void {
   headerEl.insertBefore(backBtn, heading);
 }
 
-// Ensure coverage data is loaded, then find a media item by type and ID.
+// Resolve a detail route's media item: from the coverage cache when held,
+// else item-grain through the routed type's summary (A7) — never a collection
+// fetch. The resolved row is a deep-link insert: it neither marks the library
+// complete nor opens the heal gate. A 404 renders the not-found empty state,
+// any other failure the error state.
 async function findCoverageItem(
-  type: string,
+  type: "series" | "movie",
   idField: "tvdb_id" | "tmdb_id",
   id: number,
 ): Promise<CoverageItem | null> {
-  if (!coverageLoaded()) {
-    try {
-      await loadCoverage();
-    } catch {
-      /* fall through */
+  const cached = coverageItems().find(
+    (item: CoverageItem) => item._type === type && item[idField] === id,
+  );
+  if (cached) {
+    return cached;
+  }
+  let status: number;
+  let error: string | undefined;
+  let row: CoverageItem | null = null;
+  if (type === "series") {
+    const res = await coverageSeriesSummaryRaw(id);
+    ({ status, error } = res);
+    if (res.ok && res.data !== undefined) {
+      row = { ...res.data, _type: "series" };
+    }
+  } else {
+    const res = await coverageMovieSummaryRaw(id);
+    ({ status, error } = res);
+    if (res.ok && res.data !== undefined) {
+      row = { ...res.data, _type: "movie" };
     }
   }
-  const data = coverageItems();
-  return data.find((item: CoverageItem) => item._type === type && item[idField] === id) ?? null;
+  if (row) {
+    applyHealedRow(row);
+    return row;
+  }
+  if (status === 404) {
+    $.coverageContent.replaceChildren(
+      emptyState("Not found. This title is not in the library.", "Back to library", () => {
+        navigate("/");
+      }),
+    );
+  } else {
+    $.coverageContent.replaceChildren(errDiv(error ?? "failed to load item"));
+  }
+  return null;
 }
 
 export function navigateToHistory(mediaFilter?: string): void {
