@@ -74,6 +74,7 @@ function errorHandle(err: unknown): { outcome: Promise<unknown> } {
 function doneFor(jobId: number, over: Partial<SyncDoneEvent> = {}): SyncDoneEvent {
   return {
     job_id: jobId,
+    outcome: "result",
     file_ref: {
       media_type: "episode",
       media_id: "tvdb-1-s01e05",
@@ -398,7 +399,7 @@ describe("sync to audio (async job)", () => {
     expect(notify.success).not.toHaveBeenCalled();
   });
 
-  it("renders a failed job's error inline", async () => {
+  it("renders a crashed job's error inline", async () => {
     dispatchAudio.mockReturnValue(acceptedHandle(7));
     open();
     button(/Sync to Audio/).click();
@@ -406,12 +407,57 @@ describe("sync to audio (async job)", () => {
       expect(watchMock).toHaveBeenCalled();
     });
 
-    watcherFor(7)(doneFor(7, { applied: false, error: "analysis exceeded 15m0s" }));
+    watcherFor(7)(doneFor(7, { applied: false, outcome: "crash", error: "ffmpeg exploded" }));
 
     await vi.waitFor(() => {
-      expect(dlg().textContent).toContain("did not complete");
+      expect(dlg().textContent).toContain("Audio sync failed: ffmpeg exploded");
     });
     expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it("renders a STOPPED job distinctly from a crashed one, with no registry re-read", async () => {
+    // Both terminals carry an error string (a stop is context.Canceled), so
+    // the typed outcome is the only discriminator — and it rides the event,
+    // so the dialog never has to go back to the jobs read to find out.
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
+    open();
+    await vi.waitFor(() => {
+      expect(attachMock).toHaveBeenCalledTimes(1); // the open's own re-attach
+    });
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    watcherFor(7)(doneFor(7, { applied: false, outcome: "cancelled", error: "context canceled" }));
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Audio sync was stopped.");
+    });
+    const text = dlg().textContent ?? "";
+    expect(text).not.toContain("failed");
+    expect(text).not.toContain("did not complete");
+    expect(text).not.toContain("context canceled");
+    expect(attachMock).toHaveBeenCalledTimes(1);
+    expect(notify.success).not.toHaveBeenCalled();
+  });
+
+  it("renders a timed-out job distinctly", async () => {
+    dispatchAudio.mockReturnValue(acceptedHandle(7));
+    open();
+    button(/Sync to Audio/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    watcherFor(7)(
+      doneFor(7, { applied: false, outcome: "timeout", error: "analysis exceeded 15m0s" }),
+    );
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Audio sync ran out of time");
+    });
+    expect(dlg().textContent).not.toContain("failed");
   });
 
   it("renders the capacity 429 inline — exactly ONE visible surface, one dispatch", async () => {

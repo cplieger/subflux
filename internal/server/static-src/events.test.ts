@@ -86,6 +86,7 @@ async function openWithEpoch(head = 0): Promise<void> {
 /** A decodable sync:done payload (job 7). */
 const syncDonePayload = {
   job_id: 7,
+  outcome: "result",
   file_ref: {
     media_type: "movie",
     media_id: "tmdb-1",

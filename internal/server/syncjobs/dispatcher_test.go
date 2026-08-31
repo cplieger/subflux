@@ -71,7 +71,7 @@ func (f *fakeExec) exec(ctx context.Context, in *syncjobs.ExecInput, hook func()
 		}
 	}
 	if !hook() {
-		return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: context.Canceled}
+		return syncjobs.ExecResult{Outcome: subflux.JobCancelled, Err: context.Canceled}
 	}
 	f.mu.Lock()
 	f.order = append(f.order, in.SubtitlePath)
@@ -86,7 +86,7 @@ func (f *fakeExec) exec(ctx context.Context, in *syncjobs.ExecInput, hook func()
 	}
 	if release == nil {
 		return syncjobs.ExecResult{
-			Outcome: syncjobs.OutcomeResult, Applied: true,
+			Outcome: subflux.JobResult, Applied: true,
 			OffsetMs: 420, Confidence: 0.9, Method: "audio",
 		}
 	}
@@ -94,7 +94,7 @@ func (f *fakeExec) exec(ctx context.Context, in *syncjobs.ExecInput, hook func()
 	case r := <-release:
 		return r
 	case <-ctx.Done():
-		return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: context.Cause(ctx)}
+		return syncjobs.ExecResult{Outcome: subflux.JobCancelled, Err: context.Cause(ctx)}
 	}
 }
 
@@ -197,7 +197,7 @@ func TestDispatch_runs_a_job_to_done_result(t *testing.T) {
 	}
 
 	job := jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
-	if job.Outcome != syncjobs.OutcomeResult || !job.Applied || job.OffsetMs != 420 {
+	if job.Outcome != subflux.JobResult || !job.Applied || job.OffsetMs != 420 {
 		t.Errorf("settled job = %+v, want applied result with the executor's cumulative offset", job)
 	}
 	if job.StartedAt == nil || job.EndedAt == nil {
@@ -212,6 +212,74 @@ func TestDispatch_runs_a_job_to_done_result(t *testing.T) {
 	entry, ok := h.log.Get(acc.ActivityID)
 	if !ok || !entry.Done || entry.Failed || entry.Cancelled {
 		t.Errorf("activity entry = %+v, want a clean terminal", entry)
+	}
+}
+
+// TestPublishDone_carries_each_terminal_outcome pins the event's typed
+// verdict per terminal: the dialog renders from sync:done alone, and Error is
+// set for every non-result outcome, so without Outcome a stopped job and a
+// crashed one are the same frame.
+func TestPublishDone_carries_each_terminal_outcome(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		res     syncjobs.ExecResult
+		want    subflux.JobOutcome
+		errored bool
+	}{
+		{
+			name: "result",
+			res:  syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true, OffsetMs: 120, Confidence: 0.8},
+			want: subflux.JobResult,
+		},
+		{
+			name:    "timeout",
+			res:     syncjobs.ExecResult{Outcome: subflux.JobTimeout, Err: errors.New("analysis budget exceeded")},
+			want:    subflux.JobTimeout,
+			errored: true,
+		},
+		{
+			name:    "cancelled",
+			res:     syncjobs.ExecResult{Outcome: subflux.JobCancelled, Err: context.Canceled},
+			want:    subflux.JobCancelled,
+			errored: true,
+		},
+		{
+			name:    "crash",
+			res:     syncjobs.ExecResult{Outcome: subflux.JobCrash, Err: errors.New("ffmpeg exploded")},
+			want:    subflux.JobCrash,
+			errored: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := newHarness(t)
+			started, release := h.exec.blockOn("/a.srt")
+			acc, err := h.d.Dispatch(input("/a.srt"))
+			if err != nil {
+				t.Fatalf("Dispatch() error = %v", err)
+			}
+			<-started
+			release <- tc.res
+
+			ev := waitEvent(t, h)
+			if ev.JobID != acc.JobID {
+				t.Fatalf("sync:done job_id = %d, want the dispatched job %d", ev.JobID, acc.JobID)
+			}
+			if ev.Outcome != tc.want {
+				t.Errorf("sync:done(%s) outcome = %q, want %q", tc.name, ev.Outcome, tc.want)
+			}
+			if (ev.Error != "") != tc.errored {
+				t.Errorf("sync:done(%s) error = %q, want errored = %v (Error alone cannot discriminate the three failures)",
+					tc.name, ev.Error, tc.errored)
+			}
+			// The event carries the RECORD's verdict, not a re-derivation.
+			job := jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
+			if job.Outcome != ev.Outcome {
+				t.Errorf("registry outcome = %q, sync:done outcome = %q, want the same verdict", job.Outcome, ev.Outcome)
+			}
+		})
 	}
 }
 
@@ -232,7 +300,7 @@ func TestDispatch_fifo_one_top_level_entry_at_a_time(t *testing.T) {
 		t.Fatalf("exec order while A runs = %v, want only A", got)
 	}
 
-	releaseA <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	releaseA <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 	jobByID(t, h.d, accC.JobID, syncjobs.StateDone)
 
 	want := []string{"/a.srt", "/b.srt", "/c.srt"}
@@ -257,7 +325,7 @@ func TestDispatch_same_file_dedupe_answers_existing_ids(t *testing.T) {
 		t.Errorf("same-file dispatch = %+v, want the existing job's ids %+v", second, first)
 	}
 
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 	jobByID(t, h.d, first.JobID, syncjobs.StateDone)
 
 	// Terminal: the dedupe entry released, a re-dispatch is a NEW job.
@@ -327,7 +395,7 @@ func TestCancel_queued_releases_capacity_immediately(t *testing.T) {
 
 	// queued → done(cancelled) is RETAINED and reload-visible; never executed.
 	job := jobByID(t, h.d, victim.JobID, syncjobs.StateDone)
-	if job.Outcome != syncjobs.OutcomeCancelled || job.StartedAt != nil {
+	if job.Outcome != subflux.JobCancelled || job.StartedAt != nil {
 		t.Errorf("cancelled queued job = %+v, want done(cancelled) never started", job)
 	}
 	if slices.Contains(h.exec.execOrder(), fmt.Sprintf("/hold%d.srt", len(queued))) {
@@ -361,12 +429,18 @@ func TestCancel_running_converts_and_settles_on_worker_exit(t *testing.T) {
 	// The stop entry's context cancel unblocks the exec; the job settles
 	// done(cancelled) on worker exit and the terminal event still publishes.
 	job := jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
-	if job.Outcome != syncjobs.OutcomeCancelled || job.StartedAt == nil {
+	if job.Outcome != subflux.JobCancelled || job.StartedAt == nil {
 		t.Errorf("converted job = %+v, want done(cancelled) after running", job)
 	}
 	ev := waitEvent(t, h)
 	if ev.JobID != acc.JobID || ev.Applied || ev.Error == "" {
 		t.Errorf("sync:done = %+v, want the cancelled job's terminal", ev)
+	}
+	// The conversion is the only path that settles a job the client still
+	// thinks is queued, and its event must SAY cancelled: the error string it
+	// also carries is what a crash carries too.
+	if ev.Outcome != subflux.JobCancelled {
+		t.Errorf("sync:done outcome = %q, want %q", ev.Outcome, subflux.JobCancelled)
 	}
 	entry, _ := h.log.Get(acc.ActivityID)
 	if !entry.Done || !entry.Cancelled {
@@ -391,7 +465,7 @@ func TestCancel_wins_the_admission_race_and_the_worker_never_spawns(t *testing.T
 	close(gate)
 
 	job := jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
-	if job.Outcome != syncjobs.OutcomeCancelled {
+	if job.Outcome != subflux.JobCancelled {
 		t.Fatalf("job outcome = %q, want cancelled", job.Outcome)
 	}
 	if job.StartedAt != nil {
@@ -455,7 +529,7 @@ func TestStop_registered_before_running_publishes(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("no running upsert observed")
 	}
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 	jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
 
 	// Terminal unregisters before terminal-publish: the entry is no longer
@@ -485,7 +559,7 @@ func TestShutdown_settles_queued_and_waits_for_the_admitted_worker(t *testing.T)
 	// cancelled); queued jobs settled cancelled without ever executing.
 	for _, acc := range []syncjobs.Accepted{running, q1, q2} {
 		job := jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
-		if job.Outcome != syncjobs.OutcomeCancelled {
+		if job.Outcome != subflux.JobCancelled {
 			t.Errorf("job %d outcome = %q, want cancelled at shutdown", acc.JobID, job.Outcome)
 		}
 	}
@@ -605,7 +679,7 @@ func TestRetention_and_cap(t *testing.T) {
 			t.Fatalf("registry after prune = %+v, want only the running job", jobs)
 		}
 
-		release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+		release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 		synctest.Wait()
 	})
 }
@@ -668,7 +742,7 @@ func TestRetention_never_evicts_a_live_batchs_done_items(t *testing.T) {
 
 		// Releasing the wedged item finalizes the batch: no panic, and the
 		// aggregate counts fold BOTH items (a pruned id would miscount).
-		release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true}
+		release <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true}
 		synctest.Wait()
 		entry, ok := log.Get(acc.ActivityID)
 		if !ok || !entry.Done || entry.Failed || entry.Cancelled {

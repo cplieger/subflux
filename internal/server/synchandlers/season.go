@@ -148,13 +148,36 @@ func (h *Handler) enumerateSeason(ctx context.Context, req *SyncSeasonRequest) (
 		return nil, fmt.Errorf("%w: sonarr not configured", resolve.ErrMediaNotFound)
 	}
 
+	ser, err := seasonSeries(ctx, st, req.SeriesID)
+	if err != nil {
+		return nil, err
+	}
+	episodes, err := st.Sonarr.Episodes(ctx, req.SeriesID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: episodes for series %d: %w", errSeasonFetch, req.SeriesID, err)
+	}
+	eps := seasonEpisodes(episodes, req.Season)
+
+	sel := &seasonSelection{}
+	if len(eps) > 0 {
+		if err := h.selectSeasonItems(ctx, sel, st, ser, req, eps); err != nil {
+			return nil, err
+		}
+	}
+	sel.detail = seasonDetail(ser.Title, req.Season, len(sel.items), sel.skipped)
+	return sel, nil
+}
+
+// seasonSeries resolves the request's series id against the cached series
+// list.
+func seasonSeries(ctx context.Context, st *SeasonState, seriesID int) (*arrapi.Series, error) {
 	series, err := st.Sonarr.Series(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: series list: %w", errSeasonFetch, err)
 	}
 	var ser *arrapi.Series
 	for i := range series {
-		if series[i].ID == req.SeriesID {
+		if series[i].ID == seriesID {
 			ser = &series[i]
 			break
 		}
@@ -163,73 +186,93 @@ func (h *Handler) enumerateSeason(ctx context.Context, req *SyncSeasonRequest) (
 	// (the collections omit it — A2's exclusion parity), so there is
 	// nothing a season batch could address either.
 	if ser == nil || ser.TvdbID <= 0 {
-		return nil, fmt.Errorf("%w: series %d", resolve.ErrMediaNotFound, req.SeriesID)
+		return nil, fmt.Errorf("%w: series %d", resolve.ErrMediaNotFound, seriesID)
 	}
+	return ser, nil
+}
 
-	episodes, err := st.Sonarr.Episodes(ctx, req.SeriesID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: episodes for series %d: %w", errSeasonFetch, req.SeriesID, err)
-	}
-	// File-bearing episodes of the season, ascending — the order the
-	// media endpoint served the pool.
+// seasonEpisodes narrows a series' episodes to the season's file-bearing
+// ones, ascending — the order the media endpoint served the pool.
+func seasonEpisodes(episodes []arrapi.Episode, season int) []arrapi.Episode {
 	eps := make([]arrapi.Episode, 0, len(episodes))
 	for i := range episodes {
-		if episodes[i].SeasonNumber == req.Season && episodes[i].HasFile {
+		if episodes[i].SeasonNumber == season && episodes[i].HasFile {
 			eps = append(eps, episodes[i])
 		}
 	}
 	slices.SortFunc(eps, func(a, b arrapi.Episode) int { return a.EpisodeNumber - b.EpisodeNumber })
+	return eps
+}
 
-	sel := &seasonSelection{}
-	if len(eps) > 0 {
-		// Config snapshot at acceptance: the target pairs every item is
-		// judged against, resolved once.
-		targets := st.Cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(ser.OriginalLanguage), nil)
+// selectSeasonItems appends every runnable item of the season's episodes,
+// under one config snapshot and one store read.
+func (h *Handler) selectSeasonItems(ctx context.Context, sel *seasonSelection,
+	st *SeasonState, ser *arrapi.Series, req *SyncSeasonRequest, eps []arrapi.Episode,
+) error {
+	// Config snapshot at acceptance: the target pairs every item is
+	// judged against, resolved once.
+	targets := st.Cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(ser.OriginalLanguage), nil)
 
-		rows, err := h.files.SubtitleFiles(ctx, subflux.MediaTypeEpisode, mediaid.SeriesPrefix(ser.TvdbID, ser.ImdbID))
-		if err != nil {
-			return nil, fmt.Errorf("subtitle rows for series %d: %w", req.SeriesID, err)
+	rows, err := h.files.SubtitleFiles(ctx, subflux.MediaTypeEpisode, mediaid.SeriesPrefix(ser.TvdbID, ser.ImdbID))
+	if err != nil {
+		return fmt.Errorf("subtitle rows for series %d: %w", req.SeriesID, err)
+	}
+	idx := indexSubtitleRows(rows)
+
+	for i := range eps {
+		mediaID := mediaid.Episode(ser.TvdbID, ser.ImdbID,
+			mediaid.SeasonEpisode{Season: req.Season, Episode: eps[i].EpisodeNumber})
+		h.appendEpisodeItems(ctx, sel, idx[mediaID], targets)
+	}
+	return nil
+}
+
+// indexSubtitleRows groups a series' subtitle rows by media id and target
+// pair. The pool consumed the coverage detail read, which deduplicates
+// (media_id, language, variant, source); selecting from the same shape keeps
+// ordinal choice identical.
+func indexSubtitleRows(rows []subflux.SubtitleEntry) map[string]map[coverage.Key][]*subflux.SubtitleEntry {
+	rows = coverage.DeduplicateFileRows(rows)
+	idx := make(map[string]map[coverage.Key][]*subflux.SubtitleEntry, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		k := coverage.Key{Lang: row.Language, Variant: row.Variant}
+		if idx[row.MediaID] == nil {
+			idx[row.MediaID] = make(map[coverage.Key][]*subflux.SubtitleEntry, 4)
 		}
-		// The pool consumed the coverage detail read, which deduplicates
-		// (media_id, language, variant, source); selecting from the same
-		// shape keeps ordinal choice identical.
-		rows = coverage.DeduplicateFileRows(rows)
-		idx := make(map[string]map[coverage.Key][]*subflux.SubtitleEntry, len(rows))
-		for i := range rows {
-			row := &rows[i]
-			k := coverage.Key{Lang: row.Language, Variant: row.Variant}
-			if idx[row.MediaID] == nil {
-				idx[row.MediaID] = make(map[coverage.Key][]*subflux.SubtitleEntry, 4)
-			}
-			idx[row.MediaID][k] = append(idx[row.MediaID][k], row)
-		}
+		idx[row.MediaID][k] = append(idx[row.MediaID][k], row)
+	}
+	return idx
+}
 
-		for i := range eps {
-			mediaID := mediaid.Episode(ser.TvdbID, ser.ImdbID,
-				mediaid.SeasonEpisode{Season: req.Season, Episode: eps[i].EpisodeNumber})
-			subs := idx[mediaID]
-			for j := range targets {
-				t := &targets[j]
-				key := coverage.Key{Lang: t.Code, Variant: string(t.EffectiveVariant())}
-				for _, row := range subs[key] {
-					if row.Source == string(subflux.SourceEmbedded) {
-						continue
-					}
-					h.appendSeasonItem(ctx, sel, row)
-				}
+// appendEpisodeItems appends one episode's items: the configured target
+// pairs, EXTERNAL rows only, every matching ordinal.
+func (h *Handler) appendEpisodeItems(ctx context.Context, sel *seasonSelection,
+	subs map[coverage.Key][]*subflux.SubtitleEntry, targets []subflux.SubtitleTarget,
+) {
+	for j := range targets {
+		t := &targets[j]
+		key := coverage.Key{Lang: t.Code, Variant: string(t.EffectiveVariant())}
+		for _, row := range subs[key] {
+			if row.Source == string(subflux.SourceEmbedded) {
+				continue
 			}
+			h.appendSeasonItem(ctx, sel, row)
 		}
 	}
+}
 
+// seasonDetail renders the batch activity entry's aggregate detail line.
+func seasonDetail(title string, season, items, skipped int) string {
 	files := "files"
-	if len(sel.items) == 1 {
+	if items == 1 {
 		files = "file"
 	}
-	sel.detail = fmt.Sprintf("%s S%02d · %d %s", ser.Title, req.Season, len(sel.items), files)
-	if sel.skipped > 0 {
-		sel.detail += fmt.Sprintf(" · %d skipped", sel.skipped)
+	detail := fmt.Sprintf("%s S%02d · %d %s", title, season, items, files)
+	if skipped > 0 {
+		detail += fmt.Sprintf(" · %d skipped", skipped)
 	}
-	return sel, nil
+	return detail
 }
 
 // appendSeasonItem resolves one selected row into a runnable item, applying

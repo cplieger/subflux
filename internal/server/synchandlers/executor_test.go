@@ -84,7 +84,7 @@ func TestExecute_cancelDuringPreHookRead_settlesCancelled(t *testing.T) {
 	racedAcc <- acc
 
 	job := awaitJob(t, d, acc.JobID)
-	if job.Outcome != syncjobs.OutcomeCancelled {
+	if job.Outcome != subflux.JobCancelled {
 		t.Errorf("raced job = %+v, want done(cancelled), never done(crash)", job)
 	}
 	if job.StartedAt != nil {

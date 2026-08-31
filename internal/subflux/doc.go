@@ -17,8 +17,9 @@
 // acyclicity is what the package is for.
 //
 // Two of its contents are a published contract rather than an internal detail.
-// ErrorCode's constants and every json-tagged struct here are discovered by
-// internal/wirespec and emitted as TypeScript, so a type that leaves or a field
-// that is renamed changes a cross-language contract. SchemaFunc is a func type,
-// and the one contract-shaped declaration still here.
+// The constants of the enums wirespec registers (ErrorCode, JobOutcome) and
+// every json-tagged struct here are discovered by internal/wirespec and emitted
+// as TypeScript, so a type that leaves or a field that is renamed changes a
+// cross-language contract. SchemaFunc is a func type, and the one
+// contract-shaped declaration still here.
 package subflux

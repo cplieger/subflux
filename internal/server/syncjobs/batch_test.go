@@ -39,7 +39,7 @@ func batchInput(seriesID, season int, paths ...string) *syncjobs.BatchInput {
 }
 
 // awaitEntry polls the activity log until pred accepts the entry.
-func awaitEntry(t *testing.T, log *activity.Log, id string, want string, pred func(activity.Entry) bool) activity.Entry {
+func awaitEntry(t *testing.T, log *activity.Log, id, want string, pred func(activity.Entry) bool) activity.Entry {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -113,8 +113,8 @@ func TestDispatchBatch_two_items_retain_both_results_and_publish_own_events(t *t
 	if err != nil {
 		t.Fatalf("DispatchBatch() error = %v", err)
 	}
-	release1 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true, OffsetMs: 100, Confidence: 0.9, Method: "audio"}
-	release2 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: false, OffsetMs: 200, Confidence: 0.2, Method: "audio"}
+	release1 <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true, OffsetMs: 100, Confidence: 0.9, Method: "audio"}
+	release2 <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: false, OffsetMs: 200, Confidence: 0.2, Method: "audio"}
 
 	ev1 := waitEvent(t, h)
 	ev2 := waitEvent(t, h)
@@ -134,7 +134,7 @@ func TestDispatchBatch_two_items_retain_both_results_and_publish_own_events(t *t
 		t.Fatalf("Jobs(batch) = %d records, want 2", len(jobs))
 	}
 	for _, j := range jobs {
-		if j.State != syncjobs.StateDone || j.Outcome != syncjobs.OutcomeResult {
+		if j.State != syncjobs.StateDone || j.Outcome != subflux.JobResult {
 			t.Errorf("job %d = %q/%q, want done(result)", j.JobID, j.State, j.Outcome)
 		}
 	}
@@ -165,7 +165,7 @@ func TestDispatchBatch_partial_failures_batch_completes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DispatchBatch() error = %v", err)
 	}
-	release1 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeCrash, Err: errors.New("ffmpeg exploded")}
+	release1 <- syncjobs.ExecResult{Outcome: subflux.JobCrash, Err: errors.New("ffmpeg exploded")}
 
 	entry := awaitEntry(t, h.log, acc.ActivityID, "done", func(e activity.Entry) bool { return e.Done })
 	if entry.Failed || entry.Cancelled {
@@ -180,10 +180,10 @@ func TestDispatchBatch_partial_failures_batch_completes(t *testing.T) {
 	for _, j := range jobs {
 		byOrdinal[j.Ordinal] = j
 	}
-	if byOrdinal[1].Outcome != syncjobs.OutcomeCrash || byOrdinal[1].Error == "" {
+	if byOrdinal[1].Outcome != subflux.JobCrash || byOrdinal[1].Error == "" {
 		t.Errorf("item 1 = %+v, want its crash retained", byOrdinal[1])
 	}
-	if byOrdinal[2].Outcome != syncjobs.OutcomeResult {
+	if byOrdinal[2].Outcome != subflux.JobResult {
 		t.Errorf("item 2 = %+v, want the sibling's clean result", byOrdinal[2])
 	}
 }
@@ -205,9 +205,9 @@ func TestDispatchBatch_items_run_sequentially(t *testing.T) {
 		t.Fatal("item 2 started while item 1 was running; want sequential submission")
 	case <-time.After(50 * time.Millisecond):
 	}
-	release1 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release1 <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 	<-started2
-	release2 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release2 <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 
 	if got := h.exec.execOrder(); !slices.Equal(got, []string{"/e1.srt", "/e2.srt"}) {
 		t.Errorf("exec order = %v, want ordinal order", got)
@@ -245,7 +245,7 @@ func TestDispatchBatch_stop_mid_item_cancels_via_the_single_stop_entry(t *testin
 	jobs := h.d.Jobs(acc.ActivityID)
 	byOrdinal := map[int]syncjobs.Job{}
 	for _, j := range jobs {
-		if j.State != syncjobs.StateDone || j.Outcome != syncjobs.OutcomeCancelled {
+		if j.State != syncjobs.StateDone || j.Outcome != subflux.JobCancelled {
 			t.Errorf("job %d = %q/%q, want done(cancelled)", j.JobID, j.State, j.Outcome)
 		}
 		byOrdinal[j.Ordinal] = j
@@ -265,6 +265,10 @@ func TestDispatchBatch_stop_mid_item_cancels_via_the_single_stop_entry(t *testin
 	ev := waitEvent(t, h)
 	if ev.JobID != byOrdinal[1].JobID || ev.Error == "" {
 		t.Errorf("sync:done = %+v, want item 1's cancelled terminal", ev)
+	}
+	if ev.Outcome != subflux.JobCancelled {
+		t.Errorf("sync:done outcome = %q, want %q (the batch's publish carries the item's verdict too)",
+			ev.Outcome, subflux.JobCancelled)
 	}
 	select {
 	case extra := <-h.events:
@@ -311,10 +315,10 @@ func TestDispatchBatch_stop_between_items_no_409_window(t *testing.T) {
 	for _, j := range jobs {
 		byOrdinal[j.Ordinal] = j
 	}
-	if byOrdinal[1].Outcome != syncjobs.OutcomeResult {
+	if byOrdinal[1].Outcome != subflux.JobResult {
 		t.Errorf("item 1 = %+v, want its completed result RETAINED through the stop", byOrdinal[1])
 	}
-	if byOrdinal[2].Outcome != syncjobs.OutcomeCancelled || byOrdinal[2].StartedAt != nil {
+	if byOrdinal[2].Outcome != subflux.JobCancelled || byOrdinal[2].StartedAt != nil {
 		t.Errorf("item 2 = %+v, want cancelled never admitted", byOrdinal[2])
 	}
 }
@@ -337,7 +341,7 @@ func TestDispatchBatch_queued_delete_settles_everything_and_releases_capacity(t 
 		t.Fatalf("Cancel(queued batch) = %v, want CancelledQueued", got)
 	}
 	for _, j := range h.d.Jobs(acc.ActivityID) {
-		if j.State != syncjobs.StateDone || j.Outcome != syncjobs.OutcomeCancelled || j.StartedAt != nil {
+		if j.State != syncjobs.StateDone || j.Outcome != subflux.JobCancelled || j.StartedAt != nil {
 			t.Errorf("item %d = %+v, want done(cancelled) never executed", j.Ordinal, j)
 		}
 	}
@@ -356,7 +360,7 @@ func TestDispatchBatch_queued_delete_settles_everything_and_releases_capacity(t 
 		}
 	default:
 	}
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 }
 
 func TestDispatchBatch_same_scope_answers_existing_id(t *testing.T) {
@@ -385,7 +389,7 @@ func TestDispatchBatch_same_scope_answers_existing_id(t *testing.T) {
 	if third.Existing || third.ActivityID == first.ActivityID {
 		t.Errorf("other-scope dispatch = %+v, want a fresh batch", third)
 	}
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 }
 
 func TestDispatchBatch_takes_one_admission_slot(t *testing.T) {
@@ -428,7 +432,7 @@ func TestDispatchBatch_same_file_single_dispatch_dedupes_to_the_item(t *testing.
 	if !single.Existing || single.ActivityID != acc.ActivityID {
 		t.Errorf("same-file single = %+v, want the batch item's ids (batch %q)", single, acc.ActivityID)
 	}
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 }
 
 func TestDispatchBatch_live_single_skips_the_overlapping_item(t *testing.T) {
@@ -451,7 +455,7 @@ func TestDispatchBatch_live_single_skips_the_overlapping_item(t *testing.T) {
 	if len(jobs) != 1 || jobs[0].Ordinal != 1 {
 		t.Errorf("Jobs(batch) = %+v, want only the free file as ordinal 1", jobs)
 	}
-	release <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult}
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult}
 	jobByID(t, h.d, jobs[0].JobID, syncjobs.StateDone)
 }
 
@@ -476,7 +480,7 @@ func TestDispatchBatch_shutdown_settles_queued_batch(t *testing.T) {
 	}
 
 	for _, j := range h.d.Jobs(acc.ActivityID) {
-		if j.State != syncjobs.StateDone || j.Outcome != syncjobs.OutcomeCancelled || j.StartedAt != nil {
+		if j.State != syncjobs.StateDone || j.Outcome != subflux.JobCancelled || j.StartedAt != nil {
 			t.Errorf("item %d = %+v, want settled cancelled never executed at shutdown", j.Ordinal, j)
 		}
 	}
@@ -499,7 +503,7 @@ func TestDispatchBatch_aggregate_progress_advances_per_item(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DispatchBatch() error = %v", err)
 	}
-	release1 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true}
+	release1 <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true}
 	<-started2
 
 	// After item 1 settles the aggregate reads 1/2 — no per-item shape,
@@ -508,7 +512,7 @@ func TestDispatchBatch_aggregate_progress_advances_per_item(t *testing.T) {
 	if entry.Total != 2 || entry.Done {
 		t.Errorf("mid-batch aggregate = %+v, want a live 1/2", entry)
 	}
-	release2 <- syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true}
+	release2 <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true}
 	entry = awaitEntry(t, h.log, acc.ActivityID, "done", func(e activity.Entry) bool { return e.Done })
 	if entry.Current != 2 || entry.Total != 2 {
 		t.Errorf("terminal aggregate = %d/%d, want 2/2", entry.Current, entry.Total)

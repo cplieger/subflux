@@ -40,10 +40,10 @@ func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hoo
 		if ctx.Err() != nil {
 			// A queued-DELETE race conversion cancels the job context during
 			// this pre-hook read: that is a cancellation, not a crash.
-			return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: ctx.Err()}
+			return syncjobs.ExecResult{Outcome: subflux.JobCancelled, Err: ctx.Err()}
 		}
 		return syncjobs.ExecResult{
-			Outcome: syncjobs.OutcomeCrash,
+			Outcome: subflux.JobCrash,
 			Err:     fmt.Errorf("read subtitle: %w", err),
 		}
 	}
@@ -69,7 +69,7 @@ func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hoo
 	cumulative := prev + result.Offset
 
 	res := syncjobs.ExecResult{
-		Outcome:    syncjobs.OutcomeResult,
+		Outcome:    subflux.JobResult,
 		OffsetMs:   cumulative,
 		Confidence: float64(result.Confidence),
 		Method:     string(result.Method),
@@ -79,7 +79,7 @@ func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hoo
 		return res
 	}
 	if err := e.apply(ctx, in.SubtitlePath, result, cumulative); err != nil {
-		return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCrash, Err: err}
+		return syncjobs.ExecResult{Outcome: subflux.JobCrash, Err: err}
 	}
 	slog.Info("audio sync applied",
 		"offset_ms", result.Offset,
@@ -90,14 +90,14 @@ func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hoo
 }
 
 // outcomeFromWorker maps the typed core's vocabulary onto the job record's.
-func outcomeFromWorker(o syncworker.Outcome) syncjobs.JobOutcome {
+func outcomeFromWorker(o syncworker.Outcome) subflux.JobOutcome {
 	switch o {
 	case syncworker.OutcomeTimeout:
-		return syncjobs.OutcomeTimeout
+		return subflux.JobTimeout
 	case syncworker.OutcomeCancelled:
-		return syncjobs.OutcomeCancelled
+		return subflux.JobCancelled
 	default:
-		return syncjobs.OutcomeCrash
+		return subflux.JobCrash
 	}
 }
 

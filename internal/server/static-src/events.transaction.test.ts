@@ -731,6 +731,7 @@ describe("boot-change application", () => {
       "sync:done",
       {
         job_id: 7,
+        outcome: "result",
         file_ref: {
           media_type: "movie",
           media_id: "tmdb-1",

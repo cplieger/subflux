@@ -246,6 +246,7 @@ describe("the batch view drives from the registry", () => {
 
     watcherFor(11)({
       job_id: 11,
+      outcome: "result",
       batch_activity_id: "act-7",
       file_ref: {
         media_type: "episode",
@@ -268,6 +269,55 @@ describe("the batch view drives from the registry", () => {
     // Its sibling is untouched by job 11's settlement.
     expect(text).toContain("S01E02 · English — queued");
     expect(text).toContain("Syncing 1/2");
+  });
+
+  it("a CRASHED item settles from its own event — only a stop re-reads the batch", async () => {
+    // A crash does not stop the batch, so its siblings keep running and
+    // nothing settled behind our back. The reconcile re-read is for a STOP,
+    // whose queued siblings settle server-side with no events of their own —
+    // and the typed outcome is what tells the two apart (both carry an error).
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(
+        query && query["batch_activity_id"] === "act-7"
+          ? [job(11, 1, "queued"), job(12, 2, "queued")]
+          : [],
+      ),
+    );
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalledTimes(2);
+    });
+    const readsBefore = syncJobsMock.mock.calls.length;
+
+    watcherFor(11)({
+      job_id: 11,
+      outcome: "crash",
+      error: "ffmpeg exploded",
+      batch_activity_id: "act-7",
+      file_ref: {
+        media_type: "episode",
+        media_id: "tvdb-81189-s01e01",
+        language: "en",
+        variant: "standard",
+        source: "external",
+      },
+      offset_ms: 0,
+      confidence: 0,
+      method: "",
+      applied: false,
+      dry_run: false,
+    });
+
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("S01E01 · English — failed");
+    });
+    expect(syncJobsMock.mock.calls).toHaveLength(readsBefore);
+    expect(dlg().textContent).toContain("S01E02 · English — queued");
   });
 });
 
