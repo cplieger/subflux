@@ -89,6 +89,15 @@ function disposeMovieBinding(): void {
   movieKey = "";
 }
 
+/** C2 — release on leave: drop both detail bindings (collection
+ *  subscriptions + row effects). The ROUTER's leave path owns the call, via
+ *  page-leg's abortPageLeg; renders re-dispose on rebuild, so this is safely
+ *  idempotent. */
+export function disposeDetailBindings(): void {
+  disposeSeriesBinding();
+  disposeMovieBinding();
+}
+
 /** Drop null entries so a children list can be spread into `replaceChildren`
  *  (which, unlike `el`, does not skip nulls). */
 function compact(nodes: (HTMLElement | null)[]): HTMLElement[] {
@@ -394,6 +403,7 @@ function epSig(
   subs: Partial<Record<string, SubtitleEntry[]>>,
   targetLangs: { lang: string; variant: string }[],
   hasHistory: boolean,
+  icSig: string,
 ): string {
   let parts: string;
   if (targetLangs.length > 0) {
@@ -410,20 +420,27 @@ function epSig(
   } else {
     parts = join("subs", String(Object.keys(subs).length));
   }
-  const ic = join(...[...store.get("ignoredCodecs")].sort());
-  return join(parts, hasHistory ? "1" : "0", ic);
+  return join(parts, hasHistory ? "1" : "0", icSig);
+}
+
+/** The ignored-codec component of every row signature, derived ONCE per
+ *  rebuild (C3): the set is render-global, so sorting it per row was pure
+ *  rework multiplied by the episode count. */
+function ignoredCodecsSig(): string {
+  return join(...[...store.get("ignoredCodecs")].sort());
 }
 
 // Column header labels (recreated per season since DOM nodes can only appear
-// once in the document).
+// once in the document). Explicit table semantics: the desktop tree leaves
+// the table formatting context (C1), which strips the implicit roles.
 function makeColHeaders(): HTMLElement {
   return el(
     "tr",
-    { className: "season-head" },
-    el("th", null, "Ep"),
-    el("th", null, "Title"),
-    el("th", null, "Subtitles"),
-    el("th", null, ""),
+    { className: "season-head", role: "row" },
+    el("th", { role: "columnheader" }, "Ep"),
+    el("th", { role: "columnheader" }, "Title"),
+    el("th", { role: "columnheader" }, "Subtitles"),
+    el("th", { role: "columnheader" }, ""),
   );
 }
 
@@ -530,24 +547,29 @@ function buildEpisodeRow(row: DetailEpRow): HTMLElement {
           "td",
           {
             className: "ep-num",
+            role: "cell",
             "data-tip": `Absolute #${absEp}, aired ${fmtEpisode(season, airedEp)}`,
           },
           epLabel,
           el("span", { className: "ep-aired" }, ` E${pad(airedEp)}`),
         )
-      : el("td", { className: "ep-num" }, epLabel);
+      : el("td", { className: "ep-num", role: "cell" }, epLabel);
 
-  const covCell = el("td", { className: "ep-coverage" }, ...episodeCoverageChildren(row));
+  const covCell = el(
+    "td",
+    { className: "ep-coverage", role: "cell" },
+    ...episodeCoverageChildren(row),
+  );
 
   const tr = el(
     "tr",
-    null,
+    { role: "row" },
     epNumCell,
-    el("td", { className: "ep-title", "data-ep": epLabel }, ep.title),
+    el("td", { className: "ep-title", role: "cell", "data-ep": epLabel }, ep.title),
     covCell,
     el(
       "td",
-      { "data-col": "actions" },
+      { role: "cell", "data-col": "actions" },
       el("div", { className: "action-group" }, ...episodeActionChildren(row)),
     ),
   );
@@ -621,17 +643,20 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
   return [syncBtn, histBtn, searchBtn];
 }
 
-/** Build a season-head row (label + action buttons). */
+/** Build a season-head row (label + action buttons). The label cell SPANS
+ *  the data columns on desktop (grid placement in 06-table.css); the two
+ *  empty cells only exist for the mobile branch's flex layout, which hides
+ *  them, and stay hidden on desktop. */
 function buildSeasonHeadRow(row: DetailHeadRow): HTMLElement {
   const tr = el(
     "tr",
-    { className: "season-head" },
-    el("td", {}, row.label),
-    el("td", {}),
-    el("td", {}),
+    { className: "season-head", role: "row" },
+    el("td", { role: "cell" }, row.label),
+    el("td", { role: "cell" }),
+    el("td", { role: "cell" }),
     el(
       "td",
-      { "data-col": "actions" },
+      { role: "cell", "data-col": "actions" },
       el("div", { className: "action-group" }, ...seasonHeadActionChildren(row)),
     ),
   );
@@ -656,7 +681,9 @@ const seriesSpec: ListSpec<DetailRow> = {
   mount: (r) => {
     switch (r.kind) {
       case "gap":
-        return el("tr", { className: "season-gap" }, el("td", { colSpan: 999 }));
+        // Spans every column via grid-column: 1 / -1 (06-table.css); the
+        // colSpan escape hatch died with the table formatting context.
+        return el("tr", { className: "season-gap", role: "row" }, el("td", { role: "cell" }));
       case "head":
         return buildSeasonHeadRow(r);
       case "cols":
@@ -686,6 +713,30 @@ const seriesSpec: ListSpec<DetailRow> = {
   },
 };
 
+/** Seasons with download history, derived in ONE pass over the history set
+ *  (C3): the per-season `[...historySet].some(startsWith)` scan was a full
+ *  re-walk of the set multiplied by the season count. Episode ids are
+ *  `tvdb-{id}-s{NN}e{NN}` (tvdbMediaId), so the season number sits between
+ *  the `s` and the first `e` after it. */
+function seasonsWithHistory(tvdbId: number, historySet: Set<string>): Set<number> {
+  const prefix = `tvdb-${tvdbId}-s`;
+  const out = new Set<number>();
+  for (const id of historySet) {
+    if (!id.startsWith(prefix)) {
+      continue;
+    }
+    const e = id.indexOf("e", prefix.length);
+    if (e <= prefix.length) {
+      continue;
+    }
+    const season = Number(id.slice(prefix.length, e));
+    if (Number.isFinite(season)) {
+      out.add(season);
+    }
+  }
+  return out;
+}
+
 /** Build the ordered DetailRow list for a series (season heads, column
  *  headers, gaps, and episode rows in display order). */
 function buildSeriesRows(
@@ -697,6 +748,9 @@ function buildSeriesRows(
   historySet: Set<string>,
 ): DetailRow[] {
   const rows: DetailRow[] = [];
+  // Per-rebuild derivations, hoisted out of the per-row/per-season work (C3).
+  const icSig = ignoredCodecsSig();
+  const historySeasons = seasonsWithHistory(series.tvdb_id, historySet);
   let first = true;
   for (const sg of sortedSeasons) {
     if (!sg.episodes.some((ep) => ep.has_file)) {
@@ -707,9 +761,7 @@ function buildSeriesRows(
     }
     first = false;
     const syncEps = collectSeasonSyncEps(sg, series, subIdx, targetLangs);
-    const hasHist = [...historySet].some((id) =>
-      id.startsWith(`tvdb-${series.tvdb_id}-s${pad(sg.season)}e`),
-    );
+    const hasHist = historySeasons.has(sg.season);
     rows.push({
       kind: "head",
       season: sg.season,
@@ -736,7 +788,7 @@ function buildSeriesRows(
         targetLangs,
         hasAbsOrder,
         hasHistory,
-        sig: epSig(subs, targetLangs, hasHistory),
+        sig: epSig(subs, targetLangs, hasHistory, icSig),
       });
     }
   }
@@ -865,23 +917,33 @@ export function renderSeriesDetail(
   // REBUILD: fresh collection + binding + table shell.
   disposeSeriesBinding();
   const coll = createCollection<DetailRow>(detailRowKey);
-  const tbody = el("tbody");
+  const tbody = el("tbody", { role: "rowgroup" });
   const unbind = bindList(tbody, coll, seriesSpec);
   coll.setAll(rows);
 
+  // Detach any previous content BEFORE patching the fresh shell in: patch
+  // reuses position-matched elements, so patching the new table over a live
+  // old one keeps the OLD tbody on screen and strands this binding's tbody
+  // in the discarded copy (row updates would repaint a detached node). A
+  // rebuild is a replacement by definition.
+  patch(out, document.createDocumentFragment());
+
+  // The desktop tree leaves the table formatting context (C1), which strips
+  // the implicit table semantics, so the roles are explicit. The accessible
+  // name is the panel heading — PanelConfigure populates #lib-heading before
+  // this render commits. Column widths live in ONE shared desktop
+  // grid-template-columns custom property (06-table.css), which replaced the
+  // <colgroup>.
   const frag = document.createDocumentFragment();
   frag.appendChild(
     el(
       "table",
-      { className: "series-detail", "data-series-id": key },
-      el(
-        "colgroup",
-        null,
-        el("col", { style: "width: 8%" }),
-        el("col", { style: "width: 34%" }),
-        el("col", { style: "width: 34%" }),
-        el("col", { style: "width: 24%" }),
-      ),
+      {
+        className: "series-detail",
+        role: "table",
+        "aria-labelledby": "lib-heading",
+        "data-series-id": key,
+      },
       tbody,
     ),
   );
@@ -1186,6 +1248,14 @@ function renderMovieDetail(m: MovieDetail, subs: SubtitleEntry[]): void {
   const tbody = el("tbody");
   const unbind = bindList(tbody, coll, movieSpec);
   coll.setAll(rows);
+
+  // Detach any previous content BEFORE patching the fresh shell in: patch
+  // keys tables by data-movie-id, so a same-movie rebuild over a live table
+  // would keep the OLD tbody on screen and strand this binding's tbody in
+  // the discarded copy (C2's route-leave dispose makes that reachable: the
+  // reuse check above fails on a disposed binding while the table is still
+  // connected). A rebuild is a replacement by definition.
+  patch(out, document.createDocumentFragment());
 
   const frag = document.createDocumentFragment();
   frag.appendChild(
