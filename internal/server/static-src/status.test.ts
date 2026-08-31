@@ -85,7 +85,7 @@ vi.mock("./popover-menu.js", () => ({
 }));
 
 import * as store from "./store.js";
-import { buildActivityItem, updateLiveTimers } from "./status.js";
+import { buildActivityItem } from "./status.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
@@ -378,40 +378,6 @@ describe("status: buildActivityItem running and queued renders", () => {
   it("renders the server-supplied detail in its own cell", () => {
     const item = buildActivityItem(entry({ id: "x9", detail: "Searched 12 items" }));
     expect(item.querySelector(".act-detail")?.textContent).toBe("Searched 12 items");
-  });
-});
-
-describe("status: updateLiveTimers", () => {
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    store.set("isAdmin", false);
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("re-renders every running row's elapsed time and leaves terminal rows frozen", () => {
-    vi.setSystemTime(new Date("2026-07-19T10:00:30Z"));
-    const running = buildActivityItem(entry({ id: "lt1", started_at: "2026-07-19T10:00:00Z" }));
-    const finished = buildActivityItem(
-      entry({
-        id: "lt2",
-        done: true,
-        started_at: "2026-07-19T09:00:00Z",
-        ended_at: "2026-07-19T09:00:10Z",
-      }),
-    );
-    document.body.append(running, finished);
-    expect(running.querySelector(".live-timer")?.textContent).toBe(" \u00B7 30s");
-
-    vi.setSystemTime(new Date("2026-07-19T10:02:10Z"));
-    updateLiveTimers();
-
-    expect(running.querySelector(".live-timer")?.textContent).toBe(" \u00B7 2m 10s");
-    // Terminal rows carry no data-started, so their frozen duration stays put.
-    expect(finished.querySelector(".live-timer")?.textContent).toBe(" \u00B7 10s");
   });
 });
 
@@ -1153,6 +1119,71 @@ describe("status: popup content", () => {
     vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
     await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-16T06:00:00Z" }) });
     expect(mutedRow()?.textContent).toBe("Last scan: 3d ago");
+  });
+});
+
+describe("status: identity-stable renders (task 13)", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.status.initStatusPopover();
+  });
+
+  it("an unchanged poll mutates nothing in the DOM", async () => {
+    // Time-stable rows only (done + queued): a running row's elapsed text
+    // legitimately refreshes per poll and would read as a mutation.
+    const snapshot: PollWire = {
+      activities: [
+        entry({ id: "s1", done: true, ended_at: "2026-07-19T10:05:00Z", detail: "done" }),
+        entry({ id: "s2", queued: true, detail: "waiting" }),
+      ],
+      alerts: { ok: true, status: 200, data: [alertEntry({ id: 3 })] },
+    };
+    await h.runPollWith(snapshot);
+    expect(document.querySelector('[data-act-id="s1"]')).not.toBeNull();
+
+    // Records delivered mid-poll (each await is a microtask turn) land in the
+    // callback; drain the queue at the end for the rest.
+    const seen: MutationRecord[] = [];
+    const mo = new MutationObserver((records) => seen.push(...records));
+    mo.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+    await h.runPollWith(snapshot);
+    seen.push(...mo.takeRecords());
+    mo.disconnect();
+
+    expect(seen.map((r) => `${r.type}:${r.target.nodeName}`)).toEqual([]);
+  });
+
+  it("a running→done transition updates the open popup row in place (R7.2)", async () => {
+    await h.runPoll([entry({ id: "u1", detail: "Scanning X" })]);
+    const row = document.querySelector('[data-act-id="u1"]');
+    expect(row).not.toBeNull();
+    expect(row?.querySelector(".act-active .spinner")).not.toBeNull();
+
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({
+        id: "u1",
+        done: true,
+        ended_at: "2026-07-19T10:03:00Z",
+        detail: "Scanning X",
+      }),
+    });
+
+    const after = document.querySelector('[data-act-id="u1"]');
+    expect(after).toBe(row);
+    expect(after?.classList.contains("pop-done")).toBe(true);
+    expect(after?.querySelector(".act-done")).not.toBeNull();
+    expect(after?.querySelector(".spinner")).toBeNull();
+    expect(after?.querySelector(".live-timer")?.textContent).toBe(" \u00B7 3m 0s");
+    // The done row's dismiss control arrived with the update, wired.
+    expect(after?.querySelector('button[aria-label="Dismiss"]')).not.toBeNull();
   });
 });
 

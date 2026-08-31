@@ -56,7 +56,7 @@ vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: () => undefined,
   triggerSeasonScan: () => undefined,
   triggerMovieScan: () => undefined,
-  applyScanButtonState: () => undefined,
+  registerScanButton: () => undefined,
 }));
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => (k === "ignoredCodecs" ? new Set<string>() : null),

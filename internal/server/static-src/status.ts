@@ -96,10 +96,13 @@ export function initStatusPopover(): void {
           { showDelayMs: 0, minVisibleMs: 300 },
         );
       }
+      startLiveTimers();
       void pollStatus();
     },
+    onClose: stopLiveTimers,
   });
   $.statusBtn.addEventListener("click", () => statusPopover?.toggle());
+  registerCleanup(stopLiveTimers);
 }
 
 // Check if the status popup is currently visible.
@@ -150,10 +153,12 @@ function timedOutProviders(providers: ProvidersResponse): string[] {
   return ongoing;
 }
 
-/** Update the status button icon, label, and severity based on current state. */
+/** Update the status button icon, label, and severity based on current state.
+ *  Identity-stable (R8.5): the computed status maps 1:1 to the icon and
+ *  label, so an unchanged `data-status` skips every DOM write — no
+ *  unconditional icon replaceChildren on a no-change render. */
 function updateStatusButton(
   btn: HTMLElement,
-  providers: ProvidersResponse,
   alerts: Alert[],
   activities: ActivityEntry[],
   ongoing: string[],
@@ -163,33 +168,34 @@ function updateStatusButton(
   const hasPersistent = hasAlerts && alerts.some((a: Alert) => a.kind === "persistent");
   const isActive = Array.isArray(activities) && activities.some((a: ActivityEntry) => !a.done);
 
+  let status: string;
+  let label: string;
+  let iconName: "warning" | "dot" | null;
+  if (hasAlerts && (alerts.some((a: Alert) => a.level === "error") || hasPersistent)) {
+    status = "error";
+    label = "Error";
+    iconName = "warning";
+  } else if (hasOngoing || hasAlerts) {
+    status = "warn";
+    label = "Warning";
+    iconName = "warning";
+  } else if (isActive) {
+    status = "scanning";
+    label = "Searching";
+    iconName = null;
+  } else {
+    status = "idle";
+    label = "Healthy";
+    iconName = "dot";
+  }
+
   const statusEl = document.getElementById("statusIcon");
-  const statusLabel = btn.querySelector(".nav-label");
-  if (statusEl) {
-    if (hasAlerts && (alerts.some((a: Alert) => a.level === "error") || hasPersistent)) {
-      btn.dataset["status"] = "error";
-      statusEl.replaceChildren(icon("warning"));
-      if (statusLabel) {
-        statusLabel.textContent = "Error";
-      }
-    } else if (hasOngoing || hasAlerts) {
-      btn.dataset["status"] = "warn";
-      statusEl.replaceChildren(icon("warning"));
-      if (statusLabel) {
-        statusLabel.textContent = "Warning";
-      }
-    } else if (isActive) {
-      btn.dataset["status"] = "scanning";
-      statusEl.replaceChildren();
-      if (statusLabel) {
-        statusLabel.textContent = "Searching";
-      }
-    } else {
-      btn.dataset["status"] = "idle";
-      statusEl.replaceChildren(icon("dot"));
-      if (statusLabel) {
-        statusLabel.textContent = "Healthy";
-      }
+  if (statusEl && btn.dataset["status"] !== status) {
+    btn.dataset["status"] = status;
+    statusEl.replaceChildren(...(iconName === null ? [] : [icon(iconName)]));
+    const statusLabel = btn.querySelector(".nav-label");
+    if (statusLabel) {
+      statusLabel.textContent = label;
     }
   }
   return isActive;
@@ -424,7 +430,7 @@ function renderStatus(): void {
   publishRunningScans(activities);
   reconcileStoppingOverlay(activities);
 
-  const isActive = updateStatusButton(btn, knownProviders, alerts, activities, ongoing);
+  const isActive = updateStatusButton(btn, alerts, activities, ongoing);
   processActivitySideEffects(activities);
   for (const fn of activityObservers) {
     fn(activities);
@@ -869,6 +875,18 @@ function renderPopup(
     reconcile($.statusPopup, items, {
       key: (item) => item.key,
       mount: (item) => item.build(),
+      // The R7.2 gap: without this, a keyed row mounted once never repaints,
+      // so a running activity kept its spinner after finishing while the
+      // popup stayed open. A fresh build patched over the live row updates
+      // it in place — attributes, text, and handlers sync only where they
+      // differ, so an unchanged row is left untouched.
+      update: (row, item) => {
+        const fresh = item.build();
+        if (row.className !== fresh.className) {
+          row.className = fresh.className;
+        }
+        patch(row, ...Array.from(fresh.childNodes));
+      },
     });
     // Content changed after placement — re-clamp against the real height
     // (no-op while the popup is closed).
@@ -971,9 +989,29 @@ const dismissAlertAction = apiAction<number>({
   error: "Dismiss failed",
 });
 
-export function updateLiveTimers(): void {
+// --- Live timers (popup-scoped) ---
+//
+// The 1s elapsed-time tick runs ONLY while the popup is open (the popover's
+// open/close hooks own the interval), and the row scan roots at the popup —
+// the only place `.live-timer[data-started]` rows render (R8.5). A closed
+// popup costs zero timers and zero DOM reads.
+
+let liveTimerId: ReturnType<typeof setInterval> | null = null;
+
+function startLiveTimers(): void {
+  liveTimerId ??= setInterval(updateLiveTimers, 1000);
+}
+
+function stopLiveTimers(): void {
+  if (liveTimerId !== null) {
+    clearInterval(liveTimerId);
+    liveTimerId = null;
+  }
+}
+
+function updateLiveTimers(): void {
   const now = new Date();
-  document.querySelectorAll(".live-timer[data-started]").forEach((timer: Element) => {
+  $.statusPopup.querySelectorAll(".live-timer[data-started]").forEach((timer: Element) => {
     timer.textContent = ` \u00B7 ${formatDuration(
       new Date(timer.getAttribute("data-started") ?? ""),
       now,

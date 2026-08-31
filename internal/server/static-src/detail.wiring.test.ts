@@ -80,7 +80,7 @@ vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: vi.fn(),
   triggerSeasonScan: vi.fn(),
   triggerMovieScan: vi.fn(),
-  applyScanButtonState: vi.fn(),
+  registerScanButton: vi.fn(),
 }));
 const storeState = vi.hoisted(() => ({
   ignoredCodecs: new Set<string>(),
@@ -109,7 +109,7 @@ vi.mock("./store.js", () => ({
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import { openSearchPopup } from "./search.js";
 import { confirmSeasonSync } from "./sync.js";
-import { applyScanButtonState } from "./detail-scan.js";
+import { registerScanButton } from "./detail-scan.js";
 import { seasonScopeKey } from "./scan-scope.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
 
@@ -276,7 +276,7 @@ describe("detail: episode and season action buttons", () => {
       throw new Error("season search button missing");
     }
     expect(seasonSearch.getAttribute("data-scan-scope")).toBe(seasonScopeKey(351, 1));
-    expect(applyScanButtonState).toHaveBeenCalledWith(seasonSearch);
+    expect(registerScanButton).toHaveBeenCalledWith(seasonSearch);
   });
 
   it("confirms a season audio sync with the season's external subtitles", () => {

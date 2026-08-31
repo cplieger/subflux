@@ -64,8 +64,8 @@ vi.mock("./wire/client.gen.js", () => ({
 }));
 
 // The real module registers apiActions at import time and pulls in the
-// status.ts graph; coverage.ts only consumes applyScanButtonState.
-vi.mock("./detail-scan.js", () => ({ applyScanButtonState: () => undefined }));
+// status.ts graph; coverage.ts only consumes registerScanButton.
+vi.mock("./detail-scan.js", () => ({ registerScanButton: () => undefined }));
 
 // The reconcile tick lives in status.ts; capture registrations so tests fire
 // ticks by hand (the tick's own cadence/pause is pinned in status.test.ts).
