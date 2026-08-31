@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/cplieger/arrapi/v2"
 )
@@ -482,6 +483,84 @@ func TestWantedEpisodes_scanBypassRegistersWriteThrough(t *testing.T) {
 	ks.mu.Unlock()
 	if !floorSet {
 		t.Error("the scan bypass did not reset the floor clock")
+	}
+}
+
+// The scan's episode write-throughs are what make the episodes family grow
+// with the LIBRARY, so the resident set stays bounded across a full walk while
+// the series list — a different family, a different store — survives it.
+func TestWantedEpisodes_scanEpisodeRetentionIsBounded(t *testing.T) {
+	const seriesCount = maxResidentEpisodeEntries * 4
+	shipped := &fakeSonarr{episodes: make(map[int][]arrapi.Episode, seriesCount)}
+	for i := 1; i <= seriesCount; i++ {
+		shipped.series = append(shipped.series, arrapi.Series{ID: i, TvdbID: 1000 + i})
+		shipped.episodes[i] = []arrapi.Episode{
+			{ID: 100000 + i, HasFile: true, EpisodeFile: &arrapi.EpisodeFile{SceneName: "x"}},
+		}
+	}
+	c := testCachedSonarr(shipped, &fakeSonarr{}, testGate(t.Context()))
+
+	var seen int
+	if err := c.WantedEpisodes(t.Context(), nil, func(_ arrapi.Series, _ arrapi.Episode) error {
+		seen++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if seen != seriesCount {
+		t.Fatalf("WantedEpisodes walked %d episodes, want %d", seen, seriesCount)
+	}
+
+	if got := c.table.episodes.resident(); got > maxResidentEpisodeEntries {
+		t.Errorf("resident episode entries after a %d-series scan = %d, want <= %d",
+			seriesCount, got, maxResidentEpisodeEntries)
+	}
+	if _, ok := c.table.lookup(keySeriesList); !ok {
+		t.Error("the series-list entry was swept with the episodes; the bound must be scoped to that family")
+	}
+}
+
+// The bound changes retention, never the write-through's wave semantics: at an
+// episodes key it still resets the floor clock and still wins as the newest
+// write, and a sweep leaves the floor clock standing.
+func TestWriteThrough_episodesKeyKeepsItsWaveSemantics(t *testing.T) {
+	c := testCachedSonarr(&fakeSonarr{}, &fakeSonarr{}, testGate(t.Context()))
+	key := episodesKey(1)
+
+	begin := time.Now()
+	c.table.writeThrough(key, readEntry{payload: []arrapi.Episode{{ID: 101}}, readBegin: begin})
+	if e, ok := c.table.lookup(key); !ok || payloadAs[[]arrapi.Episode](e.payload)[0].ID != 101 {
+		t.Fatalf("entry = %v (ok=%v), want the write-through's episodes", e.payload, ok)
+	}
+	ks := c.table.key(key)
+	ks.mu.Lock()
+	floor := ks.lastWaveStart
+	ks.mu.Unlock()
+	if !floor.Equal(begin) {
+		t.Errorf("floor clock = %v, want the write-through's read-begin %v", floor, begin)
+	}
+
+	// An older write-through loses to the entry already held.
+	c.table.writeThrough(key, readEntry{payload: []arrapi.Episode{{ID: 999}}, readBegin: begin.Add(-time.Second)})
+	if e, _ := c.table.lookup(key); payloadAs[[]arrapi.Episode](e.payload)[0].ID != 101 {
+		t.Errorf("entry = %v, want the newer write to survive a stale write-through", e.payload)
+	}
+
+	// Sweeping the generation drops the payload, never the key's floor clock.
+	for i := range maxResidentEpisodeEntries * 2 {
+		c.table.put(episodesKey(1000+i), readEntry{payload: []arrapi.Episode{}, readBegin: time.Now()})
+	}
+	if _, ok := c.table.lookup(key); ok {
+		t.Fatalf("key %q survived %d newer episode entries; the bound did not bind", key, maxResidentEpisodeEntries*2)
+	}
+	ks.mu.Lock()
+	floor, commit := ks.lastWaveStart, ks.lastCommit
+	ks.mu.Unlock()
+	if !floor.Equal(begin) {
+		t.Errorf("floor clock after a sweep = %v, want the retained %v", floor, begin)
+	}
+	if !commit.Equal(begin) {
+		t.Errorf("write-ordering clock after a sweep = %v, want the retained %v", commit, begin)
 	}
 }
 

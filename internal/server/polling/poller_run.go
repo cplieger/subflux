@@ -11,7 +11,6 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
@@ -73,7 +72,6 @@ type StateFunc func() *LiveState
 type Poller struct {
 	deps          Deps
 	stateFunc     StateFunc
-	tagCache      *cache.Cache[map[int]struct{}]
 	importRetries map[string]int
 	work          chan sourceBatch
 	detectHigh    map[subflux.PollKey]time.Time
@@ -98,24 +96,14 @@ type sourceBatch struct {
 // left to the next scheduled full scan, which covers the item anyway.
 const maxImportRetries = 3
 
-// NewPoller creates a Poller with the given dependencies. In
-// unconfigured mode (server.New called without WithConfig) stateFunc
-// may return a LiveState with a nil Cfg; we fall back to a sane
-// default TTL so construction does not panic. Run() reads the live
-// PollInterval per cycle and the per-entry expiry is governed by the
-// cache TTL set here, so the first poll after configuration uses the
-// configured interval naturally; the tag cache lifetime is the only
-// thing tied to this initial value.
+// NewPoller creates a Poller with the given dependencies. Nothing is captured
+// from the live state here: Run reads the PollInterval per cycle and the
+// exclude-tag read goes to the arr-read wrapper, which owns its own TTL, so a
+// hot-reloaded config takes effect on the next wake.
 func NewPoller(deps Deps, stateFunc StateFunc) *Poller { //nolint:gocritic // hugeParam: callers pass by value
-	const defaultPollInterval = 2 * time.Minute
-	ttl := 2 * defaultPollInterval
-	if ls := stateFunc(); ls != nil && ls.Cfg != nil {
-		ttl = 2 * ls.Cfg.PollInterval()
-	}
 	return &Poller{
 		deps:          deps,
 		stateFunc:     stateFunc,
-		tagCache:      cache.New[map[int]struct{}](ttl),
 		importRetries: make(map[string]int),
 		work:          make(chan sourceBatch, 8),
 		detectHigh:    make(map[subflux.PollKey]time.Time),
@@ -312,8 +300,12 @@ func (p *Poller) executeBatch(ctx context.Context, b *sourceBatch) {
 
 	searchCfg := ls.Cfg.Search()
 	scanDelay := searchCfg.ScanDelay
-	excludeIDs := p.excludeTagIDs(ctx, resolver, string(b.source),
-		searchCfg.ExcludeArrTags, ls.Cfg.PollInterval())
+	// One resolution per batch, straight to the arr client: the arr-read
+	// wrapper coalesces concurrent readers and caches the result for its own
+	// TTL, and unlike a private cache here it never caches a fail-open nil, so
+	// a tag endpoint that was down for one cycle is retried on the next batch
+	// instead of holding "no exclusions" for a poll interval.
+	excludeIDs := resolver.ResolveExcludeTagIDs(ctx, searchCfg.ExcludeArrTags, false)
 
 	latest, oldestFailed, completed := p.runBatchEntries(ctx, ls, b, process, excludeIDs, scanDelay)
 	if !completed {
@@ -370,20 +362,6 @@ func (p *Poller) runBatchEntries(ctx context.Context, ls *LiveState, b *sourceBa
 		p.trackImportOutcome(b.source, entry.ID, entry.Date, path, retryable, &oldestFailed)
 	}
 	return latest, oldestFailed, true
-}
-
-// excludeTagIDs returns cached tag IDs if still valid, otherwise resolves
-// them from the arr client and caches with singleflight deduplication.
-func (p *Poller) excludeTagIDs(ctx context.Context, client tagResolver, cacheKey string,
-	tags []string, _ time.Duration,
-) map[int]struct{} {
-	ids, err := p.tagCache.GetOrFetchCtx(ctx, cacheKey, func(ctx context.Context) (map[int]struct{}, error) {
-		return client.ResolveExcludeTagIDs(ctx, tags, false), nil
-	})
-	if err != nil {
-		return nil
-	}
-	return ids
 }
 
 // detectSonarr fetches new Sonarr import events and enqueues them for the
