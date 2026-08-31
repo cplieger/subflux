@@ -109,6 +109,19 @@ interface TrackedDownload {
 // Subtitle key → in-flight download. Entries leave on a terminal observation.
 const trackedDownloads = new Map<string, TrackedDownload>();
 
+// One-shot, armed by events.ts on a boot_id change. A restart drops the
+// activity log with the process, so a tracked download the new boot cannot
+// account for will never see its completion event: the FIRST snapshot after
+// the restart — the recovery transaction's own authoritative status read —
+// resolves it instead of waiting forever.
+let restartSweep = false;
+
+/** A server restart happened: the tracked activity ids belong to a dead
+ *  process. Arms a one-shot sweep the next activity snapshot consumes. */
+export function armDownloadRestartSweep(): void {
+  restartSweep = true;
+}
+
 function downloadKey(sub: SearchResult, lang: string): string {
   return join("dl", sub.provider, sub.subtitle_id, lang);
 }
@@ -142,11 +155,33 @@ function settleDownloadButton(activityId: string, failed: boolean): void {
   btn.removeAttribute("data-tip");
 }
 
+/** Idle render for a download button: re-clickable, carrying no verdict. The
+ *  state a freshly built row starts in, reached again when a tracked download
+ *  can be resolved neither way — the outcome is unknowable, so claiming one
+ *  would be a lie in either direction. */
+function resetDownloadButton(activityId: string): void {
+  const btn = searchDlg.querySelector<HTMLButtonElement>(
+    `button[data-activity-id="${CSS.escape(activityId)}"]`,
+  );
+  if (!btn) {
+    return;
+  }
+  delete btn.dataset["activityId"];
+  btn.disabled = false;
+  patch(btn, icon("download"));
+  btn.setAttribute("data-tip", "Server restarted \u2014 outcome unknown, retry");
+}
+
 /** Flip tracked download buttons from the activity store: an entry observed
  *  done settles its button; an entry evicted after being seen counts as
  *  completed; an entry not yet observed keeps waiting (the 202 precedes the
- *  event by construction — the server starts the activity before answering). */
+ *  event by construction — the server starts the activity before answering),
+ *  unless a restart sweep is armed, which retires that wait. */
 function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
+  // Consumed BEFORE the empty-map exit: a sweep that outlived its own restart
+  // would neutralize a later, healthy download.
+  const swept = restartSweep;
+  restartSweep = false;
   if (trackedDownloads.size === 0) {
     return;
   }
@@ -158,6 +193,13 @@ function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
       continue;
     }
     if (!act && !t.seen) {
+      if (!swept) {
+        continue;
+      }
+      // This snapshot is the restarted server's authoritative state and it has
+      // never heard of the entry, so nothing will ever complete it.
+      trackedDownloads.delete(key);
+      resetDownloadButton(t.activityId);
       continue;
     }
     trackedDownloads.delete(key);
@@ -172,6 +214,7 @@ function drainSearchState(): void {
   searchAbort?.abort();
   searchAbort = null;
   trackedDownloads.clear();
+  restartSweep = false;
 }
 
 /** Test-only. */

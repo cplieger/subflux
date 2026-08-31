@@ -71,18 +71,14 @@ vi.mock("./bus.js", () => ({
 // Mocked whole: the real module registers apiActions at import time and pulls
 // in the status.ts graph. coverage.ts only consumes registerScanButton.
 vi.mock("./detail-scan.js", () => ({ registerScanButton: () => undefined }));
-// Mutable store state so a test can flip the admin / unconfigured flags without
+// Mutable store state so a test can flip the unconfigured flag without
 // re-mocking, and assert what coverage.ts wrote.
 const storeState = vi.hoisted(() => ({
-  isAdmin: false,
   isUnconfigured: false,
   sets: [] as [string, unknown][],
 }));
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => {
-    if (k === "isAdmin") {
-      return storeState.isAdmin;
-    }
     if (k === "isUnconfigured") {
       return storeState.isUnconfigured;
     }
@@ -198,7 +194,6 @@ beforeEach(async () => {
   clientState.signals = [];
   document.body.innerHTML = FIXTURE;
   bus.emitted = [];
-  storeState.isAdmin = false;
   storeState.isUnconfigured = false;
   storeState.sets = [];
   filterCoverage();
@@ -1264,69 +1259,10 @@ describe("coverage: configurePanel", () => {
     expect(document.querySelector('[data-nav="arr"]')).toBeNull();
   });
 
-  it("runs the history action on a History click", () => {
-    let clicked = 0;
-    configurePanel(false, {
-      title: "The Wire",
-      historyAction: () => {
-        clicked += 1;
-      },
-    });
-
-    reqEl<HTMLButtonElement>('[data-nav="hist"]').click();
-
-    expect(clicked).toBe(1);
-  });
-
-  it("inserts the History button before the arr link", () => {
-    configurePanel(false, {
-      title: "The Wire",
-      arrLink: "http://sonarr/series/1",
-      historyAction: () => undefined,
-    });
-
-    const navs = Array.from(document.querySelectorAll("[data-nav]")).map((e) =>
-      e.getAttribute("data-nav"),
-    );
-    expect(navs).toEqual(["back", "hist", "arr"]);
-  });
-
-  it("offers the Files button to an admin", () => {
-    storeState.isAdmin = true;
-
-    configurePanel(false, { title: "The Wire", filesAction: () => undefined });
-
-    expect(document.querySelector('[data-nav="files"]')).not.toBeNull();
-  });
-
-  it("withholds the Files button from a non-admin", () => {
-    storeState.isAdmin = false;
-
-    configurePanel(false, { title: "The Wire", filesAction: () => undefined });
-
-    expect(document.querySelector('[data-nav="files"]')).toBeNull();
-  });
-
-  it("runs the files action on a Files click", () => {
-    storeState.isAdmin = true;
-    let clicked = 0;
-    configurePanel(false, {
-      title: "The Wire",
-      filesAction: () => {
-        clicked += 1;
-      },
-    });
-
-    reqEl<HTMLButtonElement>('[data-nav="files"]').click();
-
-    expect(clicked).toBe(1);
-  });
-
   it("drops the previous detail's nav buttons on the next configure", () => {
     configurePanel(false, {
       title: "The Wire",
       arrLink: "http://sonarr/series/1",
-      historyAction: () => undefined,
     });
 
     configurePanel(false, { title: "Heat" });

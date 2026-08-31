@@ -10,7 +10,7 @@
 // manual per-badge DOM patching.
 
 import * as store from "./store.js";
-import { $, el, text, icon, errDiv, input, select, insertNavButton } from "./dom.js";
+import { $, el, text, icon, errDiv, input, select } from "./dom.js";
 import { coverageSeries, coverageMovies } from "./wire/client.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from "./utils.js";
@@ -442,39 +442,6 @@ export function configurePanel(visible: boolean, detail?: DetailConfig): void {
         ` ${name}`,
       ),
     );
-  }
-
-  // History button between back and arr link.
-  if (detail.historyAction) {
-    const histBtn = el(
-      "button",
-      {
-        type: "button",
-        className: "ghost",
-        "data-nav": "hist",
-        onclick: detail.historyAction,
-      },
-      icon("history"),
-      el("span", { className: "btn-text" }, " History"),
-    );
-    insertNavButton(histBtn);
-  }
-
-  // Files button.
-  if (detail.filesAction && store.get("isAdmin")) {
-    const filesBtn = el(
-      "button",
-      {
-        type: "button",
-        className: "ghost",
-        "data-nav": "files",
-        "data-tip": "Manage subtitle files",
-        onclick: detail.filesAction,
-      },
-      icon("file"),
-      el("span", { className: "btn-text" }, " Files"),
-    );
-    insertNavButton(filesBtn);
   }
 }
 

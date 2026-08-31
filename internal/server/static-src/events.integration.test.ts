@@ -116,6 +116,7 @@ vi.mock("./wire/client.gen.js", async (importOriginal) => ({
     wireCall(wire.movieSummaryRaw, [id, q, opts?.signal]) as Promise<RawResult>,
 }));
 vi.mock("./history.js", () => ({ noteHistoryMutation: vi.fn() }));
+vi.mock("./search.js", () => ({ armDownloadRestartSweep: vi.fn() }));
 
 import type { SeriesItem } from "./wire/types.gen.js";
 import * as store from "./store.js";

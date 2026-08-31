@@ -53,7 +53,7 @@ vi.mock("./detail.js", () => ({
 
 // The router's popup collaborators (their module graphs stay out).
 vi.mock("./config.js", () => ({ openConfig: vi.fn() }));
-vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
+vi.mock("./search.js", () => ({ openSearchPopup: vi.fn(), armDownloadRestartSweep: vi.fn() }));
 vi.mock("./files.js", () => ({ openFileManager: vi.fn() }));
 
 // The view transition runs its callback straight through (cosmetics).

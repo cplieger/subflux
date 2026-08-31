@@ -29,6 +29,7 @@ vi.mock("./status.js", () => ({
   applyProviderEvent: vi.fn(),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
+vi.mock("./search.js", () => ({ armDownloadRestartSweep: vi.fn() }));
 vi.mock("./bus.js", async (importOriginal) => ({
   ...(await importOriginal<typeof BusModule>()),
   emit: vi.fn(),
