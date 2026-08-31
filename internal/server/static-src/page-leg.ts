@@ -19,7 +19,6 @@
 import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
 import {
-  coverageMovieSubsRaw,
   coverageMovieSummary,
   coverageMovieSummaryRaw,
   coverageSeriesDetail,
@@ -34,6 +33,7 @@ import type { ApiResult } from "./api-client.js";
 import type { MovieDetail } from "./api-types.js";
 import { loadCoverage } from "./coverage.js";
 import { openMovieDetail, renderMovieDetailFromLeg, renderSeriesDetail } from "./detail.js";
+import { readMovieDetail } from "./movie-detail-read.js";
 import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
 import { dropDetailScopedDirtyRoots, setDetailRefresher } from "./coverage-heal.js";
 import { coverageRow } from "./coverage-store.js";
@@ -365,20 +365,19 @@ async function transactionArm(
     // painting an empty subs table. /subs and stateIDs are store-only reads
     // and never carry ?recovery=1; a 404 is a definitive answer (vanished
     // item), rendered as the shipped fallback.
-    const [row, subs, historyIDs] = await Promise.all([
+    const [row, pair] = await Promise.all([
       coverageMovieSummaryRaw(ctx.tmdbId, rq, { signal }),
-      coverageMovieSubsRaw(ctx.tmdbId, { signal }),
-      stateIDsRaw({ type: "movie", prefix: `tmdb-${ctx.tmdbId}` }, { signal }),
+      readMovieDetail(ctx.tmdbId, { signal }),
     ]);
     if (!isCurrent(key, gen, ctrl)) {
       return outrunOrRerouted(key);
     }
-    const failure = legFailure(row, subs, historyIDs);
+    const failure = legFailure(row, pair.subs, pair.historyIDs);
     if (failure) {
       throw failure;
     }
     if (row.ok && row.data !== undefined) {
-      renderMovieDetailFromLeg(row.data, subs.data ?? [], historyIDs.data ?? []);
+      renderMovieDetailFromLeg(row.data, pair.reads);
     }
     return "applied";
   }

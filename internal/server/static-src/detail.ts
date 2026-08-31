@@ -3,12 +3,8 @@
 import * as store from "./store.js";
 import { $, el, icon, errDiv, pad, insertNavButton } from "./dom.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
-import {
-  coverageSeriesDetail,
-  coverageMovieSubs,
-  mediaEpisodes,
-  stateIDs,
-} from "./wire/client.gen.js";
+import { coverageSeriesDetail, mediaEpisodes, stateIDs } from "./wire/client.gen.js";
+import { readMovieDetail, type MovieDetailReads } from "./movie-detail-read.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   fmtEpisode,
@@ -1080,20 +1076,6 @@ function addMovieHistoryButton(m: MovieDetail): void {
   insertNavButton(histBtn);
 }
 
-/** What a movie-detail READ hands the render: this movie's subtitle rows and
- *  the media ids its download history holds. Everything downstream of the read
- *  takes this one payload, so the plain open and the transaction leg cannot
- *  drift in what they make of the same answers.
- *
- *  The reads themselves stay with each caller, because their failure policies
- *  are opposites: a navigation paints what it can (the null-collapsing client),
- *  while the leg reads the same pair plus the summary on the RAW client so a
- *  failed read can refuse the commit instead of painting a half-answer. */
-interface MovieDetailReads {
-  readonly subs: SubtitleEntry[];
-  readonly historyIDs: string[];
-}
-
 /** Enter the movie-detail view for a row already in hand: tab title, panel
  *  config, and the detail context every refresh path classifies the route
  *  from. The plain open calls it BEFORE its reads — the header is known from
@@ -1110,18 +1092,14 @@ function enterMovieDetail(m: MovieDetail): void {
  *  the LEG owns the three reads on the raw client, so commit waits for them
  *  and a failed read aborts the transaction instead of painting an empty
  *  subs table. */
-export function renderMovieDetailFromLeg(
-  m: MovieDetail,
-  subs: SubtitleEntry[],
-  historyIDs: string[],
-): void {
+export function renderMovieDetailFromLeg(m: MovieDetail, reads: MovieDetailReads): void {
   // Supersede any in-flight plain open: this render owns the fresh paint.
   if (detailAbort) {
     detailAbort.abort();
     detailAbort = null;
   }
   enterMovieDetail(m);
-  renderMovieDetail(m, { subs, historyIDs });
+  renderMovieDetail(m, reads);
 }
 
 export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: AbortSignal): void {
@@ -1161,21 +1139,17 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
 
   // The pair the render needs, read under ONE signal so the skeleton covers
   // the whole load and the paint gets both answers at once (the leg awaits the
-  // same pair inside its triple). NULL-COLLAPSING on purpose, and that is the
-  // only difference from the leg: a navigation has no commit to refuse, so a
-  // failed read becomes an empty list and paints the shipped empty surface
-  // rather than latching a transaction.
-  Promise.all([
-    coverageMovieSubs(m.tmdb_id, { signal }),
-    stateIDs({ type: "movie", prefix: `tmdb-${m.tmdb_id}` }, { signal }),
-  ])
-    .then(([subs, historyIDs]) => {
+  // same pair inside its triple). THE POLICY, and the only difference from the
+  // leg: a navigation has no commit to refuse, so a read that did not answer
+  // paints as empty rather than latching a transaction.
+  readMovieDetail(m.tmdb_id, { signal })
+    .then((r) => {
       if (signal.aborted) {
         timing.cancel();
         return;
       }
       timing.commit(() => {
-        renderMovieDetail(m, { subs: subs ?? [], historyIDs: historyIDs ?? [] });
+        renderMovieDetail(m, r.reads);
       });
     })
     .catch((e: unknown) => {
