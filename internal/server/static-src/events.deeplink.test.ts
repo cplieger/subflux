@@ -148,12 +148,8 @@ document.body.innerHTML = `
 
 import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
-import {
-  coverageItems,
-  libraryLoaded,
-  registeredCollections,
-  _resetCoverageForTest,
-} from "./coverage.js";
+import { _resetCoverageForTest } from "./coverage.js";
+import { coverageItems, libraryLoaded, registeredCollections } from "./coverage-store.js";
 import { _resetHealForTest } from "./coverage-heal.js";
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
 

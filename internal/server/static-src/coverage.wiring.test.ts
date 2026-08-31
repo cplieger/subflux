@@ -61,6 +61,11 @@ vi.mock("./detail-scan.js", () => ({
   },
 }));
 
+// coverage.ts calls the reset rule directly on every pair application; the
+// real heal would pull the status.ts graph and the summary endpoints, neither
+// of which this suite is about.
+vi.mock("./coverage-heal.js", () => ({ resetCoverageHeal: () => undefined }));
+
 const storeState = vi.hoisted(() => ({ isUnconfigured: false }));
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => {

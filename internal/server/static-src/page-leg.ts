@@ -31,6 +31,7 @@ import {
 } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import type { ApiResult } from "./api-client.js";
+import type { MovieDetail } from "./api-types.js";
 import { loadCoverage } from "./coverage.js";
 import {
   disposeDetailBindings,
@@ -39,6 +40,8 @@ import {
   renderSeriesDetail,
 } from "./detail.js";
 import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
+import { setDetailRefresher } from "./coverage-heal.js";
+import { coverageRow } from "./coverage-store.js";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
  *  a route leave superseded it and the results were discarded. */
@@ -228,8 +231,25 @@ async function refreshSeriesDetailPair(): Promise<void> {
   }
 }
 
-on(BusEvent.RefreshSeriesDetail, () => {
-  void refreshSeriesDetailPair();
+// The heal's detail coupling, wired in the direction the layers already run:
+// coverage-heal.ts sits BELOW this module (it writes rows through
+// coverage-store.ts while this module refreshes routes), so it cannot import
+// the refresh and this module registers it instead. A6's two arms differ in
+// kind, so both live here rather than in the heal: the series arm is a route
+// refresh under this module's own generation guard, and the movie arm re-runs
+// openMovieDetail's on-demand reads (/subs + one state/ids read) from the row
+// the heal just landed, under detail.ts's own controller.
+setDetailRefresher((root) => {
+  if (root.kind === "series") {
+    void refreshSeriesDetailPair();
+    return;
+  }
+  const row = coverageRow(root.rootKey);
+  if (row) {
+    // A movie root's row IS the summary payload plus the client discriminant,
+    // so the narrowing is the same one detail.ts's navigation entry makes.
+    openMovieDetail(row as MovieDetail, true);
+  }
 });
 
 // --- Task 9: the transaction's PAGE leg ---

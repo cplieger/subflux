@@ -121,13 +121,8 @@ vi.mock("./search.js", () => ({ armDownloadRestartSweep: vi.fn() }));
 import type { SeriesItem } from "./wire/types.gen.js";
 import * as store from "./store.js";
 const storeRef = store;
-import {
-  coverageItems,
-  fetchAndMergeCoverage,
-  libraryLoaded,
-  registeredCollections,
-  _resetCoverageForTest,
-} from "./coverage.js";
+import { fetchAndMergeCoverage, _resetCoverageForTest } from "./coverage.js";
+import { coverageItems, libraryLoaded, registeredCollections } from "./coverage-store.js";
 import { _resetHealForTest } from "./coverage-heal.js";
 import { noteHistoryMutation } from "./history.js";
 

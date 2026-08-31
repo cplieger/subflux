@@ -65,7 +65,18 @@ vi.mock("./bus.js", () => ({
     OpenMovie: "open:movie",
     ScanSeries: "scan:series",
     ScanMovie: "scan:movie",
-    CoverageOverwrite: "coverage:overwrite",
+  },
+}));
+
+// coverage.ts calls the A6 reset rule DIRECTLY before every pair application,
+// so the heal is a collaborator here rather than a bus subscriber: the double
+// records each call and lets a test observe the collection AT reset time,
+// which is how the ordering is pinned without a bus.
+const heal = vi.hoisted(() => ({ resets: 0, onReset: null as null | (() => void) }));
+vi.mock("./coverage-heal.js", () => ({
+  resetCoverageHeal: () => {
+    heal.resets += 1;
+    heal.onReset?.();
   },
 }));
 // Mocked whole: the real module registers apiActions at import time and pulls
@@ -91,18 +102,20 @@ vi.mock("./store.js", () => ({
 
 import {
   _resetCoverageForTest,
-  applyHealedRow,
   configurePanel,
-  coverageItems,
-  coverageRow,
   fetchAndMergeCoverage,
   filterCoverage,
-  libraryLoaded,
   loadCoverage,
-  registeredCollections,
-  removeCoverageRow,
   renderCoverage,
 } from "./coverage.js";
+import {
+  applyHealedRow,
+  coverageItems,
+  coverageRow,
+  libraryLoaded,
+  registeredCollections,
+  removeCoverageRow,
+} from "./coverage-store.js";
 import type { CoverageItem, CoverageTarget } from "./api-types.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
@@ -194,6 +207,8 @@ beforeEach(async () => {
   clientState.signals = [];
   document.body.innerHTML = FIXTURE;
   bus.emitted = [];
+  heal.resets = 0;
+  heal.onReset = null;
   storeState.isUnconfigured = false;
   storeState.sets = [];
   filterCoverage();
@@ -248,9 +263,7 @@ function cellsOf(i: number): Element[] {
   return Array.from(reqRow(i).children);
 }
 
-/** Render the given wire rows through the real load path. Drops the load's
- *  own `coverage:overwrite` emission (pinned by its own suite below) so
- *  interaction tests assert only what the interaction emitted. */
+/** Render the given wire rows through the real load path. */
 async function load(
   seriesRows: Record<string, unknown>[],
   movieRows: Record<string, unknown>[] = [],
@@ -258,7 +271,6 @@ async function load(
   clientState.series = seriesRows;
   clientState.movies = movieRows;
   await loadCoverage();
-  bus.emitted = bus.emitted.filter((e) => e.event !== "coverage:overwrite");
 }
 
 describe("coverage: fetchAndMergeCoverage", () => {
@@ -1332,13 +1344,34 @@ describe("coverage: A6 pair landing (heal gate + task 9 seam)", () => {
     expect(registeredCollections().size).toBe(0);
   });
 
-  it("emits coverage:overwrite before every pair snapshot (the reset-rule trigger)", async () => {
-    clientState.series = [series(1, "Show")];
+  it("runs the heal reset rule directly, BEFORE the snapshot replaces the rows", async () => {
+    await load([series(1, "Before")]);
+    heal.resets = 0;
+    const titlesAtReset: string[][] = [];
+    heal.onReset = () => {
+      titlesAtReset.push(coverageItems().map((i) => i.title));
+    };
+    clientState.series = [series(1, "After")];
     clientState.movies = [];
 
     await fetchAndMergeCoverage();
 
-    expect(bus.emitted.map((e) => e.event)).toContain("coverage:overwrite");
+    // One direct call per pair application, and the rows still standing when
+    // it ran were the OLD ones — an in-flight per-root read aborted there
+    // cannot land over this snapshot. No bus event carries any of it.
+    expect(heal.resets).toBe(1);
+    expect(titlesAtReset).toEqual([["Before"]]);
+    expect(coverageItems().map((i) => i.title)).toEqual(["After"]);
+    expect(bus.emitted).toEqual([]);
+  });
+
+  it("runs the reset rule for a FAILED pair too: the overwrite happens either way", async () => {
+    clientState.series = null; // the generated client null-collapses failures
+    clientState.movies = [movie(2, "Film")];
+
+    await fetchAndMergeCoverage();
+
+    expect(heal.resets).toBe(1);
   });
 
   it("applyHealedRow upserts a changed row and keeps an unchanged row's object", async () => {

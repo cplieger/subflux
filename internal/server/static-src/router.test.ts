@@ -41,6 +41,10 @@ vi.mock("./coverage.js", () => ({
   configurePanel: (v: boolean) => {
     coverage.panelCalls.push(v);
   },
+}));
+// The row store is a separate leaf now: the renderer's entry points above and
+// the row reads/writes below are different modules.
+vi.mock("./coverage-store.js", () => ({
   libraryLoaded: () => coverage.pairLanded,
   coverageItems: () => coverage.items,
   applyHealedRow: (item: unknown) => {

@@ -39,6 +39,9 @@ vi.mock("./bus.js", async (importOriginal) => ({
 vi.mock("./coverage.js", () => ({
   applyCoveragePair: vi.fn(),
   abortInFlightPairFetch: vi.fn(),
+}));
+// The transaction seams live on the row-store leaf.
+vi.mock("./coverage-store.js", () => ({
   beginCoverageTransaction: vi.fn(),
   beginCoveredPairWrite: vi.fn(() => vi.fn()),
   registeredCollections: vi.fn(() => new Set<string>()),

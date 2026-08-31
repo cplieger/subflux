@@ -78,7 +78,6 @@ vi.mock("./status.js", () => ({
 }));
 
 import * as store from "./store.js";
-import { on, BusEvent } from "./bus.js";
 import { SUMMARY_COALESCE_MS, DIRTY_ROOT_CAP } from "./constants.js";
 import {
   _resetHealForTest,
@@ -86,18 +85,22 @@ import {
   onHealReset,
   parseCoverageMediaId,
   resetCoverageHeal,
+  setDetailRefresher,
   subsumeDirtyRoots,
 } from "./coverage-heal.js";
+import type { CoverageRoot } from "./coverage-heal.js";
 import {
   _resetCoverageForTest,
-  applyHealedRow,
-  coverageRow,
   fetchAndMergeCoverage,
   filterCoverage,
-  libraryLoaded,
   loadCoverage,
-  registeredCollections,
 } from "./coverage.js";
+import {
+  applyHealedRow,
+  coverageRow,
+  libraryLoaded,
+  registeredCollections,
+} from "./coverage-store.js";
 import type { CoverageEvent, CoverageTarget, MediaType, SeriesItem } from "./wire/types.gen.js";
 import type { CoverageItem } from "./api-types.js";
 
@@ -206,6 +209,16 @@ function fireReconcileTick(): void {
   }
 }
 
+// The heal hands a flushed root whose own detail is open to the refresher the
+// VIEW layer registers (page-leg.ts owns the real one, and its two arms are
+// pinned there). Recording the row AT handover is what pins the ordering the
+// old bus payload used to carry: rows land before the coupling runs.
+let coupled: { root: CoverageRoot; row: CoverageItem | undefined }[] = [];
+
+function coupledKinds(): string[] {
+  return coupled.map((c) => c.root.kind);
+}
+
 function rowEls(): HTMLElement[] {
   return Array.from(document.querySelectorAll<HTMLElement>("table.library tbody tr"));
 }
@@ -225,6 +238,10 @@ beforeEach(() => {
   wire.pending = [];
   _resetHealForTest();
   _resetCoverageForTest();
+  coupled = [];
+  setDetailRefresher((root) => {
+    coupled.push({ root, row: coverageRow(root.rootKey) });
+  });
   document.body.innerHTML = FIXTURE;
   store.set("currentPage", "library");
   store.set("detailCtx", null);
@@ -606,56 +623,46 @@ describe("coverage-heal: detail couplings", () => {
     }
     store.set("detailCtx", { series: s as never, seasons: [], tvdbId: 1 });
     wire.summaries.set("series:1", okRes(seriesWire(1, { targets: [target("en", 2, 3)] })));
-    const pairRefreshes: number[] = [];
-    const off = on(BusEvent.RefreshSeriesDetail, () => pairRefreshes.push(1));
 
     healFromCoverageEvent(ev("tvdb-1-s01e01"));
     healFromCoverageEvent(ev("tvdb-1-s01e02"));
     healFromCoverageEvent(ev("tvdb-1-s01e03"));
     await window_();
-    expect(pairRefreshes).toHaveLength(1);
+    expect(coupled.map((c) => c.root)).toEqual([
+      { kind: "series", numericID: 1, rootKey: "tvdb-1" },
+    ]);
 
     healFromCoverageEvent(ev("tvdb-1-s01e04"));
     await window_();
-    expect(pairRefreshes).toHaveLength(2);
-    off();
+    expect(coupledKinds()).toEqual(["series", "series"]);
   });
 
-  it("a movie event with that detail open re-opens the detail from the healed row", async () => {
+  it("a movie event with that detail open couples once, after the row healed", async () => {
     await load([], [movieWire(2)]);
     store.set("detailCtx", { movie: true, tmdbId: 2 });
     wire.summaries.set("movie:2", okRes(movieWire(2, { targets: [target("fr", 0, 1)] })));
-    const opened: { item: CoverageItem; skipPush?: boolean }[] = [];
-    const off = on(BusEvent.OpenMovie, (p) => opened.push(p as never));
 
     healFromCoverageEvent(ev("tmdb-2", "movie"));
     healFromCoverageEvent(ev("tmdb-2", "movie"));
     await window_();
 
-    // Once per window, from the FRESH row (the /subs + state/ids reads are
-    // openMovieDetail's own), and without a history push.
-    expect(opened).toHaveLength(1);
-    expect(opened[0]?.skipPush).toBe(true);
-    expect(opened[0]?.item.targets).toEqual([target("fr", 0, 1)]);
-    off();
+    // Once per window, and the FRESH row was already in the store when the
+    // handover happened — the refresher renders from it.
+    expect(coupled.map((c) => c.root)).toEqual([
+      { kind: "movie", numericID: 2, rootKey: "tmdb-2" },
+    ]);
+    expect(coupled[0]?.row?.targets).toEqual([target("fr", 0, 1)]);
   });
 
   it("a foreign detail open couples nothing", async () => {
     await load([seriesWire(1)], [movieWire(2)]);
     store.set("detailCtx", { movie: true, tmdbId: 2 });
     wire.summaries.set("series:1", okRes(seriesWire(1, { title: "X" })));
-    const pairRefreshes: number[] = [];
-    const opened: number[] = [];
-    const offA = on(BusEvent.RefreshSeriesDetail, () => pairRefreshes.push(1));
-    const offB = on(BusEvent.OpenMovie, () => opened.push(1));
 
     healFromCoverageEvent(ev("tvdb-1-s01e01"));
     await window_();
 
-    expect(pairRefreshes).toHaveLength(0);
-    expect(opened).toHaveLength(0);
-    offA();
-    offB();
+    expect(coupled).toHaveLength(0);
   });
 });
 

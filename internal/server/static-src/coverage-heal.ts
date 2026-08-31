@@ -4,14 +4,16 @@
 // The grain of the read matches the grain of the change: an event names one
 // series/movie root and the client pulls exactly that row. Full-pair
 // collection reads stay legal in exactly two places — transactions (task 9)
-// and the library route loader — and both run the reset rule here before
-// overwriting rows (the loader via BusEvent.CoverageOverwrite; transactions
-// call resetCoverageHeal directly).
+// and the library route loader — and both go through coverage.ts's
+// applyCoveragePair, which calls resetCoverageHeal before overwriting rows.
+//
+// Rows are written through coverage-store.ts, the leaf shared with coverage.ts;
+// this module never imports the other orchestrator, which is what keeps the
+// reset rule a direct call in one direction.
 
 import * as store from "./store.js";
-import { on, emit, BusEvent } from "./bus.js";
 import { coverageMovieSummaryRaw, coverageSeriesSummaryRaw } from "./wire/client.gen.js";
-import { applyHealedRow, coverageRow, libraryLoaded, removeCoverageRow } from "./coverage.js";
+import { applyHealedRow, libraryLoaded, removeCoverageRow } from "./coverage-store.js";
 import { registerReconcileTask } from "./status.js";
 import { DIRTY_ROOT_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
 import type { CoverageEvent } from "./wire/types.gen.js";
@@ -199,26 +201,28 @@ function applyOutcome(o: HealOutcome): void {
   markDirty(root);
 }
 
+type DetailRefresher = (root: CoverageRoot) => void;
+
+let refreshDetail: DetailRefresher = () => {
+  /* no view layer loaded (the login bundle) */
+};
+
+/** Composition-time wiring: the module that owns route refreshes (page-leg.ts)
+ *  declares how a root's own open detail is refreshed. Registration rather
+ *  than an import because that module sits ABOVE this one, so the dependency
+ *  points one way and nothing here reaches the view. Deliberately NOT cleared
+ *  by _resetHealForTest — it is wiring, not per-test state. */
+export function setDetailRefresher(fn: DetailRefresher): void {
+  refreshDetail = fn;
+}
+
 /** Detail coupling, once per window: a flushed root whose own detail is open
  *  refreshes that detail's reads (independent of the summary outcome — the
  *  detail's data rides different endpoints). */
 function runDetailCouplings(outcomes: HealOutcome[]): void {
   for (const { heal } of outcomes) {
-    if (!detailOpen(heal.root)) {
-      continue;
-    }
-    if (heal.root.kind === "series") {
-      // R1.2: a coverage event on an open series detail costs the refresh
-      // PAIR (episode coverage + history ids), never the arr-backed
-      // episodes read the transaction triple carries.
-      emit(BusEvent.RefreshSeriesDetail);
-    } else {
-      const row = coverageRow(heal.root.rootKey);
-      if (row) {
-        // Re-runs the movie detail's on-demand reads: /subs + one
-        // state/ids?type=movie read, rendering from the freshly healed row.
-        emit(BusEvent.OpenMovie, { item: row, skipPush: true });
-      }
+    if (detailOpen(heal.root)) {
+      refreshDetail(heal.root);
     }
   }
 }
@@ -282,10 +286,9 @@ export function onHealReset(fn: () => void): () => void {
   };
 }
 
-/** THE RESET RULE (A6), shared by every full-pair writer: abort in-flight
- *  per-root GETs and clear the pending window for rows about to be
- *  overwritten. The library route loader triggers it through
- *  BusEvent.CoverageOverwrite; task 9's transactions call it directly. */
+/** THE RESET RULE (A6): abort in-flight per-root GETs and clear the pending
+ *  window for rows about to be overwritten. Called by coverage.ts's
+ *  applyCoveragePair, which every full-pair writer goes through. */
 export function resetCoverageHeal(): void {
   for (const ctrl of inflight.values()) {
     ctrl.abort();
@@ -300,8 +303,6 @@ export function resetCoverageHeal(): void {
     fn();
   }
 }
-
-on(BusEvent.CoverageOverwrite, resetCoverageHeal);
 
 /** Test-only: abort/clear all coalescer state, callbacks included. */
 export function _resetHealForTest(): void {

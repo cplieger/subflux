@@ -97,6 +97,9 @@ vi.mock("./coverage.js", () => ({
   abortInFlightPairFetch: () => {
     cov.aborts += 1;
   },
+}));
+// The transaction seams live on the row-store leaf.
+vi.mock("./coverage-store.js", () => ({
   beginCoverageTransaction: vi.fn(),
   beginCoveredPairWrite: vi.fn(() => vi.fn()),
   registeredCollections: () => cov.registered,
