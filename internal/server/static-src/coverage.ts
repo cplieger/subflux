@@ -18,7 +18,7 @@ import { on, emit, BusEvent } from "./bus.js";
 import type { DetailConfig } from "./bus.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
 import type { SeriesItem, MovieItem } from "./wire/types.gen.js";
-import { applyScanButtonState } from "./detail-scan.js";
+import { registerScanButton } from "./detail-scan.js";
 import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
 import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
@@ -549,7 +549,7 @@ function coverageRowCells(item: CoverageItem): HTMLElement[] {
       el("span", { className: "btn-text" }, " Search"),
     ) as HTMLButtonElement;
     // Rows painted while a scan runs restore the disabled+spinner state.
-    applyScanButtonState(scanBtn);
+    registerScanButton(scanBtn);
     actionBtn = scanBtn;
   }
 

@@ -54,7 +54,7 @@ vi.mock("./bus.js", () => ({
 // derives the same thing from a per-test flag rather than answering a constant.
 const scanState = vi.hoisted(() => ({ running: false }));
 vi.mock("./detail-scan.js", () => ({
-  applyScanButtonState: (btn: HTMLButtonElement) => {
+  registerScanButton: (btn: HTMLButtonElement) => {
     if (scanState.running) {
       btn.disabled = true;
     }

@@ -86,7 +86,7 @@ vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: vi.fn(),
   triggerSeasonScan: vi.fn(),
   triggerMovieScan: vi.fn(),
-  applyScanButtonState: () => undefined,
+  registerScanButton: () => undefined,
 }));
 // Mutable store state: the getters below read it, so a test can set the admin
 // flag or the ignored-codec set without re-mocking the module.

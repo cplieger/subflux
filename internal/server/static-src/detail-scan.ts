@@ -107,19 +107,55 @@ function runningMap(): RunningScansByScope {
   return store.get("runningScansByScope");
 }
 
-/** Apply the current store state to a single freshly-created scan button.
- *  Render paths call this at button creation so rows painted mid-scan show
- *  the running state without waiting for the next store change. */
-export function applyScanButtonState(btn: HTMLButtonElement): void {
+// The mounted-button registry (R8.5): render paths register each scan button
+// at creation, and the store effect repaints THESE — never a document-wide
+// query per publish. There is no unmount hook, so removal is a prune of
+// disconnected buttons: once per registration burst (a microtask after the
+// render pass, when the built tree is in the DOM and any discarded template
+// buttons are not), and again on every publish as the belt.
+const scanButtons = new Set<HTMLButtonElement>();
+let prunePending = false;
+
+function pruneDisconnected(): void {
+  for (const btn of scanButtons) {
+    if (!btn.isConnected) {
+      scanButtons.delete(btn);
+    }
+  }
+}
+
+function schedulePrune(): void {
+  if (prunePending) {
+    return;
+  }
+  prunePending = true;
+  queueMicrotask(() => {
+    prunePending = false;
+    pruneDisconnected();
+  });
+}
+
+/** Register a freshly created scan button: it joins the store-driven registry
+ *  and gets the current state painted, so rows painted mid-scan show the
+ *  running state without waiting for the next store change. */
+export function registerScanButton(btn: HTMLButtonElement): void {
+  scanButtons.add(btn);
+  schedulePrune();
   patchScanButton(btn, runningMap());
 }
 
-/** Sync every annotated scan button in the document with the shared store. */
+/** Registry population, for the registry-hygiene tests. */
+export function _scanButtonCountForTest(): number {
+  return scanButtons.size;
+}
+
+/** Sync every registered scan button with the shared store. */
 function syncScanButtons(): void {
+  pruneDisconnected();
   const running = runningMap();
-  document.querySelectorAll<HTMLButtonElement>("button[data-scan-scope]").forEach((btn) => {
+  for (const btn of scanButtons) {
     patchScanButton(btn, running);
-  });
+  }
 }
 
 /** Install the reactive effect that repaints scan buttons whenever the

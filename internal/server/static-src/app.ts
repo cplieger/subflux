@@ -7,7 +7,7 @@ import * as store from "./store.js";
 initActions();
 import * as events from "./events.js";
 import * as theme from "./theme.js";
-import { initStatusPopover, initStatusReconcile, updateLiveTimers } from "./status.js";
+import { initStatusPopover, initStatusReconcile } from "./status.js";
 import { initScanButtons } from "./detail-scan.js";
 import { filterCoverage } from "./coverage.js";
 import { closeSearchPopup } from "./search.js";
@@ -22,7 +22,7 @@ import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { configParsed } from "./wire/client.gen.js";
-import { subscribeToActions, registerCleanup } from "@cplieger/actions";
+import { subscribeToActions } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 
 // Initialize store.
@@ -159,15 +159,9 @@ window.addEventListener("popstate", () => {
 //     the convergence cases no event carries;
 //   - a 5s poll ONLY while the stream is DOWN (events.ts drives
 //     status.setStatusDegraded; pause-when-hidden built into pollAction).
-//
-// updateLiveTimers is a UI tick (formats running durations on screen).
-// It doesn't dispatch any action, so pollAction can't help — raw
-// setInterval + manual cleanup is correct here.
+// The live-timer tick lives in status.ts: it runs only while the status
+// popup is open (the popover's open/close hooks own it).
 initStatusReconcile();
-const liveTimerId = setInterval(updateLiveTimers, 1000);
-registerCleanup(() => {
-  clearInterval(liveTimerId);
-});
 
 // Helper: check unconfigured state (used by dialog event handlers).
 function isUnconfigured(): boolean {

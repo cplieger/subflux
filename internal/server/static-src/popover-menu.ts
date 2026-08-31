@@ -37,6 +37,9 @@ interface MenuPopoverOptions {
   haspopup?: "menu" | true;
   /** Rebuild the panel's content each time it opens. */
   onOpen?: () => void;
+  /** Fired when the panel closes, whatever dismissed it (toggle, outside
+   *  click, Escape). */
+  onClose?: () => void;
 }
 
 /**
@@ -99,6 +102,7 @@ export function createMenuPopover(
       // against the real height, per the popover contract for content changes.
       controller.reposition();
     },
+    ...(opts.onClose !== undefined ? { onClose: opts.onClose } : {}),
   });
 
   // Positioning is JS-driven, so the desktop/mobile switch is a matchMedia

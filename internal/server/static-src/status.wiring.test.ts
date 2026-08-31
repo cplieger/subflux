@@ -74,12 +74,13 @@ vi.mock("@cplieger/actions", () => ({
 }));
 
 // The popover primitive, with the options object status.ts hands it kept so a
-// test can fire `onOpen` the way a user opening the panel does.
+// test can fire `onOpen`/`onClose` the way a user opening and closing the
+// panel does.
 const popover = vi.hoisted(() => {
   const state = {
     anchor: null as HTMLElement | null,
     panel: null as HTMLElement | null,
-    opts: {} as { onOpen?: () => void },
+    opts: {} as { onOpen?: () => void; onClose?: () => void },
     isOpen: true,
     toggles: 0,
     repositions: 0,
@@ -96,7 +97,11 @@ const popover = vi.hoisted(() => {
 });
 
 vi.mock("./popover-menu.js", () => ({
-  createMenuPopover: (anchor: HTMLElement, panel: HTMLElement, opts: { onOpen?: () => void }) => {
+  createMenuPopover: (
+    anchor: HTMLElement,
+    panel: HTMLElement,
+    opts: { onOpen?: () => void; onClose?: () => void },
+  ) => {
     popover.anchor = anchor;
     popover.panel = panel;
     popover.opts = opts;
@@ -242,6 +247,8 @@ interface Harness {
   store: typeof StoreModule;
   /** Fire the popover's open hook, the way the primitive does on open. */
   openPanel: () => void;
+  /** Fire the popover's close hook, the way the primitive does on close. */
+  closePanel: () => void;
   /** Run one real status poll with the wire under the test's control. */
   poll: (w?: PollWire) => Promise<void>;
 }
@@ -297,7 +304,12 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
     throw new Error("status.poll run not captured");
   }
   const openPanel = (): void => {
+    popover.isOpen = true;
     popover.opts.onOpen?.();
+  };
+  const closePanel = (): void => {
+    popover.isOpen = false;
+    popover.opts.onClose?.();
   };
   const poll = async (w: PollWire = {}): Promise<void> => {
     wire.alerts = { ok: true, status: 200, data: w.alerts ?? [] };
@@ -305,7 +317,7 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
     wire.stats = w.stats ?? null;
     await run(undefined, w.signal ?? new AbortController().signal);
   };
-  return { status, store, openPanel, poll };
+  return { status, store, openPanel, closePanel, poll };
 }
 
 function skeletonRows(): NodeListOf<Element> {
@@ -423,6 +435,62 @@ describe("status: popup anti-flicker paint", () => {
     // The commit renders the LATEST snapshot, not the one queued first.
     expect(document.querySelector('[data-act-id="b1"]')).not.toBeNull();
     expect(document.querySelector('[data-act-id="a1"]')).toBeNull();
+  });
+});
+
+describe("status: live timers tick only while the popup is open", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("opening starts the 1s tick, closing stops it", async () => {
+    const h = await boot();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T10:00:30Z"));
+    await h.poll({ activities: [entry({ id: "lt1", started_at: "2026-07-19T10:00:00Z" })] });
+    const timer = (): string =>
+      document.querySelector('#statusPopup [data-act-id="lt1"] .live-timer')?.textContent ?? "";
+    expect(timer()).toBe(" \u00B7 30s");
+
+    // Panel never opened: the clock advances, the row stays frozen — a
+    // closed popup costs zero timer work.
+    vi.setSystemTime(new Date("2026-07-19T10:01:30Z"));
+    vi.advanceTimersByTime(5_000);
+    expect(timer()).toBe(" \u00B7 30s");
+
+    h.openPanel();
+    vi.setSystemTime(new Date("2026-07-19T10:02:09Z"));
+    vi.advanceTimersByTime(1_000); // the tick fires at 10:02:10
+    expect(timer()).toBe(" \u00B7 2m 10s");
+
+    h.closePanel();
+    vi.setSystemTime(new Date("2026-07-19T10:05:00Z"));
+    vi.advanceTimersByTime(10_000);
+    expect(timer()).toBe(" \u00B7 2m 10s");
+  });
+
+  it("the tick re-renders only rows inside the popup", async () => {
+    const h = await boot();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T10:00:30Z"));
+    await h.poll({ activities: [entry({ id: "in1", started_at: "2026-07-19T10:00:00Z" })] });
+
+    // A stray timer row OUTSIDE the popup: nothing ships one, and the
+    // popup-rooted scan must not touch it either way.
+    const stray = document.createElement("span");
+    stray.className = "live-timer";
+    stray.setAttribute("data-started", "2026-07-19T10:00:00Z");
+    stray.textContent = " \u00B7 30s";
+    document.body.appendChild(stray);
+
+    h.openPanel();
+    vi.setSystemTime(new Date("2026-07-19T10:02:09Z"));
+    vi.advanceTimersByTime(1_000); // the tick fires at 10:02:10
+
+    expect(
+      document.querySelector('#statusPopup [data-act-id="in1"] .live-timer')?.textContent,
+    ).toBe(" \u00B7 2m 10s");
+    expect(stray.textContent).toBe(" \u00B7 30s");
   });
 });
 

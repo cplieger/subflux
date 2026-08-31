@@ -28,7 +28,7 @@ import {
   triggerSeriesScan,
   triggerSeasonScan,
   triggerMovieScan,
-  applyScanButtonState,
+  registerScanButton,
 } from "./detail-scan.js";
 import { seasonScopeKey } from "./scan-scope.js";
 import type {
@@ -606,7 +606,7 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
     el("span", { className: "btn-text" }, " Search"),
   ) as HTMLButtonElement;
   // Rows painted while a scan runs restore the disabled+spinner state.
-  applyScanButtonState(searchBtn);
+  registerScanButton(searchBtn);
   const histBtn = hasHistory
     ? el(
         "button",

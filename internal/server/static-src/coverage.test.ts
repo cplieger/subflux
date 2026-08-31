@@ -69,8 +69,8 @@ vi.mock("./bus.js", () => ({
   },
 }));
 // Mocked whole: the real module registers apiActions at import time and pulls
-// in the status.ts graph. coverage.ts only consumes applyScanButtonState.
-vi.mock("./detail-scan.js", () => ({ applyScanButtonState: () => undefined }));
+// in the status.ts graph. coverage.ts only consumes registerScanButton.
+vi.mock("./detail-scan.js", () => ({ registerScanButton: () => undefined }));
 // Mutable store state so a test can flip the admin / unconfigured flags without
 // re-mocking, and assert what coverage.ts wrote.
 const storeState = vi.hoisted(() => ({

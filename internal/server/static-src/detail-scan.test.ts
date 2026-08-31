@@ -15,8 +15,9 @@ import {
   triggerSeriesScan,
   triggerSeasonScan,
   triggerMovieScan,
-  applyScanButtonState,
+  registerScanButton,
   initScanButtons,
+  _scanButtonCountForTest,
 } from "./detail-scan.js";
 import { seriesScopeKey, seasonScopeKey, movieScopeKey } from "./scan-scope.js";
 import type { RunningScan } from "./scan-scope.js";
@@ -82,8 +83,9 @@ function movie(id: number): MovieDetail {
   return { id, title: "Film" } as MovieDetail;
 }
 
-/** A scan button as the render paths build it: the scope key in the dataset
- *  and an icon slot for the spinner to replace. */
+/** A scan button as the render paths build it: the scope key in the dataset,
+ *  an icon slot for the spinner to replace, mounted and REGISTERED the way
+ *  every render path registers its buttons at creation. */
 function scanButton(scopeKey: string): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.dataset["scanScope"] = scopeKey;
@@ -91,6 +93,7 @@ function scanButton(scopeKey: string): HTMLButtonElement {
   slot.className = "icon icon-search";
   btn.appendChild(slot);
   document.body.appendChild(btn);
+  registerScanButton(btn);
   return btn;
 }
 
@@ -211,11 +214,9 @@ describe("optimistic scope marking", () => {
   });
 });
 
-describe("applyScanButtonState", () => {
+describe("registerScanButton", () => {
   it("leaves a button enabled when no scan covers its scope", () => {
     const btn = scanButton(seriesScopeKey(42));
-
-    applyScanButtonState(btn);
 
     expect(btn.disabled).toBe(false);
     expect(btn.hasAttribute("aria-busy")).toBe(false);
@@ -224,9 +225,8 @@ describe("applyScanButtonState", () => {
 
   it("disables the button and swaps the icon for a spinner while its scope runs", () => {
     running([[seriesScopeKey(42), { activityId: "a", cancellable: true }]]);
-    const btn = scanButton(seriesScopeKey(42));
 
-    applyScanButtonState(btn);
+    const btn = scanButton(seriesScopeKey(42));
 
     expect(btn.disabled).toBe(true);
     expect(btn.getAttribute("aria-busy")).toBe("true");
@@ -236,18 +236,16 @@ describe("applyScanButtonState", () => {
 
   it("ignores a scan on a different scope", () => {
     running([[seasonScopeKey(42, 1), { activityId: "a", cancellable: true }]]);
-    const btn = scanButton(seriesScopeKey(42));
 
-    applyScanButtonState(btn);
+    const btn = scanButton(seriesScopeKey(42));
 
     expect(btn.disabled).toBe(false);
   });
 
   it("never marks a button that carries no scope", () => {
     running([["", { activityId: "a", cancellable: true }]]);
-    const btn = scanButton("");
 
-    applyScanButtonState(btn);
+    const btn = scanButton("");
 
     expect(btn.disabled).toBe(false);
   });
@@ -289,5 +287,62 @@ describe("initScanButtons", () => {
     running([[seriesScopeKey(42), { activityId: "a", cancellable: true }]]);
 
     expect(other.disabled).toBe(false);
+  });
+});
+
+describe("the mounted-button registry (R8.5)", () => {
+  /** Resolves after the registration burst's coalesced prune microtask. */
+  const microtask = (): Promise<void> => new Promise((r) => queueMicrotask(r));
+
+  it("repaints registered buttons without a document-wide scan", () => {
+    const btn = scanButton(seriesScopeKey(42));
+    initScanButtons();
+    const qsa = vi.spyOn(document, "querySelectorAll");
+
+    running([[seriesScopeKey(42), { activityId: "a", cancellable: true }]]);
+
+    expect(btn.disabled).toBe(true);
+    expect(qsa).not.toHaveBeenCalled();
+    qsa.mockRestore();
+  });
+
+  it("an unregistered annotated button is not managed", () => {
+    // The registry is the population: a data-scan-scope button nothing
+    // registered (the old document scan would have found it) stays untouched.
+    const btn = document.createElement("button");
+    btn.dataset["scanScope"] = seriesScopeKey(42);
+    const slot = document.createElement("span");
+    slot.className = "icon icon-search";
+    btn.appendChild(slot);
+    document.body.appendChild(btn);
+    initScanButtons();
+
+    running([[seriesScopeKey(42), { activityId: "a", cancellable: true }]]);
+
+    expect(btn.disabled).toBe(false);
+    expect(btn.querySelector(".spinner")).toBeNull();
+  });
+
+  it("a publish drops unmounted buttons from the registry", async () => {
+    const a = scanButton(seriesScopeKey(1));
+    scanButton(movieScopeKey(2));
+    initScanButtons();
+    await microtask();
+    expect(_scanButtonCountForTest()).toBe(2);
+
+    a.remove();
+    running([]);
+
+    expect(_scanButtonCountForTest()).toBe(1);
+  });
+
+  it("a registration burst prunes disconnected buttons without waiting for a publish", async () => {
+    const a = scanButton(seriesScopeKey(1));
+    a.remove();
+    scanButton(seriesScopeKey(3));
+
+    await microtask();
+
+    expect(_scanButtonCountForTest()).toBe(1);
   });
 });
