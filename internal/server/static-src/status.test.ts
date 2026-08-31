@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
+import type * as ActionsModule from "@cplieger/actions";
+
 // Capture every action's dispatch mock, run() implementation, and full
 // definition by name so tests can drive and assert specific actions
 // (activity.cancel, activity.dismiss, status.poll, …). vi.hoisted because
@@ -43,12 +46,16 @@ vi.mock("./api-client.js", () => ({
   fillPath: (template: string, params: Record<string, string | number>): string =>
     template.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(String(params[k]))),
 }));
-vi.mock("@cplieger/actions", () => ({
+vi.mock("@cplieger/actions", async (importOriginal) => ({
   apiAction: (cfg: { name: string }) => registerAction(cfg),
   defineAction: (cfg: { name: string }) => registerAction(cfg),
   retryNetwork: (fn: unknown) => fn,
   RETRY_STANDARD: {},
   registerCleanup: () => undefined,
+  // The REAL pollAction: setStatusDegraded's 5s floor is pinned against the
+  // genuine cadence primitive (fake timers drive it), with only the action's
+  // dispatch captured above.
+  pollAction: (await importOriginal<typeof ActionsModule>()).pollAction,
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./wire/decoders.gen.js", () => ({
@@ -79,7 +86,7 @@ vi.mock("./popover-menu.js", () => ({
 
 import * as store from "./store.js";
 import { buildActivityItem, updateLiveTimers } from "./status.js";
-import { STATUS_RECONCILE_MS } from "./constants.js";
+import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
 import type * as BusModule from "./bus.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
@@ -614,9 +621,22 @@ describe("status: unreachable server", () => {
     expect(statusLabelText()).toBe("Healthy");
   });
 
-  it("going offline abandons the poll before the activity fetch", async () => {
-    await h.runPollWith({ alerts: { ok: false, status: 0 } });
-    expect(wire.listActivity).not.toHaveBeenCalled();
+  it("offline gates result handling, not issuance: legs fire, results are discarded", async () => {
+    // The legs go out in one concurrent burst, so the activity fetch is
+    // ISSUED alongside the alerts probe…
+    const published = vi.fn();
+    const off = store.subscribe("runningScansByScope", published);
+    await h.runPollWith({
+      alerts: { ok: false, status: 0 },
+      activities: [entry({ id: "off1", kind: "series", media_id: 1, cancellable: true })],
+    });
+    off();
+
+    expect(wire.listActivity).toHaveBeenCalled();
+    // …but the offline verdict discards its RESULT: nothing publishes, and
+    // the button shows offline rather than the fetched running scan.
+    expect(published).not.toHaveBeenCalled();
+    expect(statusBtnEl().dataset["status"]).toBe("offline");
   });
 
   it("a poll aborted mid-flight does not paint the offline state", async () => {
@@ -1324,5 +1344,257 @@ describe("status: reconcile tick", () => {
 
     vi.advanceTimersByTime(3 * STATUS_RECONCILE_MS);
     expect(task).not.toHaveBeenCalled();
+  });
+});
+
+// --- Event-fed store suites (E2) --------------------------------------------
+//
+// These drive the exported appliers directly (events.ts routes decoded SSE
+// payloads into them) and assert the status surfaces repaint with the poll
+// SILENT — no wire call is armed or expected. Idempotent re-application is
+// pinned through observables a real repaint would move: the status icon is
+// rebuilt by replaceChildren on every render, so node identity survives only
+// a no-op, and the running-scans store publish is watched via subscribe.
+
+describe("status: event-fed store", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("an activity upsert flips the chip and publishes running scans, poll silent", () => {
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "ev1", kind: "series", media_id: 42, cancellable: true }),
+    });
+
+    expect(statusBtnEl().dataset["status"]).toBe("scanning");
+    expect(statusLabelText()).toBe("Searching");
+    const scans = h.store.get("runningScansByScope");
+    expect([...scans.values()]).toEqual([{ activityId: "ev1", cancellable: true }]);
+    expect(wire.listActivity).not.toHaveBeenCalled();
+    expect(wire.listAlertsRaw).not.toHaveBeenCalled();
+  });
+
+  it("an activity remove drops the entry; re-applying the remove is a no-op", () => {
+    const e = entry({ id: "ev2", kind: "movie", media_id: 7, cancellable: true });
+    h.status.applyActivityEvent({ op: "upsert", entry: e });
+    expect(statusBtnEl().dataset["status"]).toBe("scanning");
+
+    h.status.applyActivityEvent({ op: "remove", entry: e });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+    expect(h.store.get("runningScansByScope").size).toBe(0);
+
+    const iconNode = statusIconEl().firstElementChild;
+    expect(iconNode).not.toBeNull();
+    h.status.applyActivityEvent({ op: "remove", entry: e });
+    expect(statusIconEl().firstElementChild).toBe(iconNode);
+  });
+
+  it("a replayed activity upsert mutates nothing the second time", () => {
+    // A done entry renders the idle dot: icon node identity is the repaint
+    // detector (every real render rebuilds it via replaceChildren).
+    const e = entry({ id: "ev3", done: true, ended_at: "2026-08-30T10:01:00Z" });
+    h.status.applyActivityEvent({ op: "upsert", entry: e });
+
+    const published = vi.fn();
+    const off = store.subscribe("runningScansByScope", published);
+    const iconNode = statusIconEl().firstElementChild;
+    expect(iconNode).not.toBeNull();
+
+    // A fresh but value-identical entry object, as a decoded replay is.
+    h.status.applyActivityEvent({ op: "upsert", entry: entry({ ...e }) });
+    off();
+
+    expect(published).not.toHaveBeenCalled();
+    expect(statusIconEl().firstElementChild).toBe(iconNode);
+  });
+
+  it("an activity upsert carrying a CHANGE does repaint", () => {
+    const e = entry({ id: "ev4", kind: "series", media_id: 3, cancellable: true });
+    h.status.applyActivityEvent({ op: "upsert", entry: e });
+    expect(statusBtnEl().dataset["status"]).toBe("scanning");
+
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ ...e, done: true, ended_at: "2026-08-30T10:01:00Z" }),
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+    expect(h.store.get("runningScansByScope").size).toBe(0);
+  });
+
+  it("an alert raise flips the chip to warning and a dismiss restores it, event-fresh", () => {
+    h.status.applyAlertEvent({ op: "raise", alert: alertEntry({ id: 5 }) });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+    expect(statusLabelText()).toBe("Warning");
+    expect(wire.listAlertsRaw).not.toHaveBeenCalled();
+
+    h.status.applyAlertEvent({ op: "dismiss", alert: alertEntry({ id: 5 }) });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+  });
+
+  it("a replayed alert raise mutates nothing the second time", () => {
+    h.status.applyAlertEvent({ op: "raise", alert: alertEntry({ id: 6 }) });
+    const iconNode = statusIconEl().firstElementChild;
+    expect(iconNode).not.toBeNull();
+
+    h.status.applyAlertEvent({ op: "raise", alert: alertEntry({ id: 6 }) });
+    expect(statusIconEl().firstElementChild).toBe(iconNode);
+  });
+
+  it("a dismiss for an alert the store never held renders nothing", () => {
+    h.status.applyAlertEvent({ op: "dismiss", alert: alertEntry({ id: 99 }) });
+    expect(statusBtnEl().dataset["status"]).toBeUndefined();
+  });
+
+  it("a provider raise turns the chip event-fresh; a clear restores it", () => {
+    h.status.applyProviderEvent({
+      op: "raise",
+      entry: {
+        provider: "opensubtitles",
+        status: { timed_out: true, recent_failures: 3, threshold: 5 },
+      },
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+    expect(statusLabelText()).toBe("Warning");
+    expect(wire.providerTimeouts).not.toHaveBeenCalled();
+
+    // A clear carries the post-clear snapshot, the same shape the poll
+    // serves for a healthy provider.
+    h.status.applyProviderEvent({
+      op: "clear",
+      entry: {
+        provider: "opensubtitles",
+        status: { timed_out: false, recent_failures: 0, threshold: 5 },
+      },
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+  });
+
+  it("a replayed provider raise mutates nothing the second time", () => {
+    h.status.applyProviderEvent({
+      op: "raise",
+      entry: { provider: "subdl", status: { timed_out: true, recent_failures: 4, threshold: 5 } },
+    });
+    const iconNode = statusIconEl().firstElementChild;
+    expect(iconNode).not.toBeNull();
+
+    h.status.applyProviderEvent({
+      op: "raise",
+      entry: { provider: "subdl", status: { timed_out: true, recent_failures: 4, threshold: 5 } },
+    });
+    expect(statusIconEl().firstElementChild).toBe(iconNode);
+  });
+
+  it("events repaint an open popup", () => {
+    h.status.initStatusPopover();
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "pv1", detail: "Scanning X" }),
+    });
+    expect(document.querySelector('[data-act-id="pv1"]')).not.toBeNull();
+  });
+
+  it("a terminal activity event toasts once seeded, and a replay does not re-toast", async () => {
+    await h.runPoll([entry({ id: "t9" })]);
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "t9", done: true, detail: "event done" }),
+    });
+    expect(h.notifyM.success).toHaveBeenCalledExactlyOnceWith("event done");
+
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "t9", done: true, detail: "event done" }),
+    });
+    expect(h.notifyM.success).toHaveBeenCalledTimes(1);
+  });
+
+  it("a terminal event before the first poll seeds does not toast", () => {
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "pre1", done: true, detail: "too early" }),
+    });
+    expect(h.notifyM.success).not.toHaveBeenCalled();
+  });
+
+  it("the reconcile poll replaces event-fed state wholesale", async () => {
+    // An expired-but-undismissed alert (TTL expiry emits no event) vanishes
+    // at the next full fetch: the poll is the convergence authority.
+    h.status.applyAlertEvent({ op: "raise", alert: alertEntry({ id: 7 }) });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+
+    await h.runPollWith({ alerts: { ok: true, status: 200, data: [] } });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+  });
+});
+
+describe("status: the poll floor (E2)", () => {
+  let h: PollHarness;
+
+  function setDocumentHidden(hidden: boolean): void {
+    Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    h = await freshPollHarness();
+  });
+
+  afterEach(() => {
+    h.status.setStatusDegraded(false);
+    setDocumentHidden(false);
+    vi.useRealTimers();
+  });
+
+  it("steady-state while connected: the reconcile tick costs one poll per interval", () => {
+    h.status.initStatusReconcile();
+    const dispatch = dispatchers.get("status.poll");
+
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS - 1);
+    expect(dispatch).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("degraded mode polls on the 5s cadence and recovery stops it", async () => {
+    const dispatch = dispatchers.get("status.poll");
+    h.status.setStatusDegraded(true);
+    // Entering the down period costs one immediate catch-up fetch…
+    expect(dispatch).toHaveBeenCalledTimes(1);
+
+    // …then the 5s cadence.
+    await vi.advanceTimersByTimeAsync(SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(3);
+
+    // Reconnect: events own status again, the floor poll stops.
+    h.status.setStatusDegraded(false);
+    await vi.advanceTimersByTimeAsync(5 * SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(3);
+  });
+
+  it("re-entering the same degraded state does not stack pollers", async () => {
+    const dispatch = dispatchers.get("status.poll");
+    h.status.setStatusDegraded(true);
+    // Every ladder re-entry funnels through here; only the first counts.
+    h.status.setStatusDegraded(true);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("a hidden tab issues ZERO status polls, degraded mode included", () => {
+    setDocumentHidden(true);
+    h.status.initStatusReconcile();
+    h.status.setStatusDegraded(true);
+
+    vi.advanceTimersByTime(10 * STATUS_RECONCILE_MS);
+    expect(dispatchers.get("status.poll")).not.toHaveBeenCalled();
   });
 });

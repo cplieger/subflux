@@ -23,7 +23,14 @@
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { healFromCoverageEvent, resetCoverageHeal, subsumeDirtyRoots } from "./coverage-heal.js";
-import { pollStatus, abortPoll } from "./status.js";
+import {
+  abortPoll,
+  applyActivityEvent,
+  applyAlertEvent,
+  applyProviderEvent,
+  pollStatus,
+  setStatusDegraded,
+} from "./status.js";
 import {
   applyCoveragePair,
   abortInFlightPairFetch,
@@ -47,17 +54,23 @@ import {
 import { PATH_EVENTS, coverageMoviesRaw, coverageSeriesRaw } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import {
+  decodeActivityEvent,
+  decodeAlertEvent,
   decodeCoverageEvent,
   decodeEpochEvent,
   decodeNotifyEvent,
+  decodeProviderEvent,
   decodeScanEvent,
   decodeSyncDoneEvent,
 } from "./wire/decoders.gen.js";
 import type {
+  ActivityEvent,
+  AlertEvent,
   CoverageEvent,
   EpochEvent,
   EventData,
   NotifyEvent,
+  ProviderEvent,
   ScanEvent,
   SyncDoneEvent,
 } from "./wire/types.gen.js";
@@ -87,7 +100,15 @@ function decodeSSE<T extends EventData>(e: MessageEvent, decoder: Decoder<T>): T
 // at hold time (holdQueue) — so a deferred application can tell an old-boot
 // frame from a current one.
 interface BufferedFrame {
-  type: "coverage" | "notify" | "scan:start" | "scan:done" | "sync:done";
+  type:
+    | "coverage"
+    | "notify"
+    | "scan:start"
+    | "scan:done"
+    | "sync:done"
+    | "activity"
+    | "alert"
+    | "provider";
   payload: EventData;
   id: number | null;
   bootID: string | null;
@@ -213,6 +234,9 @@ export function connect(): void {
   eventSource = new EventSource(url);
 
   eventSource.addEventListener("open", () => {
+    // The stream is live again: events own status from here (the epoch's
+    // transaction runs the one status fetch), so the degraded 5s poll stops.
+    setStatusDegraded(false);
     // The attempt counter resets ONLY on a non-latched open and on COMMIT;
     // a latched ladder keeps climbing so a persistent outage costs at most
     // one transaction per SSE_MAX_RECONNECT_MS.
@@ -273,6 +297,24 @@ export function connect(): void {
     const payload = decodeSSE(e, decodeSyncDoneEvent);
     if (payload) {
       routeFrame("sync:done", payload, e);
+    }
+  });
+  eventSource.addEventListener("activity", (e: MessageEvent) => {
+    const payload = decodeSSE(e, decodeActivityEvent);
+    if (payload) {
+      routeFrame("activity", payload, e);
+    }
+  });
+  eventSource.addEventListener("alert", (e: MessageEvent) => {
+    const payload = decodeSSE(e, decodeAlertEvent);
+    if (payload) {
+      routeFrame("alert", payload, e);
+    }
+  });
+  eventSource.addEventListener("provider", (e: MessageEvent) => {
+    const payload = decodeSSE(e, decodeProviderEvent);
+    if (payload) {
+      routeFrame("provider", payload, e);
     }
   });
 
@@ -341,6 +383,10 @@ function teardownConnection(): void {
 }
 
 function scheduleReconnect(): void {
+  // Entering (or already in) the reconnect ladder: the stream is DOWN, so
+  // status rides the 5s poll until an open. Every down period funnels
+  // through here — refused connects, post-CLOSED backoff, latched teardowns.
+  setStatusDegraded(true);
   if (reconnectTimer) {
     return;
   }
@@ -368,6 +414,11 @@ function disconnect(): void {
   }
   // reconnectAttempt deliberately NOT reset here: it resets only on a
   // non-latched open and on COMMIT.
+  //
+  // A deliberate teardown is not DOWN: no ladder is left running (cancelled
+  // just above), the tab is hidden or unloading, and a hidden tab issues
+  // zero status polls. Reconnect-on-visible re-decides the state.
+  setStatusDegraded(false);
   abortPoll();
 }
 
@@ -419,8 +470,7 @@ function showNotifyToast(payload: NotifyEvent): void {
   }
 }
 
-/** THE REPLAY TABLE, exhaustive over the union as it exists now (task 10's
- *  status variants slot in as rows):
+/** THE REPLAY TABLE, exhaustive over the union:
  *  - coverage re-applies through the A6 coalescer (idempotent — the heal
  *    fetches current truth);
  *  - notify dedupes by (boot_id, frame_id);
@@ -428,7 +478,8 @@ function showNotifyToast(payload: NotifyEvent): void {
  *  - scan:done re-applies STATE (status poll + page refresh, both
  *    idempotent); its toast half lives in the status poll's transition
  *    detector, deduped there by activity id;
- *  - activity / alert / provider re-apply when task 10 adds them;
+ *  - activity / alert / provider re-apply through the status store's keyed
+ *    idempotent appliers (a re-applied delta mutates nothing);
  *  - sync:done re-applies, idempotent per job_id (the settlement registry
  *    keeps each job's terminal, so a replayed frame settles nothing twice);
  *  - epoch is never replayed (no id, handled before this table).
@@ -458,6 +509,15 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
       void pollStatus();
       emit(BusEvent.DataInvalidate);
       break;
+    case "activity":
+      applyActivityEvent(f.payload as ActivityEvent);
+      break;
+    case "alert":
+      applyAlertEvent(f.payload as AlertEvent);
+      break;
+    case "provider":
+      applyProviderEvent(f.payload as ProviderEvent);
+      break;
     case "sync:done":
       syncDoneFromEvent(f.payload as SyncDoneEvent);
       break;
@@ -472,8 +532,8 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
  *  settlement (a restart drops the server's job registry, so a held
  *  settlement is this job's only delivery), deduped in the OLD namespace.
  *  State-bearing frames (coverage, the scan:* state halves and scan:done's
- *  toast, and task 10's activity/alert/provider) are SKIPPED: the new
- *  transaction's legs and status fetch are strictly newer authority. No
+ *  toast, and the activity/alert/provider status deltas) are SKIPPED: the
+ *  new transaction's legs and status fetch are strictly newer authority. No
  *  counter advancement — old-boot ids never touch the new boot's counters. */
 function applyOldBootFrame(f: BufferedFrame): void {
   if (f.type === "notify" && dedupeToast(f)) {

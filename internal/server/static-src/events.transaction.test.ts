@@ -52,6 +52,10 @@ vi.mock("./status.js", () => ({
     seq.log.push("pollStatus");
   },
   abortPoll: vi.fn(),
+  setStatusDegraded: vi.fn(),
+  applyActivityEvent: vi.fn(),
+  applyAlertEvent: vi.fn(),
+  applyProviderEvent: vi.fn(),
 }));
 
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));

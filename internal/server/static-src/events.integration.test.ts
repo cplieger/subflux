@@ -25,6 +25,10 @@ vi.mock("./status.js", () => ({
     status.polls += 1;
   },
   abortPoll: vi.fn(),
+  setStatusDegraded: vi.fn(),
+  applyActivityEvent: vi.fn(),
+  applyAlertEvent: vi.fn(),
+  applyProviderEvent: vi.fn(),
   registerReconcileTask: (fn: () => void) => {
     status.reconcileTasks.push(fn);
     return () => undefined;

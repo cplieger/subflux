@@ -7,7 +7,7 @@ import * as store from "./store.js";
 initActions();
 import * as events from "./events.js";
 import * as theme from "./theme.js";
-import { initStatusPopover, pollStatusAction, updateLiveTimers } from "./status.js";
+import { initStatusPopover, initStatusReconcile, updateLiveTimers } from "./status.js";
 import { initScanButtons } from "./detail-scan.js";
 import { filterCoverage } from "./coverage.js";
 import { closeSearchPopup } from "./search.js";
@@ -21,9 +21,8 @@ import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { configParsed } from "./wire/client.gen.js";
-import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
+import { subscribeToActions, registerCleanup } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
-import { STATUS_POLL_MS } from "./constants.js";
 
 // Initialize store.
 store.batch(() => {
@@ -146,20 +145,19 @@ window.addEventListener("popstate", () => {
   });
 });
 
-// Background polls. The status poll uses pollAction which adds:
-//   - pause-when-hidden: saves battery + server load while the tab is
-//     in the background. Resume on visibilitychange.
-//   - refresh-on-focus: instant freshness when the user returns to the
-//     tab — alerts / activities / providers are repainted immediately.
-//   - auto cleanup: pollAction registers its own cleanup hook for
-//     beforeunload drain (no manual clearInterval needed).
+// Background cadences. Status is EVENT-DRIVEN while the SSE stream is up
+// (the server's status deltas feed the status store), and the poll becomes
+// a floor under it (E2):
+//   - ONE fetch at connect/boot — the transaction's status leg (events.ts);
+//   - a 60s reconcile tick while CONNECTED (skipped while hidden) owning
+//     the convergence cases no event carries;
+//   - a 5s poll ONLY while the stream is DOWN (events.ts drives
+//     status.setStatusDegraded; pause-when-hidden built into pollAction).
 //
 // updateLiveTimers is a UI tick (formats running durations on screen).
 // It doesn't dispatch any action, so pollAction can't help — raw
 // setInterval + manual cleanup is correct here.
-pollAction(pollStatusAction, undefined, {
-  interval: STATUS_POLL_MS,
-});
+initStatusReconcile();
 const liveTimerId = setInterval(updateLiveTimers, 1000);
 registerCleanup(() => {
   clearInterval(liveTimerId);

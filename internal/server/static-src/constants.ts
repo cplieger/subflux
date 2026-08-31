@@ -1,6 +1,9 @@
 // Named constants for timeout and interval values used across the UI.
 
-export const STATUS_POLL_MS = 5_000;
+// Degraded-mode status poll cadence (E2): ONLY while the SSE stream is DOWN
+// (a refused connect or post-CLOSED backoff — the reconnect ladder). While
+// connected, events feed status and STATUS_RECONCILE_MS is the floor.
+export const SSE_DOWN_POLL_MS = 5_000;
 export const STATUS_RECONCILE_MS = 60_000;
 // Per-root coverage-heal window: events arriving inside one window share one
 // trailing flush (one summary GET per root).
