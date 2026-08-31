@@ -494,7 +494,7 @@ func ensureConfigFile(path string, def []byte) error {
 // server assemblies (configured cold boot and unconfigured mode); the callers
 // append only their mode-specific option (WithConfig / WithPort). One builder
 // means the two assemblies cannot drift apart again.
-func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.Option {
+func serverOptions(reg *provider.Registry, syncExec *syncworker.Client) []server.Option {
 	return []server.Option{
 		server.WithDefaultConfig(defaultConfig),
 		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
@@ -502,6 +502,9 @@ func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.O
 		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
 		server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec)),
+		// The SAME client as the typed job runner: dispatched sync jobs and
+		// automatic syncs contend on its one execution slot.
+		server.WithSyncRunner(syncExec),
 		server.WithMetrics(obs.New()),
 		server.WithLogSetup(setupLogging),
 	}
@@ -567,13 +570,15 @@ func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func 
 }
 
 // newSyncExec builds the server-mode sync executor: the sync-worker process
-// client (P13 isolation). Falls back to in-process sync — the pre-P13
-// behavior — only when the running executable's path cannot be resolved.
-func newSyncExec() syncing.SyncExec {
+// client (P13 isolation). Falls back to the same client running jobs
+// in-process — the pre-P13 behavior — only when the running executable's
+// path cannot be resolved. One client instance either way: its single
+// execution slot is shared by automatic syncs and dispatched sync jobs.
+func newSyncExec() *syncworker.Client {
 	client, err := syncworker.NewClient()
 	if err != nil {
 		slog.Warn("sync worker unavailable; sync runs in-process", "error", err)
-		return syncing.InProcessExec{LangMapper: classify.Alpha2FromAlpha3}
+		return syncworker.NewInProcess()
 	}
 	return client
 }

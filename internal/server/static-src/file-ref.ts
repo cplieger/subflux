@@ -40,18 +40,25 @@ export function subtitleRef(mediaType: MediaType, sub: SubtitleEntry): FileRefAr
  * inside each component instead, so no field's content can forge another
  * field's boundary.
  *
+ * Variant and source normalize EMPTY the way the server's fileRef defaults
+ * do ("" means standard/external), so a key built from a local entry matches
+ * one built from a server-echoed FileRef (the sync job registry's
+ * `file_ref`) for the same file.
+ *
  * The separator moved from `|` to `:`, so these bytes changed. That costs
  * nothing: this key is in-memory only — a `createCollection` key and a lookup
  * in the actions framework's in-flight dedupe map — never persisted and never
  * sent to the server (the wire carries the FileRef fields themselves).
  */
 export function refKey(ref: FileRefArgs): string {
+  const variant = ref.variant !== undefined && ref.variant !== "" ? ref.variant : "standard";
+  const source = ref.source !== undefined && ref.source !== "" ? ref.source : "external";
   return join(
     ref.media_type,
     ref.media_id,
     ref.language,
-    ref.variant ?? "standard",
-    ref.source ?? "external",
+    variant,
+    source,
     String(ref.ordinal ?? 0),
   );
 }

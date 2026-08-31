@@ -34,6 +34,7 @@ import {
   settleCoverageTransaction,
 } from "./coverage.js";
 import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
+import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   EPOCH_TIMEOUT_MS,
@@ -50,6 +51,7 @@ import {
   decodeEpochEvent,
   decodeNotifyEvent,
   decodeScanEvent,
+  decodeSyncDoneEvent,
 } from "./wire/decoders.gen.js";
 import type {
   CoverageEvent,
@@ -57,6 +59,7 @@ import type {
   EventData,
   NotifyEvent,
   ScanEvent,
+  SyncDoneEvent,
 } from "./wire/types.gen.js";
 import type { Decoder } from "./validators.js";
 
@@ -84,7 +87,7 @@ function decodeSSE<T extends EventData>(e: MessageEvent, decoder: Decoder<T>): T
 // at hold time (holdQueue) — so a deferred application can tell an old-boot
 // frame from a current one.
 interface BufferedFrame {
-  type: "coverage" | "notify" | "scan:start" | "scan:done";
+  type: "coverage" | "notify" | "scan:start" | "scan:done" | "sync:done";
   payload: EventData;
   id: number | null;
   bootID: string | null;
@@ -266,6 +269,12 @@ export function connect(): void {
       routeFrame("scan:done", payload, e);
     }
   });
+  eventSource.addEventListener("sync:done", (e: MessageEvent) => {
+    const payload = decodeSSE(e, decodeSyncDoneEvent);
+    if (payload) {
+      routeFrame("sync:done", payload, e);
+    }
+  });
 
   eventSource.addEventListener("error", () => {
     const es = eventSource;
@@ -410,8 +419,8 @@ function showNotifyToast(payload: NotifyEvent): void {
   }
 }
 
-/** THE REPLAY TABLE, exhaustive over the union as it exists now (tasks 10
- *  and 14 slot their variants in as rows):
+/** THE REPLAY TABLE, exhaustive over the union as it exists now (task 10's
+ *  status variants slot in as rows):
  *  - coverage re-applies through the A6 coalescer (idempotent — the heal
  *    fetches current truth);
  *  - notify dedupes by (boot_id, frame_id);
@@ -420,7 +429,8 @@ function showNotifyToast(payload: NotifyEvent): void {
  *    idempotent); its toast half lives in the status poll's transition
  *    detector, deduped there by activity id;
  *  - activity / alert / provider re-apply when task 10 adds them;
- *  - sync:done re-applies idempotently per job_id when task 14 adds it;
+ *  - sync:done re-applies, idempotent per job_id (the settlement registry
+ *    keeps each job's terminal, so a replayed frame settles nothing twice);
  *  - epoch is never replayed (no id, handled before this table).
  *  Counter advancement: appliedHigh advances by max over applied ids. */
 function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
@@ -448,6 +458,9 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
       void pollStatus();
       emit(BusEvent.DataInvalidate);
       break;
+    case "sync:done":
+      syncDoneFromEvent(f.payload as SyncDoneEvent);
+      break;
   }
   if (advanceCounters && f.id !== null) {
     appliedHigh = appliedHigh === null ? f.id : Math.max(appliedHigh, f.id);
@@ -455,8 +468,9 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
 }
 
 /** The BOOT-CHANGE APPLICATION arm: from an old boot, ONLY the
- *  non-reconstructible payloads apply — notify toasts (and sync:done dialog
- *  settlement when task 14 adds it), deduped in the OLD namespace.
+ *  non-reconstructible payloads apply — notify toasts and sync:done dialog
+ *  settlement (a restart drops the server's job registry, so a held
+ *  settlement is this job's only delivery), deduped in the OLD namespace.
  *  State-bearing frames (coverage, the scan:* state halves and scan:done's
  *  toast, and task 10's activity/alert/provider) are SKIPPED: the new
  *  transaction's legs and status fetch are strictly newer authority. No
@@ -464,6 +478,9 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
 function applyOldBootFrame(f: BufferedFrame): void {
   if (f.type === "notify" && dedupeToast(f)) {
     showNotifyToast(f.payload as NotifyEvent);
+  }
+  if (f.type === "sync:done") {
+    syncDoneFromEvent(f.payload as SyncDoneEvent);
   }
 }
 
@@ -515,8 +532,11 @@ async function handleEpoch(epoch: EpochEvent): Promise<void> {
   }
   if (bootChanged) {
     // The dedupe namespace resets with the boot — after the old namespace's
-    // payloads applied. (Sync correlation clears with it when task 14 lands.)
+    // payloads applied. Sync correlation is per boot too: the dialog's
+    // job_id match clears WITH the namespace (the held settlement landed
+    // first, above), and pending watchers re-attach via the jobs read.
     appliedToastKeys.clear();
+    clearSyncCorrelation();
   }
   bootID = epoch.boot_id; // stores on epoch arrival
 

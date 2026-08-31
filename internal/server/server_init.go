@@ -20,6 +20,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/storeops"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -158,11 +159,25 @@ func (s *Server) initHandlers() {
 		Cfg:                   func() *config.Config { return s.state().cfg },
 		RecordStoreWriteError: s.recordStoreWriteError,
 	})
+	// The async sync dispatcher (D1), built BEFORE the two handler families
+	// that bind it by value into their Deps (activityhandlers routes queued
+	// deletes through it; synchandlers dispatches into and reads it).
+	s.syncJobs = syncjobs.New(syncjobs.Deps{
+		Exec: (&synchandlers.AudioExecutor{
+			Store:  s.stores.sync,
+			Proc:   s.subtitleProc,
+			Runner: s.syncRunner,
+		}).Execute,
+		Log:         s.activity,
+		Stops:       &s.stops,
+		PublishDone: s.events.PublishSyncDone,
+	})
 	s.activityH = activityhandlers.New(activityhandlers.Deps{
 		Activity: s.activity,
 		Alerts:   s.alerts,
 		Stops:    &s.stops,
 		Events:   s.events,
+		SyncJobs: s.syncJobs,
 	})
 	s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
 		Store: s.db,
@@ -205,7 +220,7 @@ func (s *Server) initHandlers() {
 	s.syncH = synchandlers.New(synchandlers.Deps{
 		Store:        s.stores.sync,
 		SubtitleProc: s.subtitleProc,
-		Activity:     s.activity,
+		Jobs:         s.syncJobs,
 		Resolve:      resolver,
 	})
 }

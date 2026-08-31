@@ -51,6 +51,11 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// whether or not anyone polls.
 	s.bgWg.Go(func() { s.runActivityPrune(ctx) })
 
+	// The sync job dispatcher's run loop (D1): one top-level entry at a time
+	// in FIFO order, on the server lifetime — shutdown settles queued jobs
+	// cancelled and waits for the admitted worker through this goroutine.
+	s.bgWg.Go(func() { s.syncJobs.Run(ctx) })
+
 	if onReady != nil {
 		s.ready.Set(true)
 		onReady()

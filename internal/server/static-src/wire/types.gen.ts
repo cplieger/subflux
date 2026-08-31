@@ -10,7 +10,11 @@ export type AlertOp = "raise" | "dismiss";
 
 export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
 
-export type EventType = "coverage" | "notify" | "scan:start" | "scan:done" | "epoch" | "activity" | "alert" | "provider";
+export type EventType = "coverage" | "notify" | "scan:start" | "scan:done" | "epoch" | "activity" | "alert" | "provider" | "sync:done";
+
+export type JobOutcome = "result" | "timeout" | "cancelled" | "crash";
+
+export type JobState = "queued" | "running" | "done";
 
 export type MediaType = "movie" | "episode" | "series";
 
@@ -33,15 +37,15 @@ export type Variant = "standard" | "hi" | "forced";
 /**
  * EventData is a sealed interface restricting Event.Data to known payload types.
  * Implementors: CoverageEvent, NotifyEvent, ScanEvent, EpochEvent, ActivityEvent,
- * AlertEvent, ProviderEvent.
+ * AlertEvent, ProviderEvent, SyncDoneEvent.
  * //
  * The wiregen directive below emits the TS union
- * (export type EventData = CoverageEvent | NotifyEvent | ... | ProviderEvent)
+ * (export type EventData = CoverageEvent | NotifyEvent | ... | SyncDoneEvent)
  * plus its runtime decoders; the discriminator is the SSE envelope's "type" key
  * (Event.Type), which is also the named SSE event the browser dispatches on.
  * //
  */
-export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent | ActivityEvent | AlertEvent | ProviderEvent;
+export type EventData = CoverageEvent | NotifyEvent | ScanEvent | EpochEvent | ActivityEvent | AlertEvent | ProviderEvent | SyncDoneEvent;
 
 /** APIKeyInfo is one entry of the GET /api/auth/apikeys response. */
 export interface APIKeyInfo {
@@ -289,6 +293,54 @@ export interface FileEntry {
   ordinal?: number;
   offset_ms?: number;
   size?: number;
+}
+
+/**
+ * FileRef addresses exactly one stored subtitle file: the store row identity
+ * (media_type, media_id, language, variant, source) plus the manual-sibling
+ * ordinal parsed from the row's filename (subtitlefile.ManualOrdinal; 0 = the
+ * unnumbered auto file). A bare quad is NOT unique — manual ordinals share a
+ * quad, and sync offsets are path-keyed in the store, so ambiguous
+ * resolution would corrupt offset bookkeeping.
+ * //
+ * MediaID is the store media identifier (e.g. "tmdb-1271",
+ * "tvdb-121361-s01e05"), matching the /api/files wire fields.
+ */
+export interface FileRef {
+  media_type: MediaType;
+  media_id: string;
+  language: string;
+  variant: string;
+  source: string;
+  ordinal?: number;
+}
+
+/**
+ * Job is one sync job record: the wire shape GET /api/sync/jobs serves.
+ * JobID is a NUMERIC process sequence — distinct from the activity log's
+ * string ids, which the record carries beside it. The registry is truth
+ * independent of the activity ring; a restart drops it (jobs are not
+ * persisted — the client re-attaches via this read and finds nothing).
+ */
+export interface Job {
+  accepted_at: string;
+  started_at?: string;
+  ended_at?: string;
+  batch_activity_id?: string;
+  method?: string;
+  error?: string;
+  state: JobState;
+  outcome?: JobOutcome;
+  activity_id: string;
+  file_ref: FileRef;
+  job_id: number;
+  offset_ms?: number;
+  series_id?: number;
+  season?: number;
+  ordinal?: number;
+  confidence?: number;
+  applied?: boolean;
+  dry_run?: boolean;
 }
 
 /** KeyGenerated is the JSON response after generating an API key. */
@@ -833,6 +885,15 @@ export interface SubtitleTarget {
 }
 
 /**
+ * SyncAccepted is the 202 body for POST /api/sync/audio: the activity entry
+ * id and the numeric job id the dialog correlates sync:done on.
+ */
+export interface SyncAccepted {
+  activity_id: string;
+  job_id: number;
+}
+
+/**
  * SyncAudioRequest is the typed body for POST /api/sync/audio: the FileRef
  * of the subtitle to align (the server resolves the subtitle path from the
  * store row and the video path from the same media) plus the dry-run flag.
@@ -847,12 +908,24 @@ export interface SyncAudioRequest {
   dry_run?: boolean;
 }
 
-/** SyncAudioResponse is the typed response for POST /api/sync/audio. */
-export interface SyncAudioResponse {
-  method: string;
+/**
+ * SyncDoneEvent is the data payload for sync:done (D1): one sync job's
+ * terminal result, published when the job's worker ran (a queued
+ * cancellation publishes nothing). JobID is the dialog's correlation key —
+ * the 202 handed it over, and replay is idempotent per job_id. OffsetMs is
+ * the CUMULATIVE offset (stored plus this run's correction); Error is set
+ * for timeout/crash/cancelled outcomes.
+ */
+export interface SyncDoneEvent {
+  batch_activity_id?: string;
+  method?: string;
+  error?: string;
+  file_ref: FileRef;
+  job_id: number;
   offset_ms: number;
   confidence: number;
   applied: boolean;
+  dry_run: boolean;
 }
 
 /**

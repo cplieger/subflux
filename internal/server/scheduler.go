@@ -71,7 +71,9 @@ const activityPruneInterval = 60 * time.Second
 
 // runActivityPrune drives activity retention on a ticker. The prune POLICY
 // (what leaves, and the remove events it fires) stays on Log.PruneCompleted;
-// this goroutine — the server's, on bgWg — is its one driver.
+// this goroutine — the server's, on bgWg — is its one driver. Sync job
+// records share the retention constant and the driver (ONE owner), pruned
+// through the dispatcher's own policy (queued/running never evicted).
 func (s *Server) runActivityPrune(ctx context.Context) {
 	ticker := time.NewTicker(activityPruneInterval)
 	defer ticker.Stop()
@@ -79,6 +81,7 @@ func (s *Server) runActivityPrune(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			s.activity.PruneCompleted(activity.DefaultPruneAge)
+			s.syncJobs.Prune(activity.DefaultPruneAge)
 		case <-ctx.Done():
 			return
 		}

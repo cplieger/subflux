@@ -22,6 +22,21 @@ vi.mock("./notify.js", () => ({
   },
 }));
 
+// The sync settlement registry: settlements and the boot-change clear land
+// in the shared sequence log, so their ORDER against each other is a plain
+// assertion (the held settlement must land before the correlation clears).
+const syncReg = vi.hoisted(() => ({ settled: [] as number[], clears: 0 }));
+vi.mock("./sync-jobs.js", () => ({
+  syncDoneFromEvent: (ev: { job_id: number }) => {
+    syncReg.settled.push(ev.job_id);
+    seq.log.push(`syncDone:${String(ev.job_id)}`);
+  },
+  clearSyncCorrelation: () => {
+    syncReg.clears += 1;
+    seq.log.push("syncClear");
+  },
+}));
+
 vi.mock("./coverage-heal.js", () => ({
   healFromCoverageEvent: (p: { media_id: string }) => {
     seq.log.push(`heal:${p.media_id}`);
@@ -149,6 +164,8 @@ beforeEach(() => {
   vi.spyOn(Math, "random").mockReturnValue(0);
   seq.log = [];
   toasts.infos = [];
+  syncReg.settled = [];
+  syncReg.clears = 0;
   status.polls = 0;
   cov.registered = new Set<string>();
   cov.applied = [];
@@ -599,6 +616,57 @@ describe("boot-change application", () => {
 
     // The next reconnect presents a cursor for the NEW boot.
     expect(reconnect()).toBe("/api/events?last_id=2");
+  });
+
+  it("restart mid-transaction: a held sync:done settles in the old namespace, THEN correlation clears", async () => {
+    // The held settlement is non-reconstructible: a restart drops the
+    // server's job registry, so this frame is the dialog's only delivery.
+    wire.defer = true;
+    events.connect();
+    lastFakeES().open();
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+    lastFakeES().frame(
+      "sync:done",
+      {
+        job_id: 7,
+        file_ref: {
+          media_type: "movie",
+          media_id: "tmdb-1",
+          language: "en",
+          variant: "standard",
+          source: "external",
+        },
+        offset_ms: 250,
+        confidence: 0.9,
+        method: "audio",
+        applied: true,
+        dry_run: true,
+      },
+      9,
+    );
+    expect(events._stateForTest().holdQueueLength).toBe(1);
+
+    lastFakeES().fail(); // restart mid-transaction: abort keeps the queue
+    await settle();
+    wire.defer = false;
+
+    vi.advanceTimersByTime(10 * SSE_MAX_RECONNECT_MS);
+    lastFakeES().open();
+    lastFakeES().epoch("boot-b", false, 2);
+    await settle();
+
+    // The dialog settled its job exactly once, and the correlation cleared
+    // WITH the namespace — strictly AFTER the held settlement landed.
+    expect(syncReg.settled).toStrictEqual([7]);
+    expect(syncReg.clears).toBe(1);
+    const iSettle = seq.log.indexOf("syncDone:7");
+    const iClear = seq.log.indexOf("syncClear");
+    expect(iSettle).toBeGreaterThanOrEqual(0);
+    expect(iClear).toBeGreaterThan(iSettle);
+    // Old-boot ids never touch the new boot's counters.
+    expect(events._stateForTest().appliedHigh).toBeNull();
+    expect(events._stateForTest().watermark).toBe(2);
   });
 
   it("the SAME numeric frame id across two boots applies both payloads once each", async () => {

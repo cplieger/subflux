@@ -22,11 +22,19 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // activityPageSize is the maximum number of recent activities returned.
 const activityPageSize = 20
+
+// SyncJobCanceller routes an activity-id cancellation into the sync-job
+// dispatcher: the activity-id→dispatcher lookup this surface consults BEFORE
+// the legacy scan path on DELETE. *syncjobs.Dispatcher satisfies it.
+type SyncJobCanceller interface {
+	Cancel(activityID string) syncjobs.CancelOutcome
+}
 
 // Deps is what this surface needs, and it is the whole of it: three registries
 // and the event hub, each already owned by a sibling package.
@@ -47,6 +55,10 @@ type Deps struct {
 	// construction and re-applied by hot reload, so no per-request config read
 	// happens here.
 	Events *events.EventBus
+	// SyncJobs cancels queued sync jobs addressed by activity id (D1). A
+	// queued DELETE releases the admission slot immediately; one that lost
+	// the race to admission converts to a running-cancel.
+	SyncJobs SyncJobCanceller
 }
 
 // Handler serves the activity, alert and event routes.
@@ -121,11 +133,28 @@ func (h *Handler) HandleGetActivity(w http.ResponseWriter, _ *http.Request) {
 
 // HandleDismissActivity removes a completed activity or cancels a queued one.
 // DELETE /api/activity?id={id}
+//
+// A QUEUED sync job routes through the dispatcher BEFORE the legacy scan
+// path: its slot releases immediately (the next 202 enters), and a delete
+// that lost the lock race to admission converts to a running-cancel through
+// the just-registered stop entry — 204 either way, with the job settling
+// done(cancelled) on worker exit. A TERMINAL sync row's dismissal never
+// touches the registry: it falls through to the plain activity dismiss.
 func (h *Handler) HandleDismissActivity(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "id required")
 		return
+	}
+	if h.deps.SyncJobs != nil {
+		switch h.deps.SyncJobs.Cancel(id) {
+		case syncjobs.CancelledQueued, syncjobs.CancelConverted:
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case syncjobs.CancelTerminal, syncjobs.CancelUnknown:
+			// Terminal sync rows dismiss like any completed entry; unknown
+			// ids take the legacy scan path.
+		}
 	}
 	if h.deps.Activity.Cancel(id) {
 		w.WriteHeader(http.StatusNoContent)

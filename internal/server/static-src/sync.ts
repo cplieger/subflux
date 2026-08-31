@@ -5,7 +5,9 @@ import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./
 import { openDialog } from "@cplieger/ui-primitives/dialog";
 import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
-import { subtitleRef, type FileRefArgs } from "./file-ref.js";
+import { attachSyncJob, watchSyncJob } from "./sync-jobs.js";
+import { refKey, subtitleRef, type FileRefArgs } from "./file-ref.js";
+import type { SyncDoneEvent } from "./wire/types.gen.js";
 import {
   previewStart,
   PATH_PREVIEW_POSTER,
@@ -97,6 +99,20 @@ function currentRef(): FileRefArgs | null {
 let offset = signal(0);
 let stopOffsetEffect: (() => void) | null = null;
 let stopSaveBinding: (() => void) | null = null;
+
+// The open dialog's async-sync attachment: the watched job's unwatch
+// disposer and the inline result panel it renders into. Closing the dialog
+// drops the WATCH only — the analysis is server-owned and continues; a
+// reopen re-attaches via the jobs read.
+let syncUnwatch: (() => void) | null = null;
+let audioResultEl: HTMLElement | null = null;
+
+function stopWatchingSyncJob(): void {
+  if (syncUnwatch) {
+    syncUnwatch();
+    syncUnwatch = null;
+  }
+}
 
 // Drain any in-flight ffmpeg stream + revoke blob URL on page unload.
 // Browsers handle this naturally on real navigation; the registration
@@ -203,6 +219,14 @@ export function openSyncDialog(
     if (syncState.status === "preview") {
       updatePreviewTrack();
     }
+    // The result panel follows the selection: drop the old watch and
+    // re-attach for the newly selected file (live job, newest terminal, or
+    // nothing).
+    stopWatchingSyncJob();
+    if (audioResultEl) {
+      audioResultEl.hidden = true;
+      void reattachSyncJob(audioResultEl, false);
+    }
   });
 
   const titleParts: (string | Node)[] = [text("Subtitle Sync")];
@@ -250,6 +274,7 @@ export function openSyncDialog(
     className: "sync-audio-result",
     hidden: true,
   });
+  audioResultEl = audioResultDiv;
   const audioBtn = el(
     "button",
     {
@@ -261,6 +286,12 @@ export function openSyncDialog(
     " Sync to Audio",
   );
   body.appendChild(el("div", { className: "sync-audio" }, audioBtn, audioResultDiv));
+
+  // RELOAD RE-ATTACH: a job dispatched before a reload (or from a closed
+  // dialog) is still the server's; the jobs read answers queued state,
+  // running progress, or a completed-while-away outcome for this file.
+  stopWatchingSyncJob();
+  void reattachSyncJob(audioResultDiv, false);
 
   // Video preview: backdrop/poster background with play button.
   const preview = buildVideoPreview();
@@ -408,6 +439,11 @@ function closeSyncDialog(): void {
     stopSaveBinding();
     stopSaveBinding = null;
   }
+  // Drop the job WATCH, never the job: the analysis is server-owned and
+  // continues after the dialog closes; reopening re-attaches via the jobs
+  // read.
+  stopWatchingSyncJob();
+  audioResultEl = null;
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
     syncState.ffmpegAbort.abort();
   }
@@ -466,6 +502,110 @@ async function applyManualOffset(): Promise<void> {
   closeSyncDialog();
 }
 
+// The fields the inline result panel renders, shared by the live sync:done
+// event and the reload path's job record.
+interface SyncOutcomeView {
+  applied?: boolean;
+  confidence?: number;
+  offset_ms?: number;
+  error?: string;
+}
+
+/** Render one job's terminal outcome into the inline result panel — the
+ *  dialog's ONE surface for analysis results and refusals alike. */
+function renderSyncOutcome(view: SyncOutcomeView, resultDiv: HTMLElement): void {
+  resultDiv.hidden = false;
+  resultDiv.className = "sync-audio-result";
+  if (view.error) {
+    resultDiv.textContent = `Audio sync did not complete: ${view.error}`;
+    return;
+  }
+  const confidence = ((view.confidence ?? 0) * 100).toFixed(0);
+  if (view.applied) {
+    const offsetMs = view.offset_ms ?? 0;
+    resultDiv.textContent = `${formatOffsetMs(offsetMs)} (${confidence}% confidence)`;
+    offset.value = offsetMs;
+    updateTimecodeDisplay(offsetMs);
+    if (syncState.status === "preview") {
+      updatePreviewTrack();
+    }
+    notify.success("Audio sync offset applied to preview");
+  } else {
+    resultDiv.textContent = `Low confidence (${confidence}%). No changes.`;
+  }
+}
+
+/** Watch one job's settlement for the open dialog, showing `label` until the
+ *  sync:done event (matched on the 202's job_id) settles it. */
+function watchDialogSyncJob(jobId: number, resultDiv: HTMLElement, label: string): void {
+  stopWatchingSyncJob();
+  resultDiv.hidden = false;
+  resultDiv.className = "sync-audio-result";
+  resultDiv.textContent = label;
+  syncUnwatch = watchSyncJob(jobId, (ev: SyncDoneEvent | null) => {
+    syncUnwatch = null;
+    if (audioResultEl !== resultDiv) {
+      return; // the dialog closed or rebuilt while the job ran
+    }
+    if (ev === null) {
+      // Boot changed and no held settlement covered this job: the
+      // correlation is lost; re-attach via the jobs read.
+      void reattachSyncJob(resultDiv, true);
+      return;
+    }
+    const cur = currentRef();
+    if (cur && refKey(ev.file_ref) === refKey(cur)) {
+      renderSyncOutcome(ev, resultDiv);
+    }
+  });
+}
+
+/** Re-attach the result panel through the jobs read: prefer this file's
+ *  queued/running job, else its newest terminal outcome. `lost` marks a
+ *  correlation lost to a server restart, reported when nothing is found. */
+async function reattachSyncJob(resultDiv: HTMLElement, lost: boolean): Promise<void> {
+  const ref = currentRef();
+  if (!ref) {
+    return;
+  }
+  const key = refKey(ref);
+  const state = await attachSyncJob(ref);
+  const cur = currentRef();
+  if (audioResultEl !== resultDiv || !cur || refKey(cur) !== key) {
+    return; // closed, rebuilt, or re-selected while the read was in flight
+  }
+  switch (state.kind) {
+    case "live":
+      watchDialogSyncJob(
+        state.job.job_id,
+        resultDiv,
+        state.job.state === "queued" ? "Queued for analysis\u2026" : "Analyzing audio\u2026",
+      );
+      break;
+    case "done":
+      renderSyncOutcome(state.job, resultDiv);
+      break;
+    case "none":
+      if (lost) {
+        resultDiv.hidden = false;
+        resultDiv.className = "sync-audio-result";
+        resultDiv.textContent = "Sync result was lost to a server restart. Run it again.";
+      }
+      break;
+  }
+}
+
+/** The typed capacity refusal: the admission lease is full (HTTP 429), read
+ *  through the dispatch handle's outcome (ActionErrorLike.status). */
+function isCapacityRefusal(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    (err as { status?: unknown }).status === 429
+  );
+}
+
 async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Promise<void> {
   const ref = currentRef();
   if (!ref) {
@@ -474,34 +614,30 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
   }
   btn.disabled = true;
   const origNodes = Array.from(btn.childNodes, (n: ChildNode) => n.cloneNode(true));
-  btn.textContent = "Syncing\u2026";
+  btn.textContent = "Requesting\u2026";
   resultDiv.hidden = true;
   try {
-    const data = await audioSyncAction.dispatch({
-      ...ref,
-      dry_run: true,
-    });
-    if (data === null) {
-      notify.error("Audio sync failed");
+    // One dispatch, NO retry: an instant 202 hands over {activity_id,
+    // job_id}; the analysis result arrives via sync:done matched on job_id.
+    const outcome = await audioSyncAction.dispatch({ ...ref, dry_run: true }).outcome;
+    if (outcome.status === "cancelled") {
       return;
     }
-    resultDiv.hidden = false;
-    resultDiv.className = "sync-audio-result";
-    if (data.applied) {
-      resultDiv.textContent = `${formatOffsetMs(
-        data.offset_ms,
-      )} (${(data.confidence * 100).toFixed(0)}% confidence)`;
-      offset.value = data.offset_ms;
-      updateTimecodeDisplay(data.offset_ms);
-      if (syncState.status === "preview") {
-        updatePreviewTrack();
+    if (outcome.status === "error") {
+      if (isCapacityRefusal(outcome.error)) {
+        // THE 429 ARM: the typed cap refusal renders through the dialog's
+        // inline result path — exactly ONE visible surface (error: false
+        // keeps the framework toast off, and no notify fires here).
+        resultDiv.hidden = false;
+        resultDiv.className = "sync-audio-result";
+        resultDiv.textContent =
+          "Sync queue is full \u2014 wait for a running sync to finish, then try again.";
+      } else {
+        notify.error("Audio sync failed");
       }
-      notify.success("Audio sync offset applied to preview");
-    } else {
-      resultDiv.textContent = `Low confidence (${(data.confidence * 100).toFixed(
-        0,
-      )}%). No changes.`;
+      return;
     }
+    watchDialogSyncJob(outcome.value.job_id, resultDiv, "Analyzing audio\u2026");
   } finally {
     btn.replaceChildren(...origNodes);
     btn.disabled = false;

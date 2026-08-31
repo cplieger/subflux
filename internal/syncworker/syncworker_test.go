@@ -219,7 +219,7 @@ func TestClient_response_error_degrades_to_no_change(t *testing.T) {
 	if result.Applied() {
 		t.Errorf("result applied despite job error")
 	}
-	if sink.CountLevel(slog.LevelWarn, "sync worker job errored; subtitle kept unsynced") == 0 {
+	if sink.CountLevel(slog.LevelWarn, "sync worker failed; subtitle kept unsynced") == 0 {
 		t.Errorf("want degradation WARN on job error")
 	}
 }
@@ -326,8 +326,9 @@ func TestClient_kill_on_cancel(t *testing.T) {
 	}
 	// The diagnosis must name the cancellation: an operator reading a "worker
 	// process: signal: killed" line cannot tell a timeout from a crashing child.
-	const wantErr = "cancelled: context deadline exceeded"
-	if got, ok := sink.AttrValue("sync worker failed", "error"); !ok || got != wantErr {
-		t.Errorf("cancelled worker warning error = (%q, %v), want %q", got, ok, wantErr)
+	// A cancelled CALLER is routine, so the projection logs it at Debug.
+	const wantErr = "context deadline exceeded"
+	if got, ok := sink.AttrValue("sync worker job cancelled; subtitle kept unsynced", "error"); !ok || got != wantErr {
+		t.Errorf("cancelled worker log error = (%q, %v), want %q", got, ok, wantErr)
 	}
 }
