@@ -1,9 +1,8 @@
 // DOM utility functions. All UI construction goes through these helpers
 // to ensure DOM-safety (no innerHTML) and CSP compliance.
 
-// The CSP-safe element factory now lives in @cplieger/reactive (paired with
-// reconcile/patch). Re-export it so existing `import { el } from "./dom.js"`
-// call sites are unchanged.
+// Re-exported from @cplieger/reactive so existing `./dom.js` imports of `el`
+// are unchanged.
 import { el } from "@cplieger/reactive";
 import { wireBackdropDismiss } from "@cplieger/ui-primitives/dialog";
 import { ask } from "@cplieger/ui-primitives/ask";
@@ -25,18 +24,9 @@ export function icon(name: string): HTMLElement {
   return el("span", { className: `icon icon-${name}` });
 }
 
-/** withHelp marks a form label as carrying help text and returns it. The
- *  tooltip anchors on the whole label; a superscript "?" tells the reader
- *  there is one, since a hover-only affordance nothing marks is a hover
- *  nobody tries. The settings dialog and the setup wizard render the same
- *  schema `help` field, so both go through here rather than each inventing a
- *  marker — the wizard's own was a bordered circle that shipped empty.
- *
- *  The glyph is aria-hidden because it names nothing: the label keeps its
- *  accessible name, and the tooltip primitive announces the text through the
- *  anchor's aria-describedby. An absent tip is a no-op, so a call site stays
- *  one line. Styling (and the trigger's help cursor) is in 16-uip-skin.css,
- *  the one CSS split both bundles load. */
+/** Sets `data-tip` and appends a decorative `aria-hidden` "?" marker; the
+ *  label's accessible name is unaffected. Shared by the settings dialog and
+ *  setup wizard for the schema `help` field. Styling in 16-uip-skin.css. */
 export function withHelp<T extends HTMLElement>(label: T, tip: string | undefined): T {
   if (tip) {
     label.setAttribute("data-tip", tip);
@@ -57,28 +47,12 @@ export function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// Fade-out-then-close a native <dialog>, delegating the lifecycle to
-// @cplieger/ui-primitives' dialog primitive: it adds the namespaced
-// `is-leaving` class, waits for the CSS transition (or a fallback), then
-// close()s. The subflux skin maps `dialog.is-leaving` to the exact
-// opacity + `translate: 0 0.5rem` exit the old inline-style version produced,
-// so the animation is unchanged. An already-closed dialog is a no-op: the
-// primitive checks `open` itself before it touches the class list.
-//
-// Re-exported rather than wrapped: the local wrapper was a pass-through that
-// also narrowed away the primitive's optional `onClosed` argument. dom.ts stays
-// the facade the five call sites import from, so none of them change.
+// Re-exported (not wrapped) so dom.ts stays the facade call sites import from.
 export { closeDialog } from "@cplieger/ui-primitives/dialog";
 
-// Drag-safe backdrop dismissal via the library's wireBackdropDismiss (a press
-// must both start and end on the dialog element itself, so a drag-select
-// ending on the backdrop doesn't count). Wire ONCE per dialog, at boot (F3):
-// the listeners live with the permanent element across every open. A
-// per-open-cycle latch, re-armed by the dialog's `close` event, keeps
-// closeFn to at most one call per open — a second press during the close
-// fade must not run a close routine (and its history.back()) twice. The old
-// shape detached itself on close, which forced callers to re-wire per open
-// and leaked one `close` listener per open.
+// Wire ONCE per dialog at boot; the `dismissed` latch (re-armed by the
+// dialog's `close` event) caps closeFn at one call per open, since a second
+// press during the close fade must not run history.back() twice.
 export function onBackdropClose(dlg: HTMLDialogElement, closeFn: () => void): void {
   let dismissed = false;
   wireBackdropDismiss(dlg, () => {
@@ -111,16 +85,9 @@ export function dialogHead(title: string | HTMLElement, closeFn: () => void): HT
   );
 }
 
-// --- Cross-module DOM registry ($) ---
-//
-// Lazy getters for DOM elements referenced from multiple modules. Each
-// getter throws if the element is missing — this fails fast at first
-// access instead of returning silently-wrong nulls. Use a local
-// `document.getElementById` for elements touched by only one module, or
-// for elements that may be absent (dynamically created, removed after
-// startup).
-//
-// Pattern mirrors apps/vibekit/web/static-src/dom.ts `$`.
+// Cross-module DOM registry: lazy getters that throw if the element is
+// missing (fail fast instead of a silently-wrong null). Single-module or
+// possibly-absent elements stay raw `document.getElementById` lookups.
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- caller specifies T for type narrowing
 function req<T extends HTMLElement>(id: string): T {
@@ -132,61 +99,35 @@ function req<T extends HTMLElement>(id: string): T {
 }
 
 export const $ = {
-  // Coverage content area: the primary render target for the library,
-  // detail, and files views. Touched by coverage.ts, detail.ts,
-  // router.ts, files.ts.
   get coverageContent(): HTMLElement {
     return req("coverageContent");
   },
-
-  // Library heading: shown on the coverage list. Mutated by router.ts
-  // and coverage.ts.
   get libHeading(): HTMLElement {
     return req("lib-heading");
   },
-
-  // Coverage panel root: toggled by router.ts, referenced for filter
-  // controls from coverage.ts.
   get coveragePanel(): HTMLElement {
     return req("coveragePanel");
   },
-
-  // History panel root: toggled by router.ts.
   get historyPanel(): HTMLElement {
     return req("historyPanel");
   },
-
-  // History navigation button in the header. Wired by app.ts (click),
-  // toggled active/inactive by router.ts.
   get historyBtn(): HTMLElement {
     return req("historyBtn");
   },
-
-  // Config dialog close button. Wired by app.ts (click listener),
-  // show/hide toggled by config.ts based on unconfigured state.
   get configClose(): HTMLElement {
     return req("configClose");
   },
-
-  // Status popup container. Rendered into by status.ts, wired to the
-  // toggle event by app.ts.
   get statusPopup(): HTMLElement {
     return req("statusPopup");
   },
-
-  // Status button in the header. Updated by status.ts; the anchor for the
-  // status popup (a @cplieger/ui-primitives popover — see status.ts
-  // initStatusPopover).
   get statusBtn(): HTMLElement {
     return req("statusBtn");
   },
 };
 
-// Note on "startup-only" elements (themeBtn, configBtn, userBtn):
-// user-menu.ts removes themeBtn and configBtn from the DOM after
-// initialization because their controls move into the user-menu
-// popover. A $ getter would throw on post-removal access; these stay
-// as raw document.getElementById lookups with the null-guard pattern.
+// themeBtn/configBtn/userBtn stay raw lookups: user-menu.ts removes
+// themeBtn/configBtn from the DOM after init, and a $ getter would throw on
+// post-removal access.
 
 export function dialog(id: string): HTMLDialogElement {
   return document.getElementById(id) as HTMLDialogElement;
@@ -200,13 +141,7 @@ export function select(id: string): HTMLSelectElement {
   return document.getElementById(id) as HTMLSelectElement;
 }
 
-// Promise-based confirmation, delegating to @cplieger/ui-primitives' ask
-// primitive (boolean shape; its own reused, lazily-created
-// <dialog class="uip-ask">). subflux always supplies a title; `confirmLabel`
-// maps to the OK button. Cancel / Escape / backdrop-click all resolve false.
-// The skin styles the `.uip-ask` dialog (which inherits subflux's base dialog
-// chrome) + its parts to match the previous look. Signature kept as (title,
-// message, label) so the files.ts / security.ts call sites are unchanged.
+// Cancel / Escape / backdrop-click all resolve false.
 export function confirm(title: string, message: string, confirmLabel?: string): Promise<boolean> {
   return ask(message, confirmLabel !== undefined ? { title, confirmLabel } : { title });
 }

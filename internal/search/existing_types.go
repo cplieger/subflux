@@ -2,23 +2,17 @@ package search
 
 import "github.com/cplieger/subflux/internal/subflux"
 
-// Subtitle source identifiers for coverage tracking.
 const sourceExternal = subflux.SourceExternal
-
-// --- Subtitle types ---
 
 // existingSubs describes what subtitles already exist for a video file.
 type existingSubs struct {
-	// IgnoredCodecs is the set of embedded codecs that should be treated
-	// as "present but not usable" (e.g. PGS, VobSub when the user wants
-	// text-based subs). hasSubtitle returns false for these so the search
-	// engine will look for alternatives online.
+	// IgnoredCodecs is the set of embedded codecs treated as "present but
+	// not usable" (e.g. PGS, VobSub when the user wants text-based subs).
+	// hasSubtitle returns false for these so the engine looks for
+	// alternatives online.
 	IgnoredCodecs map[string]bool
 
-	// Embedded subtitle tracks with full variant info from native parsing.
 	Embedded []embeddedSub
-
-	// External subtitle files found on disk, with variant info.
 	External []externalSub
 }
 
@@ -38,8 +32,6 @@ type externalSub struct {
 	Forced bool
 }
 
-// --- Subtitle lookup methods ---
-
 // hasSubtitle checks if a usable subtitle exists for the given target.
 // Embedded tracks with codecs in IgnoredCodecs are skipped.
 func (e *existingSubs) hasSubtitle(lang string, variant subflux.Variant) bool {
@@ -58,7 +50,6 @@ func (e *existingSubs) hasSubtitle(lang string, variant subflux.Variant) bool {
 	return false
 }
 
-// hasExternalSubtitle checks if an external subtitle file exists for the target.
 func (e *existingSubs) hasExternalSubtitle(lang string, variant subflux.Variant) bool {
 	for _, ext := range e.External {
 		if ext.Lang == lang && matchesVariant(ext.HI, ext.Forced, variant) {
@@ -68,11 +59,9 @@ func (e *existingSubs) hasExternalSubtitle(lang string, variant subflux.Variant)
 	return false
 }
 
-// --- Variant matching ---
-
-// matchesVariant reports whether the hi/forced flags match the requested variant.
-// Recognized variants: "hi", "forced", and "standard" (or empty) means
-// a regular subtitle (neither HI nor forced).
+// matchesVariant reports whether the hi/forced flags match the requested
+// variant. Recognized variants: "hi", "forced", and "standard" (or empty)
+// means a regular subtitle (neither HI nor forced).
 func matchesVariant(hi, forced bool, variant subflux.Variant) bool {
 	switch variant {
 	case subflux.VariantHI:

@@ -11,8 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// HandleStateStats returns aggregate stats for the dashboard.
-// GET /api/state/stats
+// HandleStateStats handles GET /api/state/stats.
 func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
@@ -21,7 +20,6 @@ func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, resp)
 }
 
-// computeStateStats does the actual stats query work.
 func (h *Handler) computeStateStats(ctx context.Context) subflux.Stats {
 	downloads, dbAttempts, err := h.queryDB.Stats(ctx)
 	if err != nil {
@@ -64,8 +62,6 @@ func (h *Handler) computeStateStats(ctx context.Context) subflux.Stats {
 	}
 }
 
-// fetchMediaCountsParallel fetches series and movies concurrently from
-// the configured sonarr/radarr clients.
 func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arrapi.Series, movies []arrapi.Movie, partial bool) {
 	g, gctx := errgroup.WithContext(ctx)
 

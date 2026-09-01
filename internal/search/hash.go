@@ -22,23 +22,16 @@ var hashBufPool = sync.Pool{
 	},
 }
 
-// hashFile computes the OpenSubtitles hash for a video file.
-// The hash is based on the file size and the first and last 64KB of the file.
-// ctx is checked between the two I/O operations for shutdown cancellation.
+// hashFile computes the OpenSubtitles hash for a video file: file size plus
+// the first and last 64KB. ctx is checked between the two I/O operations for
+// shutdown cancellation.
 func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64, err error) {
-	// Validate the path locally so CodeQL's go/path-injection analyzer
-	// can prove safety without tracking the media-root scan that
-	// produced `path`. Read-only hashing still warrants the guard:
-	// reject non-absolute paths and ".." traversal segments. Only whole
-	// ".." segments are traversal — a filename merely containing ".."
-	// (e.g. "Show.S01E01..720p.mkv") is legitimate and must still hash,
-	// which is exactly pathinside.HasDotDot's component-precise rule.
-	// The test runs on the CLEANED path deliberately: `path` here is
-	// machine-supplied (an arr-reported file path from the media scan),
-	// not a human-written config value, so a traversal that normalizes
-	// away is a spelling of a legitimate location rather than a
-	// suspicious one — the hygiene axis's "a human would not have
-	// written it that way" argument does not apply to this input class.
+	// Validated locally so CodeQL's go/path-injection analyzer can prove
+	// safety without tracking the media-root scan that produced path.
+	// path is machine-supplied (an arr-reported file path), so a ".."
+	// component that normalizes away is a legitimate location, not a
+	// suspicious one; only whole ".." segments count as traversal, so a
+	// filename merely containing ".." still hashes.
 	clean := filepath.Clean(path)
 	if !filepath.IsAbs(clean) || pathinside.HasDotDot(clean) {
 		return "", 0, fmt.Errorf("hashFile: unsafe path %q", path)
@@ -65,7 +58,6 @@ func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64,
 	buf := *bufp
 	defer hashBufPool.Put(bufp)
 
-	// Read first 64KB.
 	if _, err := io.ReadFull(f, buf); err != nil {
 		return "", size, fmt.Errorf("read head: %w", err)
 	}
@@ -73,12 +65,10 @@ func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64,
 		hash += binary.LittleEndian.Uint64(buf[i*8 : (i+1)*8])
 	}
 
-	// Check for cancellation between I/O operations.
 	if err := ctx.Err(); err != nil {
 		return "", size, err
 	}
 
-	// Read last 64KB.
 	if _, err := f.Seek(-hashBlockSize, io.SeekEnd); err != nil {
 		return "", size, fmt.Errorf("seek tail: %w", err)
 	}

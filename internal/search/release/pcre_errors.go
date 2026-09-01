@@ -10,8 +10,8 @@ import "fmt"
 // human-readable reason.
 type CompileError struct {
 	Construct string // offending construct, e.g. "(?=", "(?>", "\\k", "++"
-	Reason    string // why it was rejected
-	Offset    int    // byte offset in the source pattern, -1 when unknown
+	Reason    string
+	Offset    int // byte offset in the source pattern, -1 when unknown
 }
 
 // Error implements the error interface.
@@ -22,7 +22,6 @@ func (e *CompileError) Error() string {
 	return fmt.Sprintf("pcre compile: %s: %s", e.Construct, e.Reason)
 }
 
-// compileErr builds a *CompileError.
 func compileErr(construct string, offset int, reason string) *CompileError {
 	return &CompileError{Construct: construct, Offset: offset, Reason: reason}
 }

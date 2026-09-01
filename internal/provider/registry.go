@@ -70,10 +70,8 @@ func (e *RegistryError) Unwrap() error { return e.Err }
 // subflux with real polymorphism — nine implementations plus the retry wrapper,
 // where every other one has exactly one.
 type Provider interface {
-	// Name returns the provider identifier (e.g. "opensubtitles", "yifysubtitles").
 	Name() subflux.ProviderID
 
-	// Search finds subtitles matching the request.
 	Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error)
 
 	// Download fetches the subtitle content for the given search result.
@@ -163,7 +161,6 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[subflux.ProviderID
 
 	result, errs := partitionResults(r.buildProviders(ctx, toLoad, providers))
 
-	// Sort by name for deterministic ordering.
 	slices.SortFunc(result, func(a, b Provider) int {
 		return cmp.Compare(a.Name(), b.Name())
 	})
@@ -239,7 +236,7 @@ func (r *Registry) buildProviders(ctx context.Context, toLoad []subflux.Provider
 			} else {
 				results[i] = loadResult{name: name, provider: p}
 			}
-			return nil // never return error; preserve partial success
+			return nil
 		})
 	}
 	_ = g.Wait()

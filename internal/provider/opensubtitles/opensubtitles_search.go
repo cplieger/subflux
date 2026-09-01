@@ -17,7 +17,7 @@ import (
 
 // numbering represents one (season, episode) pair to search.
 type numbering struct {
-	scheme  string // for logging: "aired", "scene", "absolute"
+	scheme  string
 	season  int
 	episode int
 }
@@ -38,7 +38,7 @@ func episodeNumberings(req *subflux.SearchRequest) []numbering {
 			return
 		}
 		if s <= 0 {
-			s = req.Season // inherit aired season when provider doesn't specify
+			s = req.Season
 		}
 		p := pair{s, e}
 		if seen[p] {
@@ -50,10 +50,8 @@ func episodeNumberings(req *subflux.SearchRequest) []numbering {
 
 	add(req.Season, req.Episode, schemeAired)
 	add(req.SceneSeason, req.SceneEpisode, "scene")
-	// Absolute episode uses season 1 if no scene season is set.
 	// Skip for specials (season 0): absolute numbers span the full series
-	// and map to regular-season episodes on OpenSubtitles, producing
-	// wrong matches (e.g. special 1 with absolute 6 → S01E06).
+	// and would map onto a regular season (e.g. special 1 → S01E06).
 	if req.Season != 0 {
 		absSeason := req.SceneSeason
 		if absSeason <= 0 {
@@ -74,7 +72,6 @@ func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchReque
 		maxResults = 60
 	}
 
-	// Try ID-based search first.
 	params := p.buildSearchParams(req, season, episode)
 	idSent := params.Has("imdb_id") || params.Has("parent_imdb_id") ||
 		params.Has("tmdb_id")
@@ -84,7 +81,7 @@ func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchReque
 		if err != nil {
 			return r, err
 		}
-		// Mark ID-based results so the identity filter trusts them.
+		// ID-based results are trusted by the identity filter as IMDB matches.
 		for i := range r {
 			if r[i].MatchedBy == matchByTitle {
 				r[i].MatchedBy = matchByImdb
@@ -93,15 +90,12 @@ func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchReque
 		results = r
 	}
 
-	// If ID-based search returned results, or we have no title to fall back
-	// to, return what we have.
 	if len(results) > 0 || req.Title == "" {
 		return results, nil
 	}
 
-	// Fallback: query-based search using title. This handles cases where
-	// Sonarr/Radarr IMDB IDs don't match OpenSubtitles' catalog entries
-	// (e.g. anime with multiple IMDB entries for the same show).
+	// Fallback: some Sonarr/Radarr IMDB IDs don't match OpenSubtitles'
+	// catalog entries (e.g. anime with multiple IMDB entries per show).
 	slog.Info("opensubtitles: ID search returned 0 results, retrying with query",
 		"title", req.Title, "season", season, "episode", episode)
 	params = p.buildQueryParams(req, season, episode)
@@ -182,15 +176,9 @@ func joinOSLangs(langs []string) string {
 }
 
 // commonSearchParams returns the parameters shared by both ID-based and
-// query-based searches: languages, season/episode numbers, and the two
-// provenance filters.
-//
-// The API's own defaults are asymmetric, so each provenance flag carries only
-// its non-default direction: AI-translated results come back unless the query
-// excludes them, and machine-translated results stay out unless the query
-// includes them. filterSearchResults re-checks both on the returned
-// attributes, so a server-side change of either default cannot leak results
-// past the user's choice.
+// query-based searches. The AI/machine-translation flags send only their
+// non-default direction (API defaults are asymmetric), and
+// filterSearchResults re-checks both on the returned attributes.
 func (p *Provider) commonSearchParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
@@ -218,15 +206,12 @@ func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
 ) url.Values {
 	params := p.commonSearchParams(req, season, episode)
 
-	// Hash.
 	if p.useHash && req.VideoHash != "" {
 		params.Set("moviehash", req.VideoHash)
 	}
 
-	// Prefer TMDB ID for movies, IMDB ID as fallback. Sanitize once and
-	// skip the ID entirely when the input normalizes to an empty string
-	// (e.g. "tt0", "tt00000") — sending an empty parent_imdb_id= or
-	// imdb_id= costs an API round trip that always returns zero results.
+	// Skip an ID that sanitizes to empty (e.g. "tt0"): an empty
+	// parent_imdb_id=/imdb_id= wastes an API round trip for zero results.
 	sanitized := ""
 	if req.ImdbID != "" {
 		sanitized = classify.SanitizeImdbID(req.ImdbID)
@@ -235,10 +220,8 @@ func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
 	case req.MediaType == subflux.MediaTypeMovie && req.TmdbID != 0:
 		params.Set("tmdb_id", strconv.Itoa(req.TmdbID))
 	case req.MediaType == subflux.MediaTypeEpisode && sanitized != "":
-		// For episodes, use parent_imdb_id (series IMDB ID).
 		params.Set("parent_imdb_id", sanitized)
 	case sanitized != "":
-		// For movies without a TMDB ID, use imdb_id.
 		params.Set("imdb_id", sanitized)
 	}
 
@@ -246,8 +229,7 @@ func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
 }
 
 // buildQueryParams builds search parameters using the title as a text query
-// instead of an ID. Used as a fallback when ID-based search returns no results
-// (common when Sonarr/Radarr metadata IDs don't match OpenSubtitles' catalog).
+// instead of an ID, used as a fallback when ID-based search returns none.
 func (p *Provider) buildQueryParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {

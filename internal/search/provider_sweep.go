@@ -17,8 +17,8 @@ import (
 
 // --- Provider sweep ---
 
-// searchProvider executes a single provider search and classifies the outcome.
-// If trackTimeout is true, failures/successes are recorded in the timeout tracker.
+// searchProvider records failures/successes in the timeout tracker when
+// trackTimeout is true.
 func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
 	req *subflux.SearchRequest, trackTimeout bool,
 ) ([]subflux.Subtitle, subflux.ProviderID, error) {
@@ -55,15 +55,11 @@ func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
 	return subs, name, nil
 }
 
-// searchProvidersFiltered searches all eligible providers concurrently.
-// Providers in timeout are skipped.
-// Returns results and per-provider success/error lists.
-//
-// Concurrent calls with identical request inputs (media id, language list,
-// video path/hash, provider set) are coalesced via singleflight so that a
-// poller event and a manual scan firing on the same media don't issue
-// duplicate provider HTTP requests. The key includes VideoPath/VideoHash
-// so requests differing only by file artifact get separate calls.
+// searchProvidersFiltered coalesces concurrent calls with identical request
+// inputs via singleflight, so a poller event and a manual scan on the same
+// media don't issue duplicate provider HTTP requests. The key includes
+// VideoPath/VideoHash so requests differing only by file artifact get
+// separate calls.
 func (e *Engine) searchProvidersFiltered(ctx context.Context,
 	req *subflux.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
@@ -77,7 +73,6 @@ func (e *Engine) searchProvidersFiltered(ctx context.Context,
 	if err != nil {
 		return searchOutcome{}
 	}
-	// Check the caller's own context after the flight completes.
 	if ctx.Err() != nil {
 		return searchOutcome{}
 	}
@@ -88,10 +83,7 @@ func (e *Engine) searchProvidersFiltered(ctx context.Context,
 	return out
 }
 
-// buildSearchKey produces a stable singleflight key from request inputs.
-// Two callers with the same key share a single underlying provider sweep.
-//
-// The key is assembled with keyenc rather than by concatenating with a
+// buildSearchKey is assembled with keyenc rather than by concatenating with a
 // separator, because three of its six fields can contain one. A collision here
 // is not a cache miss: two different requests share one flight, and the second
 // caller receives the FIRST request's subtitle results for its own video. The
@@ -123,8 +115,6 @@ func buildSearchKey(req *subflux.SearchRequest, providers []provider.Provider) s
 	)
 }
 
-// searchProvidersFilteredInner does the actual provider sweep — wrapped by
-// searchProvidersFiltered to provide singleflight deduplication.
 func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 	req *subflux.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
@@ -170,7 +160,6 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 
 	_ = g.Wait()
 
-	// Log timed-out providers.
 	if to := (searchOutcome{providers: provResults}).timedOut(); len(to) > 0 {
 		slog.Debug("providers timed out, skipping",
 			"providers", to, "media", req.MediaLabel(), "lang", req.Languages)
@@ -182,7 +171,6 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 	}
 }
 
-// downloadFromProvider finds the named provider and downloads the subtitle.
 func (e *Engine) downloadFromProvider(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	p, ok := e.providersByName[sub.Provider]
 	if !ok {
@@ -203,7 +191,6 @@ func (e *Engine) downloadFromProvider(ctx context.Context, sub *subflux.Subtitle
 	return data, nil
 }
 
-// unionProviders returns the union of providers across targets that need searching.
 func (e *Engine) unionProviders(states []targetState) []provider.Provider {
 	names := make(map[subflux.ProviderID]bool)
 	for i := range states {
@@ -223,7 +210,6 @@ func (e *Engine) unionProviders(states []targetState) []provider.Provider {
 	return out
 }
 
-// filterByTargetProviders keeps only subtitles from providers allowed for the target.
 func filterByTargetProviders(subs []subflux.Subtitle, allowed map[subflux.ProviderID]struct{}) []subflux.Subtitle {
 	var out []subflux.Subtitle
 	for i := range subs {
@@ -234,8 +220,6 @@ func filterByTargetProviders(subs []subflux.Subtitle, allowed map[subflux.Provid
 	return out
 }
 
-// providerConcurrency returns the configured maximum provider concurrency,
-// falling back to subflux.DefaultProviderConcurrency when unconfigured.
 func (e *Engine) providerConcurrency() int {
 	maxConc := e.cfg.Search().MaxProviderConcurrency
 	if maxConc <= 0 {

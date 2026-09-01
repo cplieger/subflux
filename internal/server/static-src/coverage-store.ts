@@ -38,7 +38,7 @@ let pairLanded = false;
 // state — survives SSE boot_id changes.
 const registeredCollectionNames = new Set<string>();
 
-// --- Task 9 transaction seams: tombstones, covered writers, the leg join ---
+// --- Transaction seams: tombstones, covered writers, the leg join ---
 
 // Whether an SSE transaction is open is transaction.ts's fact (events.ts
 // brackets it). While one is open, a heal 404-delete records its root as a
@@ -58,9 +58,9 @@ let coveredPairWriters = 0;
 type CollectionLegJoin = "landed" | "failed" | "uncovered";
 let pendingLeg: Promise<CollectionLegJoin> | null = null;
 
-/** Task 9: settle (commit or abort) — tombstones clear only when no covered
- *  full-pair writer is still in flight. Idempotent, and safe in either order
- *  against `settleTransaction`: an open transaction keeps them. */
+/** Settle (commit or abort) — tombstones clear only when no covered
+ *  full-pair writer is still in flight. Idempotent, and safe in either
+ *  order against `settleTransaction`: an open transaction keeps them. */
 export function releaseCoverageTombstones(): void {
   maybeClearTombstones();
 }
@@ -73,8 +73,8 @@ function maybeClearTombstones(): void {
   }
 }
 
-/** Task 9: register (or clear) the transaction's in-flight collection leg
- *  for loaders to join. */
+/** Register (or clear) the transaction's in-flight collection leg for
+ *  loaders to join. */
 export function setCollectionLegJoin(p: Promise<CollectionLegJoin> | null): void {
   pendingLeg = p;
 }
@@ -84,8 +84,8 @@ export function pendingCollectionLeg(): Promise<CollectionLegJoin> | null {
   return pendingLeg;
 }
 
-/** Task 9: mark a full-pair write in flight; returns the matching end call.
- *  Only a write that BEGINS during an open transaction is covered. */
+/** Mark a full-pair write in flight; returns the matching end call. Only a
+ *  write that begins during an open transaction is covered. */
 export function beginCoveredPairWrite(): () => void {
   if (openTransaction() === null) {
     return () => {
@@ -104,13 +104,14 @@ export function libraryLoaded(): boolean {
   return pairLanded;
 }
 
-/** Collections registered by landed pair loads (task 9's collection leg). */
+/** Collections registered by landed pair loads (the transaction's
+ *  collection leg). */
 export function registeredCollections(): ReadonlySet<string> {
   return registeredCollectionNames;
 }
 
 /** A failed pair read registers the pair without opening the gate, so the
- *  latch's forced transaction still fetches it (task 9). */
+ *  latch's forced transaction still fetches it. */
 export function registerCollectionPair(): void {
   registeredCollectionNames.add("series").add("movies");
 }
@@ -131,8 +132,8 @@ export function applyHealedRow(item: CoverageItem): void {
 }
 
 /** A6 heal delete: a summary 404 means the collection omits this row now.
- *  During a transaction the root is TOMBSTONED so a full-pair snapshot read
- *  before the delete cannot resurrect it (task 9). */
+ *  During a transaction the root is tombstoned so a full-pair snapshot read
+ *  before the delete cannot resurrect it. */
 export function removeCoverageRow(rootKey: string): void {
   if (openTransaction() !== null) {
     tombstones.add(rootKey);
@@ -213,10 +214,10 @@ export function setCoveragePair(
     });
   coverage.setAll(merged);
   if (series !== null && movies !== null) {
-    // The pair LANDED: open A6's heal gate and register the pair for task 9's
-    // transaction collection legs — set by WHICHEVER caller lands it. A null
-    // leg is a failed read (the generated client null-collapses), and a
-    // failed pair load must open nothing.
+    // The pair landed: open the heal gate and register the pair for the
+    // transaction's collection legs. A null leg is a failed read (the
+    // generated client null-collapses), and a failed pair load must open
+    // nothing.
     pairLanded = true;
     registerCollectionPair();
   }

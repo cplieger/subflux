@@ -17,27 +17,16 @@ import (
 	"github.com/cplieger/xmlx"
 )
 
-// --- AniDB HTTP API ---
-
 // buildEpisodeCacheKey builds the episodeCache key for a series and
 // episode number string. Numeric episode numbers are normalized to their
 // integer form so lookups from episodeID (which builds the same key from
-// an int) match regardless of leading zeros or whitespace in the source XML.
-// Non-numeric episode numbers (S1/C1/T1 for specials, credits, trailers)
-// use the trimmed raw string.
+// an int) match regardless of leading zeros or whitespace. Non-numeric
+// episode numbers (S1/C1/T1 for specials, credits, trailers) use the
+// trimmed raw string.
 //
-// epNo is the component that can carry the separator: it is chardata straight
-// out of AniDB's episodes XML, so its alphabet belongs to the remote API, and
-// the non-numeric branch stores it verbatim. seriesID cannot (it is an int),
-// which is the only reason the fmt.Sprintf form was injective — the ':'-free
-// head pinned the boundary. A collision does not miss, it answers: the map
-// yields another episode's AniDB episode id, animetosho searches by that id
-// (searchByEpisodeID), and the WRONG episode's subtitle is scored and written
-// next to this video, where it then counts as covered and is never retried.
-// This key is built here (write side, from the XML) and in episodeID (read
-// side, from the resolved episode number); both must stay on this grammar or
-// every lookup misses. Ordinary epNos carry neither ':' nor '\', so the bytes
-// are unchanged.
+// This is the write side of a grammar shared with episodeID's read side;
+// both must agree byte for byte, or a lookup can resolve to the WRONG
+// episode's AniDB id and the wrong subtitle gets written next to it.
 func buildEpisodeCacheKey(seriesID int, epNo string) string {
 	epNo = strings.TrimSpace(epNo)
 	if n, err := strconv.Atoi(epNo); err == nil {
@@ -47,10 +36,7 @@ func buildEpisodeCacheKey(seriesID int, epNo string) string {
 }
 
 // rateLimitAniDB enforces AniDB's 1-req-per-2s policy using a channel-based
-// timer. The rateCh channel has capacity 1: a token is available when the
-// next request is permitted. After consuming the token, a time.AfterFunc
-// re-fills the channel after anidbMinInterval, ensuring precise spacing
-// without holding the mutex during the wait.
+// timer so precise spacing doesn't require holding the mutex during the wait.
 func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -66,25 +52,15 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 // episodeID returns the AniDB episode ID for a series+episode pair.
 // Fetches and caches all episodes from the series on first access.
 //
-// Concurrent callers for the same seriesID coalesce via singleflight:
-// only one goroutine issues the HTTP request; the rest share its result.
-// This defends AniDB's strict rate limit from a library-scan thundering herd (F3).
+// Concurrent callers for the same seriesID coalesce via singleflight: only
+// one goroutine issues the HTTP request, defending AniDB's strict rate
+// limit from a library-scan thundering herd.
 //
 // A short-circuit on banUntil suppresses further API traffic when AniDB
-// previously returned an <error> XML body (F2).
-//
-// The cacheKey below is the READ side of the episodeCache grammar whose write
-// side is buildEpisodeCacheKey; the two must agree byte for byte or every
-// lookup misses and the cache degrades to one API call per episode against
-// AniDB's 1-req-per-2s limit. Neither component can carry the separator on
-// this side (both are ints), so keyenc.Join reproduces the previous bytes
-// exactly; it is used anyway so the two sides share one encoder rather than
-// two format strings that can drift apart. See buildEpisodeCacheKey for what a
-// collision costs.
+// previously returned an <error> XML body.
 func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
 	cacheKey := keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(episodeNo))
 
-	// Fast path: already cached.
 	m.mu.Lock()
 	if id, ok := m.episodeCache[cacheKey]; ok {
 		m.mu.Unlock()
@@ -98,7 +74,6 @@ func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, e
 	}
 	m.mu.Unlock()
 
-	// Coalesce concurrent fetches for the same series.
 	sfKey := strconv.Itoa(seriesID)
 	_, err, _ := m.sf.Do(sfKey, func() (any, error) {
 		return nil, m.cacheEpisodes(ctx, seriesID)
@@ -115,8 +90,6 @@ func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, e
 	}
 	return 0, fmt.Errorf("episode %d not found in AniDB series %d", episodeNo, seriesID)
 }
-
-// --- AniDB HTTP API types ---
 
 type anidbAnime struct {
 	Episodes []anidbEpisode `xml:"episodes>episode"`
@@ -136,9 +109,8 @@ type anidbError struct {
 }
 
 // cacheEpisodes retrieves all episodes for a series from the AniDB HTTP API
-// and populates the shared episode cache. Returns an error on HTTP failure,
-// malformed XML, or an AniDB <error> response. The caller reads results by
-// cacheKey after this returns (command-query split per Q1).
+// and populates the shared episode cache. The caller reads results by
+// cacheKey after this returns.
 func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	slog.Debug("anidb: fetching episodes from API", "series_id", seriesID)
 
@@ -182,18 +154,14 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 		return fmt.Errorf("anidb: episodes decompress: %w", err)
 	}
 
-	// The byte cap and the inflate ceiling above bound the WIRE, not the decode:
-	// encoding/xml materializes each token first, so a body inside the cap can
-	// still force one cap-sized token allocation or grow the decoder's element
-	// stack one heap entry per tiny tag. Gate the inflated bytes ONCE here,
-	// before either unmarshal below re-tokenizes them.
+	// The byte cap and the inflate ceiling above bound the wire, not the
+	// decode: encoding/xml materializes each token first, so gate the
+	// inflated bytes once here, before either unmarshal below re-tokenizes
+	// them.
 	if err := xmlx.Preflight(data, episodeLimits); err != nil {
 		return fmt.Errorf("anidb: episodes outside decode bounds: %w", err)
 	}
 
-	// AniDB signals errors with HTTP 200 + <error>...</error>. Check for
-	// the error envelope before unmarshalling the normal shape; otherwise
-	// a Banned/Client-invalid response looks like a zero-episode series.
 	var errCheck anidbError
 	if err := xml.Unmarshal(data, &errCheck); err == nil && errCheck.Message != "" {
 		slog.Error("anidb: API returned error",
@@ -207,9 +175,6 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 		return fmt.Errorf("parse episodes: %w", err)
 	}
 
-	// Cache all episodes from this series. See buildEpisodeCacheKey for
-	// the normalization rules (integer epNo canonicalized to %d; specials
-	// like S1/C1/T1 kept as strings).
 	m.mu.Lock()
 	for _, ep := range anime.Episodes {
 		m.episodeCache[buildEpisodeCacheKey(seriesID, ep.EpNo)] = ep.ID
@@ -217,9 +182,8 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	m.mu.Unlock()
 
 	if len(anime.Episodes) == 0 {
-		// Legitimate zero-episode response (e.g. fresh anime not yet populated).
-		// Logged at INFO so operators can distinguish it from the silent-ban
-		// case handled above.
+		// INFO, not WARN: a fresh anime not yet populated is a legitimate
+		// zero-episode response, distinct from the silent-ban case above.
 		slog.Info("anidb: API returned zero episodes", "series_id", seriesID)
 	} else {
 		slog.Debug("anidb: episodes cached",

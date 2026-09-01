@@ -29,7 +29,6 @@ func SyncAgainstReference(ctx context.Context, data []byte, videoPath, lang stri
 		Method: subsync.MethodNone,
 	}
 
-	// Only strategy: embedded subtitle reference.
 	refCues := ExtractEmbeddedReference(ctx, videoPath, lang, mapper)
 	if len(refCues) < subsync.MinCuesForSync {
 		return noChange
@@ -58,31 +57,26 @@ func SyncAgainstReference(ctx context.Context, data []byte, videoPath, lang stri
 func SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) subsync.SyncResult {
 	noChange := subsync.SyncResult{Method: subsync.MethodNone}
 
-	// Build hints from available metadata.
 	var hints subsync.AudioSyncHints
 	var isASS bool
 	if subtitlePath != "" {
 		ext := strings.ToLower(filepath.Ext(subtitlePath))
 		isASS = ext == ExtASS || ext == ExtSSA
 	} else {
-		// No path available (automatic fallback); detect ASS by content.
 		isASS = subsync.IsASSContent(data)
 	}
 	hints.IsASS = isASS
 
-	// Get media duration for adaptive strategy selection.
 	if durMs, err := ffmpeg.ProbeDuration(ctx, videoPath); err == nil {
 		hints.DurationSec = int(durMs / 1000)
 	}
 
-	// Parse cues: use native ASS parser for ASS files, SRT parser otherwise.
 	var incCues []subsync.Cue
 	if isASS {
 		dialogueCues, _, err := subsync.ParseASSDialogue(data)
 		if err != nil || len(dialogueCues) < subsync.MinCuesForSync {
 			slog.Debug("sync: ASS parse failed or too few cues, falling back to SRT",
 				"error", err, "dialogue_cues", len(dialogueCues))
-			// Fall back to SRT parsing.
 			isASS = false
 			hints.IsASS = false
 		} else {
@@ -145,14 +139,10 @@ func ExtractEmbeddedReference(ctx context.Context, videoPath, excludeLang string
 func SyncFromCues(ctx context.Context, data []byte, refCues []subsync.Cue, videoPath string) subsync.SyncResult {
 	noChange := subsync.SyncResult{Method: subsync.MethodNone}
 
-	// Parse a decoded VIEW. A UTF-16 subtitle carries its own structure encoded
-	// too — the digits, the "-->" and the line breaks are all NUL-interleaved —
-	// so ParseSRT finds no cues in the raw bytes and this returns MethodNone,
-	// which reads as "nothing to correct" rather than "I could not read it".
-	// Nothing here persists the decode: the caller keeps the original bytes
-	// unless alignment actually produced a change, and whether a CONVERSION is
-	// written is post_processing.normalize_utf8's decision alone. The audio path
-	// above decodes for the same reason.
+	// Decode first: a UTF-16 subtitle's structure (digits, "-->", line breaks)
+	// is NUL-interleaved, so ParseSRT on the raw bytes finds no cues and
+	// returns MethodNone rather than an error. The decode is a view only;
+	// persistence is post_processing.normalize_utf8's decision.
 	incCues, err := subsync.ParseSRT(bytes.NewReader(subtitleenc.Normalize(data)))
 	if err != nil {
 		slog.Debug("sync: cannot parse incoming SRT", "error", err)

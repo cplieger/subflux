@@ -59,25 +59,11 @@ func (g *quadGate) lock(key string) (unlock func()) {
 // namespace, so the gate is package-scoped rather than per-handler.
 var downloadPathGate = newQuadGate()
 
-// downloadQuadKey builds the gate key for a quad.
-//
-// One of the four components can carry a separator, and it is not the one the
-// previous comment claimed: mediaID is mediaid.Episode/BuildMovieID output,
-// which falls back to the arr's raw imdbId string when TVDB/TMDB is absent, so
-// its alphabet is Sonarr/Radarr's choice rather than ours. The other three
-// genuinely cannot — subflux.MediaType and subflux.Variant are closed constant sets,
-// and lang has passed langcode.Valid, whose whole vocabulary is two ASCII
-// letters. That, not "media IDs never contain control characters", is why the
-// old NUL-joined form was injective: the single unconstrained component sat
-// between components whose alphabets pinned the field boundaries. keyenc escapes
-// each component instead, so the key stays injective without that argument — the
-// property matters because a merge would put two unrelated media items behind
-// ONE mutex, serializing an ordinal allocation and its atomic write against a
-// download that has nothing to do with them (distinct quads still write
-// distinct numbered paths, so a merge costs latency, not files).
-//
-// The key bytes change (NUL joins become ':'); the gate map is process-local
-// and rebuilt per run, so no persisted or cross-process value depends on them.
+// downloadQuadKey builds the gate key for a quad. keyenc.Join escapes each
+// component, so the key stays injective even though mediaID (Sonarr/Radarr's
+// own alphabet, via mediaid.Episode/BuildMovieID) is the one component whose
+// character set this package does not control; a merge would serialize an
+// unrelated download's ordinal allocation behind the same mutex.
 func downloadQuadKey(mt subflux.MediaType, mediaID, lang string, variant subflux.Variant) string {
 	return keyenc.Join(string(mt), mediaID, lang, string(variant))
 }

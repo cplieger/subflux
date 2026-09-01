@@ -1,5 +1,4 @@
 // login.ts — Standalone login page logic. Only imports leaf modules.
-
 import type { ApiResult } from "./api-client.js";
 import {
   authSetupCreateRaw,
@@ -24,8 +23,8 @@ import { hasCode, ErrorCode } from "./error_codes.js";
 
 // --- Inline interfaces for API response shapes ---
 
-/** Shape of the raw WebAuthn login-finish / OIDC-link JSON bodies (both flows
- *  answer with the login-success envelope; only `redirect` is consumed). */
+/** Login-success envelope shared by the WebAuthn login-finish and OIDC-link
+ *  responses; only `redirect` is consumed. */
 interface LoginRedirect {
   redirect?: string;
 }
@@ -38,8 +37,7 @@ let webauthnSessionToken = "";
 let conditionalUIAttempts = 0;
 
 // Drain in-flight conditional WebAuthn ceremony + clear any pending retry
-// timer on page unload. Without this, a retry fires into a torn-down DOM
-// after a failed conditional UI attempt + slow navigation.
+// timer on page unload; otherwise a retry fires into a torn-down DOM.
 registerCleanup(() => {
   conditionalAbort?.abort();
   conditionalAbort = null;
@@ -52,17 +50,13 @@ registerCleanup(() => {
 // --- Initialization ---
 
 async function init(): Promise<void> {
-  // Delegated tooltips over the wizard's data-tip info icons — the same
-  // primitive + attribute + delays as the app page (app.ts), replacing the
-  // old CSS-only ::before tooltip.
   initTooltips({ attribute: "data-tip", delayCold: 300, delayWarm: 300 });
 
   // Link-on-login: an OIDC login that collided with an existing local account
   // redirects here with ?oidc_link=<token>; prove the password to link it.
   const linkToken = new URLSearchParams(window.location.search).get("oidc_link");
   if (linkToken) {
-    // Wire before reveal: this flow HIDES the username field, and showPage
-    // focuses the first visible field of the page it reveals.
+    // Wire before reveal: showPage focuses the first visible field.
     wireOIDCLinkForm(linkToken);
     showPage("loginPage");
     return;
@@ -81,26 +75,15 @@ async function init(): Promise<void> {
     return;
   }
 
-  // A reload of the wizard's own address. setup_required is already false —
-  // creating the admin is step one of setup, not the end of it — so the only
-  // remaining question is whether setup finished.
   if (window.location.pathname === SETUP_PATH) {
     if (data.config_valid) {
-      // It finished (here or in another tab). Hand the URL back to the server,
-      // which answers with the app or the login page per the session.
       window.location.replace("/");
       return;
     }
-    // Creating the admin issued a session, so the usual case is that we are
-    // still authenticated and can re-enter without asking for the password
-    // again. Its only cost is the passkey offer, which already declines with
-    // that exact reason when it has no password to confirm with.
-    //
-    // Without a session (cookie cleared, a server restart — sessions are
-    // in-memory — or a much later return) this probe answers 401, and the
-    // transport's session-expiry chokepoint navigates to /login?next=/setup.
-    // That is the right landing: the resume-setup form there funds the wizard
-    // with a fresh password and postLoginDestination sends it straight back.
+    // Creating the admin issued a session, so this is usually still
+    // authenticated. Without one (cookie cleared, restart, or a later
+    // return) this 401s and the session-expiry redirect lands on
+    // /login?next=/setup, whose resume-setup form funds the wizard again.
     const who = await me();
     if (who) {
       if (postLoginDestination(who.role, false) === "wizard") {
@@ -110,8 +93,7 @@ async function init(): Promise<void> {
       }
       return;
     }
-    // Reached only if that redirect did not happen (a transport failure rather
-    // than a 401): show the resume-setup login rather than an empty page.
+    // No 401: a transport failure. Fall through to resume-setup login below.
   }
 
   if (!data.config_valid) {
@@ -179,8 +161,8 @@ async function startConditionalUI(): Promise<void> {
       return;
     }
     webauthnSessionToken = options.session_token;
-    // The wire envelope nests the options under a second publicKey key
-    // (go-webauthn's CredentialAssertion shape).
+    // go-webauthn's CredentialAssertion shape nests the options under a
+    // second publicKey key.
     const pk = requestOptionsFromJSON(options.publicKey.publicKey);
     conditionalAbort = new AbortController();
     const credential = (await navigator.credentials.get({
@@ -220,8 +202,8 @@ async function passkeyLogin(): Promise<void> {
       return;
     }
     webauthnSessionToken = options.session_token;
-    // The wire envelope nests the options under a second publicKey key
-    // (go-webauthn's CredentialAssertion shape).
+    // go-webauthn's CredentialAssertion shape nests the options under a
+    // second publicKey key.
     const credential = (await navigator.credentials.get({
       publicKey: requestOptionsFromJSON(options.publicKey.publicKey),
     })) as PublicKeyCredential | null;
@@ -354,9 +336,8 @@ function wireLoginForm(resumeSetup: boolean): void {
         return;
       }
       if (resumeSetup) {
-        // Setup is unfinished (config invalid). Route by role: the wizard's
-        // endpoints are admin-gated, so a non-admin gets the "an admin needs
-        // to finish setup" notice instead of a wizard of 403s (R3.8).
+        // The wizard's endpoints are admin-gated: route non-admins to the
+        // "an admin needs to finish setup" notice instead of a wizard of 403s.
         const dest = postLoginDestination(res.data?.user.role ?? "", false);
         if (dest === "wizard") {
           await startConfigWizard({ configValid: false, password });
@@ -386,11 +367,8 @@ function wireOIDCLinkForm(linkToken: string): void {
   const userInput = form.querySelector<HTMLInputElement>('input[name="username"]');
   if (userInput) {
     userInput.removeAttribute("required");
-    // Hide the field AND every label bound to it. login.html's labels are
-    // SIBLINGS of their inputs (`<label for>`), never wrappers, so the old
-    // closest("label") always found nothing and fell through to the input
-    // alone — leaving a "Username" caption over a field that was no longer
-    // there. `labels` resolves both the for= and wrapping shapes.
+    // login.html's labels are siblings (<label for>), never wrappers, so
+    // closest("label") finds nothing — hide via `labels` instead.
     userInput.hidden = true;
     for (const label of userInput.labels ?? []) {
       label.hidden = true;
@@ -414,8 +392,6 @@ function wireOIDCLinkForm(linkToken: string): void {
       password,
     });
     if (!res.ok) {
-      // The error envelope never carries a data payload; res.error holds the
-      // server's message.
       showError("loginError", res.error ?? "Failed to link account");
       return;
     }
@@ -440,20 +416,15 @@ function wireSetupForm(configValid: boolean): void {
     const password = (formData.get("password") as string) || "";
     const res = await authSetupCreateRaw({ username, password });
     if (!res.ok) {
-      // The error envelope never carries a data payload; res.error holds the
-      // server's message.
       showError("setupError", res.error ?? "Setup failed");
       return;
     }
-    // ONE flow for every first boot: admin creation flows straight into the
-    // config wizard, prefilled and accelerated by whatever the config file
-    // already answers; the password (memory-only) funds the post-activation
-    // passkey offer.
+    // ONE flow for every first boot: admin creation flows into the config
+    // wizard, prefilled from the config file; the memory-only password funds
+    // the post-activation passkey offer.
     //
-    // Offer the credential for saving here, while this form is still the page.
-    // Not awaited: the wizard must not wait behind a save prompt, and the call
-    // never rejects. See password-credential.ts for why the browser cannot
-    // work this out on its own.
+    // Not awaited: the wizard must not wait behind a save prompt, and the
+    // call never rejects (see password-credential.ts).
     void storePasswordCredential(username, password);
     await startConfigWizard({ configValid, password });
   });

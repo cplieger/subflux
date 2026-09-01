@@ -38,29 +38,22 @@ import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
 import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
 import { patch, reconcile } from "@cplieger/reactive";
 
-// Alert, Stats, and ProvidersResponse are the generated wire types, so the
-// runtime decoder + the type stay in lockstep. The local re-export keeps
-// the existing references in this file working.
+// Alert, Stats, and ProvidersResponse are the generated wire types, kept
+// locally re-exported so existing references in this file work.
 type Stats = StatsType;
 type ProvidersResponse = ProvidersResponseType;
 
 const toastedActivities = new Set<string>();
 // First-successful-poll marker for toast seeding: entries already terminal
-// on the FIRST response are historical and seed silently; entries reaching a
-// terminal state on any LATER response toast. A "toasted set is empty"
-// marker would misclassify the first real completion as historical whenever
-// the first response held only running activities.
+// on the FIRST response are historical and seed silently; only later
+// completions toast.
 let activitiesInitialized = false;
 const dismissedActivities = new Set<string>();
 
-// F2: both per-id memory sets prune on activity `remove` events (the server
-// pruned the row, so the memory goes with it), with a size cap as the belt
-// for ids that vanish without one (an SSE-down prune converges here). The
-// belt evicts only ids that already LEFT the ring: evicting a live done id
-// would make the next render re-toast it — and re-record it, evicting the
-// next live id, a toast storm over the whole snapshot. The cap is far above
-// the server's activity ring (a 20-row page plus running extras, 15-minute
-// prune), so the sets converge to the cap as soon as dead residue exists.
+// Both per-id memory sets prune on activity `remove` events, with a size cap
+// as the belt for ids that vanish without one. The belt evicts only ids that
+// already left the ring — evicting a live id would re-toast/re-record it on
+// the next render, cascading into a toast storm over the whole snapshot.
 const ACTIVITY_SET_CAP = 200;
 
 /** Record an id in one of the bounded memory sets: insertion-ordered, and
@@ -79,35 +72,25 @@ function addBounded(set: Set<string>, id: string): void {
   }
 }
 
-// Optimistic "stopping…" overlay: activity ids whose stop was dispatched but
-// whose terminal (cancelled) state has not arrived yet. Honesty note: a stop
-// ends the scan after the item IN FLIGHT completes — for single-item scopes
-// that is the whole scan, so this state may sit for minutes.
+// Ids whose stop was dispatched but whose terminal state has not arrived
+// yet. A stop ends the scan after the item in flight completes, so for
+// single-item scopes this may sit for minutes.
 const stoppingActivities = new Set<string>();
 
-// The status popup is a @cplieger/ui-primitives popover anchored to the status
-// button (replacing the native Popover API). Held here so isPopupOpen() and the
-// background poll can query/refresh it.
 let statusPopover: MenuPopover | null = null;
 
-// First-open anti-flicker controller for the popup skeleton, settled by the
-// first renderPopup after opening. showDelay 0 (an empty popup at min-height
-// would be worse than an instant skeleton) + the fleet's 300ms min-visible so
-// a fast poll can't flash it. deferredPaint holds the newest paint while a
-// min-visible commit is still pending, so a poll burst can't paint stale rows.
+// First-open anti-flicker controller: showDelay 0 (an empty popup at
+// min-height is worse than an instant skeleton) + 300ms min-visible.
+// deferredPaint holds the newest paint while a min-visible commit is
+// pending, so a poll burst can't paint stale rows.
 let popupSkeleton: SkeletonTimingController | null = null;
 let deferredPaint: (() => void) | null = null;
 
-// requires @cplieger/ui-primitives >= 2.1.0 (popover stretch mode); verified
-// locally via a node_modules overlay until released.
 export function initStatusPopover(): void {
   statusPopover = createMenuPopover($.statusBtn, $.statusPopup, {
-    // Panel role is "group" (not a menu), so leave haspopup at its default
-    // ("true") — there is no dedicated "group" aria-haspopup token.
+    // Panel role is "group", not "menu" — no dedicated aria-haspopup token
+    // for that, so leave it at its default.
     onOpen: () => {
-      // First open: anti-flicker skeleton (see popupSkeleton above), then
-      // poll. This was the native `toggle` listener in app.ts before the
-      // popover migration.
       if (!$.statusPopup.children.length && popupSkeleton === null) {
         popupSkeleton = skeletonTiming(
           () => {
@@ -136,7 +119,6 @@ function isPopupOpen(): boolean {
   return statusPopover?.isOpen ?? false;
 }
 
-// Build the stats summary fragment (media count, downloads, missing, providers).
 function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): HTMLElement | null {
   const parts: string[] = [];
   if (stats) {
@@ -179,10 +161,8 @@ function timedOutProviders(providers: ProvidersResponse): string[] {
   return ongoing;
 }
 
-/** Update the status button icon, label, and severity based on current state.
- *  Identity-stable (R8.5): the computed status maps 1:1 to the icon and
- *  label, so an unchanged `data-status` skips every DOM write — no
- *  unconditional icon replaceChildren on a no-change render. */
+/** Update the status button icon, label, and severity. Identity-stable: an
+ *  unchanged data-status skips every DOM write. */
 function updateStatusButton(
   btn: HTMLElement,
   alerts: Alert[],
@@ -227,9 +207,7 @@ function updateStatusButton(
   return isActive;
 }
 
-/** Flip the status button to the offline state (server unreachable) and, when
- *  the popup is open, replace its content with a single explanatory row.
- *  The next successful poll overwrites both. */
+/** Flip the status button to offline (server unreachable). */
 function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
   btn.dataset["status"] = "offline";
   const statusEl = document.getElementById("statusIcon");
@@ -248,10 +226,9 @@ function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
   }
 }
 
-/** First successful poll: whatever is already done predates this page load —
- *  seed it as historical (even when the snapshot has no done entries at all)
- *  so only LATER completions toast. Poll-only, because a FULL snapshot is the
- *  one honest baseline; event deltas never seed. */
+/** First successful poll: whatever is already done predates this page load,
+ *  so seed it as historical. Poll-only — a full snapshot is the one honest
+ *  baseline; event deltas never seed. */
 function seedToastHistory(activities: readonly ActivityEntry[]): void {
   if (activitiesInitialized) {
     return;
@@ -259,9 +236,7 @@ function seedToastHistory(activities: readonly ActivityEntry[]): void {
   activitiesInitialized = true;
   for (const a of activities) {
     if (a.done) {
-      // Plain add, no cap: the seed is a baseline, not growth — capping it
-      // would misread the evicted overflow of a large first snapshot as
-      // fresh completions. Growth paths use addBounded.
+      // Plain add, no cap: a seed is a baseline, not growth.
       toastedActivities.add(a.id);
     }
   }
@@ -270,8 +245,6 @@ function seedToastHistory(activities: readonly ActivityEntry[]): void {
 /** Process activity side effects: detect completions, show toasts. */
 function processActivitySideEffects(activities: readonly ActivityEntry[]): void {
   if (!activitiesInitialized) {
-    // No baseline yet: an entry seen before the first poll seeds cannot be
-    // told from history, so completion toasts wait for the seed.
     return;
   }
   for (const a of activities) {
@@ -282,8 +255,6 @@ function processActivitySideEffects(activities: readonly ActivityEntry[]): void 
         a.action !== "Manual Download" &&
         a.action !== "Audio Sync"
       ) {
-        // Distinct terminal signals: a cancelled or failed scan must not
-        // produce a success toast.
         if (a.cancelled) {
           notify.info(`Stopped: ${a.detail}`);
         } else if (a.failed) {
@@ -296,11 +267,8 @@ function processActivitySideEffects(activities: readonly ActivityEntry[]): void 
   }
 }
 
-// Status poll is a deduped action so overlapping dispatches collapse
-// onto a single in-flight request. Replaces the prior `polling` re-entry
-// guard + `pollAbort` AbortController. abortPoll() calls .cancel() to
-// abort in-flight on disconnect / page unload. error: false because
-// transient failures during background polling shouldn't toast.
+// Deduped so overlapping dispatches collapse onto one in-flight request.
+// error: false because transient background-poll failures shouldn't toast.
 const pollStatusAction = defineAction<undefined, undefined>({
   name: "status.poll",
   dedupe: true,
@@ -308,13 +276,9 @@ const pollStatusAction = defineAction<undefined, undefined>({
     const unconfigured = store.get("isUnconfigured");
     const popupVisible = isPopupOpen();
 
-    // Every leg issues in ONE concurrent burst; offline detection gates what
-    // is done with the RESULTS below, never their issuance. Alerts go
-    // through the RAW flavor so a network-level failure (status 0, not an
-    // abort) is distinguishable from "no alerts": an unreachable server must
-    // show the offline state, not coalesce to a green "Healthy" — the status
-    // button would otherwise be at its most reassuring exactly when the app
-    // is down. stateStats stays popup-gated.
+    // Alerts go through the RAW flavor so a network-level failure (status 0)
+    // is distinguishable from "no alerts" — an unreachable server must show
+    // offline, not coalesce to a green "Healthy".
     const [alertsRes, activitiesRes, providersRes, statsRes] = await Promise.all([
       listAlertsRaw({ signal }),
       listActivity({ signal }),
@@ -329,9 +293,9 @@ const pollStatusAction = defineAction<undefined, undefined>({
       return;
     }
 
-    // The poll is the reconcile authority: it REPLACES the event-fed store
-    // wholesale, which is what converges the three event-less cases (alert
-    // TTL expiry, alert cap eviction, unqueried provider-cooldown expiry).
+    // The poll REPLACES the event-fed store wholesale, converging the
+    // three event-less cases (alert TTL expiry, alert cap eviction,
+    // unqueried provider-cooldown expiry).
     const activities = activitiesRes ?? [];
     knownActivities = new Map(activities.map((a) => [a.id, a]));
     knownAlerts = new Map(((alertsRes.ok ? alertsRes.data : null) ?? []).map((a) => [a.id, a]));
@@ -360,20 +324,16 @@ export async function pollStatus(): Promise<void> {
 
 // --- The event-fed status store (E2) ---
 //
-// The server's status deltas (activity upsert/remove, alert raise/dismiss,
-// provider raise/clear) land here idempotently via events.ts; each full poll
-// REPLACES the snapshot wholesale. Maps preserve arrival order: the poll
-// writes the server's chronological list, an unseen event key appends, a
-// known key updates in place.
+// Server deltas (activity upsert/remove, alert raise/dismiss, provider
+// raise/clear) land here idempotently via events.ts; each full poll
+// replaces the snapshot wholesale.
 
 let knownActivities = new Map<string, ActivityEntry>();
 let knownAlerts = new Map<number, Alert>();
 let knownProviders: ProvidersResponse = { enabled: false, providers: {} };
 let knownStats: Stats | null = null;
 
-/** Shallow equality over two decoder-shaped flat records (every compared
- *  field is a primitive, and absent optionals are omitted rather than set to
- *  undefined). What makes re-application a no-op. */
+/** Shallow equality over two decoder-shaped flat records. */
 function sameRecord<T extends object>(a: T, b: T): boolean {
   const keys = Object.keys(a) as (keyof T)[];
   if (keys.length !== Object.keys(b).length) {
@@ -382,17 +342,14 @@ function sameRecord<T extends object>(a: T, b: T): boolean {
   return keys.every((k) => a[k] === b[k]);
 }
 
-/** Apply an activity delta (op upsert|remove, keyed entry.id). Re-applying a
- *  frame the store already reflects mutates nothing and repaints nothing. */
+/** Apply an activity delta, idempotently. */
 export function applyActivityEvent(ev: ActivityEvent): void {
   const entry = ev.entry;
   if (!entry) {
     return;
   }
   if (ev.op === "remove") {
-    // F2: the server pruned the row — drop the per-id memory with it. The
-    // toast dedupe and the optimistic-dismiss filter both key off ids that
-    // can never reappear once removed.
+    // The server pruned the row — drop the per-id memory with it.
     toastedActivities.delete(entry.id);
     dismissedActivities.delete(entry.id);
     if (!knownActivities.delete(entry.id)) {
@@ -408,7 +365,7 @@ export function applyActivityEvent(ev: ActivityEvent): void {
   renderStatus();
 }
 
-/** Apply an alert delta (op raise|dismiss, keyed alert.id), idempotently. */
+/** Apply an alert delta, idempotently. */
 export function applyAlertEvent(ev: AlertEvent): void {
   const alert = ev.alert;
   if (!alert) {
@@ -428,12 +385,10 @@ export function applyAlertEvent(ev: AlertEvent): void {
   renderStatus();
 }
 
-/** Apply a provider timeout delta (op raise|clear, keyed entry.provider),
- *  idempotently. Both ops upsert the carried status snapshot — a clear is
- *  the entry with timed_out false, the same per-provider shape the poll
- *  serves — and any provider event proves the health tracker is live, so
- *  `enabled` flips true. A cooldown expiring UNQUERIED emits no event; the
- *  reconcile tick's full fetch owns that convergence. */
+/** Apply a provider timeout delta, idempotently. Both ops upsert the
+ *  carried status snapshot; any provider event proves the health tracker
+ *  is live, so `enabled` flips true. A cooldown expiring unqueried emits
+ *  no event; the reconcile tick's full fetch owns that convergence. */
 export function applyProviderEvent(ev: ProviderEvent): void {
   const entry = ev.entry;
   if (!entry) {
@@ -450,11 +405,9 @@ export function applyProviderEvent(ev: ProviderEvent): void {
   renderStatus();
 }
 
-/** Repaint every status surface from the store: the running-scans map the
- *  scan buttons key off, the stopping-overlay reconcile, the nav button +
- *  label, completion toasts, the registered activity observers, and the
- *  popup when it is open. Shared by event application and the poll, so
- *  buttons and chip stay event-fresh with the poll silent. */
+/** Repaint every status surface from the store. Shared by event
+ *  application and the poll, so buttons and chip stay event-fresh with
+ *  the poll silent. */
 function renderStatus(): void {
   const btn = $.statusBtn;
   const activities = [...knownActivities.values()];
@@ -476,12 +429,10 @@ function renderStatus(): void {
   renderPopup(knownStats, knownProviders, activities, alerts, ongoing, isActive);
 }
 
-// --- Activity observers (task 12) ---
+// --- Activity observers ---
 //
-// Modules tracking specific activity ids (search.ts's download buttons)
-// observe every status-store change — event-fed while SSE is up, poll-fed
-// while it is down (the degraded 5s poll and the reconcile tick land here
-// too) — through one registration, replacing per-consumer pollers.
+// Modules tracking specific activity ids observe every status-store change
+// (event-fed while SSE is up, poll-fed while down) through one registration.
 
 const activityObservers = new Set<(activities: readonly ActivityEntry[]) => void>();
 
@@ -494,15 +445,13 @@ export function observeActivities(fn: (activities: readonly ActivityEntry[]) => 
   };
 }
 
-/** Publish the running-scans-by-scope map derived from the structured scope
- *  fields. This is the load-bearing restoration/catch-up path: a fresh poll
- *  rebuilds it with zero SSE events seen, and activity events keep it live
- *  in between. Scan buttons subscribe via detail-scan.ts, so an unchanged
- *  map is NOT re-published — a re-applied event writes no signal. */
+/** Publish the running-scans-by-scope map. Load-bearing restoration path: a
+ *  fresh poll rebuilds it with zero SSE events seen. An unchanged map is
+ *  NOT re-published. */
 function publishRunningScans(activities: readonly ActivityEntry[]): void {
   const next = runningScans(activities);
-  // Pre-boot reads (app.ts seeds the key before any poll or event) are
-  // undefined at runtime even though the store type says otherwise.
+  // Pre-boot reads are undefined at runtime even though the store type
+  // says otherwise.
   const prev = store.get("runningScansByScope") as RunningScansByScope | undefined;
   if (prev !== undefined && sameScans(prev, next)) {
     return;
@@ -530,8 +479,8 @@ function sameScans(a: RunningScansByScope, b: RunningScansByScope): boolean {
   return true;
 }
 
-/** Reconcile the optimistic "stopping…" overlay: entries that reached a
- *  terminal state (or vanished) leave the set. */
+/** Reconcile the "stopping…" overlay: terminal or vanished entries leave
+ *  the set. */
 function reconcileStoppingOverlay(activities: readonly ActivityEntry[]): void {
   if (stoppingActivities.size === 0) {
     return;
@@ -551,16 +500,15 @@ function reconcileStoppingOverlay(activities: readonly ActivityEntry[]): void {
 
 // --- The poll floor (E2) ---
 //
-// One fetch at connect/boot: the transaction's status leg (events.ts). While
-// CONNECTED, events feed the store and the 60s reconcile tick is the drift
-// belt. ONLY while the stream is DOWN does status ride the 5s poll.
+// One fetch at connect/boot: the transaction's status leg. While connected,
+// events feed the store and the 60s reconcile tick is the drift belt. Only
+// while the stream is down does status ride the 5s poll.
 
 let stopDownPoll: (() => void) | null = null;
 
-/** SSE connection state, driven by events.ts. DOWN — a refused connect or
- *  the post-CLOSED reconnect ladder — puts status on the 5s poll (pausing
- *  while hidden; pollAction owns that); a live stream stops it. CONNECTING
- *  blips never enter here: the browser's own retry is not a down period. */
+/** SSE connection state, driven by events.ts. A refused connect or the
+ *  post-CLOSED reconnect ladder puts status on the 5s poll; a live stream
+ *  stops it. CONNECTING blips never enter here. */
 export function setStatusDegraded(down: boolean): void {
   if (down === (stopDownPoll !== null)) {
     return;
@@ -574,10 +522,8 @@ export function setStatusDegraded(down: boolean): void {
 }
 
 /** Put the status poll on the shared 60s reconcile cadence: the drift belt
- *  while SSE is CONNECTED. Each tick's full fetch owns the three
- *  reconcile-only convergence cases no event carries — alert TTL expiry,
- *  alert cap eviction, and a provider cooldown expiring unqueried. The tick
- *  skips while hidden: a hidden tab issues zero status polls. */
+ *  while SSE is connected, covering alert TTL expiry, alert cap eviction,
+ *  and a provider cooldown expiring unqueried. Skips while hidden. */
 export function initStatusReconcile(): void {
   registerReconcileTask(() => {
     void pollStatus();
@@ -586,10 +532,8 @@ export function initStatusReconcile(): void {
 
 // --- Reconcile tick ---
 //
-// The 60s drift belt (E2), shared: the coverage dirty-set retry and the
-// status poll both ride it. Started lazily on the first registration, and it
-// PAUSES WHEN HIDDEN: a hidden tab converges on return via replay or
-// transaction instead.
+// The 60s drift belt (E2), shared by the coverage dirty-set retry and the
+// status poll. Started lazily on first registration; pauses while hidden.
 
 const reconcileTasks = new Set<() => void>();
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;
@@ -620,11 +564,8 @@ export function registerReconcileTask(fn: () => void): () => void {
   };
 }
 
-// buildActivityItem constructs a single activity row for the status popup.
-// Terminal states render DISTINCTLY: completed (check), cancelled (stop
-// glyph, muted), failed (warning) — a cancelled or failed scan must never
-// wear the success check. Running scan entries carry the stop control.
-// Exported for tests.
+// Terminal states render distinctly: completed (check), cancelled (stop
+// glyph, muted), failed (warning). Exported for tests.
 export function buildActivityItem(a: ActivityEntry): HTMLElement {
   const stopping = !a.done && stoppingActivities.has(a.id);
 
@@ -661,8 +602,6 @@ export function buildActivityItem(a: ActivityEntry): HTMLElement {
   } else if (a.done) {
     timerSpan = null;
   } else if (stopping) {
-    // Optimistic post-dispatch state. End-of-current-item semantics: for a
-    // single-item scope this may honestly sit here for minutes.
     timerSpan = el("span", { className: "live-timer" }, " \u00B7 stopping\u2026");
   } else if (a.queued) {
     timerSpan = el("span", { className: "live-timer" }, " \u00B7 queued");
@@ -677,9 +616,7 @@ export function buildActivityItem(a: ActivityEntry): HTMLElement {
     );
   }
 
-  // Running scan entries get the stop control (canonical home per the S12
-  // ruling): confirm-less graceful stop, rendered per the object-level role
-  // (full scans are admin-stoppable only). Queued entries keep the dismiss
+  // Running scan entries get the stop control; queued keep the dismiss
   // cancel; done entries the dismiss button.
   let actionBtn: HTMLElement | null = null;
   if (a.done || a.queued) {
@@ -726,9 +663,8 @@ export function buildActivityItem(a: ActivityEntry): HTMLElement {
   );
 }
 
-/** Dispatch a graceful stop for a running scan with the optimistic
- *  "stopping…" state; the terminal cancelled entry arriving via poll (or a
- *  failed dispatch reverting the overlay) reconciles the row. */
+/** Dispatch a graceful stop with the optimistic "stopping…" state; the
+ *  terminal entry arriving via poll (or a failed dispatch) reconciles the row. */
 function requestStopScan(id: string, btn: HTMLButtonElement | null): void {
   stoppingActivities.add(id);
   if (btn) {
@@ -741,18 +677,14 @@ function requestStopScan(id: string, btn: HTMLButtonElement | null): void {
   }
   void cancelActivityAction.dispatch(id).then((r) => {
     if (r === null) {
-      // Stop rejected (network failure, or the scan finished first): revert
-      // the optimistic overlay; the poll repaints the row's true state.
       stoppingActivities.delete(id);
     }
     void pollStatus();
   });
 }
 
-/** Stop a running background scan. Silent on failure (no toast): the row
- *  reverting from "stopping…" plus the next poll's true state is the
- *  feedback. Dedupe guards rapid double-clicks; the endpoint is idempotent
- *  (204 for already-stopping) anyway. */
+/** Stop a running background scan. Silent on failure — the row reverting
+ *  from "stopping…" plus the next poll is the feedback. */
 const cancelActivityAction = apiAction<string>({
   name: "activity.cancel",
   request: (id) => ({ method: "POST", path: fillPath(PATH_CANCEL_ACTIVITY, { id }) }),
@@ -768,8 +700,6 @@ function buildAlertItem(a: Alert): HTMLElement {
       className: "pop-dismiss",
       "aria-label": "Dismiss alert",
       onclick: (e: MouseEvent) => {
-        // Optimistic exit animation, matching activity dismissal; a server
-        // failure surfaces as the alert reappearing on the next poll.
         const item = (e.currentTarget as HTMLElement).closest(".pop-item");
         if (item) {
           animateDismiss(item);
@@ -909,11 +839,10 @@ function renderPopup(
     reconcile($.statusPopup, items, {
       key: (item) => item.key,
       mount: (item) => item.build(),
-      // The R7.2 gap: without this, a keyed row mounted once never repaints,
-      // so a running activity kept its spinner after finishing while the
-      // popup stayed open. A fresh build patched over the live row updates
-      // it in place — attributes, text, and handlers sync only where they
-      // differ, so an unchanged row is left untouched.
+      // Without an update path, a keyed row mounted once never repaints, so
+      // a running activity kept its spinner after finishing while the
+      // popup stayed open. A fresh build patched over the live row syncs
+      // only what differs.
       update: (row, item) => {
         const fresh = item.build();
         if (row.className !== fresh.className) {
@@ -922,8 +851,7 @@ function renderPopup(
         patch(row, ...Array.from(fresh.childNodes));
       },
     });
-    // Content changed after placement — re-clamp against the real height
-    // (no-op while the popup is closed).
+    // Re-clamp against the real height after content changes (no-op while closed).
     statusPopover?.reposition();
   };
   if (popupSkeleton !== null) {
@@ -932,28 +860,25 @@ function renderPopup(
     const s = popupSkeleton;
     popupSkeleton = null;
     s.commit(() => {
-      // Detach the skeleton before the first reconcile: reconcile() removes
-      // only children carrying its key attribute, so the unkeyed placeholder
-      // rows would survive this paint and every later one, with the live rows
-      // inserted below them. detail.ts clears its container in the commit for
-      // the same reason; the table views get it from their shell patch.
+      // reconcile() removes only children carrying its key attribute, so
+      // the unkeyed skeleton rows must be detached before the first
+      // reconcile or they'd survive every later paint too.
       $.statusPopup.replaceChildren();
       deferredPaint?.();
       deferredPaint = null;
     });
   } else if (deferredPaint !== null) {
-    // A newer poll landed before the min-visible commit fired: supersede the
-    // queued paint so the deferred commit renders the freshest data.
+    // A newer poll landed before the min-visible commit fired: supersede
+    // the queued paint.
     deferredPaint = paint;
   } else {
     paint();
   }
 }
 
-/** Play the authored exit animation (fade + slide + collapse) on a popup row,
- *  removing the element when the transition ends (300ms fallback covers
- *  reduced-motion and transition-less environments). Removal outside
- *  reconcile is safe: the dismissed row is filtered from the next render. */
+/** Play the exit animation on a popup row, removing the element when the
+ *  transition ends (300ms fallback for reduced-motion / transition-less
+ *  environments). */
 function animateDismiss(item: Element): void {
   item.classList.add("pop-dismissing");
   const remove = (): void => {
@@ -965,8 +890,6 @@ function animateDismiss(item: Element): void {
 
 function dismissActivity(id: string): void {
   addBounded(dismissedActivities, id);
-  // Play the exit animation for immediate feedback; the row is filtered from
-  // subsequent renders by the dismissedActivities set.
   const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
   if (item) {
     const btn = item.querySelector<HTMLButtonElement>(".close-btn");
@@ -975,11 +898,8 @@ function dismissActivity(id: string): void {
     }
     animateDismiss(item);
   }
-  // Optimistic hide with rollback: on success the server prunes the entry
-  // and the set entry is moot; on terminal failure (retries exhausted) the
-  // id must LEAVE the client-side set — it is permanent otherwise, so the
-  // row could never reappear — and a refresh poll repaints the true state.
-  // The action's error notification reports the failure.
+  // Optimistic hide with rollback: on terminal failure the id must LEAVE
+  // the client-side set, or the row could never reappear.
   void dismissActivityAction.dispatch(id).then((r) => {
     if (r === null) {
       dismissedActivities.delete(id);
@@ -989,10 +909,7 @@ function dismissActivity(id: string): void {
 }
 
 /** Dismiss an activity. retryNetwork + RETRY_STANDARD absorb transient
- *  blips (a quick disconnect would otherwise leave the row hidden but never
- *  actually dismissed server-side); a terminal failure surfaces the action
- *  error notification and dismissActivity rolls the optimistic hide back.
- *  dedupe protects against rapid double-click. */
+ *  blips; a terminal failure rolls the optimistic hide back. */
 const dismissActivityAction = apiAction<string>({
   name: "activity.dismiss",
   request: (id) => ({
@@ -1012,8 +929,7 @@ async function dismissAlert(id: number): Promise<void> {
   }
 }
 
-/** Dismiss an alert with retry on transient network failures. Dedupe
- *  prevents rapid-click duplicate deletes against the same alert id. */
+/** Dismiss an alert with retry on transient network failures. */
 const dismissAlertAction = apiAction<number>({
   name: "alerts.dismiss",
   request: (id) => ({ method: "DELETE", path: `${PATH_DISMISS_ALERT}?id=${id}` }),
@@ -1025,10 +941,8 @@ const dismissAlertAction = apiAction<number>({
 
 // --- Live timers (popup-scoped) ---
 //
-// The 1s elapsed-time tick runs ONLY while the popup is open (the popover's
-// open/close hooks own the interval), and the row scan roots at the popup —
-// the only place `.live-timer[data-started]` rows render (R8.5). A closed
-// popup costs zero timers and zero DOM reads.
+// The 1s tick runs only while the popup is open; `.live-timer[data-started]`
+// rows only render there. A closed popup costs zero timers.
 
 let liveTimerId: ReturnType<typeof setInterval> | null = null;
 

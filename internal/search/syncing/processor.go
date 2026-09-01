@@ -8,16 +8,10 @@ import (
 	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
-// SubtitleProcessor implements the SRT surface both handler families declare,
-// using subsync, without an intermediate backend interface. Every operation
-// (parse/write/shift/normalize) runs in-process; audio sync is a server-owned
-// job and does not come through here.
 // SubtitleProcessor is the SRT text surface both handler families declare:
 // encoding normalization, parsing and serialization. Stateless, so the zero
 // value is the only one anyone needs.
 type SubtitleProcessor struct{}
-
-// Compile-time check.
 
 // apiCuesFromSubsync converts []subsync.Cue to []subflux.SubtitleCue via
 // explicit field-by-field copy.

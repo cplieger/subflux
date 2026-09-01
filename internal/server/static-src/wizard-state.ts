@@ -1,9 +1,8 @@
-// wizard-state.ts — Pure first-boot wizard logic: prefill from the
-// structured config, the per-step {prefill, satisfied, validate, touched}
-// matrix's satisfied/collapse gating, draft fingerprint + touched-only
-// overlay, and the GET-overlay-PUT full-map save assembly. No DOM, no
-// network: wizard.ts owns the flow, this module owns the decisions, so the
-// vitest suite can pin them without a browser.
+// wizard-state.ts — pure first-boot wizard logic: prefill from the
+// structured config, the per-step satisfied/collapse gating, draft
+// fingerprint + touched-only overlay, and the GET-overlay-PUT full-map save
+// assembly. No DOM, no network: wizard.ts owns the flow, this module owns
+// the decisions, so the vitest suite can pin them without a browser.
 
 import { EXAMPLE_SECTIONS } from "./wizard-example.js";
 import { DEFAULT_VARIANT } from "./constants.js";
@@ -59,7 +58,7 @@ export const STEP_IDS = [
 /** StepID identifies one wizard step. */
 export type StepID = (typeof STEP_IDS)[number];
 
-/** MANDATORY_STEPS are the steps whose satisfaction gates the R3.5
+/** MANDATORY_STEPS are the steps whose satisfaction gates the
  *  "everything looks configured — finish" fast path. The remaining steps
  *  are tunable defaults a user may accept untouched. */
 export const MANDATORY_STEPS: readonly StepID[] = ["arr", "media_roots", "providers", "languages"];
@@ -119,7 +118,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return stableStringify(a) === stableStringify(b);
 }
 
-// --- Prefill (R3.2: every non-secret value plus secret-presence state) ---
+// --- Prefill (every non-secret value plus secret-presence state) ---
 
 /** fieldMapFromSection flattens a mapping section into the wizard's string
  *  form map: bools become "true"/"false", numbers their decimal form,
@@ -136,9 +135,9 @@ function fieldMapFromSection(sect: Record<string, unknown>): Record<string, stri
   return out;
 }
 
-/** prefillModel builds the wizard model from the structured config: the
- *  "prefill" column of the step matrix. Secret values arrive redacted-empty
- *  by design; presence is carried separately (WizardBoot.secretsPresent). */
+/** prefillModel builds the wizard model from the structured config. Secret
+ *  values arrive redacted-empty by design; presence is carried separately
+ *  (WizardBoot.secretsPresent). */
 export function prefillModel(sections: Sections): WizardModel {
   const model: WizardModel = {
     wizardValues: {},
@@ -233,7 +232,7 @@ function subtitleVariant(sub: Record<string, unknown>): string {
   return DEFAULT_VARIANT;
 }
 
-// --- Satisfied / collapse gating (R3.3) ---
+// --- Satisfied / collapse gating ---
 
 /** arrComplete reports whether one arr section is fully configured: URL set
  *  and API key either entered or already saved (presence flag). */
@@ -260,9 +259,9 @@ export function providerEnabledInSections(sections: Sections, name: string): boo
   return !isRecord(block) || block["enabled"] !== false;
 }
 
-/** stepComplete is the per-step structural-completeness column of the
- *  matrix, evaluated over the CONFIG (not form state): does the section
- *  actually answer the step's question? */
+/** stepComplete is the per-step structural-completeness check, evaluated
+ *  over the config (not form state): does the section actually answer the
+ *  step's question? */
 function stepComplete(step: StepID, boot: WizardBoot): boolean {
   const { sections, secretsPresent } = boot;
   switch (step) {
@@ -302,11 +301,10 @@ export function differsFromExample(step: StepID, sections: Sections): boolean {
   );
 }
 
-/** stepSatisfied is the collapse gate (R3.3, settled): a step may
- *  auto-collapse ONLY when the config is valid AND its section differs from
- *  the embedded example default AND the section structurally answers the
- *  step. A fresh volume (example config, config_valid=false) satisfies
- *  nothing — the FULL walk. */
+/** stepSatisfied is the collapse gate: a step may auto-collapse only when
+ *  the config is valid AND its section differs from the embedded example
+ *  default AND the section structurally answers the step. A fresh volume
+ *  (example config, config_valid=false) satisfies nothing — the full walk. */
 export function stepSatisfied(step: StepID, boot: WizardBoot): boolean {
   return boot.configValid && differsFromExample(step, boot.sections) && stepComplete(step, boot);
 }
@@ -322,13 +320,13 @@ export function satisfiedSteps(boot: WizardBoot): Set<StepID> {
   return out;
 }
 
-/** fastPathAvailable is the R3.5 gate: config valid and every mandatory
- *  step satisfied — the flow may open directly on the review screen. */
+/** fastPathAvailable gates opening directly on the review screen: config
+ *  valid and every mandatory step satisfied. */
 export function fastPathAvailable(boot: WizardBoot): boolean {
   return boot.configValid && MANDATORY_STEPS.every((id) => stepSatisfied(id, boot));
 }
 
-// --- Draft (R3.7) ---
+// --- Draft ---
 
 /** WizardDraft is the localStorage draft: the SANITIZED model (v2 excludes
  *  every schema secret field — see buildDraftJSON) plus the fingerprint of
@@ -595,7 +593,7 @@ function copyValues(out: WizardModel, from: WizardModel, keys: readonly string[]
   }
 }
 
-// --- Save assembly (R3.4: GET-overlay-PUT the FULL map) ---
+// --- Save assembly (GET-overlay-PUT the full map) ---
 
 /** typedValue mirrors the retired YAML emitter's value typing: bool words
  *  become booleans, all-digit strings numbers, everything else stays a
@@ -795,7 +793,7 @@ function serializeLanguages(model: WizardModel): Sections {
   return out;
 }
 
-// --- Post-login routing (R3.8) ---
+// --- Post-login routing ---
 
 /** PostLoginDestination is where a successful login lands. */
 export type PostLoginDestination = "app" | "wizard" | "admin_needed_notice";

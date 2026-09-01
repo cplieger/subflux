@@ -20,10 +20,9 @@ var ignoredCodecTable = []struct {
 // policy. This is the ONE resolver every consumer (engine + server handlers)
 // goes through.
 //
-// The parameter is an anonymous one-method interface because that is the whole
-// of what this resolver reads: 1 of the 37 values the configuration offers.
-// Every caller's own config surface already carries EmbeddedPolicy, so each
-// satisfies this structurally without naming anything.
+// The parameter is an anonymous one-method interface because that is the
+// only value this resolver reads; every caller's config surface already
+// carries EmbeddedPolicy, so each satisfies this structurally.
 func IgnoredCodecsFromConfig(cfg interface{ EmbeddedPolicy() subflux.EmbeddedPolicy }) map[string]bool {
 	p := cfg.EmbeddedPolicy()
 	ignored := make(map[string]bool, 4)

@@ -103,7 +103,6 @@ func (p *Poller) processPollImport(
 	return false, queried
 }
 
-// processSonarrImport handles a single Sonarr import event from the history API.
 func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
 	path := entry.ImportedPath()
 
@@ -151,7 +150,6 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 	)
 }
 
-// processRadarrImport handles a single Radarr import event from the history API.
 func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
 	path := entry.ImportedPath()
 

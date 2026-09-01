@@ -52,8 +52,8 @@ func Build(req *subflux.SearchRequest) string {
 	case subflux.MediaTypeEpisode:
 		return Episode(req.TvdbID, req.ImdbID, SeasonEpisode{Season: req.Season, Episode: req.Episode})
 	default:
-		// Legacy fallthrough: treat unknown types as episodes so older
-		// scan state with missing subflux.MediaType still resolves.
+		// Unknown MediaType (e.g. absent from older persisted state) is
+		// treated as an episode.
 		return Episode(req.TvdbID, req.ImdbID, SeasonEpisode{Season: req.Season, Episode: req.Episode})
 	}
 }

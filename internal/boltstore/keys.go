@@ -51,7 +51,7 @@ const (
 )
 
 // coreBuckets and authBuckets list every bucket the core store bootstraps. Kept
-// adjacent to the name constants so store.go's bootstrap (task 2.3) cannot drift
+// adjacent to the name constants so store.go's bootstrap cannot drift
 // from the declared schema.
 var (
 	coreBuckets = [][]byte{

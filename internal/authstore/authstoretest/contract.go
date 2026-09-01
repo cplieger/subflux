@@ -2,7 +2,7 @@
 // suite for subflux's auth store against the auth library's persistence SPI. It
 // depends ONLY on the cplieger/auth library (the domain types and the store
 // interface), so it pins behaviour at the AuthStore seam rather than at one
-// engine's internals (Requirements 14.1, 14.2). The bbolt authstore.Store is
+// engine's internals. The bbolt authstore.Store is
 // the only engine today.
 //
 // # What this suite is
@@ -13,23 +13,24 @@
 //   - uniqueness: duplicate username (case-insensitive), duplicate
 //     (oidc_issuer, oidc_sub), duplicate passkey credential id, and duplicate
 //     API-key hash are each rejected with a non-nil error and no partial write
-//     (Requirements 9.3, 16.1);
+//
+// ;
 //   - user-delete cascade: a deleted user's passkeys, API keys, and sessions
 //     are all removed, the freed username can be recreated, and ANOTHER user's
-//     records are untouched (Requirement 9.4);
+//     records are untouched;
 //   - single-use ConsumeOIDCState: the first consume returns the stored values
-//     exactly, the second returns not-found (Requirement 16.3);
+//     exactly, the second returns not-found;
 //   - credential ownership: a non-owner cannot delete or rename a passkey, nor
-//     delete an API key (Requirement 16.4);
+//     delete an API key;
 //   - session expiry: CleanupExpiredSessions evicts idle-expired and
 //     absolute-expired sessions, keeps live ones, with an exact count and an
-//     exclusive boundary (Requirement 10.3);
+//     exclusive boundary;
 //   - the WebAuthn user handle: create mints a non-empty one, it resolves its
 //     owner and nobody else, a duplicate is rejected, and an unknown or empty
 //     handle reports plain absence (the discoverable-login lookup);
 //   - sign_count durability across a simulated restart: a raised sign_count
 //     survives a Reopen, and so do the durable user/passkey records
-//     (Requirement 9.5, the durable-and-monotonic half every engine owes).
+//     (the durable-and-monotonic half every engine owes).
 //
 // Engine-specific behaviours are deliberately NOT asserted here, so the shared
 // suite never pins one engine's detail. They are covered by store-specific
@@ -238,7 +239,7 @@ func mkSession(hash string, userID int64, created, lastActivity time.Time) *auth
 // --- behaviours ---
 
 // testUniqueness asserts all four uniqueness constraints reject a duplicate
-// with a non-nil error and write nothing (Requirements 9.3, 16.1).
+// with a non-nil error and write nothing.
 func testUniqueness(t *testing.T, h Harness) {
 	t.Helper()
 	s := h.Store()
@@ -248,7 +249,7 @@ func testUniqueness(t *testing.T, h Harness) {
 }
 
 // assertUsernameUniqueness asserts a duplicate username is rejected
-// case-insensitively with no partial write (Requirements 9.3, 16.1).
+// case-insensitively with no partial write.
 func assertUsernameUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
@@ -264,7 +265,7 @@ func assertUsernameUniqueness(t *testing.T, s SPI) {
 }
 
 // assertOIDCUniqueness asserts a duplicate (issuer, sub) is rejected while a
-// distinct sub under the same issuer is allowed (Requirement 9.3).
+// distinct sub under the same issuer is allowed.
 func assertOIDCUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
@@ -290,7 +291,7 @@ func assertOIDCUniqueness(t *testing.T, s SPI) {
 // assertCredentialUniqueness asserts a duplicate passkey credential id and a
 // duplicate API-key hash are each rejected with no partial write. Both checks
 // need a real owner (an engine may enforce a NOT NULL owner FK), so this helper
-// creates one and exercises both (Requirements 9.3, 16.1).
+// creates one and exercises both.
 func assertCredentialUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
@@ -329,7 +330,7 @@ func assertCredentialUniqueness(t *testing.T, s SPI) {
 
 // testDeleteUserCascade asserts DeleteUser removes the user's passkeys, API
 // keys, and sessions, frees the username, and leaves another user untouched
-// (Requirement 9.4).
+// .
 func testDeleteUserCascade(t *testing.T, h Harness) {
 	t.Helper()
 	ctx := context.Background()
@@ -375,7 +376,7 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 
 // assertVictimCascaded verifies the deleted user is gone, its username is
 // freed, and its passkeys, API keys, and sessions were all cascaded away
-// (Requirement 9.4). Split in two so each half stays inside gocyclo's ceiling:
+// . Split in two so each half stays inside gocyclo's ceiling:
 // every lookup now asserts the full (value, found, err) triple, which costs
 // two branches apiece.
 func assertVictimCascaded(t *testing.T, s SPI, victimID int64, vCred []byte) {
@@ -422,7 +423,7 @@ func assertVictimChildrenCascaded(t *testing.T, s SPI, victimID int64, vCred []b
 }
 
 // assertKeepUserIntact verifies the unrelated user and all its records survive
-// another user's delete cascade (Requirement 9.4 isolation).
+// another user's delete cascade.
 func assertKeepUserIntact(t *testing.T, s SPI, keepID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -442,7 +443,7 @@ func assertKeepUserIntact(t *testing.T, s SPI, keepID int64) {
 }
 
 // testConsumeOIDCStateSingleUse asserts the first consume returns the stored
-// values exactly and the second returns not-found (Requirement 16.3).
+// values exactly and the second returns not-found.
 func testConsumeOIDCStateSingleUse(t *testing.T, h Harness) {
 	t.Helper()
 	ctx := context.Background()
@@ -474,7 +475,7 @@ func testConsumeOIDCStateSingleUse(t *testing.T, h Harness) {
 }
 
 // testCredentialOwnership asserts a non-owner cannot delete or rename a passkey,
-// nor delete an API key; the owner can (Requirement 16.4).
+// nor delete an API key; the owner can.
 func testCredentialOwnership(t *testing.T, h Harness) {
 	t.Helper()
 	ctx := context.Background()
@@ -494,7 +495,7 @@ func testCredentialOwnership(t *testing.T, h Harness) {
 }
 
 // assertPasskeyOwnership verifies a non-owner can neither rename nor delete a
-// passkey while the owner can (Requirement 16.4).
+// passkey while the owner can.
 func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -539,7 +540,7 @@ func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 }
 
 // assertAPIKeyOwnership verifies a non-owner cannot delete an API key while the
-// owner can (Requirement 16.4).
+// owner can.
 func assertAPIKeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -568,7 +569,7 @@ func assertAPIKeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 
 // testSessionExpiry asserts CleanupExpiredSessions evicts idle-expired and
 // absolute-expired sessions, keeps live and exactly-at-boundary sessions, and
-// returns the exact evicted count (Requirement 10.3). The exclusive (strict)
+// returns the exact evicted count. The exclusive (strict)
 // boundary is part of the seam, not an engine detail.
 func testSessionExpiry(t *testing.T, h Harness) {
 	t.Helper()
@@ -618,7 +619,7 @@ func testSessionExpiry(t *testing.T, h Harness) {
 }
 
 // testSignCountDurableAcrossReopen asserts a raised sign_count and the durable
-// user/passkey records survive a simulated restart (Requirement 9.5, the
+// user/passkey records survive a simulated restart (the
 // durable half every engine owes).
 func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	t.Helper()

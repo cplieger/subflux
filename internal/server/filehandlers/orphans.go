@@ -1,15 +1,14 @@
 package filehandlers
 
-// Orphan files (S7 / R3.4): subtitle files on disk with no store row were
-// previously invisible AND un-deletable via the API (the listing was
-// store-rows-only). The listing now walks the media item's directories and
-// surfaces orphans with server-minted opaque handles from a bounded TTL
-// table; deletion resolves a handle exactly once, revalidates metadata +
-// extension + containment, consumes it, then deletes. Expired handles
-// answer 410, unknown ones 404. No client-supplied path exists anywhere in
-// the flow, and the all-orphan arr fallback only walks directories of an
-// arr item whose identity provably matches the requested media_id. Handles
-// are random 128-bit values, meaningless off-box, and never logged.
+// Orphan files (S7 / R3.4): subtitle files on disk with no store row.
+// The listing walks the media item's directories and surfaces orphans with
+// server-minted opaque handles from a bounded TTL table; deletion resolves
+// a handle exactly once, revalidates metadata + extension + containment,
+// consumes it, then deletes. Expired handles answer 410, unknown ones 404.
+// No client-supplied path exists anywhere in the flow, and the all-orphan
+// arr fallback only walks directories of an arr item whose identity provably
+// matches the requested media_id. Handles are random 128-bit values,
+// meaningless off-box, and never logged.
 
 import (
 	"context"

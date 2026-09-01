@@ -17,11 +17,9 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// providerTimeoutResponse is an alias for the canonical wire type.
 type providerTimeoutResponse = subflux.ProvidersResponse
 
-// HandleState returns subtitle state with optional filters.
-// GET /api/state?type=episode&lang=fr&provider=opensubtitles&limit=50
+// HandleState handles GET /api/state?type=episode&lang=fr&provider=opensubtitles&limit=50.
 func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !httpapi.RequireGET(w, r) {
@@ -67,8 +65,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, entries)
 }
 
-// HandleBackoff returns items currently in adaptive search backoff.
-// GET /api/backoff
+// HandleBackoff handles GET /api/backoff.
 func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !httpapi.RequireGET(w, r) {
@@ -82,16 +79,14 @@ func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, entries)
 }
 
-// HandleBackoffByPrefix returns backoff entries for media IDs matching a prefix.
-// GET /api/backoff/prefix?type=episode&prefix=tvdb-81189-
+// HandleBackoffByPrefix handles GET /api/backoff/prefix?type=episode&prefix=tvdb-81189-.
 func (h *Handler) HandleBackoffByPrefix(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	handleTypePrefixQuery(w, r, "backoff prefix",
 		func(mt, p string) (any, error) { return h.queryDB.BackoffByPrefix(ctx, subflux.MediaType(mt), p) })
 }
 
-// HandleLocks returns all manually locked media+language pairs.
-// GET /api/locks
+// HandleLocks handles GET /api/locks.
 func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !httpapi.RequireGET(w, r) {
@@ -113,8 +108,7 @@ type ProviderInfo struct {
 	Loaded  bool   `json:"loaded"`
 }
 
-// HandleProviders returns registered providers with enabled status.
-// GET /api/providers
+// HandleProviders handles GET /api/providers.
 func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
@@ -161,8 +155,7 @@ type ParsedConfig struct {
 	Radarr         bool                      `json:"radarr_configured"`
 }
 
-// HandleConfigParsed returns the config as structured JSON.
-// GET /api/config/parsed
+// HandleConfigParsed handles GET /api/config/parsed.
 func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
@@ -206,8 +199,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleScore simulates scoring a subtitle against a video.
-// POST /api/score with JSON body.
+// HandleScore handles POST /api/score (JSON body).
 func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequirePOST(w, r) {
 		return
@@ -254,9 +246,8 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, subflux.ScorePreview(result))
 }
 
-// HandleSearchTargets resolves subtitle targets for a media item
-// without actually searching. Useful for debugging language rules.
-// GET /api/search/targets?orig_lang=en&audio_langs=en,fr
+// HandleSearchTargets handles GET /api/search/targets?orig_lang=en&audio_langs=en,fr:
+// resolves subtitle targets for a media item without actually searching.
 func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
@@ -301,8 +292,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleProviderTimeout returns provider timeout state for all providers.
-// GET /api/providers/timeout
+// HandleProviderTimeout handles GET /api/providers/timeout.
 func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
@@ -316,8 +306,7 @@ func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) 
 	httpapi.WriteJSON(w, providerTimeoutResponse{Enabled: true, Providers: status})
 }
 
-// HandleProviderTimeoutReset clears all provider timeout state and re-enables all providers.
-// POST /api/providers/timeout/reset
+// HandleProviderTimeoutReset handles POST /api/providers/timeout/reset.
 func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequirePOST(w, r) {
 		return

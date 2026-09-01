@@ -97,27 +97,21 @@ type Engine struct {
 // Option configures the search Engine.
 type Option func(*Engine)
 
-// WithStore sets the search store.
 func WithStore(s Store) Option { return func(e *Engine) { e.store = s } }
 
-// WithConfig sets the search configuration.
 func WithConfig(c Cfg) Option { return func(e *Engine) { e.cfg = c } }
 
-// WithMetrics sets the metrics recorder.
 func WithMetrics(m Metrics) Option { return func(e *Engine) { e.metrics = m } }
 
-// WithScorer sets the subtitle scorer.
 func WithScorer(s Scorer) Option { return func(e *Engine) { e.scorer = s } }
 
-// WithSyncer sets the subtitle syncer.
 func WithSyncer(s SubtitleSyncer) Option { return func(e *Engine) { e.syncer = s } }
 
 // WithSyncExec sets the executor for the engine's own heavy sync calls (the
 // audio fallback). Defaults to in-process; server mode installs the
-// sync-worker client so alignment memory lives in a disposable child (P13).
+// sync-worker client so alignment memory lives in a disposable child.
 func WithSyncExec(x syncing.SyncExec) Option { return func(e *Engine) { e.syncExec = x } }
 
-// WithTracks sets the track detector.
 func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t } }
 
 // WithTimeout sets the provider health tracker. When not set, the engine
@@ -137,7 +131,6 @@ type providerHealth interface {
 	SetOnChange(fn providerhealth.OnChange)
 }
 
-// noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}
 
 func (noopHealth) IsTimedOut(subflux.ProviderID) bool                    { return false }
@@ -167,7 +160,6 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	for _, o := range opts {
 		o(e)
 	}
-	// Build O(1) lookup map for downloadFromProvider.
 	e.providersByName = make(map[subflux.ProviderID]provider.Provider, len(providers))
 	for _, p := range providers {
 		e.providersByName[p.Name()] = p
@@ -204,7 +196,6 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	return e
 }
 
-// ScoreSubtitles scores and ranks subtitles for a search request.
 func (e *Engine) ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult {
 	results, _ = scoring.FilterByIdentity(results, req)
 	video := videoInfoFromRequest(req)
@@ -221,8 +212,7 @@ func (e *Engine) ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Su
 	return out
 }
 
-// HashFile computes the OpenSubtitles hash and file size for a video file.
-// Concurrent calls for the same path are deduplicated via singleflight.
+// HashFile deduplicates concurrent calls for the same path via singleflight.
 func (e *Engine) HashFile(ctx context.Context, path string) (hash string, size int64, err error) {
 	type hashResult struct {
 		hash string
@@ -245,8 +235,7 @@ func (e *Engine) HashFile(ctx context.Context, path string) (hash string, size i
 	return r.hash, r.size, nil
 }
 
-// ProviderTimeouts returns a snapshot of all provider timeout states.
-// Returns (status, true) if timeouts are enabled, (nil, false) otherwise.
+// ProviderTimeouts returns (nil, false) when timeouts are disabled.
 func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStatus, bool) {
 	s := e.timeout.Status()
 	if s == nil {
@@ -255,7 +244,6 @@ func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStat
 	return s, true
 }
 
-// ResetTimeouts clears all provider timeout state and re-enables all providers.
 func (e *Engine) ResetTimeouts() {
 	e.timeout.Reset()
 }
@@ -268,7 +256,6 @@ func (e *Engine) SetProviderHealthHook(fn providerhealth.OnChange) {
 	e.timeout.SetOnChange(fn)
 }
 
-// SimulateScore simulates scoring a subtitle against a video using release names.
 func (e *Engine) SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult {
 	video := videoInfoFromRequest(&subflux.SearchRequest{
 		MediaType:   mediaType,
@@ -288,7 +275,6 @@ func (e *Engine) SimulateScore(mediaType subflux.MediaType, videoRelease, subRel
 	}
 }
 
-// groupTargetsByLang groups targets by language code, preserving insertion order.
 func groupTargetsByLang(targets []subflux.SubtitleTarget) (groups map[string][]subflux.SubtitleTarget, order []string) {
 	groups = make(map[string][]subflux.SubtitleTarget)
 	for _, t := range targets {
@@ -301,8 +287,8 @@ func groupTargetsByLang(targets []subflux.SubtitleTarget) (groups map[string][]s
 }
 
 // detectExistingObserved probes local subtitles and applies the engine's
-// detector-error policy (embedded-detector separation, R2.3): a failed probe
-// is WARN-logged with a bounded path attribute and counted in
+// detector-error policy: a failed probe is WARN-logged with a bounded path
+// attribute and counted in
 // subflux_embedded_detector_errors_total — context cancellation is excluded
 // from both — and probeOK=false tells the caller to SKIP the coverage
 // replacement for this video: RecordSubtitleFiles is a full-set replacement,
@@ -358,7 +344,7 @@ func boundLogPath(p string) string {
 // PRE-work state: the inventory describes what the visit observed on disk,
 // which is correct however the search itself ends. The scanned_at stamp is
 // the post-work half (stampScanState) — splitting the two is what keeps the
-// resume stamp honest (P5). No-op (returns false) for unidentified media.
+// resume stamp honest. No-op (returns false) for unidentified media.
 func (e *Engine) recordCoverageInventory(ctx context.Context, mediaType subflux.MediaType,
 	mediaID string, existing existingSubs,
 ) bool {
@@ -419,8 +405,6 @@ func (e *Engine) InventoryCoverage(ctx context.Context, req *subflux.SearchReque
 	req.VideoPath = videoPath
 	existing, probeOK := e.detectExistingObserved(ctx, videoPath)
 	var changed bool
-	// A failed embedded probe skips the full-set coverage replacement so
-	// the last complete snapshot survives (detectExistingObserved doc).
 	if probeOK {
 		changed = e.recordCoverageInventory(ctx, mediaType, mediaID, existing)
 	}
@@ -430,14 +414,12 @@ func (e *Engine) InventoryCoverage(ctx context.Context, req *subflux.SearchReque
 	return changed
 }
 
-// gateKey builds the mediaGate key for a media item.
 func gateKey(mediaType subflux.MediaType, mediaID string) string {
 	return string(mediaType) + "\x00" + mediaID
 }
 
-// SearchTargets searches for subtitles using resolved SubtitleTargets.
-// Always searches for regular (non-HI, non-forced) subs, with HI as fallback.
-// Respects per-target provider filtering and min scores.
+// SearchTargets always searches for regular (non-HI, non-forced) subs, with
+// HI as fallback.
 func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	videoPath string, targets []subflux.SubtitleTarget,
 ) (subflux.SearchResult, error) {
@@ -446,16 +428,14 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 		"imdb", req.ImdbID, "targets", len(targets),
 		"video_path", videoPath)
 
-	// Store the video path on the request so providers (especially
-	// embedded) can access the actual file for ffprobe.
 	req.VideoPath = videoPath
 
 	mediaType := req.MediaType
 	mediaID := mediaid.Build(req)
 
-	// Serialize work on the same media item across the scheduled scan, the
-	// history poller, and manual scans (P4). Unidentified media (empty
-	// mediaID) has no stable identity to key on and skips the gate.
+	// Serializes work on the same media item across the scheduled scan, the
+	// history poller, and manual scans. Unidentified media has no stable
+	// identity to key on and skips the gate.
 	if mediaID != "" {
 		unlock := e.gate.lock(gateKey(mediaType, mediaID))
 		defer unlock()
@@ -475,11 +455,6 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 
 	var result subflux.SearchResult
 
-	// Record the discovered subtitle files for coverage tracking (pre-work:
-	// the inventory is valid however the search ends; see P5 split note on
-	// recordCoverageInventory). A failed embedded probe skips the full-set
-	// replacement so the last complete snapshot survives; the search itself
-	// continues fail-open with the partial in-memory result.
 	if probeOK {
 		result.CoverageChanged = e.recordCoverageInventory(ctx, mediaType, mediaID, existing)
 	}
@@ -487,24 +462,20 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	searchCfg := e.cfg.Search()
 	upgradeCutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
 
-	// Group targets by language code to avoid duplicate provider queries.
-	// Providers return all variants (standard, forced, HI) in one response;
-	// variant filtering is client-side.
+	// Providers return all variants in one response, so grouping by language
+	// avoids duplicate queries; variant filtering happens client-side.
 	groups, langOrder := groupTargetsByLang(targets)
 
-	// Check context before starting concurrent work.
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
 
-	// Process language groups concurrently. Each group already uses errgroup
-	// internally for provider concurrency, and singleflight deduplicates
-	// identical provider queries across languages. Each group produces one
-	// typed subflux.LangOutcome; the tracker and stats consume those directly.
+	// singleflight deduplicates identical provider queries across languages
+	// processed concurrently here.
 	result.Langs = make([]subflux.LangOutcome, len(langOrder))
 
 	g := new(errgroup.Group)
-	g.SetLimit(4) // Cap concurrent language groups.
+	g.SetLimit(4)
 	for idx, lang := range langOrder {
 		langTargets := groups[lang]
 		g.Go(func() error {
@@ -518,9 +489,8 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	}
 	_ = g.Wait()
 
-	// Stamp scanned_at post-work, and only when the work ran to completion:
-	// a cancellation mid-item must not mark the item recently-scanned, or a
-	// restart would resume-skip unfinished work for a full cycle (P5).
+	// A cancellation mid-item must not mark the item recently-scanned, or a
+	// restart would resume-skip unfinished work for a full cycle.
 	if ctx.Err() == nil {
 		e.stampScanState(ctx, mediaType, mediaID, req, true)
 	}

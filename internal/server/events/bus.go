@@ -104,10 +104,8 @@ func (eb *EventBus) Publish(e Event) {
 // appeared or disappeared for a media item, so the UI refreshes that row.
 // Callers that know only the media identity (the scan engine) leave the
 // language/source fields zero; the manual download/clear-lock path fills
-// them. Taking the payload STRUCT rather than positional arguments is what
-// lets one method serve both — the two call shapes used to be two adapter
-// methods with the same name and different signatures, and the wider one
-// took three adjacent same-typed strings. By pointer only to keep the
+// them. The payload is a STRUCT rather than positional arguments because it
+// serves both call shapes with one signature. By pointer only to keep the
 // 80-byte payload off the argument copy; it is dereferenced immediately and
 // never retained.
 func (eb *EventBus) PublishCoverageUpdate(ev *CoverageEvent) {

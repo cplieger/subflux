@@ -5,32 +5,10 @@ import (
 	"net/http"
 )
 
-// Auth-event audit logging. Emits structured slog records with a fixed
-// `event_kind=auth` attribute so log-collection tooling (Loki, journald,
-// stdout aggregators) can filter the audit trail from ordinary
-// operational logs. Replaces ad-hoc slog calls at security-relevant
-// call sites; one emit per event (audit + operator-visible message
-// share a single log line at WARN for failures, INFO for successes).
-//
-// The audit record always carries:
-//   - event_kind: "auth" (constant; the filter token)
-//   - event:      one of the AuditEvent values (login.success, etc.)
-//   - success:    bool
-//   - user:       username when known, "" for failed logins on unknown users
-//   - ip:         client IP from r.RemoteAddr (port stripped)
-//   - user_agent: request User-Agent header
-//
-// Per-event extra attributes (reason for failures, key_id for apikey
-// events, passkey_id for passkey events, etc.) are passed via kvs and
-// appended verbatim. Use slog.String / slog.Int / slog.Bool to keep
-// the structured shape; raw kv pairs work too but lose type info.
-//
-// Why slog and not a DB table: a self-hosted deployment already has Loki for
-// container logs. A new SQLite audit_events table adds schema, a
-// retention policy, and a UI for ~3x the LOC and no incremental value
-// over `loki | grep event_kind=auth | grep user=alice`. See
-// .kiro/notes/rewrite-analysis/subflux/auth.md line 35 for the design
-// rationale.
+// Auth-event audit logging: structured slog records with a fixed
+// `event_kind=auth` attribute so log-collection tooling can filter the audit
+// trail from ordinary operational logs. slog rather than a DB table: a
+// self-hosted deployment already has Loki for container logs.
 
 // AuditEventKind is the fixed attribute value used to mark auth audit
 // records. Filter on `event_kind="auth"` in log queries.
@@ -56,18 +34,9 @@ const (
 	AuditOIDCCallback     AuditEvent = "oidc.callback"
 )
 
-// Audit emits a structured auth audit record at the specified slog
-// level. Failures should emit at WARN; successes at INFO (so operator
-// dashboards still see failures distinct from routine success traffic
-// while auditors filter the full trail by event_kind).
-//
-// `user` is the username when known; pass "" for failures on unknown
-// usernames (still useful as the audit record will carry the IP and
-// the failure reason).
-//
-// Extra attributes are appended verbatim. Use `slog.String("reason",
-// "invalid_password")` or `slog.String("key_id", id)` to keep the
-// structured shape consistent.
+// Audit emits a structured auth audit record at the specified slog level.
+// Failures should emit at WARN; successes at INFO. `user` is the username
+// when known; pass "" for failures on unknown usernames.
 func Audit(r *http.Request, level slog.Level, event AuditEvent, success bool, user string, kvs ...any) {
 	attrs := make([]any, 0, 6+len(kvs))
 	attrs = append(attrs,
@@ -94,10 +63,8 @@ func toAttrs(kvs []any) []slog.Attr {
 			out = append(out, a)
 			continue
 		}
-		// Treat as key+value pair. Empty-string key when first element
-		// is not a string is also handled; the resulting attr will
-		// surface as `slog.Any("", val)` and be visible in logs as a
-		// schema error rather than silently dropped.
+		// A non-string key surfaces as slog.Any("", val) rather than
+		// dropping silently.
 		key, ok := v.(string)
 		_ = ok // ok==false leaves key as "", surfaced visibly in logs
 		var val any

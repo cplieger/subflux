@@ -103,11 +103,11 @@ func New(db *bbolt.DB) *Store {
 //
 // Because a bbolt Update commit fsyncs, a mutation that returns nil is
 // crash-durable on commit and a failed Update rolls back atomically leaving no
-// partial primary/index state (Requirements 9.1, 9.2).
+// partial primary/index state.
 
 // Auth bucket names. The CORE store (internal/boltstore) is the single
 // bucket-schema OWNER: boltstore.Open bootstraps every primary and index bucket
-// below — alongside the core buckets — in one Update (spec task 2.3). The auth
+// below — alongside the core buckets — in one Update. The auth
 // store only ever SHARES the already-bootstrapped handle, so it never creates a
 // bucket here. These constants MUST hold the same string values as the auth
 // bucket names in internal/store/buckets — the single shared owner both this
@@ -131,28 +131,28 @@ var authBuckets = buckets.Auth()
 
 // errConflict is returned by uniqueCheck when a uniqueness index already holds
 // the candidate key (duplicate username, (issuer, sub), credential id, or
-// API-key hash). The durable-domain methods (tasks 8.2-8.4) surface it on the
-// create/update paths (Requirement 9.3).
+// API-key hash). The durable-domain methods surface it on the
+// create/update paths.
 var errConflict = errors.New("authstore: unique constraint violation")
 
 // update runs fn in a single bbolt read-write transaction on the SHARED handle.
 // Every durable auth mutation goes through here, so the whole (uniqueness
 // check, put, index maintenance) sequence is one all-or-nothing transaction
 // that is crash-durable on commit; a failed Update rolls back atomically
-// leaving no partial state (Requirement 9.2).
+// leaving no partial state.
 func (s *Store) update(fn func(tx *bbolt.Tx) error) error {
 	return s.db.Update(fn)
 }
 
 // view runs fn in a single bbolt read-only transaction on the shared handle.
 // Read transactions are kept short and never perform filesystem I/O while open
-// (Requirement 13.3).
+// .
 func (s *Store) view(fn func(tx *bbolt.Tx) error) error {
 	return s.db.View(fn)
 }
 
 // authBucket returns the named bucket from tx. ok is false when the bucket is
-// absent, which the read paths treat as an empty first boot (Requirement 9.6)
+// absent, which the read paths treat as an empty first boot
 // rather than an error — an absent bucket simply has no rows. Writes go through
 // kv.PutIndexed, which returns a descriptive "bucket not found" error if
 // the owner (boltstore) somehow did not bootstrap; in production that never
@@ -166,8 +166,7 @@ func authBucket(tx *bbolt.Tx, name string) (b *bbolt.Bucket, ok bool) {
 // returns errConflict when indexBucket already holds indexKey, and nil
 // otherwise. An absent index bucket is treated as empty (no conflict),
 // consistent with the empty-first-boot rule. Callers run uniqueCheck BEFORE the
-// put so a duplicate is rejected without writing partial state (Requirement
-// 9.3).
+// put so a duplicate is rejected without writing partial state.
 func uniqueCheck(tx *bbolt.Tx, indexBucket string, indexKey []byte) error {
 	ib, ok := authBucket(tx, indexBucket)
 	if !ok {
@@ -180,7 +179,7 @@ func uniqueCheck(tx *bbolt.Tx, indexBucket string, indexKey []byte) error {
 }
 
 // decodeAuthRecord decodes a durable auth record value into v, FAILING CLOSED on
-// a decode error (Requirement 13.4): auth records are identity- and
+// a decode error: auth records are identity- and
 // credential-bearing, so an undecodable row must surface a descriptive error
 // rather than be silently skipped the way a derived core bucket would be. It is
 // the auth read path's single decode chokepoint; bucket names the source bucket

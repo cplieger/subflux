@@ -17,7 +17,6 @@ import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS } from "./constants.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
 
-/** Data-driven error-code-to-message mapping for search popup errors. */
 const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
   {
     code: ErrorCode.SearchProviderDisabled,
@@ -40,8 +39,7 @@ interface CoverageEpisode {
 }
 
 interface CoverageMedia {
-  /** Arr internal ID (Radarr movie / Sonarr series) — the MediaRef the
-   *  server resolves video paths from. */
+  /** Arr internal ID (Radarr movie / Sonarr series); the MediaRef the server resolves video paths from. */
   id: number;
   tvdb_id?: number;
   tmdb_id?: number;
@@ -69,8 +67,7 @@ interface DownloadArgs {
   season: number;
   episode: number;
   media_type: MediaType;
-  /** Arr internal ID: with media_type + season/episode this is the MediaRef
-   *  the server resolves the video file path from (no path on the wire). */
+  /** MediaRef the server resolves the video file path from (no path on the wire). */
   media_id: number;
   top_pick: boolean;
   score: number;
@@ -78,12 +75,8 @@ interface DownloadArgs {
   forced: boolean;
 }
 
-/** Download a subtitle. Server returns 202 + activity_id; completion arrives
- *  through the activity store (SSE activity events, or the degraded 5s poll
- *  while the stream is down). retryNetwork allows the framework
- *  to recover from transient blips, but app-level "download_failed"
- *  errors (provider 4xx, IO errors) are NOT retried — the user re-clicks
- *  via the manually-re-enabled button. */
+// retryNetwork recovers transient blips only; download_failed is not retried
+// (the user re-clicks via the re-enabled button).
 const downloadAction = apiAction<DownloadArgs, DownloadAccepted>({
   name: "search.download",
   request: (args) => ({ method: "POST", path: PATH_DOWNLOAD_SUBTITLE, body: args }),
@@ -94,38 +87,24 @@ const downloadAction = apiAction<DownloadArgs, DownloadAccepted>({
 
 let searchAbort: AbortController | null = null;
 
-// --- Download tracking (task 12): the activity store flips the buttons ---
-
-/** A download in flight, keyed by its subtitle identity so a reopened popup
- *  re-derives the button state (the dialog content is rebuilt per open).
- *  `seen` latches once the activity entry has been observed; an entry that
- *  later vanishes counts as completed — the server evicts only terminal
- *  rows, so eviction after `seen` means the done frame was missed. */
+/** Keyed by subtitle identity so a reopened popup re-derives button state.
+ *  `seen` latches once observed; a vanished entry counts as completed since
+ *  the server evicts only terminal rows. */
 interface TrackedDownload {
   activityId: string;
   seen: boolean;
-  /** How many server restarts had been observed when this download was
-   *  dispatched. An activity id only means anything to the process that issued
-   *  it, so this is what tells a dead process's entry from a live one's. */
+  /** Boot this was dispatched under — an activity id only means anything to
+   *  the process that issued it. */
   boot: number;
 }
 
-// Subtitle key → in-flight download. Entries leave on a terminal observation.
 const trackedDownloads = new Map<string, TrackedDownload>();
 
-// How many server restarts events.ts has reported. A restart drops the activity
-// log with the process, so a tracked download that belonged to an EARLIER boot
-// will never see its completion event: the first snapshot after the restart —
-// the recovery transaction's own authoritative status read — resolves it instead
-// of waiting forever. A download dispatched after the restart was observed
-// carries the new number and is left alone, which a one-shot sweep flag could
-// not express: it retired every unobserved entry, healthy ones included, because
-// the status snapshot it consumed may have been read before that download
-// existed.
+// Bumped on a server restart (events.ts, boot_id change): a tracked download
+// from an earlier boot is resolved by the next snapshot instead of waiting
+// forever; one from the current boot is left alone.
 let bootGeneration = 0;
 
-/** A server restart happened (events.ts, on a boot_id change): every download
- *  dispatched up to now belongs to a process that is gone. */
 export function noteServerRestart(): void {
   bootGeneration += 1;
 }
@@ -134,8 +113,6 @@ function downloadKey(sub: SearchResult, lang: string): string {
   return join("dl", sub.provider, sub.subtitle_id, lang);
 }
 
-/** The running-download render, shared by the fresh 202 and the reopen
- *  re-derive: disabled, spinner, and the activity id the observer keys on. */
 function markDownloading(btn: HTMLButtonElement, activityId: string): void {
   btn.disabled = true;
   btn.dataset["activityId"] = activityId;
@@ -143,9 +120,6 @@ function markDownloading(btn: HTMLButtonElement, activityId: string): void {
   btn.setAttribute("data-tip", "Downloading\u2026");
 }
 
-/** Terminal render for a download button; a no-op when the popup is closed
- *  or re-rendered without the row — the tracking entry is already gone, so
- *  a later reopen renders a fresh button. */
 function settleDownloadButton(activityId: string, failed: boolean): void {
   const btn = searchDlg.querySelector<HTMLButtonElement>(
     `button[data-activity-id="${CSS.escape(activityId)}"]`,
@@ -163,10 +137,7 @@ function settleDownloadButton(activityId: string, failed: boolean): void {
   btn.removeAttribute("data-tip");
 }
 
-/** Idle render for a download button: re-clickable, carrying no verdict. The
- *  state a freshly built row starts in, reached again when a tracked download
- *  can be resolved neither way — the outcome is unknowable, so claiming one
- *  would be a lie in either direction. */
+// Reached when a tracked download can be resolved neither way.
 function resetDownloadButton(activityId: string): void {
   const btn = searchDlg.querySelector<HTMLButtonElement>(
     `button[data-activity-id="${CSS.escape(activityId)}"]`,
@@ -180,11 +151,6 @@ function resetDownloadButton(activityId: string): void {
   btn.setAttribute("data-tip", "Server restarted \u2014 outcome unknown, retry");
 }
 
-/** Flip tracked download buttons from the activity store: an entry observed
- *  done settles its button; an entry evicted after being seen counts as
- *  completed; an entry not yet observed keeps waiting (the 202 precedes the
- *  event by construction — the server starts the activity before answering),
- *  unless its own boot is gone, which retires that wait. */
 function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
   if (trackedDownloads.size === 0) {
     return;
@@ -198,10 +164,8 @@ function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
     }
     if (!act && !t.seen) {
       if (t.boot === bootGeneration) {
-        continue; // the process that issued this id is still running
+        continue;
       }
-      // This snapshot is the restarted server's authoritative state and it has
-      // never heard of the entry, so nothing will ever complete it.
       trackedDownloads.delete(key);
       resetDownloadButton(t.activityId);
       continue;
@@ -213,7 +177,6 @@ function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
 
 observeActivities(reconcileDownloadButtons);
 
-/** Drain the in-flight search and the download tracking. */
 function drainSearchState(): void {
   searchAbort?.abort();
   searchAbort = null;
@@ -221,21 +184,17 @@ function drainSearchState(): void {
   bootGeneration = 0;
 }
 
-/** Test-only. */
 export function _resetSearchForTest(): void {
   drainSearchState();
 }
 
-// Page-unload safety net (also covers soft navigations in tests).
 registerCleanup(drainSearchState);
 
 const searchDlg: HTMLDialogElement = dialog("searchResultPopup");
 
-// Whether openSearchPopup pushed a history entry that closeSearchPopup
-// needs to pop (vs. direct URL navigation where no entry was pushed).
+// Whether closeSearchPopup needs to pop a history entry openSearchPopup pushed
+// (vs. direct URL navigation where none was pushed).
 let searchPushedHistory = false;
-
-// --- Search popup ---
 
 export function openSearchPopup(
   mediaType: MediaType,
@@ -248,7 +207,6 @@ export function openSearchPopup(
   const langs: string[] = cfg?.languages ?? ["en"];
   const defaultLang: string = lang ?? langs[0] ?? "en";
 
-  // Push search URL.
   const idPart: string =
     mediaType === "episode" ? `/series/${media.tvdb_id ?? ""}` : `/movie/${media.tmdb_id ?? ""}`;
   const searchPath = `${idPart}/search/${defaultLang}`;
@@ -259,7 +217,6 @@ export function openSearchPopup(
     searchPushedHistory = false;
   }
 
-  // Build header.
   let title: string = media.title;
   if (mediaType === "episode" && episode) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- episode implies season
@@ -309,12 +266,11 @@ export function openSearchPopup(
   if (searchDlg.open) {
     searchDlg.close();
   }
-  // openDialog cancels a pending is-leaving fade before showing, so a reopen
-  // within the fade window renders visible and the stale close no-ops.
+  // openDialog cancels a pending is-leaving fade, so a reopen within the fade
+  // window still renders visible.
   openDialog(searchDlg);
   searchDlg.focus();
 
-  // Auto-run search.
   void runPopupSearch(mediaType, media, season, episode, defaultLang);
 }
 
@@ -336,7 +292,6 @@ async function runPopupSearch(
   episode: CoverageEpisode | null,
   lang: string,
 ): Promise<void> {
-  // Cancel any in-flight search.
   if (searchAbort) {
     searchAbort.abort();
   }
@@ -360,9 +315,6 @@ async function runPopupSearch(
     ),
   );
 
-  // Same params (and the same conditions) as the previous hand-built
-  // URLSearchParams; the generated client serializes the object in insertion
-  // order and skips undefined values.
   const query: Record<string, QueryValue> = { type: mediaType, lang };
   if (mediaType === "episode") {
     query["tvdb"] = String(media.tvdb_id);
@@ -407,8 +359,6 @@ async function runPopupSearch(
       query["release"] = media.scene_name;
     }
   }
-  // MediaRef for server-side video resolution (hash computation): the arr
-  // internal ID; season/episode ride the episode params above.
   if (media.id > 0) {
     query["media_id"] = media.id;
   }
@@ -449,8 +399,7 @@ function renderPopupResults(
   }
 
   const frag: DocumentFragment = document.createDocumentFragment();
-  // The list renders at most 30 rows; say so instead of a bare total that
-  // contradicts the visible list ("80 results" over 30 rows read as a bug).
+  // At most 30 rows render; say so instead of a bare total that contradicts the visible list.
   const shown = Math.min(results.length, 30);
   const countText =
     results.length > shown
@@ -458,7 +407,6 @@ function renderPopupResults(
       : `${results.length} ${results.length === 1 ? "result" : "results"}`;
   frag.appendChild(el("div", { className: "muted result-count" }, countText));
 
-  // Header row.
   frag.appendChild(
     el(
       "div",
@@ -499,15 +447,11 @@ function renderPopupResults(
       },
       icon("download"),
     ) as HTMLButtonElement;
-    // Reopen re-derive: a download dispatched from an earlier open of this
-    // popup is still in flight — render its running state; the observer
-    // flips it when the activity terminates.
     const tracked = trackedDownloads.get(downloadKey(s, lang));
     if (tracked) {
       markDownloading(dlBtn, tracked.activityId);
     }
 
-    // Build score tooltip from match breakdown.
     const matches: Record<string, number> = s.matches ?? {};
     const keys: string[] = Object.keys(matches);
     const scoreTip: string =
@@ -574,24 +518,17 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     forced: sub.forced,
   }).outcome;
   if (o.status !== "success") {
-    // The framework already toasted the message; the typed outcome carries
-    // the error (cancelled dispatches carry none) for the retry decision.
     const downloadErr = o.status === "error" ? o.error : undefined;
     btn.dataset["status"] = "err";
     patch(btn, icon("close"));
     btn.setAttribute("data-tip", downloadErr?.message ?? "Download failed");
-    // Re-enable button for retry on download_failed (transient-by-design;
-    // user can manually retry rather than re-search).
+    // download_failed is transient-by-design; re-enable for manual retry.
     if (downloadErr?.code === ErrorCode.DownloadFailed) {
       (btn as HTMLButtonElement).disabled = false;
     }
     return;
   }
   const data = o.value;
-  // 202 Accepted: the download runs in a background goroutine. The button
-  // carries the activity id; the activity-store observer flips it on the
-  // terminal event (or the degraded poll while SSE is down). A close/reopen
-  // re-derives the running state from the tracking map.
   trackedDownloads.set(downloadKey(sub, lang), {
     activityId: data.activity_id,
     seen: false,

@@ -9,7 +9,6 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// Edition regex follows standard scene naming conventions.
 var editionRe = regexp.MustCompile(
 	`(?i)\b(director'?s?[-. ]?cut|extended[-. ]?(?:cut|edition)?|` +
 		`unrated|uncut|theatrical|imax|remastered|criterion|` +

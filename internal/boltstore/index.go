@@ -12,7 +12,7 @@ import (
 // index-maintenance helpers in internal/store/kv (kv). It declares each
 // secondary index as a concrete kv.IndexSpec[T], declares the O(1)
 // maintained meta counters, and exposes the typed put/delete helpers the
-// per-bucket domain methods (tasks 3-7) call.
+// per-bucket domain methods call.
 //
 // These helpers are the single chokepoint for the secondary-index maintenance
 // invariant (design: "Secondary-index maintenance invariant"): every primary
@@ -100,19 +100,19 @@ func fileCounters() []kv.CounterSpec {
 }
 
 // readDownloadCount returns the maintained subtitle_state row count (O(1)),
-// used by Stats (task 4.4). Returns 0 when the counter is unset.
+// used by Stats. Returns 0 when the counter is unset.
 func readDownloadCount(tx *bolt.Tx) int64 {
 	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyDownloadCount)
 }
 
 // readAttemptCount returns the maintained search_attempts row count (O(1)),
-// used by Stats (task 4.4). Returns 0 when the counter is unset.
+// used by Stats. Returns 0 when the counter is unset.
 func readAttemptCount(tx *bolt.Tx) int64 {
 	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyAttemptCount)
 }
 
 // readFileCount returns the maintained subtitle_files row count (O(1)), used by
-// TotalSubtitleFiles (task 5.1). Returns 0 when the counter is unset.
+// TotalSubtitleFiles. Returns 0 when the counter is unset.
 func readFileCount(tx *bolt.Tx) int64 {
 	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyFileCount)
 }
@@ -273,7 +273,7 @@ func putScanState(tx *bolt.Tx, mt subflux.MediaType, mid string, rec *scanRec) e
 }
 
 // deleteScanState removes a scan_state row and its ix_scan_at entry, all in tx.
-// Idempotent on an absent key. Used by reconcile/orphan cleanup (task 6).
+// Idempotent on an absent key. Used by reconcile/orphan cleanup.
 func deleteScanState(tx *bolt.Tx, mt subflux.MediaType, mid string) (existed bool, err error) {
 	return kv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
 		scanIndexes(), nil)

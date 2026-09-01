@@ -121,7 +121,6 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	return ScanNoResult, 0, queried
 }
 
-// SceneOrPath returns sceneName if non-empty, otherwise filePath.
 func SceneOrPath(sceneName, filePath string) string {
 	if sceneName != "" {
 		return sceneName
@@ -129,7 +128,6 @@ func SceneOrPath(sceneName, filePath string) string {
 	return filePath
 }
 
-// ExtractAltTitles returns unique alternative titles, excluding the primary.
 func ExtractAltTitles(alts []arrapi.AlternateTitle, primary string) []string {
 	if len(alts) == 0 {
 		return nil
@@ -146,7 +144,6 @@ func ExtractAltTitles(alts []arrapi.AlternateTitle, primary string) []string {
 	return titles
 }
 
-// collectEpisodes fetches all wanted episodes from Sonarr.
 func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 	excludeTags map[int]struct{},
 ) []ScanItem {
@@ -171,7 +168,6 @@ func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 	return items
 }
 
-// collectMovies fetches all wanted movies from Radarr.
 func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 	excludeTags map[int]struct{},
 ) []ScanItem {

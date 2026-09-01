@@ -25,14 +25,14 @@ type hdbSubtitleItem struct {
 }
 
 // flexInt unmarshals a JSON value that may be either a number or a string.
-// JSON null, non-positive values, and non-numeric strings are rejected so
-// a malformed/changing API response surfaces as a visible error instead
-// of silently materializing as subtitle ID "0".
+// Null, non-positive values, and non-numeric strings are rejected so a
+// malformed API response surfaces as an error instead of silently becoming
+// subtitle ID "0".
 type flexInt int
 
-// idPolicy is the id decode policy: the jsonx strict core with null and
-// "" rejected instead of tolerated as 0, and ids required positive —
-// id 0 would silently build a getdox.php?id=0&passkey=... download URL.
+// idPolicy is the id decode policy: jsonx's strict core with null and ""
+// rejected instead of tolerated as 0, and ids required positive — id 0
+// would silently build a getdox.php?id=0&passkey=... download URL.
 var idPolicy = func() jsonx.Policy {
 	p := jsonx.Strict()
 	p.Null = jsonx.Reject
@@ -41,12 +41,8 @@ var idPolicy = func() jsonx.Policy {
 	return p
 }()
 
-// UnmarshalJSON implements json.Unmarshaler for flexInt. The receiver is
-// reset first so a reused decode target never retains a stale id: on error
-// it stays 0 (no partial value), and a duplicate key's later tolerated value
-// would clear an earlier decode if the policy ever gains a Zero disposition —
-// the same invariants the jsonx field types pin (jsonx.StrictInt) and the
-// sibling consumers apply.
+// UnmarshalJSON implements json.Unmarshaler for flexInt. Resets to 0 first
+// so a reused decode target never retains a stale id on error.
 func (f *flexInt) UnmarshalJSON(data []byte) error {
 	*f = 0
 	n, err := jsonx.ParseInt64(data, idPolicy)

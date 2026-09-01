@@ -32,10 +32,7 @@ const (
 	settingUsername = "username"
 )
 
-// --- Constants and factory ---
-
 // hdbitsConfig holds tuning parameters for the HDBits provider.
-// Grouped as a struct for inspectability and future configurability.
 type hdbitsConfig struct {
 	TorrentLookupDelay       time.Duration
 	MaxCacheItemSize         int64
@@ -56,8 +53,7 @@ var defaultHDBitsConfig = hdbitsConfig{
 const providerName = subflux.ProviderNameHDBits
 
 // hdbAcceptedExts lists filename extensions accepted as subtitle content
-// (direct files, from the extension authority's archiveInput view) or
-// season-pack archives. Matched case-insensitively.
+// or season-pack archives, matched case-insensitively.
 var hdbAcceptedExts = func() map[string]bool {
 	exts := subtitleext.Extensions()
 	m := make(map[string]bool, len(exts)+2)
@@ -88,8 +84,7 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	}, nil
 }
 
-// (download cache types + lifecycle methods moved to cache.go for clearer
-// separation between API-interaction logic in this file and cache mechanics.)
+// (download cache types + lifecycle methods live in cache.go / dlcache.go.)
 
 // Provider implements the HDBits subtitle API.
 type Provider struct {
@@ -102,10 +97,8 @@ type Provider struct {
 	cfg          hdbitsConfig
 }
 
-// Compile-time check on the CacheClearer opt-in: it is discovered by type
+// Compile-time check on the CacheClearer opt-in: discovered by type
 // assertion in provider.ClearCaches, so nothing else would catch a rename.
-// The Provider contract itself needs no assertion — Factory returns this type
-// as a provider.Provider.
 var _ provider.CacheClearer = (*Provider)(nil)
 
 // --- Provider API (Name, Search, Download) ---
@@ -143,7 +136,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	g.SetLimit(p.cfg.TorrentLookupConcurrency)
 
 	for i, id := range ids {
-		// Rate limit: wait between dispatches (not between completions).
+		// Rate limit between dispatches, not completions.
 		if i > 0 {
 			t := time.NewTimer(p.cfg.TorrentLookupDelay)
 			select {
@@ -158,7 +151,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 			subs, err := p.fetchSubtitles(gctx, id, req)
 			if err != nil {
 				slog.Warn("hdbits: failed to get subtitles for torrent", "error", err)
-				return nil // non-fatal; continue other goroutines
+				return nil
 			}
 			mu.Lock()
 			results = append(results, subs...)
@@ -177,7 +170,6 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 // Season pack archives are cached per subtitle ID and reused across
 // episodes; the target episode is extracted by S##E## filename match.
 func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// Validate ID is numeric to prevent path injection.
 	if _, err := strconv.Atoi(sub.ID); err != nil {
 		return nil, fmt.Errorf("invalid subtitle ID %q: %w", sub.ID, err)
 	}
@@ -187,8 +179,6 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 		return nil, err
 	}
 
-	// Normalize: extract the target episode from a season pack archive
-	// when applicable, then validate once.
 	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
 	if err != nil {
 		return nil, fmt.Errorf("hdbits: %w", err)
@@ -204,7 +194,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	return result, nil
 }
 
-// (ClearCache and evictOldest moved to cache.go alongside the cache types.)
+// (ClearCache and evictOldest are in cache.go / dlcache.go.)
 
 // buildLookup constructs the HDBits API search parameters and cache key
 // from the search request. Returns nil params when the request lacks the
@@ -264,9 +254,8 @@ func capTorrentIDs(ids []int, maxCap int, cacheKey string) []int {
 }
 
 // fetchOrCached returns cached download data for a subtitle ID, or fetches
-// and caches it. Season pack zips are typically downloaded once and reused
-// for each episode in the season. Concurrent requests for the same subtitle
-// ID are deduplicated via singleflight.
+// and caches it. Concurrent requests for the same ID are deduplicated via
+// singleflight.
 func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, error) {
 	if cached, ok := p.dlCache.Get(subID); ok {
 		slog.Debug("hdbits: serving from download cache",
@@ -275,8 +264,8 @@ func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, err
 	}
 
 	v, err, _ := p.dlSfg.Do(subID, func() (any, error) {
-		// Re-check cache inside singleflight to avoid redundant fetch when
-		// a concurrent caller already populated it.
+		// Re-check inside singleflight in case a concurrent caller
+		// already populated it.
 		if cached, ok := p.dlCache.Get(subID); ok {
 			return cached, nil
 		}
@@ -291,10 +280,9 @@ func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, err
 
 // doFetch performs the actual HTTP download and caches the result.
 func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
-	// Build URL via url.Values so any non-hex character in the passkey
+	// Build URL via url.Values so a non-hex character in the passkey
 	// cannot corrupt the request-line or split the secret across bogus
-	// query params. HDBits passkeys are documented as 32-hex today, but
-	// encoding costs nothing and matches the pattern used elsewhere.
+	// query params.
 	q := url.Values{}
 	q.Set("id", subID)
 	q.Set(settingPasskey, p.passkey)
@@ -331,9 +319,8 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 }
 
 // findTorrentIDs searches the HDBits API for torrents matching the given
-// parameters and returns their IDs. debugKey is a redacted cache key used
-// purely for structured logging; params contains the passkey and must
-// never be logged.
+// parameters and returns their IDs. debugKey is a redacted cache key for
+// logging; params contains the passkey and must never be logged.
 func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, debugKey string) ([]int, error) {
 	body, err := json.Marshal(params)
 	if err != nil {

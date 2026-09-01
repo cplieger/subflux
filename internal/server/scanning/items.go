@@ -11,9 +11,9 @@ import (
 
 // ScanItem holds either an episode or a movie for alphabetical scanning.
 type ScanItem struct {
-	Series *arrapi.Series  // non-nil for episodes
-	Ep     *arrapi.Episode // non-nil for episodes
-	Movie  *arrapi.Movie   // non-nil for movies
+	Series *arrapi.Series
+	Ep     *arrapi.Episode
+	Movie  *arrapi.Movie
 }
 
 // SortByTitle merges episodes and movies into a single slice sorted
@@ -63,7 +63,6 @@ func SortByTitle(episodes, movies []ScanItem) []ScanItem {
 	return sorted
 }
 
-// ScanItemSeasonEp returns season and episode for sorting.
 func ScanItemSeasonEp(item ScanItem) (season, episode int) {
 	if item.Ep != nil {
 		return item.Ep.SeasonNumber, item.Ep.EpisodeNumber
@@ -71,7 +70,6 @@ func ScanItemSeasonEp(item ScanItem) (season, episode int) {
 	return 0, 0
 }
 
-// ScanItemTitle returns the title used for sort ordering.
 func ScanItemTitle(item ScanItem) string {
 	if item.Series != nil {
 		return item.Series.Title
@@ -82,7 +80,6 @@ func ScanItemTitle(item ScanItem) string {
 	return ""
 }
 
-// SkipResumed checks if a scan item was already processed recently.
 func SkipResumed(item ScanItem, recent map[string]bool, stats *subflux.ScanStats) bool {
 	if recent == nil {
 		return false

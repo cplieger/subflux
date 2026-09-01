@@ -256,8 +256,6 @@ func (r *Resolver) VideoPath(ctx context.Context, ref *MediaRef) (string, error)
 	return path, nil
 }
 
-// arrVideoPath performs the arr lookup half of VideoPath: a two-arm
-// dispatcher over the media type.
 func arrVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error) {
 	switch ref.MediaType {
 	case subflux.MediaTypeMovie:
@@ -269,7 +267,6 @@ func arrVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error)
 	}
 }
 
-// movieVideoPath resolves the movie arm: Radarr's current movie file path.
 func movieVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error) {
 	if st == nil || st.Radarr == nil {
 		return "", fmt.Errorf("%w: radarr not configured", ErrMediaNotFound)
@@ -284,8 +281,6 @@ func movieVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, erro
 	return m.MovieFile.Path, nil
 }
 
-// episodeVideoPath resolves the episode arm: the season/episode's current
-// episode file path within the Sonarr series.
 func episodeVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error) {
 	if st == nil || st.Sonarr == nil {
 		return "", fmt.Errorf("%w: sonarr not configured", ErrMediaNotFound)

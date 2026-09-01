@@ -51,11 +51,9 @@ func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
-// gestdown's custom rate-limit signal (Addic7ed throttle) with Retry-After
-// parsed into RateLimitError.RetryAfter so the scan engine's provider timeout
-// manager can honor the hint. Everything else defers to httpwire.CheckHTTPStatus,
-// which handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError
-// for other 4xx/5xx.
+// gestdown's rate-limit signal (Addic7ed throttle) with Retry-After parsed
+// into RateLimitError.RetryAfter; everything else defers to
+// httpwire.CheckHTTPStatus.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusLocked {
 		return &subflux.RateLimitError{
@@ -102,8 +100,8 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, nil
 	}
 
-	// Search languages concurrently with bounded concurrency. Within each
-	// language goroutine the show loop stays sequential (break-on-first-success).
+	// Bounded concurrency per language; each language's show loop stays
+	// sequential (break-on-first-success).
 	perLang := make([]langResult, len(langs))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(3)
@@ -253,16 +251,9 @@ func (p *Provider) findShow(ctx context.Context, tvdbID int) ([]showResult, erro
 	})
 }
 
-// showCacheKey builds the showCache key for a TVDB id.
-//
-// No component here can carry the separator: the literal is fixed and tvdbID is
-// an int, so the key is injective by construction and byte-identical to the
-// fmt.Sprintf form it replaces. It goes through keyenc anyway so this package
-// has ONE key grammar (see seasonCacheKey, whose showID genuinely can carry a
-// ':'), which is what makes a later component — a title, a language, anything
-// free-form — safe to add without re-deriving that argument. Were the key
-// forgeable, a collision would return another series' show-id list and every
-// season lookup below it would query the wrong show.
+// showCacheKey builds the showCache key for a TVDB id. Uses keyenc so this
+// package has one key grammar (see seasonCacheKey, whose showID can carry
+// a ':'); a forgeable key here would return another series' show-id list.
 func showCacheKey(tvdbID int) string {
 	return keyenc.Join("show", strconv.Itoa(tvdbID))
 }
@@ -309,19 +300,9 @@ func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season
 }
 
 // seasonCacheKey builds the subCache key for one season of one language.
-//
-// showID is the one component that can carry the separator: it is gestdown's
-// own `id` field, copied verbatim out of the shows JSON, so its alphabet is the
-// remote API's choice and not ours. The other three cannot — the literal is
-// fixed, season is an int, and gestLang is a LangRegistry value ("French"), not
-// user text — which is the only reason the fmt.Sprintf form was injective: the
-// ':'-free tail pinned the showID boundary from the right. keyenc escapes
-// element-wise, so injectivity no longer depends on which field sits where. A
-// collision would hand an episode the season list cached for a DIFFERENT show
-// or language, and because those entries are then filtered only by episode
-// NUMBER, the caller would score and download another show's S01E02 subtitle
-// for this video — or an English file recorded as French. Ordinary show ids
-// (gestdown GUIDs) carry neither ':' nor '\', so the key bytes are unchanged.
+// showID is gestdown's own free-form id and can carry the ':' separator;
+// keyenc escapes element-wise so a collision can't hand an episode another
+// show's or language's cached season list.
 func seasonCacheKey(showID string, season int, gestLang string) string {
 	return keyenc.Join("season", showID, strconv.Itoa(season), gestLang)
 }

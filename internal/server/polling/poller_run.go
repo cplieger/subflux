@@ -16,12 +16,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// PollerMetrics is the narrow metrics interface consumed by the poller.
+// PollerMetrics is the metrics surface the poller consumes.
 type PollerMetrics interface {
 	RecordImport(source subflux.PollKey)
 }
 
-// PollerEvents is the narrow events interface consumed by the poller.
+// PollerEvents is the events surface the poller consumes.
 type PollerEvents interface {
 	Publish(e events.Event)
 }
@@ -63,7 +63,7 @@ type LiveState struct {
 	Radarr PollRadarrClient
 }
 
-// StateFunc returns the current live state. Called each poll cycle to pick
+// StateFunc returns the current live state, called each poll cycle to pick
 // up hot-reloaded config/clients.
 type StateFunc func() *LiveState
 
@@ -256,10 +256,9 @@ func (p *Poller) rewindDetection(ctx context.Context, key subflux.PollKey) {
 	p.detectMu.Unlock()
 }
 
-// runExecutor is the single worker draining detected batches. One batch
-// executes at a time (imports are paced by scan_delay anyway), so provider
-// work never runs concurrently for poll-driven imports; same-item collisions
-// with scans are handled by the engine's per-media gate.
+// runExecutor is the single worker draining detected batches: one batch at
+// a time, so provider work never runs concurrently for poll-driven imports;
+// same-item collisions with scans are handled by the engine's per-media gate.
 func (p *Poller) runExecutor(ctx context.Context) {
 	for {
 		select {

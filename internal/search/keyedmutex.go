@@ -5,10 +5,8 @@ import "sync"
 // mediaGate serializes engine work per media item. SearchTargets is reached
 // concurrently by the scheduled scan, the history poller, and manual scans;
 // two of them processing the SAME item at once means duplicate provider
-// queries, duplicate hash/probe I/O, and competing subtitle-state writes.
-// The gate is keyed by (media_type, media_id), so unrelated items never
-// contend — deliberately a keyed gate, not a global lock or shared queue:
-// the poller and the scan keep running concurrently on different items.
+// queries and competing subtitle-state writes. Keyed by (media_type,
+// media_id) rather than a global lock, so unrelated items never contend.
 type mediaGate struct {
 	locks map[string]*gateEntry
 	mu    sync.Mutex

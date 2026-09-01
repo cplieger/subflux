@@ -15,7 +15,7 @@ import (
 // This file holds the scan_state half of CoverageStore: the scan_state bucket
 // (one row per (media_type, media_id)) plus its ix_scan_at recency index. It
 // mirrors the old SQLite store/coveragedb/scan_state.go behaviour exactly
-// (Requirements 5.3, 5.4, 5.6).
+//.
 //
 // scan_state keys are mt 0x00 mid (scanStateKey); the title/audio_lang/season/
 // episode/scanned_at live in the JSON value (scanRec). The ix_scan_at index is
@@ -34,7 +34,7 @@ const scanTimeLayout = "2006-01-02 15:04:05"
 
 // RecordScanState upserts the scan-state row for a media item, keyed by
 // (media_type, media_id), and refreshes its ix_scan_at recency entry, in one
-// write transaction. It mirrors the old SQLite upsert (Requirement 5.3): a
+// write transaction. It mirrors the old SQLite upsert: a
 // re-record overwrites title/season/episode/audio_lang and stamps scanned_at to
 // now (UTC). Because scanned_at changes on every record, the putScanState
 // chokepoint deletes the stale ix_scan_at entry and adds the fresh one in the
@@ -55,13 +55,13 @@ func (d *DB) RecordScanState(_ context.Context, rec *subflux.ScanRecord) error {
 
 // ScanStates returns the scan_state rows for a media type and an optional
 // media-id prefix, ordered by media_id. It mirrors the old SQLite ScanStates
-// (Requirement 5.2), which builds its filter with txutil.AppendPrefixFilter: an
+// , which builds its filter with txutil.AppendPrefixFilter: an
 // empty prefix returns every row of the media type, and a non-empty prefix is a
 // byte-PREFIX match (media_id LIKE 'prefix%'). The bbolt cursor yields keys in
 // byte order, so within a fixed media type the rows already come out ordered by
 // media_id, matching the SQL ORDER BY for free. scanned_at is rendered with
 // scanTimeLayout to match the SQLite string shape. scan_state is a derived
-// bucket, so an undecodable value is skipped with a warning (Requirement 13.4).
+// bucket, so an undecodable value is skipped with a warning.
 func (d *DB) ScanStates(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error) {
 	prefix := append(typePrefix(mediaType), mediaIDPrefix...)
 
@@ -105,7 +105,7 @@ func (d *DB) ScanStates(_ context.Context, mediaType subflux.MediaType, mediaIDP
 
 // RecentlyScanned returns the set of media ids scanned at or AFTER cutoff
 // (inclusive), across every media type, mirroring the old SQLite
-// `WHERE scanned_at >= ?` (Requirement 5.4). It seeks the ix_scan_at index to
+// `WHERE scanned_at >= ?`. It seeks the ix_scan_at index to
 // be64(cutoff.UnixNano()) and walks forward: a row whose scanned_at equals the
 // cutoff produces an index key be64(cutoff) 0x00 primary, which sorts at or
 // after the 8-byte seek key, so the cutoff itself is included while the instant
@@ -144,7 +144,7 @@ func (d *DB) RecentlyScanned(_ context.Context, cutoff time.Time) (map[string]bo
 // LastScanTime returns the most recent scanned_at, formatted with
 // scanTimeLayout in UTC, or the empty string when nothing has been scanned. It
 // mirrors the old SQLite `SELECT MAX(scanned_at)` returning NULL -> "" semantics
-// (Requirement 5.6). The newest entry is the last key of the ix_scan_at index
+// . The newest entry is the last key of the ix_scan_at index
 // (keys sort chronologically), so this is an O(1) cursor.Last() plus a decode of
 // the timestamp embedded in the index key.
 func (d *DB) LastScanTime(_ context.Context) (string, error) {

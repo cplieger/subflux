@@ -96,10 +96,9 @@ func allTracks(ctx context.Context, path string) ([]subTrack, error) {
 // Returns nil if the track should be skipped (undefined language).
 func normalizeTrack(index int, codec, lang, name string, forced, hi bool) *subTrack {
 	// Delegate to the canonical ffprobe-tag normalizer (lowercasing,
-	// "und"/"undetermined" → empty, BCP 47 primary subtag, alpha3→alpha2).
-	// A hand-rolled copy here previously drifted: it compared "und" before
-	// lowercasing, so tags like "UND" or "UNDETERMINED" leaked through as
-	// real coverage languages.
+	// "und"/"undetermined" → empty, BCP 47 primary subtag, alpha3→alpha2)
+	// rather than comparing "und" before lowercasing, which lets tags like
+	// "UND" leak through as real coverage languages.
 	lang2 := ffmpeg.NormalizeFFprobeLang(lang, classify.Alpha2FromAlpha3)
 	if lang2 == "" {
 		return nil

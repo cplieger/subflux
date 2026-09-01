@@ -109,16 +109,12 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-// NewHTTPClientNoClientTimeout returns an SSRF-safe *http.Client without
-// a client-level Timeout. Used by providers (e.g. anidb) that fetch large
-// bodies and rely on transport-level dial/response-header timeouts plus
-// per-request context.WithTimeout, where a client-level Timeout would
-// clip mid-stream.
-// NewHTTPClientNoClientTimeout builds the shared SSRF-validated provider client
-// without a client-level timeout (phase timeouts come from SafeTransport).
-// allowedPorts overrides ssrf's default {443} dial-port allowlist — pass it only
-// for a known public endpoint on a non-standard port (e.g. the AniDB HTTP API on
-// 9001); omit it for the https/443 default.
+// NewHTTPClientNoClientTimeout omits the client-level Timeout for providers
+// (e.g. anidb) that fetch large bodies with per-request context.WithTimeout,
+// where a client-level Timeout would clip mid-stream. allowedPorts overrides
+// ssrf's default {443} dial-port allowlist — pass it only for a known public
+// endpoint on a non-standard port (e.g. the AniDB HTTP API on 9001); omit it
+// for the https/443 default.
 func NewHTTPClientNoClientTimeout(allowedPorts ...uint16) *http.Client {
 	var opts []ssrf.TransportOption
 	if len(allowedPorts) > 0 {

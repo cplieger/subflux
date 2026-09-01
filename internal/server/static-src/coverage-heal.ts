@@ -1,15 +1,11 @@
-// coverage-heal.ts — A6: coverage rows heal from SSE events through ONE
+// coverage-heal.ts — A6: coverage rows heal from SSE events through one
 // per-root trailing coalescer backed by the per-item summary endpoints.
 //
-// The grain of the read matches the grain of the change: an event names one
-// series/movie root and the client pulls exactly that row. Full-pair
-// collection reads stay legal in exactly two places — transactions (task 9)
-// and the library route loader — and both go through coverage.ts's
+// Full-pair collection reads stay legal in exactly two places — transactions
+// (task 9) and the library route loader — both routed through coverage.ts's
 // applyCoveragePair, which calls resetCoverageHeal before overwriting rows.
-//
-// Rows are written through coverage-store.ts, the leaf shared with coverage.ts;
-// this module never imports the other orchestrator, which is what keeps the
-// reset rule a direct call in one direction.
+// Rows are written through coverage-store.ts, the leaf shared with
+// coverage.ts; this module never imports the other orchestrator.
 
 import * as store from "./store.js";
 import { coverageMovieSummaryRaw, coverageSeriesSummaryRaw } from "./wire/client.gen.js";
@@ -35,7 +31,7 @@ const SERIES_MEDIA_ID = /^tvdb-([1-9]\d*)(?:-s\d+e\d+)?$/;
 const MOVIE_MEDIA_ID = /^tmdb-([1-9]\d*)$/;
 
 /** THE parser (A6): map an event's media identity onto a heal root, or null
- *  for anything that must produce NO request — malformed, zero, leading-zero,
+ *  for anything that must produce no request — malformed, zero, leading-zero,
  *  imdb-fallback, and type-mismatched ids (every publisher pairs a tvdb id
  *  with media_type "episode" and a tmdb id with "movie"). */
 export function parseCoverageMediaId(mediaId: string, mediaType: string): CoverageRoot | null {
@@ -54,8 +50,8 @@ export function parseCoverageMediaId(mediaId: string, mediaType: string): Covera
   return null;
 }
 
-/** Whether `root`'s own detail view is on screen. Detail views live on the
- *  library page; the file manager is not a detail. */
+/** Whether `root`'s own detail view is on screen (detail views live on the
+ *  library page; the file manager is not a detail). */
 function detailOpen(root: CoverageRoot): boolean {
   if (store.get("currentPage") !== "library") {
     return false;
@@ -82,14 +78,14 @@ interface PendingHeal {
 const pending = new Map<string, PendingHeal>();
 let windowTimer: ReturnType<typeof setTimeout> | null = null;
 
-// rootKey → in-flight summary GET. At most one per root (serialized):
-// dispatching a newer one aborts the older, so the latest always wins.
+// rootKey → in-flight summary GET. At most one per root: dispatching a
+// newer one aborts the older, so the latest always wins.
 const inflight = new Map<string, AbortController>();
 
 // Roots whose heal failed twice, retried at each reconcile tick. Insertion
-// order is the drop-oldest order for the cap. Lifetime decides persistence: a
-// library entry persists until convergence or a committing transaction subsumes
-// it (task 9's seam); a detail entry lives in the mounted detail view's scope.
+// order is the drop-oldest order for the cap. A library entry persists until
+// convergence or a committing transaction subsumes it; a detail entry lives
+// in the mounted detail view's scope.
 interface DirtyRoot {
   root: CoverageRoot;
   /** True while the ONLY renderer is the root's own detail view, so the entry
@@ -211,11 +207,10 @@ let refreshDetail: DetailRefresher = () => {
   /* no view layer loaded (the login bundle) */
 };
 
-/** Composition-time wiring: the module that owns route refreshes (page-leg.ts)
- *  declares how a root's own open detail is refreshed. Registration rather
- *  than an import because that module sits ABOVE this one, so the dependency
- *  points one way and nothing here reaches the view. Deliberately NOT cleared
- *  by _resetHealForTest — it is wiring, not per-test state. */
+/** Composition-time wiring: page-leg.ts, which sits above this module,
+ *  declares how a root's own open detail is refreshed — registration keeps
+ *  the dependency one-way. Not cleared by _resetHealForTest (wiring, not
+ *  per-test state). */
 export function setDetailRefresher(fn: DetailRefresher): void {
   refreshDetail = fn;
 }
@@ -260,11 +255,9 @@ function retryDirtyRoots(): void {
   }
 }
 
-/** Release the dirty entries whose only renderer was a detail view, called by
- *  the router's leave path (page-leg's abortPageLeg) — once that view is gone a
- *  retry could repaint nothing, so the entry is worthless rather than pending.
- *  Library-scoped entries are untouched: a loaded library renders every root, so
- *  they persist until convergence or a commit. */
+/** Release dirty entries whose only renderer was a detail view, called by the
+ *  router's leave path — once that view is gone a retry would repaint
+ *  nothing. Library-scoped entries are untouched. */
 export function dropDetailScopedDirtyRoots(): void {
   for (const [rootKey, d] of dirty) {
     if (d.detailScoped) {
@@ -273,10 +266,10 @@ export function dropDetailScopedDirtyRoots(): void {
   }
 }
 
-/** Task 9 seam: a COMMITTING transaction subsumes the dirty set — its
- *  collection leg just landed every row fresh, so nothing is left to retry.
- *  (The route loader's pair landing deliberately does not: dirty library
- *  roots persist until convergence or a commit.) */
+/** Task 9 seam: a committing transaction subsumes the dirty set — its
+ *  collection leg just landed every row fresh. The route loader's pair
+ *  landing deliberately does not: dirty library roots persist until
+ *  convergence or a commit. */
 export function subsumeDirtyRoots(): void {
   dirty.clear();
 }
@@ -292,9 +285,9 @@ export function onHealReset(fn: () => void): () => void {
   };
 }
 
-/** THE RESET RULE (A6): abort in-flight per-root GETs and clear the pending
+/** The reset rule (A6): abort in-flight per-root GETs and clear the pending
  *  window for rows about to be overwritten. Called by coverage.ts's
- *  applyCoveragePair, which every full-pair writer goes through. */
+ *  applyCoveragePair. */
 export function resetCoverageHeal(): void {
   for (const ctrl of inflight.values()) {
     ctrl.abort();

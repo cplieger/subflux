@@ -14,7 +14,6 @@ const (
 	styleFanart      = "fanart"
 )
 
-// buildVideoArgs constructs ffmpeg arguments for streaming 360p fMP4.
 func buildVideoArgs(path string, startSec float64) []string {
 	args := []string{"-hide_banner", "-loglevel", "error"}
 	if startSec > 0 {
@@ -31,7 +30,6 @@ func buildVideoArgs(path string, startSec float64) []string {
 	return args
 }
 
-// buildBufferedArgs constructs ffmpeg arguments for buffered MP4 output.
 func buildBufferedArgs(path string, startSec float64, outPath string) []string {
 	args := []string{"-hide_banner", "-loglevel", "error", "-y"}
 	if startSec > 0 {
@@ -49,18 +47,15 @@ func buildBufferedArgs(path string, startSec float64, outPath string) []string {
 	return args
 }
 
-// responseStarted checks if the response has likely been committed.
 func responseStarted(w http.ResponseWriter) bool {
 	return w.Header().Get("Content-Type") != ""
 }
 
-// ffmpegErrorRule maps a stderr substring to a user-friendly message.
 type ffmpegErrorRule struct {
 	substr  string
 	message string
 }
 
-// ffmpegErrorTable is the data-driven classification table for ffmpeg errors.
 var ffmpegErrorTable = []ffmpegErrorRule{
 	{"No such file", errMediaNotFound},
 	{"Permission denied", "media file not accessible"},
@@ -73,7 +68,6 @@ var ffmpegErrorTable = []ffmpegErrorRule{
 	{"moov atom not found", "media file has missing metadata"},
 }
 
-// classifyFFmpegError maps ffmpeg stderr output to a user-friendly error.
 func classifyFFmpegError(stderr string) error {
 	errMsg := strings.TrimSpace(stderr)
 	if errMsg == "" {
@@ -87,7 +81,6 @@ func classifyFFmpegError(stderr string) error {
 	return fmt.Errorf("ffmpeg: %s", errMsg)
 }
 
-// posterCoverURL builds the Sonarr/Radarr media cover URL.
 func posterCoverURL(arrURL string, id int, style string) string {
 	coverType := "poster-250.jpg"
 	if style == styleFanart {
@@ -97,7 +90,6 @@ func posterCoverURL(arrURL string, id int, style string) string {
 		strings.TrimRight(arrURL, "/"), id, coverType)
 }
 
-// limitedWriterPool reuses limitedWriter instances.
 var limitedWriterPool = sync.Pool{
 	New: func() any {
 		return &limitedWriter{max: 8192}
@@ -117,7 +109,6 @@ func putLimitedWriter(lw *limitedWriter) {
 	limitedWriterPool.Put(lw)
 }
 
-// limitedWriter wraps a strings.Builder with a byte cap.
 type limitedWriter struct {
 	b   strings.Builder
 	max int

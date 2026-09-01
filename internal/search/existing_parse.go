@@ -6,8 +6,6 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// --- External subtitle path parsing ---
-
 // parseExternalSubPath extracts language and variant flags from an external
 // subtitle filename. The middle segment between base+"." and ext is split on
 // dots: the first part is the language code, subsequent parts are flag tags
@@ -36,18 +34,16 @@ func parseExternalSubPath(path, base, ext string) externalSub {
 }
 
 // globEscape escapes glob metacharacters in s so filepath.Glob treats them
-// as literal characters. On Linux (where this runs), backslash-escaping works.
+// as literal characters.
 func globEscape(s string) string {
 	if !strings.ContainsAny(s, `*?[\`) {
 		return s
 	}
 	var b strings.Builder
 	b.Grow(len(s) + 4)
-	// Iterate over bytes, not runes: paths on Linux are arbitrary byte
-	// strings that may not be valid UTF-8, and ranging by rune would
-	// rewrite each invalid byte as U+FFFD — corrupting the pattern so it
-	// no longer matches the real filename. The glob metacharacters are all
-	// ASCII, so byte-wise escaping is both correct and lossless.
+	// Byte-wise, not rune-wise: paths may not be valid UTF-8, and ranging
+	// by rune would rewrite an invalid byte as U+FFFD, corrupting the
+	// pattern. The glob metacharacters are all ASCII.
 	for i := range len(s) {
 		c := s[i]
 		switch c {
@@ -58,5 +54,3 @@ func globEscape(s string) string {
 	}
 	return b.String()
 }
-
-// --- Ignored codec detection from config ---

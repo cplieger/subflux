@@ -5,12 +5,10 @@
 // with its supersede/abort rules, the A6 reset rule that precedes every
 // overwrite, and the table render.
 //
-// The table is rendered once via `bindList` over a computed `visibleIds` view
+// The table renders once via `bindList` over a computed `visibleIds` view
 // (filter + sort + pagination as a sliced id list). A refresh merges
-// identity-preservingly, so an unchanged row's signal never fires and nothing
-// repaints; a changed row repaints whole, gated by `data-sig`. A filter/sort/
-// page change recomputes the view and reconciles structure. No paged-list, no
-// manual per-badge DOM patching.
+// identity-preservingly, so an unchanged row's signal never fires and
+// nothing repaints; a changed row repaints whole, gated by `data-sig`.
 
 import * as store from "./store.js";
 import { $, el, text, icon, errDiv, input, select } from "./dom.js";
@@ -73,22 +71,21 @@ registerCleanup(() => {
   coverageAbort = null;
 });
 
-/** Task 9: supersede the in-flight plain pair fetch (the degraded boot's
- *  ungated load) before a fresher full-pair application lands. */
+/** Supersede the in-flight plain pair fetch before a fresher full-pair
+ *  application lands. */
 export function abortInFlightPairFetch(): void {
   coverageAbort?.abort();
   coverageAbort = null;
 }
 
-/** THE full-pair application site: the loader's null-collapsing read and the
- *  transaction's failure-preserving collection leg both land here, so the A6
- *  reset rule cannot drift between the two writers.
+/** The full-pair application site: the loader's null-collapsing read and
+ *  the transaction's failure-preserving collection leg both land here, so
+ *  the A6 reset rule cannot drift between the two writers.
  *
- *  The reset rule is a DIRECT call and it precedes the overwrite: every row is
- *  about to be replaced, so the heal coalescer aborts its in-flight per-root
- *  GETs and drops its pending window first — an in-flight summary read issued
- *  before this snapshot would otherwise land after it and revert a row. The
- *  row merge, the tombstone drop and the gate are coverage-store's.
+ *  The reset rule precedes the overwrite: every row is about to be
+ *  replaced, so the heal coalescer aborts its in-flight per-root GETs and
+ *  drops its pending window first — an in-flight summary read issued before
+ *  this snapshot would otherwise land after it and revert a row.
  *
  *  Ordering is what makes this the site rather than the leaf: coverage-store
  *  is below coverage-heal, so only a module above both can call the reset. */
@@ -101,12 +98,12 @@ export function applyCoveragePair(
 }
 
 /** Fetch series and movies coverage and apply the pair through the shared
- *  application site. A route loader arriving while a transaction's collection
- *  leg covers the pair JOINS that leg (per-collection join, E3) instead of
- *  issuing a second read; a joined loader whose leg FAILS performs only its
- *  non-fetch duties — the pair registration that makes the latch's forced
- *  transaction fetch it — and renders the route's normal loading/empty state.
- *  Aborts any prior in-flight fetch — only the latest wins. */
+ *  application site. A route loader arriving while a transaction's
+ *  collection leg covers the pair joins that leg instead of issuing a
+ *  second read; a joined loader whose leg fails performs only its non-fetch
+ *  duties (registering the pair, so the latch's forced transaction fetches
+ *  it) and renders the route's normal loading/empty state. Aborts any
+ *  prior in-flight fetch — only the latest wins. */
 export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   const leg = pendingCollectionLeg();
   if (leg) {

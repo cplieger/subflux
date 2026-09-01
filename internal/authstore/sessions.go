@@ -13,8 +13,8 @@ import (
 // Sessions are EPHEMERAL: they live only in the in-memory map Store.sessions,
 // guarded by Store.mu (an RWMutex — RLock for reads, Lock for writes), and are
 // never persisted to bbolt. They are lost on restart by design; users simply
-// re-authenticate (Requirement 10.1, 10.4). last_activity updates touch memory
-// only, with zero disk churn (Requirement 10.2).
+// re-authenticate. last_activity updates touch memory
+// only, with zero disk churn.
 //
 // The observable method semantics mirror the old SQLite store/authdb/sessions.go
 // even though the backing store changed from a table to a map:
@@ -46,7 +46,7 @@ func cloneSession(sess *auth.Session) *auth.Session {
 
 // CreateSession stores a new session in memory, keyed by its token hash. A copy
 // is stored so a later mutation of the caller's struct does not affect stored
-// state. Sessions never touch disk (Requirement 10.1).
+// state. Sessions never touch disk.
 func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 	if sess == nil {
 		return nil
@@ -76,8 +76,7 @@ func (s *Store) SessionByHash(_ context.Context, tokenHash string) (*auth.Sessio
 	return cloneSession(stored), true, nil
 }
 
-// UpdateSessionActivity touches a session's last-activity time (memory only,
-// Requirement 10.2). An update for an absent session is a no-op returning nil,
+// UpdateSessionActivity touches a session's last-activity time (memory only). An update for an absent session is a no-op returning nil,
 // matching the SQLite UPDATE that affects zero rows.
 func (s *Store) UpdateSessionActivity(_ context.Context, tokenHash string, now time.Time) error {
 	s.mu.Lock()
@@ -100,7 +99,7 @@ func (s *Store) DeleteSession(_ context.Context, tokenHash string) error {
 
 // DeleteUserSessions removes all of a user's sessions except the one identified
 // by exceptHash (the keep-one exception used by "log out everywhere else" to
-// keep the current session, Requirement 16.5). Pass exceptHash="" to drop all
+// keep the current session). Pass exceptHash="" to drop all
 // of the user's sessions (the DeleteUser cascade path); no real session carries
 // an empty hash, so nothing is spuriously kept.
 func (s *Store) DeleteUserSessions(_ context.Context, userID int64, exceptHash string) error {
@@ -124,7 +123,7 @@ func (s *Store) deleteUserSessionsExcept(userID int64, exceptHash string) {
 }
 
 // CleanupExpiredSessions evicts every session past its idle OR absolute timeout
-// and returns the count evicted (Requirement 10.3). A session is expired when
+// and returns the count evicted. A session is expired when
 // last_activity is strictly before now-timeouts.Idle OR created_at is strictly
 // before now-timeouts.Absolute, matching the exclusive cutoff comparison of the
 // old SQLite delete (last_activity < idleCutoff OR created_at < absCutoff).

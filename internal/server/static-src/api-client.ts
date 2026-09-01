@@ -41,7 +41,7 @@ import type { Decoder } from "./validators.js";
 // fetch's discriminated union: `ok` is a plain boolean with optional
 // data/error (so `r.data` / `r.error` reads at existing call sites need no
 // narrowing), plus the lifted `code` / `requestId` fields and `headers`
-// (populated on the error path only — see the module header).
+// (populated on the error path only).
 export interface ApiResult<T> {
   ok: boolean;
   status: number;
@@ -80,15 +80,11 @@ async function requestRaw<T>(
     opts.decoder = decoder;
   }
 
-  // Drive @cplieger/fetch's per-verb raw helpers (apiGetRaw / apiPostRaw / …)
-  // rather than the generic requestRaw, so the library's verb helpers are what
-  // subflux actually consumes. Each is a thin wrapper over requestRaw with the
-  // method baked in (GET/DELETE thread the body through opts, POST/PUT/PATCH via
-  // the body param), so the envelope mapping, decode/warn diagnostics, and
-  // empty-body contract below are all unchanged. The raw (not null-collapsing)
-  // family is the right fit: subflux layers its own null-collapse + loose
-  // envelope on top, which the T|null helpers would hide. The switch is
-  // exhaustive over HttpMethod — no default arm, no string cast.
+  // Drive @cplieger/fetch's per-verb raw helpers rather than the generic
+  // requestRaw, so the envelope mapping and diagnostics below stay
+  // unchanged. The raw (not null-collapsing) family is the right fit:
+  // subflux layers its own null-collapse + loose envelope on top, which the
+  // T|null helpers would hide. The switch is exhaustive over HttpMethod.
   let r: FetchApiResult<T>;
   switch (method) {
     case "GET":
@@ -138,11 +134,11 @@ async function requestRaw<T>(
 }
 
 // Session expiry chokepoint: every API call routes through requestRaw, so a
-// 401 anywhere in the MAIN app (dialogs included) means the session is gone
-// and no surface has a local recovery path — redirect to the login page with
-// a return target instead of leaving a blank dialog or a silently-failed
-// action. The login shell (/login) is excluded: its own POSTs legitimately
-// answer 401 on bad credentials and must not loop.
+// 401 anywhere in the main app means the session is gone with no local
+// recovery path — redirect to the login page with a return target instead
+// of leaving a blank dialog or a silently-failed action. The login shell
+// (/login) is excluded: its own POSTs legitimately answer 401 on bad
+// credentials and must not loop.
 let redirectingToLogin = false;
 
 function handleSessionExpiry(status: number): void {
@@ -233,6 +229,4 @@ export function fillPath(template: string, params: Record<string, string | numbe
 
 // (The former hand-rolled apiGet/apiPost/… helper families were removed once
 // every JSON call site moved onto the generated wire/client.gen.ts functions;
-// the clientRequest* trio above is the only surface the generated code needs.
-// requestRaw is fully typed; add a typed wrapper here if layered code ever
-// needs extra headers again.)
+// the clientRequest* trio above is the only surface the generated code needs.)

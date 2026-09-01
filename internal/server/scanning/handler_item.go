@@ -67,8 +67,6 @@ func (h *Handler) scanEpisodes(ctx context.Context, stop <-chan struct{}, actID 
 	return activity.OutcomeCompleted
 }
 
-// filterEpisodesWithFiles returns pointers to the episodes that match filterEp
-// and have a downloaded file.
 func filterEpisodesWithFiles(episodes []arrapi.Episode,
 	filterEp func(*arrapi.Episode) bool,
 ) []*arrapi.Episode {

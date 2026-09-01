@@ -1,20 +1,13 @@
-// page-leg.ts — B2: refreshCurrentPage is the page-leg dispatcher.
+// page-leg.ts — refreshCurrentPage is the page-leg dispatcher: the one place
+// enumerating what refreshing the current route means (library reloads the
+// pair, series/movie detail re-fetch their triples, history reloads, files
+// is an empty leg). Transactions dispatch their page leg through the same
+// function, so this per-route enumeration is the shared seam.
 //
-// ONE place enumerates what refreshing the current route means (E3 step 3):
-// library reloads the pair, series detail runs the triple (episodes, episode
-// coverage, history ids), movie detail runs its own triple (summary + /subs
-// + movie stateIDs — the plain dispatcher delegates the latter two to
-// openMovieDetail, the transaction awaits all three), history reloads, and
-// files is an empty leg (the files page owns its refresh). Task 9's
-// transactions dispatch their page leg through refreshCurrentPage, so this
-// per-route enumeration is the shared seam.
-//
-// Every dispatch runs under an AbortController + generation token PER ROUTE:
-// a newer dispatch supersedes the older one (abort + stale-generation
-// discard), and the router's leave path aborts the departing route's
-// controller. A superseded run settles "superseded" in silence — its own
-// abort is never an error, because the superseding caller owns the fresh
-// render.
+// Every dispatch runs under an AbortController + generation token per route:
+// a newer dispatch supersedes the older one, and the router's leave path
+// aborts the departing route's controller. A superseded run settles
+// "superseded" in silence — the superseding caller owns the fresh render.
 
 import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
@@ -49,10 +42,8 @@ const generations = new Map<string, number>();
 // Route key → in-flight controller (at most one live run per route).
 const controllers = new Map<string, AbortController>();
 
-// The dispatcher's route identity, in the order refreshCurrentPage always
-// branched: history page, files view, series detail, movie detail, library.
-// Exported for task 9's transaction (the collection leg's routeRequired
-// check reads it).
+/** The dispatcher's route identity. Exported for the transaction's
+ *  collection-leg routeRequired check. */
 export function currentRouteKey(): string {
   if (store.get("currentPage") === "history") {
     return "history";
@@ -67,18 +58,14 @@ export function currentRouteKey(): string {
   if (ctx && "movie" in ctx && ctx.movie) {
     return `movie:${ctx.tmdbId}`;
   }
-  // No landed detail context: the URL classifies, not the transient
-  // currentPage value. A detail path IS a detail route at boot (R2.3/A7) —
-  // the router sets currentPage="library" synchronously while detailCtx
-  // lands only with the summary, so store state alone misreads a deep-link
-  // boot as the library and the collection leg fetches the pair.
+  // No landed detail context: the router sets currentPage="library"
+  // synchronously on boot while detailCtx lands only with the summary, so
+  // store state alone would misread a deep-link boot as the library.
   return routeKeyFromPath(location.pathname);
 }
 
-// URL → route identity for the window before any detail context lands,
-// mirroring the router's own table (same key space as the ctx-derived arms,
-// so a landing context is a no-op key change). Unknown paths are the
-// library — applyRoute's default arm.
+// URL → route identity before any detail context lands, mirroring the
+// router's own table. Unknown paths are the library (applyRoute's default).
 function routeKeyFromPath(path: string): string {
   if (path === "/history") {
     return "history";
@@ -96,11 +83,10 @@ function isCurrent(key: string, gen: number, ctrl: AbortController): boolean {
   return !ctrl.signal.aborted && generations.get(key) === gen && currentRouteKey() === key;
 }
 
-/** THE ROUTER's leave path: abort the departing route's in-flight page leg,
- *  so the detail refresh pair dies on leave, and release the views that route
- *  mounted beside it (C2) — a departing view's bindings, row effects and
- *  registry entries must not outlive it. One owner: every route leave funnels
- *  through here. */
+/** The router's leave path: abort the departing route's in-flight page leg
+ *  and release the views it mounted (a departing view's bindings, row
+ *  effects and registry entries must not outlive it). Every route leave
+ *  funnels through here. */
 export function abortPageLeg(): void {
   for (const [key, ctrl] of controllers) {
     generations.set(key, (generations.get(key) ?? 0) + 1);
@@ -108,15 +94,10 @@ export function abortPageLeg(): void {
   }
   controllers.clear();
   releaseRouteViews();
-  // A6: a heal entry whose only renderer was a detail view (the library never
-  // loaded, so nothing else renders the root) dies with the route. This is the
-  // only reachable transition for one: a detail-scoped entry requires an
-  // unloaded library, so no row click can exist to swap details without the
-  // router.
   dropDetailScopedDirtyRoots();
 }
 
-/** THE page-leg dispatcher. Runs the current route's page leg under the
+/** The page-leg dispatcher. Runs the current route's page leg under the
  *  route's controller and a fresh generation, superseding any prior run for
  *  the route, and hands the results to the route's renderer. */
 export async function refreshCurrentPage(): Promise<PageLegResult> {
@@ -141,14 +122,11 @@ async function dispatchLeg(
   ctrl: AbortController,
 ): Promise<PageLegResult> {
   if (key === "history") {
-    // History is its own surface: a completed download invalidates it just
-    // like the library, but the coverage arms below would never reload it.
     reloadHistory();
     return "applied";
   }
   if (key === "files") {
-    // The files page owns its refresh after delete; an empty leg applies
-    // immediately.
+    // The files page owns its own refresh after delete.
     return "applied";
   }
   const { signal } = ctrl;
@@ -173,8 +151,7 @@ async function dispatchLeg(
     return "applied";
   }
   if (ctx && "movie" in ctx && ctx.movie) {
-    // The leg is summary + /subs + movie stateIDs — never a collection read.
-    // openMovieDetail runs the latter two under this same leg signal.
+    // Summary here; openMovieDetail runs /subs + stateIDs under this signal.
     const row = await coverageMovieSummary(ctx.tmdbId, undefined, { signal });
     if (!isCurrent(key, gen, ctrl)) {
       return "superseded";
@@ -188,8 +165,8 @@ async function dispatchLeg(
     await loadCoverage(true);
     return "applied";
   }
-  // A pending detail (the URL names a detail route whose context has not
-  // landed): the route loader owns the fetch — an empty leg.
+  // A pending detail (URL names a detail route whose context hasn't landed):
+  // the route loader owns the fetch — an empty leg.
   return "applied";
 }
 
@@ -200,12 +177,10 @@ on(BusEvent.DataInvalidate, () => {
   void refreshCurrentPage();
 });
 
-/** A6's series detail-coupling (R1.2): a healed series root whose own detail
- *  is open refreshes the REFRESH PAIR — episode coverage + history ids —
- *  rendering with the cached seasons. Never mediaEpisodes: the event path is
- *  specified to cost no arr-backed read; the transaction/page-leg triple
- *  keeps it. Runs under the route's controller and a fresh generation like
- *  any dispatch, superseding an older run. */
+/** A healed series root whose own detail is open refreshes episode coverage
+ *  + history ids, rendering with the cached seasons. Never mediaEpisodes:
+ *  the heal path must cost no arr-backed read. Runs under the route's
+ *  controller and a fresh generation like any dispatch. */
 async function refreshSeriesDetailPair(): Promise<void> {
   const ctx = store.get("detailCtx");
   if (!ctx || !("tvdbId" in ctx) || !ctx.tvdbId) {
@@ -234,14 +209,12 @@ async function refreshSeriesDetailPair(): Promise<void> {
   }
 }
 
-// The heal's detail coupling, wired in the direction the layers already run:
-// coverage-heal.ts sits BELOW this module (it writes rows through
+// coverage-heal.ts sits below this module (it writes rows through
 // coverage-store.ts while this module refreshes routes), so it cannot import
-// the refresh and this module registers it instead. A6's two arms differ in
-// kind, so both live here rather than in the heal: the series arm is a route
-// refresh under this module's own generation guard, and the movie arm re-runs
-// openMovieDetail's on-demand reads (/subs + one state/ids read) from the row
-// the heal just landed, under detail.ts's own controller.
+// the refresh and this module registers it instead. The series arm is a
+// route refresh under this module's own generation guard; the movie arm
+// re-runs openMovieDetail's on-demand reads from the row the heal just
+// landed, under detail.ts's own controller.
 setDetailRefresher((root) => {
   if (root.kind === "series") {
     void refreshSeriesDetailPair();
@@ -249,28 +222,25 @@ setDetailRefresher((root) => {
   }
   const row = coverageRow(root.rootKey);
   if (row) {
-    // A movie root's row IS the summary payload plus the client discriminant,
-    // so the narrowing is the same one detail.ts's navigation entry makes.
+    // A movie root's row IS the summary payload plus the client discriminant.
     openMovieDetail(row as MovieDetail, true);
   }
 });
 
-// --- Task 9: the transaction's PAGE leg ---
+// --- The transaction's PAGE leg ---
 
 /** How the transaction's page leg landed: this dispatch applied, or a newer
  *  same-route dispatch superseded it (whose own landing satisfies the leg). */
 export type TransactionLegOutcome = "applied" | "superseded";
 
-/** Dispatch the transaction's PAGE leg (E3 step 3). Differences from the
- *  plain dispatcher: the library arm is EMPTY (the transaction's collection
- *  leg owns the pair — it settles applied immediately on dispatch), history
- *  runs task 9's settlement-aware extraction, recovery transactions send
- *  ?recovery=1 on the honoring endpoints, every fetch runs on the RAW
+/** Dispatch the transaction's page leg. Differences from the plain
+ *  dispatcher: the library arm is empty (the transaction's collection leg
+ *  owns the pair), history runs its own settlement-aware extraction,
+ *  recovery transactions send ?recovery=1, every fetch runs on the raw
  *  generated client with zero automatic retries, and a genuine transport
  *  failure or typed 429 refusal REJECTS (the transaction aborts). A
- *  route-leave mid-leg RE-ROUTES: the loop's next dispatch IS the new
- *  route's page leg (an empty leg applies immediately, so it terminates),
- *  and commit waits for the re-routed leg. */
+ *  route-leave mid-leg RE-ROUTES: the loop's next dispatch is the new
+ *  route's page leg, and commit waits for it. */
 export async function dispatchTransactionPageLeg(
   recovery: boolean,
 ): Promise<TransactionLegOutcome> {
@@ -325,9 +295,9 @@ async function transactionArm(
   recovery: boolean,
 ): Promise<TransactionLegOutcome | "rerouted"> {
   if (key === "library" || key === "files") {
-    // Library: nothing extra — the collection leg owns the pair. Files owns
-    // its own refresh. An EMPTY leg settles applied immediately on dispatch,
-    // which is what makes the re-route chain terminate.
+    // Library: the collection leg owns the pair. Files owns its own
+    // refresh. An empty leg settles applied immediately, which is what
+    // makes the re-route chain terminate.
     return "applied";
   }
   const { signal } = ctrl;
@@ -359,12 +329,11 @@ async function transactionArm(
     return "applied";
   }
   if (ctx && "movie" in ctx && ctx.movie) {
-    // E3 step 3: the movie leg is the summary + /subs + movie stateIDs
-    // TRIPLE, all awaited on the raw client — commit waits for all three,
-    // and a genuinely failed read aborts the transaction instead of
-    // painting an empty subs table. /subs and stateIDs are store-only reads
-    // and never carry ?recovery=1; a 404 is a definitive answer (vanished
-    // item), rendered as the shipped fallback.
+    // The movie leg is summary + /subs + movie stateIDs, all awaited on the
+    // raw client — commit waits for all three, and a genuinely failed read
+    // aborts the transaction instead of painting an empty subs table.
+    // /subs and stateIDs are store-only and never carry ?recovery=1; a 404
+    // is a definitive answer (vanished item), rendered as the fallback.
     const [row, pair] = await Promise.all([
       coverageMovieSummaryRaw(ctx.tmdbId, rq, { signal }),
       readMovieDetail(ctx.tmdbId, { signal }),
@@ -382,11 +351,9 @@ async function transactionArm(
     return "applied";
   }
   if (currentRouteKey() === key) {
-    // A PENDING detail: the URL still names this route but its context has
-    // not landed (a deep-link boot resolving its item). The ROUTE LOADER
-    // owns the item-grain resolution (R2.3), so the leg is EMPTY and
-    // settles applied immediately — which keeps the re-route chain
-    // terminating.
+    // A pending detail: the URL still names this route but its context
+    // hasn't landed. The route loader owns the item-grain resolution, so
+    // the leg is empty.
     return "applied";
   }
   // Route state moved between the key computation and the arm (a detail

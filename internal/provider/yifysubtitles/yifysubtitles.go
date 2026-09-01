@@ -79,12 +79,10 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 // Download fetches the subtitle archive for the given search result by first
 // loading the subtitle detail page to extract the real download link.
 func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// Validate subtitle page URL to prevent SSRF.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("yifysubtitles: %w", err)
 	}
 
-	// First fetch the subtitle page to get the download link.
 	body, err := p.fetchPage(ctx, sub.DownloadURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch subtitle page: %w", err)

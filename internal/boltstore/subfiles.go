@@ -22,13 +22,13 @@ import (
 // subtitle_files keys are mt 0x00 mid 0x00 lang 0x00 variant 0x00 source 0x00
 // path (subtitleFileKey), so the language, variant, source, and path that drive
 // per-media coverage all live in the KEY. Coverage counts therefore come from a
-// key-only prefix walk with no value decode (Requirement 18.2); only the codec
+// key-only prefix walk with no value decode; only the codec
 // lives in the JSON value. The cumulative sync offset lives solely in the
 // sync_offsets bucket (keyed by bare path, written by SetSyncOffset);
 // SubtitleFiles joins it per row. Every write routes through the
 // putSubtitleFile / deleteSubtitleFile index-maintenance chokepoints so the
 // O(1) TotalSubtitleFiles counter in the meta bucket stays consistent in the
-// same transaction as the row write (Requirement 18.1), and deleteSubtitleFile
+// same transaction as the row write, and deleteSubtitleFile
 // also drops the row's sync_offsets key so stale offsets never outlive their
 // file.
 
@@ -40,7 +40,7 @@ type subFileKey struct{ lang, variant, source, path string }
 
 // RecordSubtitleFiles diff-syncs the subtitle_files rows for one media item
 // against the set discovered on disk, in a single write transaction. It mirrors
-// the old SQLite store's diff-based RecordSubtitleFiles (Requirement 5.1):
+// the old SQLite store's diff-based RecordSubtitleFiles:
 //
 //   - rows present on disk but absent from the store are inserted,
 //   - rows whose codec changed are updated in place,
@@ -142,7 +142,7 @@ func putFileRow(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, k subF
 // decoded value. subtitle_files is a derived bucket, so an undecodable
 // value is tolerated: the row is still recorded (with a zero value) so a stale
 // row is still deleted and an in-want row is rewritten cleanly, self-healing
-// the corruption rather than aborting the scan (Requirement 13.4).
+// the corruption rather than aborting the scan.
 func loadFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string) (map[subFileKey]fileRec, error) {
 	b := tx.Bucket([]byte(bucketSubtitleFiles))
 	if b == nil {
@@ -182,7 +182,7 @@ func parseSubFileKey(key []byte) (subFileKey, bool) {
 
 // UpsertSubtitleFile inserts or updates a single subtitle_files row, mirroring
 // the old SQLite `INSERT ... ON CONFLICT DO UPDATE SET codec, updated_at`
-// (Requirement 15.7). The write routes through putSubtitleFile so the
+// . The write routes through putSubtitleFile so the
 // TotalSubtitleFiles counter is maintained.
 func (d *DB) UpsertSubtitleFile(_ context.Context, mediaType subflux.MediaType, mediaID string, f *subflux.SubtitleFile) error {
 	key := subtitleFileKey(mediaType, mediaID, f.Language, f.Variant, f.Source, f.Path)
@@ -194,7 +194,7 @@ func (d *DB) UpsertSubtitleFile(_ context.Context, mediaType subflux.MediaType, 
 
 // DeleteSubtitleFile removes the single subtitle_files row identified by its
 // full composite key, mirroring the old SQLite DELETE on the full primary key
-// (Requirement 15.7). It is idempotent: deleting an absent row is a no-op, and
+// . It is idempotent: deleting an absent row is a no-op, and
 // the TotalSubtitleFiles counter only moves when a row actually existed.
 func (d *DB) DeleteSubtitleFile(_ context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant, source subflux.SubtitleSource, path string) error {
 	key := subtitleFileKey(mediaType, mediaID, language, variant, source, path)
@@ -208,7 +208,7 @@ func (d *DB) DeleteSubtitleFile(_ context.Context, mediaType subflux.MediaType, 
 // optional media-id filter, ordered by media_id, language, variant, source
 // (the natural byte order of the composite key, so the cursor yields it for
 // free). It mirrors the old SQLite SubtitleFiles, including the prefix
-// semantics and the subtitle_state join (Requirement 5.2):
+// semantics and the subtitle_state join:
 //
 //   - an empty filter returns every row of the media type,
 //   - a filter NOT ending in "-" is an EXACT media-id match,
@@ -422,7 +422,7 @@ func stateVideoPath(tx *bolt.Tx, id int64) string {
 
 // TotalSubtitleFiles returns the total subtitle_files row count from the O(1)
 // maintained meta counter (readFileCount), never a full-bucket scan
-// (Requirement 18.1). The counter is moved inside the same transaction as every
+// . The counter is moved inside the same transaction as every
 // insert/delete by the putSubtitleFile / deleteSubtitleFile chokepoints, so it
 // equals COUNT(*) of the bucket.
 func (d *DB) TotalSubtitleFiles(_ context.Context) (int, error) {
@@ -459,7 +459,7 @@ func storedSyncOffset(tx *bolt.Tx, path string) (offsetMs int64, ok bool) {
 
 // SetSyncOffset stores the cumulative sync offset (in milliseconds) for a
 // subtitle file, keyed by its bare path in the dedicated sync_offsets bucket
-// (Requirement 6.1). The value is be64(offset_ms): a single fixed-width put, no
+// . The value is be64(offset_ms): a single fixed-width put, no
 // JSON, since sync_offsets has no secondary index and no projection. The int64
 // is reinterpreted as a uint64 for encoding, which is bit-preserving, so a
 // negative offset (subtitle ahead of audio) round-trips exactly through
@@ -475,8 +475,7 @@ func (d *DB) SetSyncOffset(_ context.Context, path string, offsetMs int64) error
 }
 
 // SyncOffset returns the stored sync offset (in milliseconds) for a subtitle
-// path, or 0 with no error when the path has no stored offset (Requirement
-// 6.1), matching the old SQLite store's not-found-means-zero behaviour. The
+// path, or 0 with no error when the path has no stored offset, matching the old SQLite store's not-found-means-zero behaviour. The
 // value is the be64(offset_ms) written by SetSyncOffset, decoded and
 // reinterpreted back to int64 (bit-preserving, so negatives round-trip).
 func (d *DB) SyncOffset(_ context.Context, path string) (int64, error) {

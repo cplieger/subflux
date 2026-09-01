@@ -25,16 +25,17 @@ import (
 //   - It first clears ALL adaptive-backoff rows for the language triple
 //     (success clears backoff; backoff has no variant dimension), each through
 //     the deleteAttempt chokepoint so the attempts counter stays consistent
-//     (Requirement 3.3).
+//
+// .
 //   - For an AUTO download (Meta.Manual false), it updates every existing auto
 //     row for the QUAD in place, preserving each row's original media_imported
-//     and surrogate id (Requirement 3.1); if no auto row exists for the quad it
-//     inserts a fresh one with media_imported = now (Requirement 3.2). An
+//     and surrogate id; if no auto row exists for the quad it
+//     inserts a fresh one with media_imported = now. An
 //     fr/forced download therefore never overwrites the fr/standard auto row.
 //   - For a MANUAL download (Meta.Manual true), it always appends a new manual
 //     row (the manual row is the quad's automation lock), storing rec.Path
 //     verbatim so the row's ordinal equals the ordinal the handler already
-//     encoded in the filename (Requirement 4.5); the ordinal is authoritative
+//     encoded in the filename; the ordinal is authoritative
 //     in rec.Path and is never re-derived from the bucket here.
 //
 // An empty rec.Variant is normalized to VariantStandard, so legacy callers
@@ -158,7 +159,7 @@ func insertStateRow(tx *bolt.Tx, rec *subflux.DownloadRecord, m *subflux.Downloa
 // through putState directly. It is a lock-bearing read (the auto-vs-manual
 // partition decides whether a manual lock is overwritten), so it FAILS CLOSED
 // on a primary decode error rather than tolerantly skipping. It is shared by
-// the subtitle_state domain methods (tasks 4.1-4.4).
+// the subtitle_state domain methods.
 func collectStateRows(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, variant subflux.Variant) ([]stateRec, error) {
 	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
@@ -218,8 +219,8 @@ func clearTripleBackoff(tx *bolt.Tx, mt subflux.MediaType, mid, lang string) err
 // form movie.lang[.variant].N.srt, mirroring the old SQLite NextManualNumber
 // extraction (strip the .srt suffix, then take the trailing run of digits). It
 // returns ok=false when no trailing numeric component is present. Shared by the
-// manual-lock methods (task 4.3) and used to assert SaveDownload stores the
-// path's ordinal unchanged (Requirement 4.5).
+// manual-lock methods and used to assert SaveDownload stores the
+// path's ordinal unchanged.
 //
 // Guard note: the digit-run heuristic assumes the app's own naming schemes.
 // Auto rows CAN carry ordinals (a top-pick manual download records a
@@ -251,7 +252,7 @@ func parseManualOrdinal(path string) (int, bool) {
 // downloaded for the language, across BOTH auto and manual rows of EVERY
 // variant, excluding rows whose release_name is empty. It mirrors the old
 // SQLite `SELECT DISTINCT release_name, provider FROM subtitle_state WHERE ...
-// AND release_name <> ”` (Requirement 3.5): the manual-search popup uses it to
+// AND release_name <> ”`: the manual-search popup uses it to
 // mark every previously-saved subtitle as already on disk, and the popup lists
 // all variants of the language, so this read is deliberately language-scoped
 // (empty-variant scan). An empty release_name can never match a search
@@ -295,7 +296,7 @@ func (d *DB) DownloadedRefs(_ context.Context, mediaType subflux.MediaType, medi
 // that winning row's media_imported, and a found flag that is false when the
 // quad has no auto row. It mirrors the old SQLite
 // `SELECT score, media_imported FROM subtitle_state WHERE ... AND manual = 0
-// ORDER BY score DESC LIMIT 1` (Requirement 3.4), refined per variant: manual
+// ORDER BY score DESC LIMIT 1`, refined per variant: manual
 // rows are ignored, an fr/forced row never answers for fr/standard, and no
 // auto row means (0, zero-time, false, nil) with no error.
 //
@@ -334,11 +335,11 @@ func (d *DB) CurrentScore(_ context.Context, mediaType subflux.MediaType, mediaI
 // fn with each entry's decoded (manual, score, provider) projection, WITHOUT
 // dereferencing the primary subtitle_state row. It is the index-only read path
 // that lets IsManuallyLocked and ManualDownloadCount answer the "manual"
-// question from a single index walk (Requirement 18.3): the projection value
+// question from a single index walk: the projection value
 // carries the manual flag, so neither method touches a primary.
 //
 // These are lock-bearing reads, so a malformed projection value FAILS CLOSED
-// (Requirement 13.4): it returns an error and the caller treats the quad as
+// : it returns an error and the caller treats the quad as
 // locked rather than silently dropping the entry. decodeStateProjection only
 // returns ok=false for a value shorter than the fixed manual+score prefix,
 // which a correctly maintained index can never produce.
@@ -363,14 +364,14 @@ func walkStateProjection(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, va
 // should be excluded from all automated actions. An empty key.Variant asks
 // whether ANY variant of the language is locked (the language-level summary the
 // manual search popup shows). It mirrors the old SQLite
-// `SELECT EXISTS(... WHERE ... AND manual = 1)` (Requirement 4.2), refined per
+// `SELECT EXISTS(... WHERE... AND manual = 1)`, refined per
 // variant.
 //
 // The answer comes purely from the ix_state_quad projection's manual flag via
 // walkStateProjection, so no primary subtitle_state row is dereferenced
-// (Requirement 18.3). As a lock-bearing read it fails closed: if the projection
+// . As a lock-bearing read it fails closed: if the projection
 // cannot be read the quad is reported locked AND the error is returned, so a
-// decode fault can never silently unlock an item (Requirement 13.4).
+// decode fault can never silently unlock an item.
 func (d *DB) IsManuallyLocked(_ context.Context, key subflux.ManualLockKey) (bool, error) {
 	locked := false
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -393,7 +394,7 @@ func (d *DB) IsManuallyLocked(_ context.Context, key subflux.ManualLockKey) (boo
 // NON-destructive: it flips each manual row's flag to auto (manual=false) and
 // rewrites the row, preserving its id, path, score, provider, release_name,
 // and media_imported, so the rows stay visible to State and DownloadedRefs
-// (Requirement 4.3). This mirrors the old SQLite `UPDATE subtitle_state SET
+// . This mirrors the old SQLite `UPDATE subtitle_state SET
 // manual = 0 WHERE ... AND manual = 1`, which was a flag flip, not a delete.
 //
 // Each flipped row routes through the putState chokepoint (the record carries
@@ -426,9 +427,9 @@ func (d *DB) ClearManualLock(_ context.Context, key subflux.ManualLockKey) error
 
 // ManualDownloadCount returns how many manual rows exist for the quad (exact
 // key.Variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
-// manual = 1` (Requirement 15.6). Like IsManuallyLocked it is served purely
+// manual = 1`. Like IsManuallyLocked it is served purely
 // from the ix_state_quad projection's manual flag via walkStateProjection,
-// with no primary dereference (Requirement 18.3).
+// with no primary dereference.
 func (d *DB) ManualDownloadCount(_ context.Context, key subflux.ManualLockKey) (int, error) {
 	count := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -448,7 +449,7 @@ func (d *DB) ManualDownloadCount(_ context.Context, key subflux.ManualLockKey) (
 // ManualSubtitlePaths returns the subtitle file paths from every manual row for
 // the quad — or every variant of the language when key.Variant is empty —
 // excluding rows with an empty path, mirroring the old SQLite
-// `SELECT path ... WHERE ... AND manual = 1 AND path != ”` (Requirement 15.6).
+// `SELECT path... WHERE... AND manual = 1 AND path != ”`.
 // maybeRevertManualLock uses it (exact variant) to check which manual files
 // still exist on disk.
 //
@@ -479,7 +480,7 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, key subflux.ManualLockKey) (
 
 // NextManualNumber returns the next manual subtitle ordinal for the quad: one
 // greater than the highest ordinal currently encoded in ANY of the quad's
-// row paths, or 1 when no row carries an ordinal (Requirement 4.4). Ordinal
+// row paths, or 1 when no row carries an ordinal. Ordinal
 // discovery deliberately ignores the Manual flag: a top-pick manual download
 // records as an AUTO row (manual=false, auto-mode semantics) yet occupies a
 // numbered path, so a manual-only scan would hand the next download the same
@@ -525,7 +526,7 @@ func (d *DB) NextManualNumber(_ context.Context, key subflux.ManualLockKey) int 
 
 // defaultQueryLimit is the safety cap applied when a caller passes Limit <= 0
 // ("no explicit limit"), matching the old SQLite store's 1000-row hard cap that
-// prevents unbounded allocation on an unfiltered State (Requirement 15.3).
+// prevents unbounded allocation on an unfiltered State.
 const defaultQueryLimit = 1000
 
 // preallocCap caps the result-slice capacity hint so a large requested Limit
@@ -600,7 +601,7 @@ func asciiLower(s string) string {
 // case-insensitively. It reproduces the old `title LIKE '%'||escaped(search)||
 // '%' ESCAPE '\'` contains-match: the escape made the user's %/_/\ literal, so
 // in Go a plain (case-folded) substring test is the exact equivalent — every
-// character of substr, including %/_/\, is matched literally (Requirement 8.4).
+// character of substr, including %/_/\, is matched literally.
 func asciiContainsFold(s, substr string) bool {
 	if substr == "" {
 		return true
@@ -681,8 +682,7 @@ func matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (ent
 }
 
 // State returns subtitle-state rows matching the query, most-recently-
-// imported first. It mirrors the old SQLite State (Requirement 8.4, 15.1,
-// 15.2, 15.3):
+// imported first. It mirrors the old SQLite State:
 //
 //   - Filters by media_type, language (both carried in the ix_state_quad key)
 //     and provider (carried in the primary row); zero-value fields mean no
@@ -775,7 +775,7 @@ func collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit, offset
 // media_type then media_id. It mirrors the old SQLite
 // `SELECT media_type, media_id, language, COUNT(*) ... WHERE manual = 1
 // GROUP BY media_type, media_id, language ORDER BY media_type, media_id`
-// (Requirement 15.5), refined per variant: an fr/forced lock and an
+// , refined per variant: an fr/forced lock and an
 // fr/standard lock list as separate entries.
 //
 // It is served entirely from the ix_state_quad projection: the manual flag
@@ -850,8 +850,7 @@ func (a *manualLockAccumulator) add(quad stateQuadInfo, manual bool) {
 
 // Stats returns the maintained O(1) download and attempt counters from the meta
 // bucket, mirroring the old SQLite `COUNT(*) FROM subtitle_state` and
-// `COUNT(*) FROM search_attempts` without scanning either bucket (Requirements
-// 18.1, 18.4). The counters are moved inside the same Update as every row
+// `COUNT(*) FROM search_attempts` without scanning either bucket. The counters are moved inside the same Update as every row
 // insert/delete via the index-maintenance chokepoints, so they track row
 // existence exactly like COUNT(*).
 func (d *DB) Stats(_ context.Context) (downloads, attempts int, err error) {
@@ -870,7 +869,7 @@ func (d *DB) Stats(_ context.Context) (downloads, attempts int, err error) {
 // the given media_type, optionally filtered to those whose id starts with
 // mediaIDPrefix. It mirrors the old SQLite `SELECT DISTINCT media_id FROM
 // subtitle_state WHERE media_type = ? [AND media_id LIKE escaped(prefix)||'%'
-// ESCAPE '\']` (Requirement 8.4): the prefix match is case-insensitive (ASCII)
+// ESCAPE '\']`: the prefix match is case-insensitive (ASCII)
 // with the user's %/_/\ treated literally (asciiHasPrefixFold).
 //
 // The media_type and media_id live in the ix_state_quad key, so the distinct

@@ -59,9 +59,9 @@ func (e *Engine) syncSubtitle(ctx context.Context, data []byte, videoPath, lang 
 	return data, 0
 }
 
-// syncSubtitleAudio runs audio-based sync on subtitle data through the
-// configured executor (in-process by default; the sync-worker client in
-// server mode, so the memory-heavy PCM/alignment work is process-isolated).
+// syncSubtitleAudio runs through the configured executor: in-process by
+// default, or the sync-worker client in server mode, which process-isolates
+// the memory-heavy PCM/alignment work.
 func (e *Engine) syncSubtitleAudio(ctx context.Context, data []byte, videoPath string) (synced []byte, offsetMs int64) {
 	result := e.syncExec.Audio(ctx, data, videoPath, "")
 	if !result.ShouldApply() || result.Cues == nil {
@@ -82,8 +82,6 @@ func (e *Engine) syncSubtitleAudio(ctx context.Context, data []byte, videoPath s
 	return synced, result.Offset
 }
 
-// downloadAndSave downloads the best subtitle, syncs timing, post-processes,
-// saves to disk, and records success in the store.
 func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest,
 	best *scoredSub, videoPath string, mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant,
 ) (string, error) {
@@ -99,10 +97,9 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 		return "", err
 	}
 
-	// Reject anything that is not subtitle text: a zero-byte body (a
-	// provider's empty 200) and a binary archive a provider returned as-is
-	// when zip extraction failed (e.g. RAR files from HDBits).
-	// subtitlefile.Validate is the single authority for both.
+	// Rejects a zero-byte body (a provider's empty 200) and a binary
+	// archive a provider returned as-is when zip extraction failed (e.g.
+	// RAR files from HDBits).
 	if err := subtitlefile.Validate(data); err != nil {
 		return "", fmt.Errorf("%w: %s: %w", ErrInvalidContent,
 			best.sub.Provider, err)
@@ -131,7 +128,6 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	return subPath, nil
 }
 
-// persistDownload records the subtitle in the store and updates coverage.
 func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest,
 	best *scoredSub, subPath, videoPath string, mediaType subflux.MediaType, mediaID, lang string,
 	syncOffsetMs int64, saveHI bool,
@@ -179,31 +175,22 @@ func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest
 	}
 }
 
-// postProcessSub applies variant-aware post-processing and determines the
-// save path. Returns the path, the effective HI flag (after strip-HI logic),
-// and the processed data.
+// postProcessSub returns the effective HI flag after strip-HI logic, which
+// may differ from the input subtitle's HearingImp flag.
 func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	videoPath, lang string, variant subflux.Variant,
 ) (subPath string, saveHI bool, processed []byte) {
 	pp := e.cfg.PostProcess()
-	// Strip HI behavior depends on the target variant:
-	// - hi variant target: never strip (user explicitly wants HI annotations).
-	// - standard/forced target: honor the global strip_hi setting, even if
-	//   the best match is an HI fallback. When strip_hi=true the stripped
-	//   file is named movie.lang.srt and recorded as variant=standard,
-	//   satisfying the target. When strip_hi=false the user has explicitly
-	//   asked to preserve HI annotations, so the file is named
-	//   movie.lang.hi.srt and recorded as variant=hi; the standard target
-	//   coverage stays empty and the next scan keeps looking for a real
-	//   standard sub. Respecting strip_hi beats phantom coverage.
+	// A standard/forced target with strip_hi=false keeps the HI fallback
+	// unstripped and records it as variant=hi rather than faking standard
+	// coverage; the next scan keeps looking for a real standard sub.
 	if variant == subflux.VariantHI {
 		pp.StripHI = false
 	}
 	processed = e.syncer.PostProcess(data, pp)
 
-	// File naming: when strip_hi is enabled and the target is standard
-	// or forced, save without .hi even if the best match was HI-flagged
-	// (the HI content has been stripped, so the file is effectively regular).
+	// The HI content has already been stripped, so the file is effectively
+	// regular even though the best match was HI-flagged.
 	saveHI = best.sub.HearingImp
 	if pp.StripHI && variant != subflux.VariantHI {
 		saveHI = false
@@ -212,8 +199,6 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	return subPath, saveHI, processed
 }
 
-// downloadBestCandidate tries candidates in score order with a bounded number
-// of attempts. Returns the saved path or empty string if all attempts fail.
 func (e *Engine) downloadBestCandidate(ctx context.Context, req *subflux.SearchRequest,
 	candidates []scoredSub, videoPath string, mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant, label string,
 ) string {

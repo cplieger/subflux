@@ -221,9 +221,8 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *subflux
 		return titleID, nil
 	}
 
-	// Try alternative titles before giving up. Track the first real error
-	// separately from the loop cursor so a transient failure followed by a
-	// clean "not found" doesn't silently mask the original problem.
+	// Track the first real error separately from the loop cursor so a
+	// transient failure followed by a clean "not found" doesn't mask it.
 	var firstErr error
 	for _, alt := range req.AlternativeTitles {
 		altReq := *req
@@ -233,9 +232,7 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *subflux
 			if firstErr == nil {
 				firstErr = altErr
 			}
-			// Rate-limit and auth errors won't resolve by trying another
-			// title; surface them immediately so the scan engine can pause
-			// or re-auth instead of burning the remaining alternatives.
+			// Rate-limit/auth errors won't resolve with another title.
 			if isFatalSearchError(altErr) {
 				return 0, fmt.Errorf("subsource search alt title: %w", altErr)
 			}
@@ -252,9 +249,7 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *subflux
 }
 
 // isFatalSearchError reports whether err should abort the alternative-title
-// loop. Rate-limit and auth errors won't resolve by trying a different title,
-// so the scan engine should see them immediately (to pause or re-auth) rather
-// than after the remaining alternatives are burned.
+// loop: rate-limit and auth errors won't resolve by trying another title.
 func isFatalSearchError(err error) bool {
 	if _, isRL := errors.AsType[*subflux.RateLimitError](err); isRL {
 		return true
@@ -303,25 +298,11 @@ func (p *Provider) searchTitle(ctx context.Context, req *subflux.SearchRequest) 
 	})
 }
 
-// titleCacheKey builds the titleCache key for a request.
-//
-// The key must carry EVERY input that changes the query: the title (the
-// alternative-title fallback retries with a different req.Title, and an
-// ImdbID-only key would turn those retries into cache hits on the primary
-// title's miss) and the season (SubSource has per-season title pages, so an
-// S01-scoped id must not answer an S02 lookup).
-//
-// It is assembled with keyenc because two of those components are ADJACENT
-// free-form arr text: req.ImdbID (passed through from Sonarr/Radarr without
-// validation) and the lowercased req.Title. A ':' in the IMDb id moves the
-// boundary between them, so ("tt1:x", "y") and ("tt1", "x:y") produced one key
-// under the old fmt.Sprintf form — the season, being a ':'-free int, only ever
-// pinned the tail. The cached value is the title id every subsequent query is
-// scoped to, so a collision is not a cache miss: Search hands the WRONG title
-// id to querySubtitles and the provider returns another film's or show's
-// subtitle list, which is then scored against this video's release name and
-// written next to it. Ordinary ids and titles carry neither ':' nor '\', so the
-// key bytes are unchanged.
+// titleCacheKey builds the titleCache key for a request. Must carry every
+// input that changes the query — title (alternative-title retries) and
+// season (SubSource has per-season title pages). Built with keyenc because
+// ImdbID and Title are adjacent free-form arr text that can carry ':';
+// a collision here hands querySubtitles the wrong title id.
 func titleCacheKey(req *subflux.SearchRequest) string {
 	season := 0
 	if req.MediaType == subflux.MediaTypeEpisode {
@@ -447,9 +428,8 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 	}
 
 	if !result.Success {
-		// API-level failure arriving as HTTP 200 (same shape as subdl's
-		// status=false path). Log at warn so operators can see partial
-		// degradation in Loki instead of a silent "0 results".
+		// API-level failure arriving as HTTP 200 (mirrors subdl's
+		// status=false path).
 		slog.Warn("subsource: API returned success=false",
 			"title_id", titleID, "lang", isoLang, "error", result.Error)
 		return nil, nil
@@ -471,8 +451,8 @@ func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) [
 
 		hi := item.HearingImp || classify.IsHearingImpaired(item.Commentary, "")
 
-		// Create one entry per release name so the scorer can evaluate
-		// each independently. Same subtitle file, different metadata.
+		// One entry per release name so the scorer evaluates each
+		// independently against the same subtitle file.
 		releases := item.ReleaseInfo
 		if len(releases) == 0 {
 			releases = []string{""}
@@ -494,9 +474,9 @@ func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) [
 	return subs
 }
 
-// FlexInt is a JSON type that unmarshals both string and number representations
-// to an int value. SubSource's API returns releaseYear as either a string or number.
-// Uses lenient semantics: errors default to zero (year=0 means "unknown").
+// FlexInt unmarshals both string and number JSON representations to an int.
+// SubSource's releaseYear field returns either shape; errors default to
+// zero (unknown year).
 type FlexInt int
 
 // yearPolicy is the lenient decode policy for releaseYear: every gate is
@@ -521,8 +501,7 @@ var yearPolicy = jsonx.Policy{
 func (f *FlexInt) UnmarshalJSON(data []byte) error {
 	n, err := jsonx.ParseInt64(data, yearPolicy)
 	if err != nil {
-		// Unreachable under the all-Zero policy; keep the lenient
-		// default anyway so a future policy tweak cannot fail records.
+		// Unreachable under the all-Zero policy; default anyway.
 		*f = 0
 		return nil
 	}

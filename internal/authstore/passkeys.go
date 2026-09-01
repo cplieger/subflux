@@ -21,7 +21,7 @@ import (
 // hardening: UpdatePasskeyAfterLogin persists a MONOTONIC sign_count
 // (max(stored, incoming)) so a replayed or cloned authenticator presenting a
 // stale counter cannot regress the stored value and defeat clone detection
-// (Requirement 9.5, CVE-2023-45669). The old store overwrote unconditionally.
+// (CVE-2023-45669). The old store overwrote unconditionally.
 //
 // auth_passkeys is PRIMARY-keyed by the raw credential_id (binary), so the
 // WebAuthn login hot path — PasskeyByCredentialID — is a single point get.
@@ -45,12 +45,12 @@ import (
 //
 // Every durable mutation runs in one s.update transaction (uniqueness check,
 // put, index maintenance), so it is crash-durable on commit and a failure
-// rolls back leaving no partial primary/index state (Requirements 9.1, 9.2).
+// rolls back leaving no partial primary/index state.
 
 // pkRec is the JSON value stored in the auth_passkeys bucket. It carries every
 // auth.PasskeyCredential field — including the json:"-" credential material and
 // the clone-warning flag — so the credential round-trips through the bbolt
-// codec without loss (Requirement 9.5). The []byte fields marshal as base64.
+// codec without loss. The []byte fields marshal as base64.
 type pkRec struct {
 	CreatedAt time.Time `json:"created_at"`
 
@@ -215,11 +215,11 @@ func passkeyUserIndexKey(userID int64, credID []byte) []byte {
 }
 
 // CreatePasskey inserts a new WebAuthn credential, rejecting a duplicate
-// credential id with errConflict before any write (Requirement 9.3), and sets
+// credential id with errConflict before any write, and sets
 // the surrogate ID on the supplied struct. CreatedAt is stamped to now when
 // zero, mirroring the SQLite CURRENT_TIMESTAMP default. The primary row and its
 // ix_passkey_user entry are written together in one Update, crash-durable on
-// commit (Requirements 9.1, 9.2).
+// commit.
 func (s *Store) CreatePasskey(_ context.Context, cred *auth.PasskeyCredential) error {
 	if cred == nil {
 		return errors.New("authstore: CreatePasskey: nil credential")
@@ -351,8 +351,7 @@ func (s *Store) PasskeyByCredentialID(_ context.Context, credID []byte) (*auth.P
 // UpdatePasskeyAfterLogin persists the post-login authenticator flags and a
 // durable, MONOTONIC sign_count: the stored value is set to
 // max(stored, incoming) so a lower incoming counter (a replay or a cloned
-// authenticator) can never regress it and defeat clone detection (Requirement
-// 9.5, CVE-2023-45669). A missing credential is a no-op returning nil, matching
+// authenticator) can never regress it and defeat clone detection (CVE-2023-45669). A missing credential is a no-op returning nil, matching
 // the SQLite UPDATE that affects zero rows. The single-key Put is crash-durable
 // on commit.
 func (s *Store) UpdatePasskeyAfterLogin(_ context.Context, credID []byte, signCount uint32, flags auth.PasskeyFlags) error {
@@ -391,7 +390,7 @@ func (s *Store) UpdatePasskeyAfterLogin(_ context.Context, credID []byte, signCo
 }
 
 // RenamePasskey sets the friendly name of the passkey ref identifies, but only
-// when it belongs to ref.UserID (Requirement 16.4). It resolves the credential
+// when it belongs to ref.UserID. It resolves the credential
 // id by a user-scoped walk of ix_passkey_user, so a passkey owned by a
 // different user is never visited and cannot be renamed. A ref matching no row
 // is a no-op returning nil, matching the SQLite UPDATE affecting zero rows.
@@ -418,7 +417,7 @@ func (s *Store) RenamePasskey(_ context.Context, ref auth.PasskeyRef, name strin
 }
 
 // DeletePasskey removes the passkey ref identifies, but only when it belongs to
-// ref.UserID (Requirement 16.4). Like RenamePasskey it resolves the credential
+// ref.UserID. Like RenamePasskey it resolves the credential
 // id via a user-scoped index walk, so it can only ever delete the supplied
 // user's own passkey. It deletes the primary row and its ix_passkey_user entry
 // in one Update; a ref matching no row is a no-op returning nil.
@@ -452,7 +451,7 @@ func (s *Store) DeletePasskey(_ context.Context, ref auth.PasskeyRef) error {
 }
 
 // PasskeyCountForUser returns the number of passkeys registered for a user
-// (Requirement 16.7). It is a key-only prefix count over ix_passkey_user with
+// . It is a key-only prefix count over ix_passkey_user with
 // no primary dereference.
 func (s *Store) PasskeyCountForUser(_ context.Context, userID int64) (int, error) {
 	count := 0

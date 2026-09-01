@@ -176,7 +176,7 @@ func writeSchemaVersion(tx *bolt.Tx, key []byte, version uint64) error {
 
 // --- Decode policy ---
 //
-// Requirement 13.4: a derived core bucket skips an undecodable record with a
+// A derived core bucket skips an undecodable record with a
 // logged warning (the next full scan rebuilds it), while an auth bucket, or any
 // lock- or uniqueness-bearing read, fails closed (returns an error and treats
 // any affected lock as held) so a security-relevant record is never silently

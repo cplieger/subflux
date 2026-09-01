@@ -22,15 +22,12 @@ import (
 const (
 	mappingURL = "https://raw.githubusercontent.com/Anime-Lists/anime-lists/master/anime-list.xml"
 	apiURL     = "http://api.anidb.net:9001/httpapi"
-	clientVer  = 1 // AniDB HTTP API client version; bump if AniDB requires it.
+	clientVer  = 1
 
 	// AniDB HTTP API policy: no more than one request every 2 seconds per
 	// client IP. See https://wiki.anidb.net/HTTP_API_Definition.
 	anidbMinInterval = 2 * time.Second
 
-	// Per-request timeouts. Superseded the old shared 15s client timeout
-	// because a 10 MB XML fetch over a throttled connection needs more
-	// headroom than a small episode-list query.
 	mappingFetchTimeout  = 60 * time.Second
 	episodesFetchTimeout = 20 * time.Second
 
@@ -60,15 +57,13 @@ func NewMapper(clientKey string) *Mapper {
 		slog.Warn("anidb: client key configured; API requests use plaintext HTTP (no HTTPS endpoint available)")
 	}
 	rateCh := make(chan struct{}, 1)
-	rateCh <- struct{}{} // initially ready
+	rateCh <- struct{}{}
 	return &Mapper{
-		// Per-phase timeouts come from ssrf.SafeTransport (10s dial, 15s
-		// response header) plus per-request context.WithTimeout at each
-		// call site. The client-level Timeout is intentionally omitted so
-		// large XML bodies aren't clipped mid-stream.
-		// 443: the github anime-list mapping (https). 9001: the AniDB HTTP API
-		// (plaintext, non-standard port) — a known public host, so ssrf's IP
-		// validation still applies; only the default 443-port allowlist is widened.
+		// The client-level Timeout is intentionally omitted so large XML
+		// bodies aren't clipped mid-stream; per-request timeouts come from
+		// context.WithTimeout at each call site.
+		// 9001 is AniDB's plaintext HTTP API port; ssrf's IP validation
+		// still applies, only the default 443-port allowlist is widened.
 		client:       provider.NewHTTPClientNoClientTimeout(443, 9001),
 		clientKey:    clientKey,
 		episodeCache: make(map[string]int),
@@ -104,7 +99,6 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 		AniDBEpisodeNo: epNo,
 	}
 
-	// If we have an API key, resolve the episode-specific ID.
 	if m.clientKey != "" && seriesID > 0 && epNo > 0 {
 		epID, epErr := m.episodeID(ctx, seriesID, epNo)
 		if epErr != nil {
@@ -118,14 +112,12 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 	return result
 }
 
-// --- Mapping XML ---
-
 // parsedMapping returns the cached parsed anime list, fetching and
 // parsing the XML if the cache is stale or empty. The lock is held for
-// the entire fetch to prevent thundering herd on cache expiry. Since
-// the cache refreshes every 24h and the fetch takes <2s, blocking
-// concurrent callers is acceptable. On fetch failure, returns the stale
-// cache (if any) with a warning log rather than failing the lookup.
+// the entire fetch to prevent thundering herd on cache expiry; the cache
+// refreshes every 24h and the fetch takes <2s, so blocking concurrent
+// callers is acceptable. On fetch failure, returns the stale cache (if
+// any) with a warning log rather than failing the lookup.
 func (m *Mapper) parsedMapping(ctx context.Context) (*animeList, error) {
 	m.mu.Lock()
 	if m.parsedList != nil && time.Since(m.mappingTime) < 24*time.Hour {
@@ -135,7 +127,6 @@ func (m *Mapper) parsedMapping(ctx context.Context) (*animeList, error) {
 	}
 	m.mu.Unlock()
 
-	// Use singleflight to coalesce concurrent mapping fetches.
 	v, err, _ := m.mappingSF.Do("mapping", func() (any, error) {
 		list, fetchErr := m.fetchMapping(ctx)
 		if fetchErr != nil {
@@ -164,10 +155,9 @@ func (m *Mapper) parsedMapping(ctx context.Context) (*animeList, error) {
 }
 
 // fetchMapping downloads and parses the anime-list.xml mapping file.
-// Public raw-file fetch on raw.githubusercontent.com; any non-200 is a
-// fetch failure, not an auth/rate-limit signal, so we keep a plain error
-// here rather than calling httpwire.CheckHTTPStatus (which would map 403
-// to *subflux.AuthError, misleading for a public blob fetch).
+// Any non-200 is reported as a plain error rather than through
+// httpwire.CheckHTTPStatus, which would map a 403 on this public raw-file
+// fetch to *subflux.AuthError.
 func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	slog.Debug("anidb: fetching anime-list.xml")
 
@@ -197,23 +187,20 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 		return nil, fmt.Errorf("anime-list.xml exceeded %d bytes", httpwire.MaxDownloadBytes)
 	}
 
-	// Defensive: GitHub's CDN always auto-negotiates gzip, which net/http's
-	// Transport decompresses transparently. If a future refactor disables
-	// that (Accept-Encoding override, Transport.DisableCompression=true),
-	// the body arrives as raw gzip bytes and xml.Unmarshal fails with a
-	// garbled error. Detecting the magic header surfaces the real cause.
+	// Defensive: if GitHub's CDN ever stops auto-negotiating gzip (Transport
+	// decompression disabled), the body arrives as raw gzip and xml.Unmarshal
+	// fails with a garbled error; detecting the magic header surfaces the
+	// real cause.
 	data, err = decompressIfGzipped(data, httpwire.MaxDownloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("anidb: mapping decompress: %w", err)
 	}
 
-	// The byte caps above bound the WIRE and the inflate, not the decode.
+	// The byte caps above bound the wire and the inflate, not the decode:
 	// encoding/xml materializes each token before this code sees it, and the
-	// mapping arrives GZIPPED, so a small download can inflate to the full
-	// ceiling and only then amplify: one cap-sized text node, or a tree nested
-	// past any real depth growing the decoder's element stack one heap entry at
-	// a time. The preflight runs over the inflated bytes we already hold and
-	// rejects a document outside the anime-list contract in one scan.
+	// mapping arrives gzipped, so a small download can inflate to the full
+	// ceiling. Preflight runs over the inflated bytes once, before either
+	// unmarshal re-tokenizes them.
 	if err := xmlx.Preflight(data, mappingLimits); err != nil {
 		return nil, fmt.Errorf("anidb: mapping outside decode bounds: %w", err)
 	}
