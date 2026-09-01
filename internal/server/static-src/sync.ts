@@ -268,9 +268,7 @@ export function openSyncDialog(
   );
 
   // Audio sync button and result.
-  const audioResultDiv = el("div", {    className: "sync-audio-result",
-    hidden: true,
-  });
+  const audioResultDiv = el("div", { className: "sync-audio-result", hidden: true });
   audioResultEl = audioResultDiv;
   const audioBtn = el(
     "button",
