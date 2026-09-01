@@ -36,7 +36,7 @@
   "dependencies": {
     "@cplieger/actions": "3.1.5",
     "@cplieger/fetch": "2.1.2",
-    "@cplieger/keyenc": "1.0.5",
+    "@cplieger/keyenc": "1.0.7",
     "@cplieger/reactive": "2.0.0",
     "@cplieger/ui-primitives": "3.0.6"
   },
