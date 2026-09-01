@@ -211,7 +211,7 @@ export interface DeleteFileRequest {
   ordinal?: number;
 }
 
-/** DownloadAccepted is the typed 202 Accepted response for manual downloads. */
+/** DownloadAccepted is the 202 response body for an accepted manual download. */
 export interface DownloadAccepted {
   activity_id: string;
   status: string;
@@ -220,8 +220,8 @@ export interface DownloadAccepted {
 /**
  * DownloadRequest holds the parsed fields for a manual download. The video
  * is addressed by MediaRef only (media_type + media_id [arr ID] +
- * season/episode); the server resolves the video file path from the arr —
- * the wire carries no file path (S7). videoPath is the server-resolved
+ * season/episode); the server resolves the video file path from the arr,
+ * so the wire carries no file path. videoPath is the server-resolved
  * value, set by the handler after resolution, never decoded from JSON.
  */
 export interface DownloadRequest {
@@ -241,7 +241,7 @@ export interface DownloadRequest {
 
 /**
  * EpisodeItem is the JSON shape for a single episode. It carries no file
- * path (S7): clients address the video by MediaRef (series arr ID + season +
+ * path: clients address the video by MediaRef (series arr ID + season +
  * episode) and the server resolves paths.
  */
 export interface EpisodeItem {
@@ -381,10 +381,10 @@ export interface ManualLockEntry {
 }
 
 /**
- * ManualSearchResponse is the typed response from RunSearch. It deliberately
- * carries no lock state: manual locks are invisible infrastructure ("a manual
- * pick is never overwritten"), not a user-facing concept, so the popup has
- * nothing to display about them.
+ * ManualSearchResponse is the typed response from RunSearch. It
+ * deliberately carries no lock state: manual locks are invisible
+ * infrastructure, not a user-facing concept, so the popup has nothing to
+ * display about them.
  */
 export interface ManualSearchResponse {
   results: SearchResult[];
@@ -545,10 +545,7 @@ export interface ProvidersResponse {
   enabled: boolean;
 }
 
-/**
- * ResolveCandidate is one ambiguity candidate; Year disambiguates equal
- * titles.
- */
+/** ResolveCandidate is one ambiguous match in a resolve response's candidate list. */
 export interface ResolveCandidate {
   media_type: MediaType;
   title: string;
@@ -558,8 +555,8 @@ export interface ResolveCandidate {
 
 /**
  * ResolveResponse is the typed result of GET /api/search/resolve. Exactly
- * one of the following holds: Resolved with Items (success), Candidates
- * (ambiguous — the client disambiguates), or all empty (no match).
+ * one holds: Resolved with Items (success), Candidates (ambiguous), or all
+ * empty (no match).
  */
 export interface ResolveResponse {
   items?: ResolvedItem[];
@@ -567,10 +564,7 @@ export interface ResolveResponse {
   resolved: boolean;
 }
 
-/**
- * ResolveSearchIDs carries the stable identifiers of a resolved item for
- * the follow-up search call.
- */
+/** ResolveSearchIDs carries the stable search identifiers a resolved item forwards to the search leg. */
 export interface ResolveSearchIDs {
   imdb?: string;
   tvdb?: number;
@@ -579,9 +573,8 @@ export interface ResolveSearchIDs {
 
 /**
  * ResolvedItem is one searchable media item: an episode of the matched
- * series (file-bearing only) or the matched movie. MediaID is the arr ID
- * (Sonarr series ID / Radarr movie ID) — the same identity the search and
- * download endpoints consume.
+ * series (file-bearing only) or the matched movie. MediaID is the arr ID,
+ * the same identity the search and download endpoints consume.
  */
 export interface ResolvedItem {
   media_type: MediaType;
@@ -698,7 +691,7 @@ export interface Scores {
   season_pack: number;
 }
 
-/** SearchResult is a single result returned by the manual search API. */
+/** SearchResult is one scored manual-search candidate in the API response. */
 export interface SearchResult {
   matches?: Record<string, number>;
   provider: string;
@@ -734,7 +727,7 @@ export interface SearchTargets {
   targets: SearchTarget[];
 }
 
-/** SeasonGroup groups episodes by season number. */
+/** SeasonGroup is a season's episodes in the GET /api/media/series/{id}/episodes response. */
 export interface SeasonGroup {
   episodes: EpisodeItem[];
   season: number;
