@@ -65,7 +65,7 @@ const providerName = subflux.ProviderNameSynthetic
 // Factory creates a synthetic provider from config settings.
 func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
-	_ = ps // synthetic uses only provider-specific keys from Custom
+	_ = ps
 	p := &syntheticProvider{
 		mode:        provider.SettingString(settings, provider.KeyMode),
 		errMsg:      provider.SettingString(settings, provider.KeyErrorMessage),

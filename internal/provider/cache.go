@@ -22,8 +22,7 @@ type CacheClearer interface {
 	ClearCache()
 }
 
-// ClearCaches calls ClearCache on any provider that implements
-// CacheClearer. Typically called at scan completion to free memory.
+// ClearCaches is typically called at scan completion to free memory.
 func ClearCaches(providers []Provider) {
 	for _, p := range providers {
 		if cc, ok := p.(CacheClearer); ok {
@@ -38,13 +37,10 @@ func ClearCaches(providers []Provider) {
 // part of the provider contract — only OpenSubtitles implements it, and the
 // registry discovers that by type assertion.
 type ShowSubtitleCounter interface {
-	// CountShowSubtitles returns the total number of subtitles available for
-	// the queried show in the queried language.
 	CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error)
 }
 
-// ResolveShowCounter finds the first provider implementing ShowSubtitleCounter.
-// Called at the composition root to inject the resolved counter into LiveState.
+// ResolveShowCounter is called at the composition root to inject the resolved counter into LiveState.
 func ResolveShowCounter(providers []Provider) ShowSubtitleCounter {
 	for _, p := range providers {
 		if c, ok := p.(ShowSubtitleCounter); ok {

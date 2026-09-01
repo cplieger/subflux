@@ -90,7 +90,7 @@ func openOptions() *bbolt.Options {
 // the handle; the caller must Close it to release the file lock.
 //
 // A held file lock (a second opener of the same file) fails fast within
-// openTimeout rather than blocking indefinitely (Requirement 13.2).
+// openTimeout rather than blocking indefinitely.
 //
 // Open's ordering is explicit (migrate.go owns steps 1-3):
 //
@@ -158,7 +158,7 @@ func openWithDomains(path string, core, auth *migrationDomain) (*DB, error) {
 
 // bootstrap creates every core and auth bucket and stamps the supplied schema
 // versions, inside a single Update. It runs AFTER the migration ladder
-// (Requirement 1.7): creating buckets ahead of a pending step could pre-create
+// : creating buckets ahead of a pending step could pre-create
 // a bucket the step expects to create or rename. The stamp values are the
 // domains' current versions — the package constants in production, a test
 // domain's target under an injected ladder — so a just-migrated file is

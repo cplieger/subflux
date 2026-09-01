@@ -19,9 +19,9 @@ import (
 )
 
 // HandlerDeps holds the dependencies for the manual search/download HTTP
-// handlers. Resolve is the S7 typed-reference resolver: the download verb
-// and the manual-search hash computation address the video by MediaRef and
-// the server resolves the file path from the arr — no client-supplied paths.
+// handlers. Resolve is the typed-reference resolver: the download verb and
+// the manual-search hash computation address the video by MediaRef and the
+// server resolves the file path from the arr — no client-supplied paths.
 type HandlerDeps struct {
 	DBFunc     func() DownloadStore
 	Activity   ActivityTracker
@@ -34,21 +34,18 @@ type HandlerDeps struct {
 	DecodeJSON func(w http.ResponseWriter, r *http.Request, v any, maxSize int64) bool
 }
 
-// BGTracker registers a background goroutine with the server's WaitGroup for
-// graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
-// launches and counts in one call: an Add/Done pair can leak a counter (an
-// early return or a panic before the defer is installed leaves the drain
-// hung), and a one-method surface makes that unrepresentable.
+// BGTracker registers a background goroutine with the server's WaitGroup
+// for graceful-shutdown tracking. One method, mirroring sync.WaitGroup.Go
+// (launch and count in one call), so an Add/Done pair can never leak a
+// counter via an early return or panic before the defer is installed.
 type BGTracker interface {
 	Go(f func())
 }
 
-// Handler provides HTTP handlers for manual search and download endpoints.
 type Handler struct {
 	deps HandlerDeps
 }
 
-// NewHandler creates a manual ops Handler with the given dependencies.
 func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: callers pass by value
 	return &Handler{deps: deps}
 }
@@ -73,7 +70,6 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The release parameter is direct user input into the release parser.
 	// The parser clamps internally (defense in depth), but a diagnostic
 	// request must never be silently truncated: reject oversized names
 	// loudly at the HTTP boundary instead.
@@ -95,10 +91,9 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	// Resolve the video path server-side from the optional MediaRef
-	// (media_id = arr ID). Best-effort: the path only feeds hash computation
-	// and the release-name default, so an unresolvable video degrades the
-	// search rather than failing it (matching the previous no-file case).
+	// Best-effort: the path only feeds hash computation and the release-name
+	// default, so an unresolvable video degrades the search rather than
+	// failing it.
 	filePath := h.resolveSearchVideo(ctx, mediaType, arrID, req.Season, req.Episode)
 	if filePath != "" && req.ReleaseName == "" {
 		req.ReleaseName = filePath
@@ -115,9 +110,9 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, result)
 }
 
-// resolveSearchVideo resolves the arr-known video path for a manual search's
-// hash computation. Returns "" when no arr reference was supplied or the
-// item cannot be resolved (logged at debug; the search proceeds hash-less).
+// resolveSearchVideo resolves the arr-known video path for a manual
+// search's hash computation. Returns "" when no arr reference was supplied
+// or the item cannot be resolved; the search then proceeds hash-less.
 func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType subflux.MediaType, arrID, season, episode int) string {
 	if arrID <= 0 {
 		return ""
@@ -133,7 +128,6 @@ func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType subflux.Medi
 	return path
 }
 
-// HandleClearLock handles POST /api/search/clear-lock.
 func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodPost {
@@ -141,9 +135,8 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The request body IS the lock key: its four json names (media_type,
-	// media_id, language, variant) are the wire shape, and subflux.ManualLockKey
-	// carries exactly those.
+	// The request body IS the lock key: its four json names are the wire
+	// shape, and subflux.ManualLockKey carries exactly those.
 	var key subflux.ManualLockKey
 	if !h.deps.DecodeJSON(w, r, &key, 0) {
 		return
@@ -164,8 +157,6 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Variant is optional: empty clears the locks of every variant of the
-	// language; a specific variant clears only that quad's lock.
 	if !isValidLockVariant(key.Variant) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
 		return
@@ -189,7 +180,6 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }
 
-// HandleManualDownload handles POST /api/search/download.
 func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
@@ -208,7 +198,6 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 
 	ls := h.deps.StateFunc()
 
-	// Find the provider first (free check) so we can return 400 immediately.
 	var prov provider.Provider
 	for _, p := range ls.Providers {
 		if p.Name() == req.Provider {
@@ -221,9 +210,8 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve the video path server-side from the MediaRef before going
-	// async, so an unknown item answers a synchronous 404 with a machine
-	// code instead of a failed background activity.
+	// Resolved before going async, so an unknown item answers a synchronous
+	// 404 with a machine code instead of a failed background activity.
 	mref := resolve.MediaRef{
 		MediaType: req.MediaType, MediaID: req.ArrID,
 		Season: req.Season, Episode: req.Episode,
@@ -242,7 +230,6 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	actID := h.deps.Activity.Start("Manual Download",
 		fmt.Sprintf("%s %s", req.Provider, req.SubtitleID), activity.SourceManual)
 
-	// Return 202 immediately; run the download in the background.
 	httpapi.WriteJSONStatus(w, http.StatusAccepted, DownloadAccepted{
 		ActivityID: actID,
 		Status:     "accepted",
@@ -253,13 +240,11 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DownloadAccepted is the typed 202 Accepted response for manual downloads.
 type DownloadAccepted struct {
 	ActivityID string `json:"activity_id"`
 	Status     string `json:"status"`
 }
 
-// runManualDownload performs the actual download in the background.
 func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
 	req *DownloadRequest, actID string,
 ) {
@@ -267,7 +252,6 @@ func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
 	ctx, cancel := context.WithTimeout(serverCtx, DownloadTimeout)
 	defer cancel()
 
-	// Log if the parent context was cancelled (server shutdown).
 	defer func() {
 		if ctx.Err() != nil && serverCtx.Err() != nil {
 			slog.Warn("manual download interrupted by shutdown",

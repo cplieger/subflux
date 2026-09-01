@@ -20,7 +20,6 @@ type statsCache struct {
 	invalid atomic.Bool
 }
 
-// statsCacheEntry is one cached compute result.
 type statsCacheEntry struct {
 	storedAt time.Time
 	resp     subflux.Stats
@@ -29,10 +28,8 @@ type statsCacheEntry struct {
 // Invalidate marks the cache stale (exported for use by polling subsystem).
 func (c *statsCache) Invalidate() { c.invalid.Store(true) }
 
-// invalidate marks the cache stale; the next call to get() will recompute.
 func (c *statsCache) invalidate() { c.invalid.Store(true) }
 
-// get returns the cached response if fresh, otherwise computes via singleflight.
 func (c *statsCache) get(ctx context.Context, fn func(context.Context) subflux.Stats) subflux.Stats {
 	if e := c.mu.Load(); e != nil && !c.invalid.Load() && time.Since(e.storedAt) < statsCacheTTL {
 		return e.resp

@@ -13,7 +13,7 @@ import (
 // This file holds the poll_state domain: the poll_state bucket
 // (one row per canonical PollKey, e.g. "sonarr" / "radarr") holding the last
 // successful poll cursor. It mirrors the old SQLite store/store_poll.go
-// behaviour exactly (Requirements 6.2, 6.3).
+// behaviour exactly.
 //
 // poll_state keys are the bare PollKey (pollStateKey); the value is the cursor
 // formatted with time.RFC3339Nano, the same layout the old SQLite store wrote
@@ -29,7 +29,7 @@ import (
 const pollTimeLayout = time.RFC3339Nano
 
 // PollTimestamp returns the last poll cursor stored for an arr source, or the
-// zero time with no error when the key has no stored value (Requirement 6.3),
+// zero time with no error when the key has no stored value,
 // matching the old SQLite not-found-means-zero behaviour. A non-canonical key is
 // rejected (mirrors the old store's key.Valid guard), and a stored value that
 // cannot be parsed as RFC3339Nano is surfaced as an error rather than silently
@@ -62,8 +62,7 @@ func (d *DB) PollTimestamp(_ context.Context, key subflux.PollKey) (time.Time, e
 }
 
 // SetPollTimestamp stores the last poll cursor for an arr source, formatted with
-// RFC3339Nano so PollTimestamp recovers it with full precision (Requirement
-// 6.2). A non-canonical key is rejected before any write (mirrors the old
+// RFC3339Nano so PollTimestamp recovers it with full precision. A non-canonical key is rejected before any write (mirrors the old
 // store's key.Valid guard), preventing a typo from silently creating a new
 // cursor row and forcing a full history re-fetch. A later set overwrites the
 // prior cursor.

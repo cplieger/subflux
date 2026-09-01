@@ -37,13 +37,10 @@ const cfgDlg: HTMLDialogElement = dialog("configDialog");
 // --- Config drawer ---
 
 // Dismissal (backdrop + Escape) is the dialog primitive's: createDialog wires
-// drag-safe backdrop dismissal (a drag-select ending on the backdrop no longer
-// closes settings) and Escape through ONE canDismiss guard — unconfigured mode
-// refuses dismissal (toast + stay open, wiring stays armed), replacing the
-// hand-rolled click/cancel/keydown listener trio that app.ts used to carry.
-// Created lazily on first open/close so importing this module in a DOM
-// without #configDialog (unit tests) stays side-effect-free, like the old
-// hand-rolled wiring.
+// drag-safe backdrop dismissal and Escape through ONE canDismiss guard —
+// unconfigured mode refuses dismissal (toast + stay open, wiring stays
+// armed). Created lazily on first open/close so importing this module in a
+// DOM without #configDialog (unit tests) stays side-effect-free.
 let cfgCtlCache: DialogController | null = null;
 function cfgCtl(): DialogController {
   cfgCtlCache ??= createDialog(cfgDlg, {
@@ -106,8 +103,8 @@ async function loadConfig(): Promise<void> {
     }
     renderConfigForm();
 
-    // Auto-open settings when unconfigured so the user can set up — through
-    // the controller, so the open path is uniform with openConfig().
+  // Auto-open settings when unconfigured, through the controller so the
+  // open path is uniform with openConfig().
     if (store.get("isUnconfigured") && !cfgDlg.open) {
       cfgCtl().open();
     }
@@ -149,11 +146,11 @@ export async function saveConfig(): Promise<void> {
   closeConfig();
 }
 
-/** confirmRPIDChange guards a WebAuthn RP ID edit (a guarded edit, not a
- *  transparent one): passkeys are scoped to their RP ID, so changing it
- *  locks out passkey-only sign-ins until users re-register. Returns false
- *  when the user backs out. Setting an RP ID for the first time needs no
- *  warning — there are no credentials to strand. */
+/** confirmRPIDChange guards a WebAuthn RP ID edit: passkeys are scoped to
+ *  their RP ID, so changing it locks out passkey-only sign-ins until users
+ *  re-register. Returns false when the user backs out. Setting an RP ID
+ *  for the first time needs no warning — there are no credentials to
+ *  strand. */
 async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boolean> {
   const oldRPID = cfgValue("auth", "webauthn_rp_id").trim();
   if (oldRPID === "") {
@@ -178,10 +175,9 @@ async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boo
 
 /** Save the form's structured sections as JSON to the structured endpoint
  *  (the server merges empty secrets, serializes canonical YAML, validates,
- *  and hot-reloads). dedupe protects against rapid Save clicks. retryNetwork
- *  covers transient blips. decodeError maps the server's JSON error envelope
- *  through configSaveError() to user-friendly text; transport failures
- *  (status 0) keep the framework's default network/timeout codes. */
+ *  and hot-reloads). dedupe protects against rapid Save clicks; retryNetwork
+ *  covers transient blips. decodeError maps the server's JSON error
+ *  envelope through configSaveError() to user-friendly text. */
 const saveConfigAction = apiAction<Record<string, unknown>>({
   name: "config.save",
   dedupe: true,
@@ -218,7 +214,7 @@ const saveConfigAction = apiAction<Record<string, unknown>>({
   error: (_args, err) => err.message,
 });
 
-// friendlyConfigError cleans up Go validation errors for display.
+// friendlyConfigError cleans up YAML validation errors for display.
 const YAML_ERROR_PATTERNS: readonly { match: string; message: string }[] = [
   { match: "mapping values are not allowed", message: "check indentation and colons" },
   { match: "did not find expected key", message: "unexpected value, check indentation" },
@@ -389,11 +385,11 @@ function clearFieldValidation(inp: HTMLInputElement): void {
   }
 }
 
-// markRequiredFields adds a red border to empty required fields.
-// For "required_group" sections (sonarr/radarr), at least one group
-// member must have its required fields filled. If neither does, both
-// get red borders. Dependencies are injected so the pass is a pure
-// function of (schema, DOM) and directly testable.
+// markRequiredFields adds a red border to empty required fields. For
+// "required_group" sections (sonarr/radarr), at least one group member
+// must have its required fields filled — if neither does, both get red
+// borders. Dependencies are injected so the pass is a pure function of
+// (schema, DOM) and directly testable.
 export function markRequiredFields(sections: SchemaSection[], body: HTMLElement): void {
   // Collect required_group state: which groups have at least one
   // member with all required fields filled?
@@ -447,12 +443,9 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
 
       updateFieldValidation(inp, field);
 
-      // Re-run the full marking pass when the user types so that satisfying
-      // a required_group via one member clears the styling on its sibling
-      // members instead of re-flagging an empty one on every keystroke. The
-      // listener captures the same sections+body it was wired with; wiring is
-      // guarded by data-required-wired and the pass only reads values and
-      // toggles classes (no input events are dispatched, so no recursion).
+      // Re-run the full marking pass on input so satisfying a
+      // required_group via one member clears the styling on its sibling
+      // members instead of re-flagging an empty one on every keystroke.
       if (!inp.dataset["requiredWired"]) {
         inp.dataset["requiredWired"] = "true";
         inp.addEventListener("input", () => {
@@ -468,9 +461,9 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
 // --- Form -> structured sections ---
 
 // buildSectionsFromForm reads the rendered form back into the structured
-// sections payload for PUT /api/config/structured. One entry per schema
-// section, typed JSON values instead of YAML text. Schema is injected so the
-// builder is a pure function of (schema, DOM) and directly testable.
+// sections payload for PUT /api/config/structured: one entry per schema
+// section, typed JSON values instead of YAML text. Schema is injected so
+// the builder is a pure function of (schema, DOM) and directly testable.
 export function buildSectionsFromForm(schemaSections: SchemaSection[]): Record<string, unknown> {
   const sections: Record<string, unknown> = {};
   for (const schema of schemaSections) {

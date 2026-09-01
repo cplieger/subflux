@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// result holds a cached pre-check result with expiry.
 type result struct {
 	expires time.Time
 	skip    bool
@@ -48,7 +47,6 @@ func (c *Cache) Set(key string, skip bool) {
 	c.mu.Unlock()
 }
 
-// Prune removes expired entries from the cache, reclaiming memory.
 func (c *Cache) Prune() {
 	c.mu.Lock()
 	now := time.Now()

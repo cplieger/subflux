@@ -89,7 +89,7 @@ type copyTransform func(bucketPath []string, k, v []byte) (newKey, newValue []by
 
 // copyBucketMap gives a copy-kind step controlled BUCKET-level rewrite access
 // during the tree walk — the format-rewrite capability record transforms alone
-// cannot express (Requirement 4.1: rename, re-parent, merge, or drop whole
+// cannot express (rename, re-parent, merge, or drop whole
 // buckets). It is consulted once per SOURCE bucket (named by its full path,
 // outermost first) and is the total authority on where that bucket lands:
 //
@@ -141,7 +141,7 @@ type migrationDomain struct {
 	// registered ladder must start from. It never changes once a domain
 	// exists; only current moves. validateLadder accepts an empty ladder
 	// only while current == base — a version bump without a registered
-	// migration path fails the open loudly (Requirement 1.6).
+	// migration path fails the open loudly.
 	base uint64
 }
 
@@ -201,8 +201,7 @@ type domainState struct {
 	fresh bool
 }
 
-// readRequiredVersion resolves a domain's schema position, failing closed per
-// Requirement 1.2:
+// readRequiredVersion resolves a domain's schema position, failing closed:
 //
 //   - present + newer than the binary -> errSchemaNewer (downgrade guard),
 //   - present otherwise -> the stored version (equal = fast path, older =
@@ -254,7 +253,7 @@ func domainHasData(tx *bolt.Tx, d *migrationDomain) bool {
 // here, before anything is written. BOTH domains are classified before the
 // view returns, so a file whose core AND auth stamps refuse produces one
 // combined diagnostic naming every stored/current version pair plus the
-// recovery path (Requirement 1.4) — never just the first domain's half.
+// recovery path — never just the first domain's half.
 func readDomainStates(db *bolt.DB, core, auth *migrationDomain) (coreState, authState domainState, err error) {
 	err = db.View(func(tx *bolt.Tx) error {
 		var coreErr, authErr error
@@ -272,7 +271,7 @@ func readDomainStates(db *bolt.DB, core, auth *migrationDomain) (coreState, auth
 
 // validateLadder checks a domain's registered ladder at Open — runtime, not
 // test-only, so a shipped malformed registry fails the open loudly before any
-// user data is touched (Requirement 1.6): every step advances exactly one
+// user data is touched: every step advances exactly one
 // version (to == from+1), steps are contiguous (from == prev.to — no gaps, no
 // duplicates, no reordering), each step carries the body its kind requires,
 // the ladder starts at the domain's base version, and it terminates exactly
@@ -377,7 +376,7 @@ const migrateCrashPointEnv = "SUBFLUX_MIGRATE_CRASHPOINT"
 const crashPointExitCode = 86
 
 // Failpoint names, one per crash boundary the design requires proving
-// (Requirement 5.3).
+// .
 const (
 	crashInPlacePreCommit = "in-place-pre-commit"   // inside a step's tx, before commit
 	crashBetweenSteps     = "between-steps"         // after a committed step, before the next
@@ -523,7 +522,7 @@ func otherDomainStamp(migrating, core, auth *migrationDomain, coreState, authSta
 // the advance of its OWN domain stamp commit in the SAME write transaction, so
 // a crash mid-step rolls back to a consistent previous-version database that
 // re-runs cleanly, and a crash after commit resumes at the next step. The
-// other domain's stamp is never touched (Requirement 1.3) — and that
+// other domain's stamp is never touched — and that
 // invariant is ENFORCED, not assumed: the other stamp's raw bytes are
 // captured before the step body runs and re-verified after it, so a callback
 // that advances, rewrites, or deletes the other domain's stamp fails the
@@ -571,7 +570,7 @@ func rawStampBytes(tx *bolt.Tx, key []byte) (value []byte, present bool) {
 // verifyOtherStampUntouched asserts the non-migrating domain's stamp has
 // exactly the presence and bytes it had before the step body ran. Any change
 // — an advance, a rewrite, a delete, or conjuring a stamp that did not exist
-// — errors, rolling the step's whole transaction back (Requirement 1.3: a
+// — errors, rolling the step's whole transaction back (a
 // step stamps exactly its OWN domain).
 func verifyOtherStampUntouched(tx *bolt.Tx, otherStampKey, before []byte, beforePresent bool) error {
 	after, afterPresent := rawStampBytes(tx, otherStampKey)
@@ -952,7 +951,7 @@ func migrationSnapshotPath(dbPath string, coreFrom, authFrom uint64) string {
 //
 // resetCorePreserving is the reusable export -> reset -> restore routine for a
 // future core-domain ladder step where a targeted in-place transform is
-// impossible (Requirement 3.1). It runs entirely inside the step's single
+// impossible. It runs entirely inside the step's single
 // write transaction, so it is crash-atomic, and preserves the irreplaceable
 // core set by construction: manual subtitle_state rows (locks + manual
 // history) and sync_offsets.
@@ -961,7 +960,7 @@ func migrationSnapshotPath(dbPath string, coreFrom, authFrom uint64) string {
 //     the Manual == true rows — BOTH the decoded record (for the Manual check
 //     and index derivation) and the row's raw JSON bytes, so additive fields
 //     written by a build this binary does not know about survive the
-//     round-trip (Requirement 3.1(a): FULL raw-row preservation, not
+//     round-trip (FULL raw-row preservation, not
 //     "whatever this build's struct happens to model"); copy sync_offsets
 //     wholesale. The fail-closed choice is deliberate: a row cannot be proven
 //     non-manual without decoding it, and the pre-migration snapshot exists —
@@ -1008,7 +1007,7 @@ func resetCorePreserving(tx *bolt.Tx) error {
 // manualRow is one exported manual subtitle_state row: the decoded record
 // (for the Manual check and canonical index derivation) PAIRED with the row's
 // deep-copied raw JSON value, so the restore can preserve additive JSON
-// fields this build's stateRec does not model (Requirement 3.1(a)).
+// fields this build's stateRec does not model.
 type manualRow struct {
 	raw []byte
 	rec stateRec

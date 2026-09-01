@@ -17,8 +17,7 @@ import (
 
 // This file holds the UserStore half of AuthStore: the durable auth_users
 // bucket plus the ix_user_name and ix_user_oidc indexes. It mirrors the old
-// SQLite store/authdb/users.go behaviour exactly (Requirements 9.3, 9.4, 16.1,
-// 16.2).
+// SQLite store/authdb/users.go behaviour exactly.
 //
 // auth_users is keyed by the be64(surrogate id) the create path allocates from
 // bbolt's NextSequence; the full account lives in the JSON value (userRec). A
@@ -50,9 +49,8 @@ import (
 // Every durable mutation runs in one s.update transaction: uniqueness is
 // checked against the index buckets BEFORE the put, then the primary and its
 // indexes are written together, so the write is crash-durable on commit and a
-// failure rolls back leaving no partial primary/index state (Requirements 9.2,
-// 9.3). DeleteUser additionally cascades to the user's passkeys and API keys
-// (durable, same tx) and sessions (in-memory, after commit) (Requirement 9.4).
+// failure rolls back leaving no partial primary/index state. DeleteUser additionally cascades to the user's passkeys and API keys
+// (durable, same tx) and sessions (in-memory, after commit).
 
 // userRec is the JSON value stored in the auth_users bucket. It carries every
 // auth.User field — including the json:"-" credential/identity fields — so the
@@ -207,7 +205,7 @@ func idxDelete(tx *bbolt.Tx, bucket string, key []byte) error {
 
 // CreateUser inserts a new user, enforcing case-insensitive username uniqueness
 // and (issuer, sub) uniqueness against the index buckets before the put, and
-// sets the surrogate ID on the supplied struct (Requirements 9.2, 9.3). A
+// sets the surrogate ID on the supplied struct. A
 // duplicate username (case-insensitive) or duplicate (issuer, sub) returns
 // errConflict and writes nothing. CreatedAt is stamped to now when zero and
 // UpdatedAt is set equal to it, mirroring the SQLite CURRENT_TIMESTAMP defaults.
@@ -235,7 +233,7 @@ func (s *Store) CreateUser(_ context.Context, user *auth.User) error {
 // checkCreateUserUniqueness enforces case-insensitive username uniqueness and,
 // when the user carries an OIDC identity, (issuer, sub) uniqueness against the
 // index buckets before any write, yielding errConflict on a duplicate
-// (Requirement 9.3).
+// .
 func checkCreateUserUniqueness(tx *bbolt.Tx, user *auth.User) error {
 	nameKey, err := userNameIndexKey(user.Username)
 	if err != nil {
@@ -333,7 +331,7 @@ func (s *Store) UserByID(_ context.Context, id int64) (*auth.User, bool, error) 
 }
 
 // UserByUsername looks up a user case-insensitively by username via
-// ix_user_name, reporting absence through found (Requirement 16.1).
+// ix_user_name, reporting absence through found.
 func (s *Store) UserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
 	key, err := userNameIndexKey(username)
 	if err != nil {
@@ -360,7 +358,7 @@ func (s *Store) UserByWebAuthnHandle(_ context.Context, handle []byte) (*auth.Us
 }
 
 // UserByEmail looks up a user case-insensitively by email, reporting absence
-// through found (Requirement 16.1). email is not indexed (it is not
+// through found. email is not indexed (it is not
 // unique in the schema), so this is a fail-closed scan of auth_users comparing
 // the ASCII-folded email of each row.
 func (s *Store) UserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
@@ -406,7 +404,7 @@ func (s *Store) UserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User
 // normal outcome the caller acts on (create the user, reject the login) while
 // this one means the store's own bookkeeping is inconsistent and the caller's
 // next write may collide with an index entry it cannot see. Like an undecodable
-// record, it fails closed (Requirement 13.4).
+// record, it fails closed.
 var errDanglingIndex = errors.New("authstore: dangling index entry: index names a user id absent from auth_users")
 
 // userByIndex resolves a user through an index bucket whose value is the user's
@@ -477,7 +475,7 @@ func (s *Store) ListUsers(_ context.Context) ([]auth.User, error) {
 
 // UpdateUser updates all mutable fields for the user, re-keying ix_user_name
 // and ix_user_oidc when the username or (issuer, sub) change (delete-old,
-// add-new), and re-checking uniqueness for the new keys (Requirement 9.3). It
+// add-new), and re-checking uniqueness for the new keys. It
 // preserves the original CreatedAt and stamps UpdatedAt to now. An update for a
 // non-existent id is a no-op returning nil, matching the SQLite UPDATE that
 // affects zero rows.
@@ -544,7 +542,7 @@ type userIndexUpdate struct {
 // checkUpdateUserUniqueness computes the index re-keying plan for an update and
 // enforces uniqueness for a newly-taken username or (issuer, sub) before any
 // write: a username whose fold changed, or a new OIDC identity, is checked
-// against its index and yields errConflict on a collision (Requirement 9.3). An
+// against its index and yields errConflict on a collision. An
 // unchanged username/identity is not re-checked, so a user keeps its own keys.
 func checkUpdateUserUniqueness(tx *bbolt.Tx, user *auth.User, oldRec *userRec) (userIndexUpdate, error) {
 	newNameKey, err := userNameIndexKey(user.Username)
@@ -611,7 +609,7 @@ func reindexUserOIDC(tx *bbolt.Tx, changed bool, oldKey, newKey, primaryKey []by
 }
 
 // DeleteUser removes the user and cascades to its passkeys, API keys, and
-// sessions (Requirement 9.4). The durable parts — the user row, its
+// sessions. The durable parts — the user row, its
 // ix_user_name / ix_user_oidc entries, and every child passkey / API key with
 // their ix_passkey_user / ix_apikey_user entries — are deleted in one Update so
 // the cascade is atomic and crash-durable on commit; the user's in-memory
@@ -729,7 +727,7 @@ func (s *Store) deleteUserSessions(userID int64) {
 }
 
 // UserCount returns the number of user accounts, used for first-boot detection
-// (Requirement 16.2). The auth_users bucket is small, so this is a cursor count
+// . The auth_users bucket is small, so this is a cursor count
 // rather than a maintained counter.
 func (s *Store) UserCount(_ context.Context) (int, error) {
 	count := 0

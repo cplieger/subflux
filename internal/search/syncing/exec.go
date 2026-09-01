@@ -31,7 +31,6 @@ type InProcessExec struct {
 	LangMapper subsync.LangMapper
 }
 
-// Compile-time assertion.
 var _ SyncExec = InProcessExec{}
 
 // Reference implements SyncExec in-process.

@@ -11,14 +11,12 @@ import (
 
 // --- Eligibility ---
 
-// checkUpgradeEligibility determines if an existing subtitle is eligible for upgrade.
-// Returns (currentScore, true) if eligible, (0, false) if not.
 func (e *Engine) checkUpgradeEligibility(
 	ctx context.Context, existing *existingSubs, searchCfg *subflux.SearchConfig,
 	mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant, title string, cutoff time.Time,
 ) (int, bool) {
 	if !existing.hasSubtitle(lang, variant) {
-		return 0, false // No subtitle on disk; not an upgrade.
+		return 0, false
 	}
 	if !searchCfg.UpgradeEnabled {
 		slog.Debug("subtitle exists, upgrades disabled",
@@ -43,13 +41,9 @@ func (e *Engine) checkUpgradeEligibility(
 	return score, true
 }
 
-// logNoResults logs the appropriate message when no results meet the minimum
-// score threshold, distinguishing between upgrade and initial search cases,
-// and reports whether this counts as a genuine no-result (non-upgrade only).
-// Adaptive-backoff recording moved to the caller's per-language-group
-// aggregation in searchLangGroup: one provider query per group = at most one
-// backoff step per group, without threading a shared *bool through the
-// variant pipeline.
+// logNoResults reports whether this is a genuine no-result (non-upgrade
+// only); the caller aggregates this per language group so backoff is
+// recorded at most once per group rather than once per variant.
 func logNoResults(state *targetState, scored []scoredSub,
 	lang, label string, minScore int,
 ) (noResult bool) {
@@ -74,7 +68,6 @@ func logNoResults(state *targetState, scored []scoredSub,
 
 // --- Pipeline filtering ---
 
-// filterProviders returns the subset of engine providers allowed for the target.
 func (e *Engine) filterProviders(target *subflux.SubtitleTarget) []provider.Provider {
 	allNames := make([]subflux.ProviderID, len(e.providers))
 	for i, p := range e.providers {
@@ -94,9 +87,8 @@ func (e *Engine) filterProviders(target *subflux.SubtitleTarget) []provider.Prov
 	return out
 }
 
-// recordProviderNoResults records adaptive backoff for each provider that
-// responded successfully but returned no usable results. Providers that
-// errored are NOT penalized (their failure is infrastructure, not content).
+// recordProviderNoResults does not penalize errored providers: their
+// failure is infrastructure, not content.
 func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType subflux.MediaType, mediaID, lang, title string, succeeded []subflux.ProviderID) {
 	adaptive := e.cfg.Adaptive()
 	if !adaptive.Enabled {
@@ -123,10 +115,8 @@ func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType subflux.
 	}
 }
 
-// filterByVariant keeps only results matching the target variant.
-// For "standard": non-HI, non-forced (with HI fallback if no regular found).
-// For "forced": only forced subs.
-// For "hi": only HI subs.
+// filterByVariant keeps only results matching the target variant; standard
+// falls back to HI subs when no regular subtitle is found.
 func filterByVariant(results []subflux.Subtitle, variant subflux.Variant) (filtered []subflux.Subtitle, fallback bool) {
 	switch variant {
 	case subflux.VariantForced:
@@ -138,7 +128,6 @@ func filterByVariant(results []subflux.Subtitle, variant subflux.Variant) (filte
 	}
 }
 
-// forcedSubs returns only the forced subtitles from results.
 func forcedSubs(results []subflux.Subtitle) []subflux.Subtitle {
 	var filtered []subflux.Subtitle
 	for i := range results {
@@ -149,7 +138,6 @@ func forcedSubs(results []subflux.Subtitle) []subflux.Subtitle {
 	return filtered
 }
 
-// hiOnlySubs returns only the hearing-impaired, non-forced subtitles.
 func hiOnlySubs(results []subflux.Subtitle) []subflux.Subtitle {
 	var filtered []subflux.Subtitle
 	for i := range results {
@@ -160,9 +148,8 @@ func hiOnlySubs(results []subflux.Subtitle) []subflux.Subtitle {
 	return filtered
 }
 
-// standardSubs returns regular (non-HI, non-forced) subtitles, falling back to
-// HI subtitles when no regular subtitle is found. The returned bool reports
-// whether the HI fallback was used.
+// standardSubs falls back to HI subtitles when no regular subtitle is found;
+// fallback reports whether that fallback was used.
 func standardSubs(results []subflux.Subtitle) (filtered []subflux.Subtitle, fallback bool) {
 	var regular, hi []subflux.Subtitle
 	for i := range results {
@@ -181,7 +168,6 @@ func standardSubs(results []subflux.Subtitle) (filtered []subflux.Subtitle, fall
 	return hi, len(hi) > 0
 }
 
-// filterByScore returns results at or above minScore.
 func filterByScore(scored []scoredSub, minScore int) []scoredSub {
 	var eligible []scoredSub
 	for i := range scored {

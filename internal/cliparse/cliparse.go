@@ -223,15 +223,14 @@ func (p Params) consumeToken(args []string, i int, known map[string]Flag, spec *
 	}
 	if !hasValue {
 		if i+1 >= len(args) {
-			// Trailing flag without a value: treated as unset, matching
-			// the pre-consolidation parser. Required flags error below.
+			// A trailing flag with no value is treated as unset; required
+			// flags error in finishParams.
 			return i, nil
 		}
 		if strings.HasPrefix(args[i+1], "--") {
-			// The next token is another flag: report the missing value
-			// instead of silently consuming the flag as the value
-			// ("--lang --download" must not set lang to "--download" and
-			// suppress the download flag).
+			// Report the missing value instead of silently consuming the next
+			// flag as this one's value ("--lang --download" must not set lang
+			// to "--download" and suppress the download flag).
 			return i, fmt.Errorf("--%s requires a value (to pass a value beginning with --, use --%s=<value>)", name, name)
 		}
 		p.strs[name] = args[i+1]

@@ -59,14 +59,13 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, nil
 	}
 
-	// BetaSeries uses TVDB IDs natively (same as Bazarr's implementation).
-	// The shows/episodes endpoint accepts thetvdb_id, not imdb_id.
+	// BetaSeries uses TVDB IDs natively; the shows/episodes endpoint accepts
+	// thetvdb_id, not imdb_id.
 	if req.TvdbID <= 0 {
 		slog.Debug("betaseries: no TVDB ID, skipping")
 		return nil, nil
 	}
 
-	// Search by series TVDB ID + season + episode.
 	searchURL := fmt.Sprintf("%sshows/episodes?thetvdb_id=%d&season=%d&episode=%d&subtitles=1&v=3.0",
 		baseURL, req.TvdbID, req.Season, req.Episode)
 
@@ -107,9 +106,8 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 }
 
 // Download fetches the subtitle content for the given search result.
-// Archives are extracted automatically via provider.ExtractAndValidate.
 func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// Validate download URL to prevent SSRF via malicious API responses.
+	// Validates against SSRF via a malicious API response supplying an internal URL.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("betaseries: %w", err)
 	}
@@ -138,7 +136,6 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 		return nil, err
 	}
 
-	// Check if it's an archive and extract subtitle.
 	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
 	if err != nil {
 		return nil, fmt.Errorf("betaseries: %w", err)
@@ -147,10 +144,8 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	return result, nil
 }
 
-// doGet performs an authenticated GET request to the BetaSeries API.
-// Returns a size-limited ReadCloser for the response body. Handles the
-// BetaSeries-specific 400/4001 "not found" response by returning a
-// synthetic empty episodes response.
+// doGet returns a synthetic empty episodes response for BetaSeries' 400/4001
+// "not found" answer rather than an error, so Search sees zero results.
 func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
@@ -161,8 +156,8 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	if err != nil {
 		return nil, err
 	}
-	// BetaSeries returns 400 for "not found" (code 4001) and auth errors
-	// (code 1001). Parse the error body to distinguish them.
+	// BetaSeries returns HTTP 400 for both "not found" (code 4001) and auth
+	// errors (code 1001); the error body's code distinguishes them.
 	if resp.StatusCode == http.StatusBadRequest {
 		defer resp.Body.Close()
 		data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxErrorBodyBytes))
@@ -188,10 +183,9 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	}{io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes), resp.Body}, nil
 }
 
-// classifyBadRequest parses a BetaSeries 400 error response body and returns
-// the appropriate result. Returns a synthetic empty response for "not found"
-// (code 4001), an AuthError for invalid API key (code 1001), or a generic
-// HTTP 400 error for unrecognized codes.
+// classifyBadRequest returns a synthetic empty response for code 4001
+// ("not found"), an AuthError for code 1001 (invalid API key), or a
+// generic HTTP 400 error for any other code.
 func classifyBadRequest(body []byte) (io.ReadCloser, error) {
 	var errResp struct {
 		Errors []struct {
@@ -210,9 +204,6 @@ func classifyBadRequest(body []byte) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("HTTP %d", http.StatusBadRequest)
 }
 
-// filterSubtitleEntries converts raw BetaSeries subtitle entries into Subtitle
-// values. Filters by requested languages (mapping BetaSeries vo/vf codes to
-// ISO 639-1) and skips the sourceSeriessub source (dead links). Pure function.
 func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, episode int) []subflux.Subtitle {
 	var results []subflux.Subtitle
 	for _, sub := range entries {
@@ -220,7 +211,7 @@ func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, 
 		if lang == "" || !slices.Contains(languages, lang) {
 			continue
 		}
-		// Skip seriessub source (dead links).
+		// seriessub source entries are dead links.
 		if sub.Source == sourceSeriessub {
 			continue
 		}
@@ -239,10 +230,8 @@ func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, 
 	return results
 }
 
-// betaLangToISO converts BetaSeries language codes to ISO 639-1.
-// BetaSeries uses "vo"/"vf" (version originale/française) alongside standard codes.
-// Only English and French are mapped because BetaSeries is a French-language service
-// and primarily hosts subtitles in these two languages.
+// betaLangToISO maps only English and French: BetaSeries is a French-language
+// service and primarily hosts subtitles in these two languages.
 func betaLangToISO(code string) string {
 	switch strings.ToLower(code) {
 	case "vo", "en":

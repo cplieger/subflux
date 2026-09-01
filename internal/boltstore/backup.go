@@ -27,7 +27,7 @@ import (
 // tx.WriteTo copies every live AND free page, so the snapshot is the same size
 // as the live file and is NOT defragmented. Reclaiming disk after heavy
 // churn is a SEPARATE, explicit bbolt.Compact step (see the file-growth
-// runbook, spec task 12.4); it is deliberately not done here so a routine
+// runbook); it is deliberately not done here so a routine
 // backup stays a cheap, read-only streaming copy.
 //
 // # Atomic write
@@ -38,7 +38,7 @@ import (
 // dest or nothing at dest — never a partial "subflux-<ts>.bolt" that pruning
 // would later treat as a valid backup.
 //
-// # Restore procedure (summary; full runbook is spec task 12.4)
+// # Restore procedure (summary; full runbook is separate)
 //
 // Backups are plain bbolt files. To restore: stop the subflux container (so it
 // releases the exclusive file lock), copy a chosen snapshot over

@@ -16,7 +16,6 @@ const valTrue = "true"
 // and enabling IDE navigation.
 type SettingKey string
 
-// Common provider setting keys.
 const (
 	KeyAPIKey          SettingKey = "api_key"
 	KeyUsername        SettingKey = "username"
@@ -39,9 +38,8 @@ const (
 	KeyDelayMs         SettingKey = "delay_ms"
 )
 
-// SettingBool returns the boolean value for key in settings.
-// Accepts native bool or string "true"/"false". Returns def if the key is
-// missing or the value is not a recognized boolean.
+// SettingBool accepts native bool or string "true"/"false"; returns def if
+// the key is missing or the value is not a recognized boolean.
 func SettingBool(settings map[string]any, key SettingKey, def bool) bool {
 	v, ok := settings[string(key)]
 	if !ok {
@@ -67,8 +65,7 @@ func SettingBool(settings map[string]any, key SettingKey, def bool) bool {
 	}
 }
 
-// SettingString returns the string value for key in settings.
-// Returns "" if the key is missing or the value is not a string.
+// SettingString returns "" if the key is missing or the value is not a string.
 func SettingString(settings map[string]any, key SettingKey) string {
 	v, ok := settings[string(key)]
 	if !ok {
@@ -83,10 +80,9 @@ func SettingString(settings map[string]any, key SettingKey) string {
 	return s
 }
 
-// SettingInt returns the integer value for key in settings.
-// Accepts native int/int64/float64 (whole YAML numeric) or numeric
-// string. Returns def if the key is missing or the value is not
-// convertible to int. Non-whole float64 values return def.
+// SettingInt accepts native int/int64/float64 (whole YAML numeric) or
+// numeric string; returns def if missing, non-convertible, or a non-whole
+// float64.
 func SettingInt(settings map[string]any, key SettingKey, def int) int {
 	v, ok := settings[string(key)]
 	if !ok {
@@ -119,9 +115,8 @@ func SettingInt(settings map[string]any, key SettingKey, def int) int {
 	return def
 }
 
-// SettingFloat returns the float64 value for key in settings.
-// Accepts native float64/int/int64 or numeric string. Returns def if
-// the key is missing or the value is not convertible to float64.
+// SettingFloat accepts native float64/int/int64 or numeric string; returns
+// def if the key is missing or the value is not convertible.
 func SettingFloat(settings map[string]any, key SettingKey, def float64) float64 {
 	v, ok := settings[string(key)]
 	if !ok {
@@ -170,7 +165,6 @@ func FromMap(settings map[string]any) Settings {
 		Token:    SettingString(settings, KeyToken),
 		UseHash:  SettingBool(settings, KeyUseHash, false),
 	}
-	// Collect non-common keys into Custom.
 	commonKeys := map[SettingKey]struct{}{
 		KeyAPIKey: {}, KeyUsername: {}, KeyPassword: {},
 		KeyPasskey: {}, KeyToken: {}, KeyUseHash: {},

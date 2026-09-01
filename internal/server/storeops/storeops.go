@@ -66,8 +66,8 @@ type Runner struct {
 // New returns a Runner over deps.
 func New(deps Deps) *Runner { return &Runner{deps: deps} }
 
-// RunBackup periodically writes a consistent database snapshot and prunes old
-// backups until ctx is cancelled.
+// RunBackup periodically writes a database snapshot and prunes old backups
+// until ctx is cancelled.
 func (r *Runner) RunBackup(ctx context.Context) {
 	for {
 		select {
@@ -125,8 +125,6 @@ func (r *Runner) runOnce(ctx context.Context) {
 // RunMetrics periodically reads the bbolt file size and freelist stats and records
 // them as Prometheus gauges. It exits when ctx is cancelled.
 func (r *Runner) RunMetrics(ctx context.Context) {
-	// Record once immediately at startup so the gauges are populated before the
-	// first scrape.
 	r.sample()
 
 	ticker := time.NewTicker(StoreMetricsInterval)
@@ -141,7 +139,7 @@ func (r *Runner) RunMetrics(ctx context.Context) {
 	}
 }
 
-// sample records one reading of the file-size and freelist gauges.
+// sample records the file-size and freelist gauges.
 func (r *Runner) sample() {
 	fileBytes, freelistBytes := r.deps.DB.StoreFileStats()
 	r.deps.Metrics.RecordStoreFileSize(fileBytes)

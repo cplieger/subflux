@@ -38,10 +38,8 @@ import { patch, createCollection, bindList, type ListSpec } from "@cplieger/reac
 import { join } from "@cplieger/keyenc";
 import { contentView, movieViewId, ownedByRoute, seriesViewId, type Scope } from "./view-scope.js";
 
-// Module-level abort controller for detail navigation fetches. Self-cleans
-// on internal navigation (each new openSeriesDetail/openMovieDetail aborts
-// the previous), but page unload also needs a cleanup hook so in-flight
-// fetches don't outlive the document.
+// Self-cleans on internal navigation; also needed on page unload so
+// in-flight fetches don't outlive the document.
 let detailAbort: AbortController | null = null;
 registerCleanup(() => {
   detailAbort?.abort();
@@ -50,26 +48,17 @@ registerCleanup(() => {
 
 // --- Persistent two-tier render state (mirrors coverage.ts / files.ts) ---
 //
-// Each detail view mounts into the shared content host (view-scope.ts) and
-// registers its `bindList` binding in the scope it gets back, so a coverage SSE
-// refresh updates rows IN PLACE (stable DOM node identity, buttons not
-// re-created, only changed coverage cells repaint) instead of rebuilding the
-// whole <table>. A render REUSES the live binding while the host still holds
-// that exact view; otherwise it MOUNTS a fresh one, and mounting releases
-// everything the previous occupant registered — bindings, row effects and the
-// scan buttons its rows built.
-//
-// The collections are the only per-view state a REUSE needs to reach, and each
-// is nulled by its own view scope, so "the host holds this view" and "this
-// collection is live" are one fact.
+// Each detail view registers its bindList binding in the scope view-scope.ts
+// returns, so a coverage SSE refresh updates rows in place instead of
+// rebuilding the table. A render REUSES the live binding while the host
+// still holds that view; otherwise it mounts fresh, releasing everything
+// the previous occupant registered.
 
 let seriesColl: ReturnType<typeof createCollection<DetailRow>> | null = null;
 let movieColl: ReturnType<typeof createCollection<MovieRow>> | null = null;
 
-/** Mount a detail view: the content host releases the previous occupant, and
- *  the ROUTER owns this one too (C2) — a detail view must not outlive the route
- *  that mounted it, and a navigation to another page writes no container it
- *  lives in. */
+/** Mount a detail view: the content host releases the previous occupant,
+ *  and the router owns this one too (a navigation away must release it). */
 function mountDetailView(viewId: string): Scope {
   const scope = contentView.mount(viewId);
   ownedByRoute(scope);
@@ -83,20 +72,14 @@ function compact(nodes: (HTMLElement | null)[]): HTMLElement[] {
 }
 
 /**
- * Index key for one (language, variant) pair.
+ * Index key for one (language, variant) pair. ONE helper for every producer
+ * and consumer: the subtitle index is built from stored files' lang/variant
+ * and looked up with the config target's lang/variant, so both ends must
+ * encode identically.
  *
- * ONE helper for every producer and every consumer on purpose: the subtitle
- * index is BUILT from the stored files' language/variant and LOOKED UP with the
- * config target's language/variant, so both ends have to encode identically. If
- * only one side moved, every lookup would miss and every row would render as
- * uncovered.
- *
- * keyenc-encoded rather than pipe-joined: both fields reach the browser from
- * the operator's config.yaml (language rules are validated for non-emptiness
- * only), so a value carrying the separator used to shift the field split and
- * let two different targets share one bucket. Ordinary codes contain neither
- * reserved character and so encode verbatim — the separator itself is the only
- * byte that changed.
+ * keyenc-encoded rather than pipe-joined: both fields come from the
+ * operator's config.yaml (validated for non-emptiness only), so a value
+ * carrying a separator could shift the field split and alias two targets.
  */
 function langVariantKey(lang: string, variant: string): string {
   return join(lang, variant);
@@ -202,7 +185,6 @@ function buildRadarrLink(movie: MovieDetail): string | null {
 }
 
 function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
-  // Abort any prior in-flight detail fetch.
   if (detailAbort) {
     detailAbort.abort();
   }
@@ -230,13 +212,9 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
     },
   });
   const out = $.coverageContent;
-  // Anti-flicker loading skeleton (150ms show-delay + 300ms min-visible,
-  // abort-aware): a cached/fast load never paints it, a slow one keeps it up
-  // long enough not to blink. The commit ALWAYS releases the pane and detaches
-  // the current content (fresh-fragment patch) before rendering — preserving
-  // the always-MOUNT guarantee the old eager skeleton patch provided, so
-  // renderSeriesDetail never reuses a previous detail view's binding. (A
-  // coverage SSE refresh paints no skeleton, so it reuses — unchanged.)
+  // Anti-flicker skeleton (150ms show-delay + 300ms min-visible, abort-aware).
+  // The commit always releases the pane and detaches current content before
+  // rendering, so a series detail render never reuses a previous view's binding.
   const timing = skeletonTiming(
     () => {
       contentView.clear();
@@ -281,10 +259,9 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
 }
 
 /** Count the season's syncable files (external subs on file-bearing
- *  episodes matching a configured target pair) — the season-head Sync
- *  button's visibility gate and the dialog's count HINT. The server
- *  enumerates authoritatively at batch acceptance (D2); this count only
- *  decides whether the affordance renders. */
+ *  episodes matching a configured target) — gates the season-head Sync
+ *  button and hints the dialog's count; the server enumerates
+ *  authoritatively at batch acceptance. */
 function countSeasonSyncFiles(
   sg: SeasonGroup,
   series: SeriesItem,
@@ -315,12 +292,10 @@ function countSeasonSyncFiles(
 
 // --- Series row model (two-tier collection rows) ---
 //
-// Each row carries EVERYTHING its mount/update needs, so the bindList specs
-// (bound once at REBUILD) never read render-scoped state that would go stale
-// on a REUSE refresh. The `sig` is a content signature: update() compares it
-// against the row element's `data-sig` and short-circuits when unchanged, so a
-// setAll (which bumps every per-row signal) repaints ONLY the rows whose
-// coverage/history actually changed.
+// Each row carries everything its mount/update needs, so the bindList
+// specs never read render-scoped state that would go stale on a reuse
+// refresh. `sig` is a content signature: update() compares it against the
+// row's `data-sig` and short-circuits when unchanged.
 
 type DetailRow =
   | { kind: "gap"; season: number }
@@ -362,25 +337,18 @@ function detailRowKey(r: DetailRow): string {
   }
 }
 
-/** Content signature for an episode row: every field that drives the coverage
- *  cell (per-lang entry source/codec/score/path) plus history-button presence.
- *  Stable across a refresh that did not touch this episode -> update no-op.
+/** Content signature for an episode row: every field that drives the
+ *  coverage cell plus history-button presence. Stable across a refresh that
+ *  did not touch this episode.
  *
- *  Assembled with keyenc at every level instead of a separator per level
- *  (`:` within an entry, `,` between entries, `|` between targets, `#`
- *  between sections). Nesting is composition: an inner list gets its own
- *  `join` and that RESULT becomes one component of the level above, which
- *  re-escapes it — so a codec or source carrying a separator can no longer
- *  make two different coverage states produce the same signature. The cost of
- *  a collision here is bounded: the signature is only compared against the
- *  row's `data-sig`, so a collision skips a repaint that was needed (a stale
- *  coverage badge until the next change), never a wrong entity.
+ *  Assembled with keyenc at every nesting level (rather than a separator per
+ *  level) so a codec or source carrying a separator can't alias two
+ *  different coverage states. A collision only skips a needed repaint
+ *  (stale badge until the next change), never a wrong entity.
  *
- *  One consequence to expect when reading a signature by hand: a single target
- *  with no entries encodes as one empty component, which keyenc hashes rather
- *  than let it alias the no-component encoding — so an uncovered single-target
- *  row carries a `sha256:` block. Deterministic and still injective; the
- *  signature is never split back, only compared. */
+ *  A single target with no entries encodes as one empty component, which
+ *  keyenc hashes rather than let alias the no-component encoding — so an
+ *  uncovered single-target row carries a `sha256:` block. */
 function epSig(
   subs: Partial<Record<string, SubtitleEntry[]>>,
   targetLangs: { lang: string; variant: string }[],
@@ -405,16 +373,12 @@ function epSig(
   return join(parts, hasHistory ? "1" : "0", icSig);
 }
 
-/** The ignored-codec component of every row signature, derived ONCE per
- *  rebuild (C3): the set is render-global, so sorting it per row was pure
- *  rework multiplied by the episode count. */
+/** Ignored-codec component of every row signature, derived once per rebuild
+ *  rather than sorted per row. */
 function ignoredCodecsSig(): string {
   return join(...[...store.get("ignoredCodecs")].sort());
 }
 
-// Column header labels (recreated per season since DOM nodes can only appear
-// once in the document). Explicit table semantics: the desktop tree leaves
-// the table formatting context (C1), which strips the implicit roles.
 function makeColHeaders(): HTMLElement {
   return el(
     "tr",
@@ -426,7 +390,7 @@ function makeColHeaders(): HTMLElement {
   );
 }
 
-/** Coverage-cell children for an episode row (the badge spans). */
+/** Coverage-cell children for an episode row. */
 function episodeCoverageChildren(row: DetailEpRow): HTMLElement[] {
   const { subs, targetLangs } = row;
   if (targetLangs.length > 0) {
@@ -513,9 +477,9 @@ function episodeActionChildren(row: DetailEpRow): (HTMLElement | null)[] {
   return [syncBtn, histBtn, searchBtn];
 }
 
-/** Build a single episode table row with coverage badges and action buttons.
- *  The coverage <td> (`.ep-coverage`) and the action group are separately
- *  addressable so `update` can repaint just them. */
+/** Build a single episode table row with coverage badges and action
+ *  buttons. The coverage cell and action group are separately addressable
+ *  so update() can repaint just them. */
 function buildEpisodeRow(row: DetailEpRow): HTMLElement {
   const { ep, season, hasAbsOrder } = row;
 
@@ -559,8 +523,7 @@ function buildEpisodeRow(row: DetailEpRow): HTMLElement {
   return tr;
 }
 
-/** Repaint just the dynamic parts of an episode row: the coverage cell and the
- *  sync/history action buttons (external-sub presence + history can change). */
+/** Repaint just the dynamic parts of an episode row. */
 function paintEpisodeRow(node: HTMLElement, row: DetailEpRow): void {
   const covCell = node.querySelector("td.ep-coverage");
   if (covCell) {
@@ -573,9 +536,9 @@ function paintEpisodeRow(node: HTMLElement, row: DetailEpRow): void {
   node.dataset["sig"] = row.sig;
 }
 
-/** Action-group children for a season-head row: [sync?, history?, search].
- *  `scope` is the ROW's scope — a fresh one per paint, so the scan button this
- *  paint builds is released when the next paint discards it. */
+/** Action-group children for a season-head row. `scope` is the row's
+ *  scope, fresh per paint, so this paint's scan button is released when
+ *  the next paint discards it. */
 function seasonHeadActionChildren(row: DetailHeadRow, scope: Scope): (HTMLElement | null)[] {
   const { series, season, syncFiles, hasHistory } = row;
 
@@ -591,7 +554,6 @@ function seasonHeadActionChildren(row: DetailHeadRow, scope: Scope): (HTMLElemen
     icon("search"),
     el("span", { className: "btn-text" }, " Search"),
   ) as HTMLButtonElement;
-  // Rows painted while a scan runs restore the disabled+spinner state.
   registerScanButton(searchBtn, scope);
   const histBtn = hasHistory
     ? el(
@@ -627,10 +589,8 @@ function seasonHeadActionChildren(row: DetailHeadRow, scope: Scope): (HTMLElemen
   return [syncBtn, histBtn, searchBtn];
 }
 
-/** Build a season-head row (label + action buttons). The label cell SPANS
- *  the data columns on desktop (grid placement in 06-table.css); the two
- *  empty cells only exist for the mobile branch's flex layout, which hides
- *  them, and stay hidden on desktop. */
+/** Build a season-head row. The label cell spans the data columns on
+ *  desktop; the two empty cells exist only for mobile's flex layout. */
 function buildSeasonHeadRow(row: DetailHeadRow, scope: Scope): HTMLElement {
   const tr = el(
     "tr",
@@ -648,8 +608,7 @@ function buildSeasonHeadRow(row: DetailHeadRow, scope: Scope): HTMLElement {
   return tr;
 }
 
-/** Repaint a season-head row's action buttons (sync/history visibility tracks
- *  syncEps + hasHistory). */
+/** Repaint a season-head row's action buttons. */
 function paintSeasonHead(node: HTMLElement, row: DetailHeadRow, scope: Scope): void {
   const actionGroup = node.querySelector('[data-col="actions"] .action-group');
   if (actionGroup) {
@@ -658,18 +617,15 @@ function paintSeasonHead(node: HTMLElement, row: DetailHeadRow, scope: Scope): v
   node.dataset["sig"] = row.sig;
 }
 
-// bindList row lifecycle for the series table. Built once per MOUNT, over that
-// view's scope: every closure is otherwise data-driven (reads only the row
-// argument) so a REUSE setAll feeds fresh row objects without any stale
-// render-scope capture, and capturing the scope is safe because the scope's
-// lifetime IS the binding's.
+// bindList row lifecycle for the series table. Built once per mount, over
+// that view's scope: closures are data-driven (read only the row argument)
+// so a reuse setAll feeds fresh row objects with no stale render-scope capture.
 function makeSeriesSpec(scope: Scope): ListSpec<DetailRow> {
   return {
     mount: (r, id) => {
       switch (r.kind) {
         case "gap":
-          // Spans every column via grid-column: 1 / -1 (06-table.css); the
-          // colSpan escape hatch died with the table formatting context.
+          // Spans every column via grid-column: 1 / -1.
           return el("tr", { className: "season-gap", role: "row" }, el("td", { role: "cell" }));
         case "head":
           return buildSeasonHeadRow(r, scope.child(id));
@@ -739,7 +695,6 @@ function buildSeriesRows(
   historySet: Set<string>,
 ): DetailRow[] {
   const rows: DetailRow[] = [];
-  // Per-rebuild derivations, hoisted out of the per-row/per-season work (C3).
   const icSig = ignoredCodecsSig();
   const historySeasons = seasonsWithHistory(series.tvdb_id, historySet);
   let first = true;
@@ -795,7 +750,6 @@ export function renderSeriesDetail(
   historySet ??= new Set();
   store.set("detailCtx", { series, seasons, tvdbId: series.tvdb_id });
 
-  // Show Files button only if any external subtitle exists.
   const hasExtSubs = subFiles.some((f) => f.source === "external");
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (headerEl) {
@@ -834,8 +788,7 @@ export function renderSeriesDetail(
     variant: t.variant,
   }));
 
-  // Index subtitle files by media_id, then by lang|variant (langVariantKey —
-  // the same encoding the per-row lookups below use).
+  // Index subtitle files by media_id, then by lang|variant.
   const byMedia = Object.groupBy(subFiles, (f) => f.media_id);
   const subIdx: Record<string, Partial<Record<string, SubtitleEntry[]>>> = {};
   for (const [mediaId, files] of Object.entries(byMedia)) {
@@ -843,8 +796,6 @@ export function renderSeriesDetail(
   }
 
   if (seasons.length === 0) {
-    // Nothing to bind: release the pane (the empty state owns no registrations)
-    // so a later same-series render mounts fresh.
     contentView.clear();
     const frag = document.createDocumentFragment();
     frag.appendChild(
@@ -856,7 +807,7 @@ export function renderSeriesDetail(
     return;
   }
 
-  // Sort seasons: regular seasons first (ascending), specials (season 0) last.
+  // Sort seasons: regular ascending, specials (season 0) last.
   const sortedSeasons = [...seasons].sort((a, b) => {
     if (a.season === 0) {
       return 1;
@@ -867,12 +818,8 @@ export function renderSeriesDetail(
     return a.season - b.season;
   });
 
-  // Detect if any episode uses absolute numbering that genuinely
-  // diverges from sequential aired order (not just a running count
-  // across seasons, which Sonarr sets for every multi-season show).
-  // Compute the expected absolute as cumulative episode count from
-  // prior seasons + current episode number; only flag when actual
-  // absolute differs.
+  // Detect absolute numbering that genuinely diverges from sequential aired
+  // order (not just a running count across seasons).
   const hasAbsOrder = (() => {
     let prior = 0;
     for (const sg of sortedSeasons) {
@@ -892,9 +839,8 @@ export function renderSeriesDetail(
 
   const rows = buildSeriesRows(series, sortedSeasons, subIdx, targetLangs, hasAbsOrder, historySet);
 
-  // REUSE: this exact series view is still the content host's occupant, so its
-  // binding renders the table on screen — just push the new rows; the per-row
-  // signals repaint only the changed rows.
+  // REUSE: this series view is still the content host's occupant, so the
+  // existing binding just gets fresh rows.
   const key = String(series.tvdb_id);
   const viewId = seriesViewId(key);
   if (contentView.scopeFor(viewId) !== null && seriesColl) {
@@ -902,8 +848,6 @@ export function renderSeriesDetail(
     return;
   }
 
-  // MOUNT: fresh scope (releasing the previous occupant), collection, binding
-  // and table shell.
   const scope = mountDetailView(viewId);
   const coll = createCollection<DetailRow>(detailRowKey);
   const tbody = el("tbody", { role: "rowgroup" });
@@ -914,18 +858,13 @@ export function renderSeriesDetail(
     seriesColl = null;
   });
 
-  // Detach any previous content BEFORE patching the fresh shell in: patch
-  // reuses position-matched elements, so patching the new table over a live
-  // old one would keep the OLD tbody on screen and leave this binding's tbody
-  // off it. A mount is a replacement by definition.
+  // Detach previous content BEFORE patching the fresh shell: patch reuses
+  // position-matched elements, so patching over a live table would keep the
+  // old tbody on screen instead of this binding's.
   patch(out, document.createDocumentFragment());
 
-  // The desktop tree leaves the table formatting context (C1), which strips
-  // the implicit table semantics, so the roles are explicit. The accessible
-  // name is the panel heading — PanelConfigure populates #lib-heading before
-  // this render commits. Column widths live in ONE shared desktop
-  // grid-template-columns custom property (06-table.css), which replaced the
-  // <colgroup>.
+  // The desktop tree leaves the table formatting context, so roles are
+  // explicit. Accessible name is #lib-heading, populated before this commits.
   const frag = document.createDocumentFragment();
   frag.appendChild(
     el(
@@ -954,17 +893,14 @@ interface MovieRow {
   sig: string;
 }
 
-/** Content signature for a movie language row: the entries' source/codec/score
- *  (everything the coverage badges render). Same nested-`join` assembly as
- *  `epSig`, for the same reason and with the same bounded cost: a collision
- *  skips a needed repaint (a stale badge), it never misidentifies a row. */
+/** Content signature for a movie language row: entries' source/codec/score.
+ *  Same nested-join assembly as epSig, same bounded collision cost. */
 function movieSig(entries: SubtitleEntry[]): string {
   const ic = join(...[...store.get("ignoredCodecs")].sort());
   return join(join(...entries.map((e) => join(e.source, e.codec ?? "", String(e.score ?? 0)))), ic);
 }
 
-/** Coverage-cell children for a movie row (codec-grouped badges, or the empty
- *  badge when there are no entries). */
+/** Coverage-cell children for a movie row. */
 function movieCoverageChildren(entries: SubtitleEntry[]): HTMLElement[] {
   if (entries.length > 0) {
     const byCodec: Record<string, SubtitleEntry[]> = {};
@@ -978,8 +914,7 @@ function movieCoverageChildren(entries: SubtitleEntry[]): HTMLElement[] {
   return [coverageBadge(null, null)];
 }
 
-/** Build a movie language row: label, coverage cell, and the per-lang Search
- *  button (captures movie + lang, both stable for a given tmdb_id). */
+/** Build a movie language row. */
 function buildMovieRow(row: MovieRow): HTMLElement {
   const { label, lang, movie } = row;
 
@@ -1030,10 +965,8 @@ const movieSpec: ListSpec<MovieRow> = {
   },
 };
 
-/** The movie detail's header: doc title + panel config from the cached row.
- *  The buttons that depend on the subtitle rows (sync, Files) are added by
- *  renderMovieDetail once the /subs rows are in hand, the way the series
- *  path adds its Files button. */
+/** The movie detail's header. The buttons depending on subtitle rows (sync,
+ *  Files) are added by renderMovieDetail once /subs rows are in hand. */
 function configureMovieHeader(m: MovieDetail): void {
   setDocTitle(m.title);
   const targets = m.targets;
@@ -1054,7 +987,7 @@ function configureMovieHeader(m: MovieDetail): void {
   });
 }
 
-/** Add the History nav button (idempotent — at most one per header). */
+/** Add the History nav button (idempotent). */
 function addMovieHistoryButton(m: MovieDetail): void {
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (!headerEl || headerEl.querySelector('[data-nav="hist"]')) {
@@ -1076,24 +1009,19 @@ function addMovieHistoryButton(m: MovieDetail): void {
   insertNavButton(histBtn);
 }
 
-/** Enter the movie-detail view for a row already in hand: tab title, panel
- *  config, and the detail context every refresh path classifies the route
- *  from. The plain open calls it BEFORE its reads — the header is known from
- *  the cached row, so it must not wait on a fetch, and a refresh dispatched
- *  mid-read has to classify as this movie — while the leg calls it after,
- *  because its summary read is where the row comes from. */
+/** Enter the movie-detail view for a row already in hand. Called before
+ *  reads (header is known from the cached row) so a refresh mid-read still
+ *  classifies as this movie. */
 function enterMovieDetail(m: MovieDetail): void {
   configureMovieHeader(m);
   store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
 }
 
-/** The transaction page leg's movie entry (E3 step 3): paint from the leg's
- *  own pre-fetched triple. Everything openMovieDetail does except reading —
- *  the LEG owns the three reads on the raw client, so commit waits for them
- *  and a failed read aborts the transaction instead of painting an empty
- *  subs table. */
+/** The transaction page leg's movie entry: paint from the leg's own
+ *  pre-fetched triple. The leg owns the three reads on the raw client, so
+ *  commit waits for them and a failed read aborts the transaction instead
+ *  of painting an empty subs table. */
 export function renderMovieDetailFromLeg(m: MovieDetail, reads: MovieDetailReads): void {
-  // Supersede any in-flight plain open: this render owns the fresh paint.
   if (detailAbort) {
     detailAbort.abort();
     detailAbort = null;
@@ -1103,13 +1031,12 @@ export function renderMovieDetailFromLeg(m: MovieDetail, reads: MovieDetailReads
 }
 
 export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: AbortSignal): void {
-  // Abort any prior in-flight detail fetch.
   if (detailAbort) {
     detailAbort.abort();
   }
   detailAbort = new AbortController();
-  // The page-leg dispatcher's movie arm (B2) threads its route controller in,
-  // so a route leave aborts this open's /subs + stateIDs reads too.
+  // legSignal (page-leg dispatcher's movie arm) means a route leave aborts
+  // this open's /subs + stateIDs reads too.
   const signal = legSignal ? AbortSignal.any([detailAbort.signal, legSignal]) : detailAbort.signal;
 
   if (!skipPush) {
@@ -1118,11 +1045,6 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
   enterMovieDetail(m);
   const out = $.coverageContent;
 
-  // Anti-flicker loading skeleton for the on-demand read (the series path's
-  // constants: 150ms show-delay + 300ms min-visible, abort-aware). The commit
-  // does NOT release the pane: renderMovieDetail's reuse check decides — a fast
-  // load leaves the movie view mounted, so a same-movie refresh repaints in
-  // place; a painted skeleton has already released it, so the render mounts.
   const timing = skeletonTiming(
     () => {
       contentView.clear();
@@ -1137,11 +1059,9 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
     { minVisibleMs: 300, signal },
   );
 
-  // The pair the render needs, read under ONE signal so the skeleton covers
-  // the whole load and the paint gets both answers at once (the leg awaits the
-  // same pair inside its triple). THE POLICY, and the only difference from the
-  // leg: a navigation has no commit to refuse, so a read that did not answer
-  // paints as empty rather than latching a transaction.
+  // Read under ONE signal so the skeleton covers the whole load; a
+  // navigation has no commit to refuse, so an unanswered read paints empty
+  // rather than latching a transaction (unlike the leg).
   readMovieDetail(m.tmdb_id, { signal })
     .then((r) => {
       if (signal.aborted) {
@@ -1165,12 +1085,9 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
     });
 }
 
-/** THE movie-detail render: paint the view from an already-read payload. Both
- *  callers land here — the plain open with the pair it read behind the
- *  skeleton, the transaction leg with the triple it awaited — so the History
- *  button the ids decide, the sync/Files buttons the rows decide, and the
- *  table are settled in ONE place rather than once per path. Split from
- *  openMovieDetail so the skeleton controller owns WHEN this runs. */
+/** The movie-detail render: paint the view from an already-read payload.
+ *  Both callers (plain open, transaction leg) land here so the History
+ *  button, sync/Files buttons, and table are settled in one place. */
 function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   const { subs, historyIDs } = reads;
   const targets = m.targets;
@@ -1185,8 +1102,7 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (headerEl) {
     // Replace, not append: a same-movie refresh re-runs this with fresh rows.
-    headerEl.querySelector('[data-nav="sync"]')?.remove();
-    const firstExtSub = extSubs[0];
+    headerEl.querySelector('[data-nav="sync"]')?.remove();    const firstExtSub = extSubs[0];
     if (extSubs.length > 0 && firstExtSub) {
       const syncBtn = el(
         "button",
@@ -1226,9 +1142,6 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   }
 
   if (targets.length === 0) {
-    // No language targets: nothing to bind. Release the pane (the empty state
-    // owns no registrations) and explain the state with a way out (a bare
-    // "not scanned" badge as the whole page body was a dead end).
     contentView.clear();
     patch(
       out,
@@ -1251,8 +1164,7 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     return { key, label, entries, lang: t.language, movie: m, sig: movieSig(entries) };
   });
 
-  // REUSE: this exact movie view is still the content host's occupant — push
-  // fresh rows.
+  // REUSE: this movie view is still the content host's occupant.
   const mKey = String(m.tmdb_id);
   const viewId = movieViewId(mKey);
   if (contentView.scopeFor(viewId) !== null && movieColl) {
@@ -1260,7 +1172,6 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     return;
   }
 
-  // MOUNT: fresh scope, collection, binding and table shell.
   const scope = mountDetailView(viewId);
   const coll = createCollection<MovieRow>((r) => r.key);
   const tbody = el("tbody");
@@ -1271,11 +1182,9 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     movieColl = null;
   });
 
-  // Detach any previous content BEFORE patching the fresh shell in: patch
-  // keys tables by data-movie-id, so a same-movie mount over a live table
-  // would keep the OLD tbody on screen and leave this binding's tbody off it
-  // (reachable whenever the previous occupant was released while its table was
-  // still standing). A mount is a replacement by definition.
+  // Detach previous content before patching the fresh shell: patch keys
+  // tables by data-movie-id, so a same-movie mount over a live table would
+  // keep the old tbody instead of this binding's.
   patch(out, document.createDocumentFragment());
 
   const frag = document.createDocumentFragment();

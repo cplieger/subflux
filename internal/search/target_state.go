@@ -15,7 +15,6 @@ import (
 // Compile-time assertion: providerOutcome implements fmt.Stringer.
 var _ fmt.Stringer = providerOutcome(0)
 
-// providerOutcome classifies the result of a single provider search.
 type providerOutcome int
 
 const (
@@ -24,7 +23,6 @@ const (
 	providerTimeout
 )
 
-// String implements fmt.Stringer for debuggable logging.
 func (o providerOutcome) String() string {
 	switch o {
 	case providerSuccess:
@@ -38,14 +36,12 @@ func (o providerOutcome) String() string {
 	}
 }
 
-// providerResult records the outcome of a single provider search.
 type providerResult struct {
 	err     error
 	name    subflux.ProviderID
 	outcome providerOutcome
 }
 
-// searchOutcome aggregates results from all providers for a single language query.
 type searchOutcome struct {
 	results   []subflux.Subtitle
 	providers []providerResult
@@ -65,7 +61,6 @@ func (o *searchOutcome) attempted() int {
 	return n
 }
 
-// succeeded returns the names of providers that returned results without error.
 func (o *searchOutcome) succeeded() []subflux.ProviderID {
 	var names []subflux.ProviderID
 	for _, p := range o.providers {
@@ -76,7 +71,6 @@ func (o *searchOutcome) succeeded() []subflux.ProviderID {
 	return names
 }
 
-// timedOut returns the names of providers that timed out.
 func (o searchOutcome) timedOut() []subflux.ProviderID {
 	var names []subflux.ProviderID
 	for _, p := range o.providers {
@@ -87,7 +81,6 @@ func (o searchOutcome) timedOut() []subflux.ProviderID {
 	return names
 }
 
-// errored returns the names of providers that returned errors.
 func (o searchOutcome) errored() []subflux.ProviderID {
 	var names []subflux.ProviderID
 	for _, p := range o.providers {
@@ -98,7 +91,6 @@ func (o searchOutcome) errored() []subflux.ProviderID {
 	return names
 }
 
-// targetState holds the computed search state for a single subtitle target.
 type targetState struct {
 	target       *subflux.SubtitleTarget
 	allowedProvs map[subflux.ProviderID]struct{}
@@ -108,11 +100,10 @@ type targetState struct {
 	isUpgrade    bool
 }
 
-// targetLocked checks the per-variant manual lock for one target. Locks live
-// on the (media_type, media_id, language, variant) quad, so a manual forced
-// download blocks only the forced target while standard/hi automation
-// continues. A store error fails CLOSED (treated as locked and skipped), the
-// same conservative stance the store itself takes.
+// targetLocked keys the manual lock on the (media_type, media_id, language,
+// variant) quad, so a manual forced download blocks only the forced target
+// while standard/hi automation continues. A store error fails CLOSED
+// (treated as locked and skipped).
 func (e *Engine) targetLocked(ctx context.Context, mediaType subflux.MediaType, mediaID, title, lang string, variant subflux.Variant) bool {
 	locked, err := e.store.IsManuallyLocked(ctx, subflux.ManualLockKey{
 		MediaType: mediaType, MediaID: mediaID, Language: lang, Variant: variant,
@@ -129,8 +120,6 @@ func (e *Engine) targetLocked(ctx context.Context, mediaType subflux.MediaType, 
 	return locked
 }
 
-// buildTargetStates computes the search state for each target in a language group.
-// Returns the states and whether any target needs searching.
 func (e *Engine) buildTargetStates(ctx context.Context, req *subflux.SearchRequest,
 	targets []subflux.SubtitleTarget, existing *existingSubs,
 	searchCfg *subflux.SearchConfig, mediaType subflux.MediaType, mediaID, lang, label string,
@@ -144,7 +133,6 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *subflux.SearchReque
 		states[i].target = t
 		states[i].variant = t.Variant
 
-		// Build allowed providers for this target.
 		provs := e.filterProviders(t)
 		allowed := make(map[subflux.ProviderID]struct{}, len(provs))
 		for _, p := range provs {
@@ -173,8 +161,7 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *subflux.SearchReque
 	return states, anyNeedsSearch
 }
 
-// decideTargetAction determines whether a target needs searching and whether
-// it's an upgrade. This is a pure decision function extracted for testability.
+// decideTargetAction is a pure decision function, extracted for testability.
 func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *subflux.SearchConfig,
 	e *Engine, mediaType subflux.MediaType, mediaID, lang string,
 	variant subflux.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool,
@@ -182,7 +169,6 @@ func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *
 	if !existing.hasSubtitle(lang, variant) {
 		return true, false, 0
 	}
-	// ForceUpgrade bypasses the normal upgrade eligibility check.
 	if forceUpgrade {
 		score, _, found, err := e.store.CurrentScore(ctx, mediaType, mediaID, lang, variant)
 		if err != nil {
@@ -203,8 +189,6 @@ func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *
 	return false, false, 0
 }
 
-// filterBackedOff removes providers that are currently in adaptive backoff
-// for the given media+language combination.
 func (e *Engine) filterBackedOff(ctx context.Context, mediaType subflux.MediaType, mediaID, lang string, providers []provider.Provider) []provider.Provider {
 	adaptive := e.cfg.Adaptive()
 	if !adaptive.Enabled {

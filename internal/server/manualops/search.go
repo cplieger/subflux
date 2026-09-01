@@ -15,8 +15,7 @@ import (
 // ParseSearchQuery extracts search parameters from the request URL. The
 // optional media_id parameter is the ARR internal ID (Radarr movie ID /
 // Sonarr series ID): with season/episode it forms the MediaRef the handler
-// resolves server-side for hash computation — the former client-supplied
-// ?file= path parameter is gone (S7).
+// resolves server-side for hash computation.
 func ParseSearchQuery(r *http.Request) (req subflux.SearchRequest, lang string, mediaType subflux.MediaType, arrID int) {
 	q := r.URL.Query()
 	lang = q.Get("lang")
@@ -52,8 +51,6 @@ func ParseSearchQuery(r *http.Request) (req subflux.SearchRequest, lang string, 
 	return req, lang, mediaType, QueryInt(q, "media_id")
 }
 
-// QueryInt parses a URL query parameter as a non-negative integer,
-// returning 0 on missing, invalid, or negative values.
 func QueryInt(q interface{ Get(string) string }, key string) int {
 	v := q.Get(key)
 	if v == "" {
@@ -66,8 +63,6 @@ func QueryInt(q interface{ Get(string) string }, key string) int {
 	return n
 }
 
-// TryComputeHash attempts to compute the video hash for the search request.
-// Logs warnings on validation or hash failures; updates req in place on success.
 func TryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchRequest, filePath string) {
 	if filePath == "" || req.VideoHash != "" {
 		return
@@ -90,8 +85,8 @@ func TryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchReque
 }
 
 // BuildSearchResults converts scored results to API response format. sc
-// supplies the server-computed tier label per score (a nil scorer — only
-// possible before the first successful wire — leaves tiers empty).
+// supplies the server-computed tier label per score; a nil scorer leaves
+// tiers empty.
 func BuildSearchResults(scored []subflux.ScoredResult, refs []subflux.DownloadedRef, sc tierLabeller) []SearchResult {
 	if len(scored) > MaxResults {
 		scored = scored[:MaxResults]
@@ -128,26 +123,23 @@ func BuildSearchResults(scored []subflux.ScoredResult, refs []subflux.Downloaded
 	return results
 }
 
-// ManualSearchResponse is the typed response from RunSearch. It deliberately
-// carries no lock state: manual locks are invisible infrastructure ("a manual
-// pick is never overwritten"), not a user-facing concept, so the popup has
-// nothing to display about them.
+// ManualSearchResponse is the typed response from RunSearch. It
+// deliberately carries no lock state: manual locks are invisible
+// infrastructure, not a user-facing concept, so the popup has nothing to
+// display about them.
 type ManualSearchResponse struct {
 	Results []SearchResult `json:"results"`
 }
 
-// RunSearch executes the manual search against all providers and returns
-// the JSON-ready response payload.
 func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *subflux.SearchRequest, lang string, mediaType subflux.MediaType, filePath string,
 ) ManualSearchResponse {
 	mediaID := mediaid.Build(req)
 	TryComputeHash(ctx, ls, req, filePath)
 
-	// Search all providers in parallel. Each provider gets its own timeout
-	// so a slow provider doesn't block others; the value is shared with the
-	// CLI search path via subflux.DefaultManualProviderTimeout to prevent
-	// silent divergence.
+	// Each provider gets its own timeout so a slow provider doesn't block
+	// others; the value is shared with the CLI search path via
+	// subflux.DefaultManualProviderTimeout to prevent silent divergence.
 	type provResult struct {
 		subs []subflux.Subtitle
 	}
@@ -176,7 +168,6 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 		allResults = append(allResults, r.subs...)
 	}
 
-	// Score and rank.
 	var scored []subflux.ScoredResult
 	if len(allResults) > 0 {
 		scored = ls.Engine.ScoreSubtitles(req, allResults)
@@ -192,7 +183,6 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 			"title", req.Title, "lang", lang, "media_type", mediaType)
 	}
 
-	// Check which results have files on disk via download history.
 	var refs []subflux.DownloadedRef
 	if len(scored) > 0 {
 		var refsErr error

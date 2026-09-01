@@ -1,16 +1,12 @@
 // files.ts — subtitle file manager page with delete controls.
 //
 // Two-tier reactive model (mirrors coverage.ts/history.ts): external files
-// live in a `createCollection` keyed by their FileRef identity (media_id +
-// language + variant + ordinal; orphan rows key on their server-minted
-// handle); the table is rendered once via `bindList` over a computed
-// `sortedIds` view (episode order for series, language for movies).
-// Optimistic delete removes one entry (rollback re-upserts it); bulk delete
-// clears the collection; a refresh is `setAll`.
+// live in a `createCollection` keyed by FileRef identity (media_id +
+// language + variant + ordinal; orphans key on their server-minted handle);
+// the table renders once via `bindList` over a computed `sortedIds` view.
 //
-// S7 addressing: the wire carries no filesystem paths. Stored files are
-// addressed by FileRef; orphans (on disk, no store row) carry a single-use
-// `orphan_handle` and display their basename via `name`.
+// S7 addressing: the wire carries no filesystem paths. Orphans (on disk, no
+// store row) carry a single-use `orphan_handle` and display their basename.
 
 import * as notify from "./notify.js";
 import * as store from "./store.js";
@@ -35,21 +31,15 @@ interface BulkDeleteResponse {
   deleted: number;
 }
 
-// External files only — embedded tracks are never shown or deletable here,
-// so the table and the collection both deal exclusively with externals. The
-// FileRef tuple is unique per stored external file (ordinal separates manual
-// siblings); orphans key on their unique per-listing handle.
+// External files only — embedded tracks are never shown or deletable here.
+// The FileRef tuple is unique per stored external file (ordinal separates
+// manual siblings); orphans key on their unique per-listing handle.
 //
-// keyenc-encoded rather than pipe-joined: `language` and `variant` come from
-// the operator's config.yaml via the stored row, so a value carrying the
-// separator used to shift the field split and let two different files collapse
-// onto one key. `createCollection` dedupes by key, so the loser DISAPPEARS from
-// the file manager — and with no row there is no delete button, making that
-// file undeletable from the UI. `join` escapes the separator inside each
-// component instead, so no field's content can forge another field's boundary.
-//
-// The orphan short-circuit stays: an orphan handle is a server-minted 32-hex
-// token, already a single unforgeable component.
+// keyenc-encoded rather than pipe-joined: `language`/`variant` come from the
+// operator's config.yaml, so a value carrying the separator could shift the
+// field split and collapse two files onto one key — the loser then has no
+// row and no delete button. `join` escapes the separator per component so no
+// field's content can forge another field's boundary.
 const fileKey = (f: FileEntry): string =>
   f.orphan_handle ?? join(f.media_id, f.language, f.variant, String(f.ordinal ?? 0));
 const files = createCollection<FileEntry>(fileKey);
@@ -61,7 +51,6 @@ let currentBackPath = "/";
 /** Sonarr/Radarr internal numeric ID for poster + MediaRef lookups. */
 let currentArrId = 0;
 
-/** Parse season/episode from a series media_id (`...s01e02`). */
 function parseEp(mediaID: string): { season: number; episode: number } {
   const m = /s(\d+)e(\d+)$/.exec(mediaID);
   if (!m) {
@@ -70,9 +59,8 @@ function parseEp(mediaID: string): { season: number; episode: number } {
   return { season: Number(m[1]), episode: Number(m[2]) };
 }
 
-/** Stable sort: episode order for series, language for movies. The trailing
- *  `path` tiebreaker gives a deterministic order for the multiple-files-per-
- *  language case (e.g. movie.fr.srt vs movie.fr.1.srt). */
+/** Episode order for series, language for movies; `path` tiebreaks the
+ *  multiple-files-per-language case (movie.fr.srt vs movie.fr.1.srt). */
 function compareFiles(a: FileEntry, b: FileEntry): number {
   const ea = parseEp(a.media_id);
   const eb = parseEp(b.media_id);
@@ -137,13 +125,11 @@ async function loadFiles(): Promise<void> {
     },
   });
 
-  // Mark as files view so data:invalidate reloads files, not library.
+  // Files view, so data:invalidate reloads files rather than the library.
   store.set("detailCtx", { files: true });
 
-  // Design-system skeleton (matching the library/history tables) with the
-  // shared anti-flicker timing: 150ms show-delay so a fast listing never
-  // flashes it, 300ms min-visible so a painted one never blinks. Settled by
-  // refreshFileData (which also runs skeleton-less on data:invalidate).
+  // Shared anti-flicker timing (150ms show-delay, 300ms min-visible),
+  // settled by refreshFileData (also runs skeleton-less on data:invalidate).
   filesSkeleton = skeletonTiming(
     () => {
       const skel = document.createDocumentFragment();
@@ -167,8 +153,6 @@ let filesSkeleton: SkeletonTimingController | null = null;
 
 async function refreshFileData(): Promise<void> {
   const out = $.coverageContent;
-  // Settle through the pending skeleton controller when one exists (honoring
-  // its show-delay/min-visible), else paint directly.
   const settle = (render: () => void): void => {
     if (filesSkeleton !== null) {
       const s = filesSkeleton;
@@ -178,7 +162,7 @@ async function refreshFileData(): Promise<void> {
       render();
     }
   };
-  // arr_id lets the server derive orphan-walk roots for the all-orphan edge
+  // arr_id lets the server derive orphan-walk roots for the all-orphan case
   // (a media item whose files all lack store rows).
   const query: Record<string, string> = {
     media_type: currentMediaType,
@@ -230,8 +214,8 @@ function buildFileRow(f: FileEntry): HTMLElement {
 
   const actionGroup = el("div", { className: "action-group" });
   if (f.source === "external") {
-    // Sync needs both the FileRef (stored row) and the video MediaRef (arr
-    // id); orphans have neither a store row nor a quad, so no sync.
+    // Sync needs the FileRef (stored row) and the video MediaRef (arr id);
+    // orphans have neither, so no sync action.
     if (!isOrphan && currentArrId > 0) {
       actionGroup.appendChild(
         el(
@@ -291,15 +275,12 @@ function buildFileRow(f: FileEntry): HTMLElement {
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
 
-/** The file manager's view id in the shared content host. */
 const VIEW_FILES = "files";
 
 function ensureMounted(): void {
   const out = $.coverageContent;
-  // Already the host's occupant: the table this view bound is still the
-  // container's content, so the live binding renders it. Ownership answers
-  // this — a DOM probe cannot tell a live table from one another view has
-  // already patched over.
+  // Ownership check: a live table this view bound is still the container's
+  // content, which a DOM probe cannot distinguish from another view's patch.
   if (contentView.scopeFor(VIEW_FILES) !== null) {
     return;
   }
@@ -333,8 +314,7 @@ function ensureMounted(): void {
     ),
   );
 
-  // "Delete all" button in the panel header (sibling of the back/arr nav).
-  // Built once here; its count + visibility track the collection reactively.
+  // Panel-header "Delete all" button; count + visibility track reactively.
   const bulkText = el("span", { className: "btn-text" });
   const bulkBtn = el(
     "button",
@@ -356,7 +336,7 @@ function ensureMounted(): void {
     headerEl.appendChild(bulkBtn);
   }
 
-  // Empty-state, table, and bulk-button visibility/count derived from the
+  // Empty-state, table, and bulk-button visibility/count track the
   // collection's id list.
   scope.add(
     effect(() => {
@@ -383,8 +363,7 @@ interface DeleteFileOp {
   entry: FileEntry;
 }
 
-/** Build the typed DELETE /api/files body for a listed entry: the orphan
- *  handle when present, else the entry's FileRef. */
+/** DELETE /api/files body for a listed entry: orphan handle when present, else the FileRef. */
 function deleteRequestFor(f: FileEntry): DeleteFileRequest {
   if (f.orphan_handle) {
     return { orphan_handle: f.orphan_handle };
@@ -392,9 +371,9 @@ function deleteRequestFor(f: FileEntry): DeleteFileRequest {
   return subtitleRef(currentMediaType as MediaType, f);
 }
 
-/** Single-file delete with optimistic remove + rollback restore on failure.
- *  The sorted view re-places a restored entry at its deterministic position,
- *  so no index bookkeeping is needed. dedupe protects against double-click. */
+/** Optimistic remove + rollback restore; the sorted view re-places a
+ *  restored entry at its deterministic position, so no index bookkeeping
+ *  is needed. dedupe guards against double-click. */
 const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
   name: "files.delete",
   request: (f) => ({ method: "DELETE", path: PATH_DELETE_FILE, body: deleteRequestFor(f) }),
@@ -411,10 +390,9 @@ const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
     }
     files.upsert(op.entry);
   },
-  // Nesting is composition: fileKey is itself a keyenc value, so the outer key
-  // must be a `join` too. A raw `files.delete:${fileKey(f)}` would reintroduce
-  // the forgeable shape one level up, because the inner value legitimately
-  // contains escaped separators.
+  // Nesting is composition: fileKey is itself a keyenc value, so the outer
+  // key must be a `join` too — a raw template string would reintroduce the
+  // forgeable shape one level up.
   dedupe: (f) => join("files.delete", fileKey(f)),
   success: "File deleted",
   error: "Delete failed",
@@ -451,9 +429,8 @@ interface BulkDeleteOp {
   externals: FileEntry[];
 }
 
-/** Bulk delete optimistically clears the collection with rollback
- *  restoration. The custom `success` is set to false so the dispatch
- *  wrapper above can show the count from the response payload. */
+/** Optimistically clears the collection with rollback restoration; `success:
+ *  false` lets the dispatch wrapper show the count from the response. */
 const bulkDeleteAction = apiAction<BulkDeleteArgs, BulkDeleteResponse, BulkDeleteOp>({
   name: "files.delete_bulk",
   request: (args) => ({ method: "DELETE", path: PATH_BULK_DELETE_FILES, body: args }),
@@ -466,11 +443,10 @@ const bulkDeleteAction = apiAction<BulkDeleteArgs, BulkDeleteResponse, BulkDelet
     if (op === undefined) {
       return;
     }
-    // Restore externals; the next refreshFileData() canonicalises the list.
     files.setAll(op.externals);
   },
   dedupe: true,
-  success: false, // dispatch wrapper handles the count-aware message
+  success: false, // count-aware message shown by the dispatch wrapper
   error: "Bulk delete failed",
   retryable: retryNetwork,
 });

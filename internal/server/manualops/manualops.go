@@ -14,10 +14,8 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// MaxResults caps the number of results returned by manual search.
 const MaxResults = 50
 
-// SearchResult is a single result returned by the manual search API.
 type SearchResult struct {
 	Matches     map[string]int     `json:"matches,omitempty"`
 	Provider    subflux.ProviderID `json:"provider"`
@@ -36,12 +34,11 @@ type SearchResult struct {
 }
 
 // WarnRecorder records an actionable warning for the UI's alert list.
-// activity.AlertLog satisfies it structurally.
+// Satisfied structurally by activity.AlertLog.
 type WarnRecorder interface {
 	RecordWarn(source, msg string)
 }
 
-// SearchDeps holds the narrow dependencies for manual search execution.
 type SearchDeps struct {
 	DB       Store
 	Activity ActivityTracker
@@ -50,18 +47,16 @@ type SearchDeps struct {
 }
 
 // Store is the two rows a manual search touches: what is already on disk
-// for the language (the popup's "downloaded" markers) and releasing a lock.
-// 2 of the 36 methods the store offers. The lock key's empty variant means
+// for the language and releasing a lock. The lock key's empty variant means
 // "all variants of the language" (see subflux.ManualLockKey).
 type Store interface {
 	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
 
-// ActivityTracker manages activity lifecycle. Progress doubles as the
-// detail mutator: download completion writes the saved subtitle path into
-// the entry detail so activity consumers (the remote CLI's poll loop)
-// can report it.
+// ActivityTracker manages activity lifecycle. Progress also mutates the
+// entry detail: download completion writes the saved subtitle path there so
+// the remote CLI's poll loop can report it.
 type ActivityTracker interface {
 	Start(action, detail string, source activity.Source) string
 	End(id string)
@@ -69,8 +64,7 @@ type ActivityTracker interface {
 	Progress(id string, current, total int, detail string)
 }
 
-// ManualSonarrClient is the Sonarr surface manual downloads use: series lookup
-// (for media-ID and title resolution) and a post-download rescan.
+// ManualSonarrClient is the Sonarr surface manual downloads use.
 type ManualSonarrClient interface {
 	SeriesByID(ctx context.Context, seriesID int) (arrapi.Series, error)
 	RescanSeries(ctx context.Context, seriesID int) error
@@ -82,18 +76,16 @@ type ManualRadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// EventPublisher publishes events to SSE clients.
-// *events.EventBus satisfies it structurally.
+// EventPublisher publishes events to SSE clients. Satisfied structurally
+// by *events.EventBus.
 type EventPublisher interface {
 	PublishNotify(level events.NotifyLevel, text string)
 	PublishCoverageUpdate(ev *events.CoverageEvent)
 }
 
-// manualEngine is what a manual search and download ask of the search engine:
-// hash the video so providers can match it exactly, score the candidates the
-// user is about to choose from, and post-process the bytes that come back.
-// Three of the engine's eight methods — the automated scan's SearchTargets and
-// the query path's timeout controls are not the manual path's business.
+// manualEngine is the narrow slice of the search engine the manual path
+// uses; SearchTargets and the query path's timeout controls belong to the
+// automated scan, not here.
 type manualEngine interface {
 	HashFile(ctx context.Context, path string) (hash string, size int64, err error)
 	ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult
@@ -101,18 +93,14 @@ type manualEngine interface {
 }
 
 // tierLabeller maps a numeric score onto the tier label the manual-search
-// popup renders. ONE of the scorer's two methods: the engine has already
-// scored these candidates by the time they reach this package, so the manual
-// path never scores anything itself.
+// popup renders; the engine has already scored these candidates by the time
+// they reach this package, so the manual path never scores anything itself.
 type tierLabeller interface {
 	ScoreToTier(score int) subflux.ScoreTier
 }
 
 // pathValidator is the containment check a manual download runs before it
 // writes: the resolved subtitle path must sit under a configured media root.
-// ONE of the 37 values the config offers — scoring, language rules and provider
-// settings all reach this package through the engine and the scorer, already
-// resolved, so the config itself is asked for nothing else.
 type pathValidator interface {
 	ValidatePath(ctx context.Context, path string) error
 }
@@ -144,21 +132,13 @@ func isValidLockVariant(v subflux.Variant) bool {
 	}
 }
 
-// alertSourceManual attributes an alert to the manual-download path. One
-// constant because ErrorNotice made the four occurrences visible as the one
-// value they always were.
+// alertSourceManual attributes an alert to the manual-download path.
 const alertSourceManual = "manual"
 
-// ErrorNotice is one error's two audiences: the operator reading the alert log
-// and the user watching the UI.
-//
-// Named rather than positional because Alert and UI are both human-readable
-// text of the same type, so a transposition compiles and reads plausibly at the
-// call site while putting the internal diagnosis in front of the user and the
-// user-facing summary in the operator's alert log. Two of the three call sites
-// pass DIFFERENT strings for the two, which is exactly where such a swap leaves
-// no trace — the one that passes the same string twice would not even change
-// behaviour, so the reviewer gets no signal from the sites either.
+// ErrorNotice is one error's two audiences: the operator reading the alert
+// log and the user watching the UI. Named fields rather than positional,
+// because Alert and UI are both human-readable strings and a transposition
+// would compile and read plausibly at most call sites.
 type ErrorNotice struct {
 	// Source attributes the alert to a subsystem.
 	Source string
@@ -168,7 +148,6 @@ type ErrorNotice struct {
 	UI string
 }
 
-// NotifyError publishes an error notification and records an alert.
 func NotifyError(deps *SearchDeps, n ErrorNotice) {
 	deps.Alerts.RecordWarn(n.Source, n.Alert)
 	deps.Events.PublishNotify(events.NotifyError, n.UI)

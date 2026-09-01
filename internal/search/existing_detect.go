@@ -11,8 +11,6 @@ import (
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// --- Detection ---
-
 // detectExisting scans for existing subtitles around a video file: the
 // injected TrackDetector for embedded tracks (with HI/forced flags) and a
 // filesystem glob for external subtitle files.
@@ -108,8 +106,6 @@ func scanExternalSubs(videoPath string, result *existingSubs) {
 			"count", len(result.External), "langs", langs)
 	}
 }
-
-// --- Subtitle file conversion for coverage tracking ---
 
 // existingToSubtitleFiles converts detected subtitles into the flat
 // SubtitleFile records stored in the DB for coverage tracking.

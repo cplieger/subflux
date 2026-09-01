@@ -8,9 +8,8 @@ import (
 
 // This file holds hdbits' LRU download-data cache with heap-based eviction:
 // the season-pack and download payloads Download serves from memory instead
-// of refetching. It was a generic package reusable by any provider until the
-// one-importer boundary was rolled up — a download cache used by exactly one
-// provider is that provider's cache.
+// of refetching. Kept here rather than a shared package because it has
+// exactly one importer.
 
 // downloadCache is a thread-safe LRU cache for download data (e.g. season
 // pack zip/rar contents). Evicts least-recently-used entries when the

@@ -10,9 +10,8 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
-// Decompress detects compressed data by magic bytes and decompresses it.
-// Supports xz (via ulikunitz/xz) and gzip. Passes through plain data
-// unchanged. Decompressed output is capped at 5 MB (decompression bomb guard).
+// Decompress detects compressed data by magic bytes and decompresses it (xz,
+// gzip). Passes through plain data unchanged. Output is capped at 5 MB.
 func Decompress(data []byte) []byte {
 	if isXZ(data) {
 		return decompressXZ(data)
@@ -35,8 +34,6 @@ func isGzip(data []byte) bool {
 	return len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b
 }
 
-// decompressXZ decompresses xz data with a 5 MB limit.
-// Returns the original data on any decompression error.
 func decompressXZ(data []byte) []byte {
 	r, err := xz.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -55,8 +52,6 @@ func decompressXZ(data []byte) []byte {
 	return decompressed
 }
 
-// decompressGzip decompresses gzip data with a 5 MB limit.
-// Returns the original data on any decompression error.
 func decompressGzip(data []byte) []byte {
 	gr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {

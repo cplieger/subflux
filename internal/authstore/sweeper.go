@@ -11,7 +11,7 @@ import (
 // This file holds the background sweeper that evicts expired sessions and OIDC
 // states from the in-memory ephemeral maps, replacing the periodic SQL cleanup
 // queries the old SQLite store ran. A single goroutine is started in Open and
-// stopped in Close (Requirements 10.3, 10.4).
+// stopped in Close.
 //
 // Where the timings come from. Open takes no arguments (fixed by the AuthStore
 // wiring and the design's authstore.New(db) composition root), so the sweep
@@ -20,16 +20,18 @@ import (
 //
 //   - The sweep INTERVAL bounds eviction latency: an expired session or OIDC
 //     state is evicted within one interval of crossing its timeout
-//     (Requirement 10.3). It matches the old server-side auth-cleanup cadence
-//     (internal/server/scheduler.AuthCleanupInterval = 15m).
-//   - The session idle/absolute DURATIONS match subflux's config defaults
-//     (internal/config/defaults.DefaultSession{Idle,Absolute}Timeout = 24h / 7d),
-//     and this package owns the 10m OIDC pending-login TTL outright. A
-//     self-hosted instance that never tunes them therefore behaves exactly
-//     like the SQLite cleanup it replaces.
+//
+// . It matches the old server-side auth-cleanup cadence
+//
+//	  (internal/server/scheduler.AuthCleanupInterval = 15m).
+//	- The session idle/absolute DURATIONS match subflux's config defaults
+//	  (internal/config/defaults.DefaultSession{Idle,Absolute}Timeout = 24h / 7d),
+//	  and this package owns the 10m OIDC pending-login TTL outright. A
+//	  self-hosted instance that never tunes them therefore behaves exactly
+//	  like the SQLite cleanup it replaces.
 //
 // The durations live on the Store (not as Open arguments) so the composition
-// root (main.go, task 10.2) MAY override them with configured values without
+// root (main.go) MAY override them with configured values without
 // changing the New(db) signature.
 const (
 	// defaultSweepInterval bounds how long an expired entry can linger.
@@ -45,7 +47,7 @@ const (
 
 // Open starts the single background sweeper goroutine. It evicts expired
 // sessions and OIDC states once per sweep interval until Close signals stop
-// (Requirements 10.3, 10.4). Open is idempotent: a second call while the
+// . Open is idempotent: a second call while the
 // sweeper is already running is a no-op, so exactly one goroutine ever runs.
 func (s *Store) Open() error {
 	s.mu.Lock()

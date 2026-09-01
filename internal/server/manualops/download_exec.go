@@ -17,18 +17,15 @@ import (
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// DownloadTimeout is the context timeout for manual downloads.
 const DownloadTimeout = 5 * time.Minute
 
-// RunDownload performs the actual download, post-processing, and save.
-// actID is the download's activity entry: on a successful save the entry's
-// detail is updated with the saved subtitle path, which is how activity
-// consumers (the remote CLI's poll loop) learn where the file landed.
-// Returns true on success.
+// RunDownload performs the download, post-processing, and save. actID is
+// the download's activity entry: on success its detail is updated with the
+// saved subtitle path, which is how the remote CLI's poll loop learns where
+// the file landed. Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
 	prov provider.Provider, req *DownloadRequest, actID string,
 ) bool {
-	// Download the subtitle.
 	sub := subflux.Subtitle{
 		Provider:    req.Provider,
 		ID:          req.SubtitleID,
@@ -51,9 +48,9 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		return false
 	}
 
-	// Reject bytes that are not a subtitle. subtitlefile.Validate owns both
-	// refusals; only the operator-facing text distinguishes them, because
-	// blaming the archive format for a body that had no bytes misdiagnoses it.
+	// subtitlefile.Validate owns both refusals; only the operator-facing text
+	// distinguishes them, because blaming the archive format for a body
+	// that had no bytes misdiagnoses it.
 	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
@@ -69,17 +66,14 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		return false
 	}
 
-	// Sync timing against existing reference subtitle. The video path was
-	// resolved server-side from the MediaRef by the handler (S7).
 	variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: req.HearingImp, Forced: req.Forced})
 	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
 
-	// Resolve media IDs for coverage tracking and history recording.
 	mediaType := req.MediaType
 	coverageMediaID, historyMediaID := ResolveMediaIDs(ctx, ls, mediaType, req.ArrID, req.Season, req.Episode)
 
-	// The display title is an arr HTTP lookup; resolve it BEFORE taking the
-	// per-quad path reservation so no remote call runs under the gate.
+	// title is an arr HTTP lookup; resolve it BEFORE taking the per-quad path
+	// reservation so no remote call runs under the gate.
 	title := LookupMediaTitle(ctx, ls, mediaType, req.ArrID)
 
 	subPath, ok := commitNumberedSubtitle(ctx, deps, db, req, historyMediaID, title, variant, data)
@@ -87,26 +81,22 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		return false
 	}
 
-	// Record the saved path as the activity entry's detail: the completion
-	// datum the CLI's poll loop (and the activity UI) reports. Counters stay
-	// zero — downloads have no progress steps.
+	// Progress counters stay zero — downloads have no progress steps; the
+	// call is here only to record the saved path as the activity detail.
 	deps.Activity.Progress(actID, 0, 0, subPath)
 
-	// Update coverage and notify arr.
 	effectiveMediaID := coverageMediaID
 	if effectiveMediaID == "" {
 		effectiveMediaID = historyMediaID
 	}
 	PostDownloadUpdate(ctx, ls, db, req, mediaType, effectiveMediaID, subPath, variant)
 
-	// Record sync offset if sub-to-sub sync was applied.
 	if syncOffsetMs != 0 {
 		if err := db.SetSyncOffset(ctx, subPath, syncOffsetMs); err != nil {
 			slog.Warn("failed to record sync offset", "error", err)
 		}
 	}
 
-	// Publish success events.
 	deps.Events.PublishNotify(events.NotifySuccess, "Subtitle downloaded")
 	deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
 		MediaType: mediaType,
@@ -119,17 +109,15 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 }
 
 // commitNumberedSubtitle allocates the quad's next ordinal, writes the
-// subtitle bytes to the numbered path, and records the download in history
-// — all under the quad's downloadPathGate reservation. Holding the gate
-// across allocation, atomic write, AND history insertion is the point:
-// ordinal discovery (NextManualNumber reads the recorded paths) always
-// sees the previous holder's committed row, so two concurrent downloads
-// for the same quad can never claim the same number and overwrite each
-// other's file. Only local disk and bbolt work runs under the gate.
-//
-// Returns ok=false only when the file write failed (the download fails); a
-// history-recording failure warns and keeps the saved file, matching the
-// previous non-fatal behavior.
+// subtitle bytes to the numbered path, and records the download in
+// history, all under the quad's downloadPathGate reservation. Holding the
+// gate across allocation, atomic write, AND history insertion is the
+// point: ordinal discovery (NextManualNumber reads the recorded paths)
+// always sees the previous holder's committed row, so two concurrent
+// downloads for the same quad can never claim the same number and
+// overwrite each other's file. Only local disk and bbolt work runs under
+// the gate. Returns ok=false only when the file write failed; a
+// history-recording failure warns and keeps the saved file.
 func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore,
 	req *DownloadRequest, historyMediaID, title string, variant subflux.Variant, data []byte,
 ) (subPath string, ok bool) {
@@ -137,7 +125,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	defer unlock()
 
 	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
-	// independent sequences, matching the variant-aware manual file naming.
+	// independent sequences.
 	n := db.NextManualNumber(ctx, subflux.ManualLockKey{
 		MediaType: req.MediaType, MediaID: historyMediaID,
 		Language: req.Language, Variant: variant,
@@ -145,7 +133,6 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	subPath = subtitlefile.ManualPath(req.VideoPath(), n,
 		subtitlefile.Tags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
-	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles
 	// with ReadBounded(MaxSyncSubSize == httpwire.MaxDownloadBytes), so a
 	// post-processed payload the read path would refuse must fail here,
@@ -163,9 +150,9 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 
 	slog.Info("manual download saved", "path", subPath, "number", n)
 
-	// Record in history. A top pick records as auto (manual=false) but
-	// still occupies a numbered path, which is why ordinal discovery scans
-	// every row's path regardless of the Manual flag.
+	// A top pick records as auto (manual=false) but still occupies a
+	// numbered path, which is why ordinal discovery scans every row's path
+	// regardless of the Manual flag.
 	meta := &subflux.DownloadMeta{
 		Manual:    !req.TopPick,
 		VideoPath: req.VideoPath(),
@@ -190,8 +177,6 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	return subPath, true
 }
 
-// ResolveMediaIDs determines the coverage and history media IDs for a manual
-// download.
 func ResolveMediaIDs(ctx context.Context, ls *LiveState,
 	mediaType subflux.MediaType, arrID, season, episode int,
 ) (coverageID, historyID string) {
@@ -217,7 +202,6 @@ func ResolveMediaIDs(ctx context.Context, ls *LiveState,
 	return coverageID, historyID
 }
 
-// LookupMovieMediaID finds the tmdb-based media ID for a Radarr movie.
 func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	if ls.Radarr == nil {
 		return ""
@@ -230,7 +214,6 @@ func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	return "tmdb-" + strconv.Itoa(m.TmdbID)
 }
 
-// LookupEpisodeMediaID finds the tvdb-based media ID for a Sonarr episode.
 func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, episode int) string {
 	if ls.Sonarr == nil {
 		return ""
@@ -243,7 +226,6 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 	return mediaid.Episode(ser.TvdbID, ser.ImdbID, mediaid.SeasonEpisode{Season: season, Episode: episode})
 }
 
-// LookupMediaTitle resolves the title for a media item from the arr client.
 func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, arrID int) string {
 	if arrID <= 0 {
 		return ""
@@ -260,8 +242,6 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.Medi
 	return ""
 }
 
-// PostDownloadUpdate updates coverage DB and refreshes the arr after a
-// successful manual download.
 func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
 	req *DownloadRequest, mediaType subflux.MediaType, coverageMediaID, subPath string, variant subflux.Variant,
 ) {

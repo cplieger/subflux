@@ -55,7 +55,7 @@ func BuildMatches(video *subflux.VideoInfo, sub *subflux.Subtitle, deps MatchDep
 
 	for _, c := range Categories {
 		if c.Extract == nil {
-			continue // bespoke matching below (source, season_pack)
+			continue // source and season_pack match via bespoke logic below
 		}
 		videoVal, subVal := c.Extract(videoRelease), c.Extract(subRelease)
 		if videoVal != "" && subVal != "" && strings.EqualFold(videoVal, subVal) {
@@ -109,8 +109,7 @@ var Categories = []Category{
 		Weight:   func(s *subflux.Scores) int { return s.Source },
 		Match:    func(m subflux.MatchSet) bool { return m.Source },
 		SetMatch: func(m *subflux.MatchSet) { m.Source = true },
-		// Matched by MatchDeps.CompareSource (source-family logic), not by
-		// generic attribute equality; Extract stays nil.
+		// Matched via MatchDeps.CompareSource, not generic equality; Extract stays nil.
 	},
 	{
 		Key:      "release_group",
@@ -152,8 +151,7 @@ var Categories = []Category{
 		Weight:   func(s *subflux.Scores) int { return s.SeasonPack },
 		Match:    func(m subflux.MatchSet) bool { return m.SeasonPack },
 		SetMatch: func(m *subflux.MatchSet) { m.SeasonPack = true },
-		// Matched by MatchDeps.IsSeasonPack on episodes, not by generic
-		// attribute equality; Extract stays nil.
+		// Matched via MatchDeps.IsSeasonPack, not generic equality; Extract stays nil.
 	},
 }
 

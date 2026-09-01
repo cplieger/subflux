@@ -41,7 +41,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 		return out
 	}
 
-	// Collect the union of providers across all targets that need searching.
 	unionProvs := e.unionProviders(states)
 	eligible := e.filterBackedOff(ctx, mediaType, mediaID, lang, unionProvs)
 	if len(eligible) == 0 {
@@ -57,7 +56,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	}
 	out.Kind = subflux.LangSearched
 
-	// Single provider query for this language.
 	langReq := *req
 	langReq.Languages = []string{lang}
 	outcome := e.searchProvidersFiltered(ctx, &langReq, eligible)
@@ -66,7 +64,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	// inter-item pacing delay on real provider traffic, not on Kind.
 	out.Queried = outcome.attempted()
 
-	// Identity validation (shared across all variants).
 	kept, dropped := scoring.FilterByIdentity(outcome.results, req)
 	if dropped > 0 {
 		if len(kept) == 0 {
@@ -79,7 +76,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	}
 	outcome.results = kept
 
-	// Process each target variant from the shared results.
 	anyNoResult := false
 	for i := range states {
 		if !states[i].needsSearch {
@@ -110,18 +106,14 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	return out
 }
 
-// processTargetVariant filters, scores, and downloads a subtitle for one
-// variant target from the shared provider results. Applies variant filtering
-// (standard/forced/HI), per-target provider filtering, scoring with upgrade
-// awareness, and iterates download candidates in score order. Returns the
-// saved path (empty if no suitable subtitle was found) and whether this
-// variant hit a genuine no-result (non-upgrade, providers answered, nothing
-// usable) — the caller records adaptive backoff once per language group.
+// processTargetVariant returns the saved path (empty if no suitable
+// subtitle was found) and whether this variant hit a genuine no-result
+// (non-upgrade, providers answered, nothing usable) — the caller records
+// adaptive backoff once per language group.
 func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRequest,
 	state *targetState, outcome *searchOutcome,
 	videoPath string, mediaType subflux.MediaType, mediaID, lang, label string,
 ) (path string, noResult bool) {
-	// Filter by variant.
 	filtered, variantFallback := filterByVariant(
 		outcome.results, state.variant,
 	)
@@ -132,7 +124,6 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 			"hi_count", len(filtered))
 	}
 
-	// Further filter to only providers allowed for this target.
 	targetFiltered := filterByTargetProviders(filtered, state.allowedProvs)
 
 	if len(targetFiltered) == 0 {

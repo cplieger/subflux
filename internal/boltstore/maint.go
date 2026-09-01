@@ -50,7 +50,7 @@ type tripleRef struct {
 
 // DeleteStateByPaths removes every subtitle_state row backed by any of the
 // given video paths and cleans the resulting orphans, mirroring the old SQLite
-// DeleteStateByPaths (Requirement 7.6). A single video file backs SEVERAL state
+// DeleteStateByPaths. A single video file backs SEVERAL state
 // rows (an auto row plus manual rows across languages), so for each path it:
 //
 //   - prefix-scans ix_state_video to collect every row's surrogate id,
@@ -178,8 +178,8 @@ func clearBackoffForTriples(tx *bolt.Tx, triples map[tripleRef]struct{}) error {
 // collectVideoPathIDs prefix-scans ix_state_video for one video path and
 // returns the surrogate ids of every subtitle_state row backed by it. The
 // trailing-separator videoPrefix means a scan for "/m/a.mkv" never matches
-// "/m/a.mkv.bak" (component-boundary safety). It is shared with ReconcileState
-// (task 6.3), which deletes a video-gone row's whole fan-out the same way.
+// "/m/a.mkv.bak" (component-boundary safety). It is shared with ReconcileState,
+// which deletes a video-gone row's whole fan-out the same way.
 func collectVideoPathIDs(tx *bolt.Tx, videoPath string) ([]int64, error) {
 	idx := tx.Bucket([]byte(bucketIxStateVideo))
 	if idx == nil {
@@ -243,7 +243,7 @@ func deleteSubtitleFilesByMedia(tx *bolt.Tx, mt subflux.MediaType, mid string) e
 // cleanOrphanedCoverageFor deletes the subtitle_files and scan_state rows for
 // each affected media item that no longer has any subtitle_state row,
 // reproducing the old cleanOrphanedCoverage. It is shared so ReconcileState
-// (task 6.3) cleans the same orphans after a video-gone delete.
+// cleans the same orphans after a video-gone delete.
 func cleanOrphanedCoverageFor(tx *bolt.Tx, media map[mediaRef]struct{}) error {
 	for mr := range media {
 		has, err := mediaHasState(tx, mr.mt, mr.mid)
@@ -264,7 +264,7 @@ func cleanOrphanedCoverageFor(tx *bolt.Tx, media map[mediaRef]struct{}) error {
 }
 
 // CleanupDrift clears adaptive-backoff state after a config change, mirroring
-// the old SQLite CleanupDrift (Requirements 7.7, 7.8). The drift describes what
+// the old SQLite CleanupDrift. The drift describes what
 // the new config dropped relative to the old one:
 //
 //   - AdaptiveDisabled: adaptive search was turned off, so EVERY search_attempts
@@ -417,11 +417,11 @@ func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string,
 // reconcileResetBatchSize bounds how many missing-subtitle rows are processed
 // per bbolt Update transaction in the reset phase. ReconcileState is the one
 // sustained write burst on a large library, so it is split into bounded batches
-// instead of one whole-library transaction (Requirement 7.4): holding the single
+// instead of one whole-library transaction: holding the single
 // write lock across a 52k-item pass would starve the live poller. The design
 // targets 200-500 rows per batch so the worst-case write-lock hold stays in the
 // low tens of milliseconds. Each batch is all-or-none; the pass as a whole is
-// not, which is safe because every operation is idempotent (Requirement 7.5).
+// not, which is safe because every operation is idempotent.
 const reconcileResetBatchSize = 500
 
 // reconcileEntry is a copy of the fields ReconcileState needs from one
@@ -449,32 +449,31 @@ const (
 
 // ReconcileState reconciles subtitle_state against the filesystem in three
 // branches, group-aware by quad (media_type, media_id, language, variant),
-// mirroring the corrected three-way semantics of the old store (Requirements
-// 7.1-7.5):
+// mirroring the corrected three-way semantics of the old store:
 //
 //   - VIDEO GONE: every row whose video file no longer exists is deleted along
 //     with its orphaned subtitle file, the language's backoff, and any
 //     scan_state for a media item left with no state. This fan-out is delegated
-//     to DeleteStateByPaths (task 6.1), which already prefix-scans
+//     to DeleteStateByPaths, which already prefix-scans
 //     ix_state_video, routes deletes through the deleteState chokepoint, clears
 //     backoff, and cleans orphaned coverage in bounded transactions.
 //   - SUBTITLE GONE, A SIBLING STILL PRESENT: when a row's subtitle file is gone
 //     but its video exists AND at least one other row for the SAME quad still
 //     has its subtitle on disk, only that one row is deleted. The remaining
 //     rows and any manual lock are PRESERVED, backoff is NOT cleared, and no row
-//     is reset (Requirement 7.2).
+//     is reset.
 //   - ALL SUBTITLES FOR A QUAD GONE: when every row for a quad has lost its
 //     subtitle (video still present), the auto rows are reset in place (clear
 //     path/score/provider/release_name, bump media_imported to now) so the next
 //     scan re-searches, the manual rows are deleted, and the language's backoff
-//     is cleared (Requirement 7.3). Counted once per quad in ResetCount.
+//     is cleared. Counted once per quad in ResetCount.
 //     Grouping by quad keeps the branches variant-precise: deleting the last
 //     forced subtitle resets only the forced rows, never the standard ones.
 //
 // The read phase snapshots the rows under short View transactions and performs
 // all filesystem stats with no transaction open; the mutation phase runs in
-// bounded Update batches (Requirement 7.4). Every operation is idempotent, so an
-// interrupted pass converges on re-run (Requirement 7.5): a deleted row stays
+// bounded Update batches. Every operation is idempotent, so an
+// interrupted pass converges on re-run: a deleted row stays
 // gone, and a reset auto row has an empty sub_path that classifies as skip on
 // the next pass, so media_imported is not bumped again.
 func (d *DB) ReconcileState(ctx context.Context) (subflux.ReconcileResult, error) {
@@ -624,7 +623,7 @@ func (d *DB) classifyReconcileEntry(e *reconcileEntry) reconcileAction {
 
 // reconcileMissingGroups applies the sub-missing branches over the grouped
 // entries in bounded Update batches and returns the number of all-subtitles-gone
-// quads reset (Requirement 7.4). Group keys are sorted for deterministic batch
+// quads reset. Group keys are sorted for deterministic batch
 // boundaries; a batch accumulates whole groups until it reaches
 // reconcileResetBatchSize rows, so a group is never split across transactions
 // (each quad's delete-manual / reset-auto / clear-backoff stays atomic).
@@ -674,11 +673,11 @@ func (d *DB) reconcileMissingGroups(
 //   - if a sibling subtitle is still present (subPresent[quad]): delete ONLY
 //     the missing-subtitle rows via the deleteState chokepoint, preserving the
 //     remaining rows and any manual lock, clearing no backoff and resetting
-//     nothing (Requirement 7.2);
+//     nothing;
 //   - otherwise (all subtitles for the quad gone): delete the manual rows and
 //     reset the auto rows in place (clear path/score/provider/release_name, bump
 //     media_imported to now) via putState, then clear the language's backoff;
-//     counted once in resetCount (Requirement 7.3).
+//     counted once in resetCount.
 //
 // All mutations route through the deleteState / putState / clearTripleBackoff
 // chokepoints so the secondary indexes and the downloads/attempts counters stay
@@ -714,10 +713,10 @@ func (d *DB) reconcileResetBatch(
 // reconcileQuad applies the missing-subtitle branches for one quad inside an
 // open Update. When a sibling subtitle is still present it deletes ONLY the
 // missing-subtitle rows (preserving the remaining rows and any manual lock,
-// clearing no backoff) and reports reset=false (Requirement 7.2). Otherwise all
+// clearing no backoff) and reports reset=false. Otherwise all
 // subtitles for the quad are gone, so it resets the whole quad (delete manual
 // rows, reset auto rows in place, clear backoff) via reconcileResetQuad and
-// reports reset=true (Requirement 7.3).
+// reports reset=true.
 func reconcileQuad(tx *bolt.Tx, sb *bolt.Bucket, q stateQuadInfo, missing []reconcileEntry, siblingPresent bool) (bool, error) {
 	if siblingPresent {
 		return false, deleteMissingRows(tx, missing)

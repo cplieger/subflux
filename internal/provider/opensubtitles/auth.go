@@ -22,17 +22,16 @@ const (
 
 // --- Authentication ---
 
-// ensureToken refreshes the API token if expired or missing. Uses singleflight
-// to deduplicate concurrent login attempts (replaces the previous thundering
-// herd pattern where multiple goroutines could login simultaneously).
+// ensureToken refreshes the API token if expired or missing, using
+// singleflight to deduplicate concurrent login attempts.
 func (p *Provider) ensureToken(ctx context.Context) error {
 	if p.tokenValid() {
 		return nil
 	}
 
 	_, err, _ := p.tokenSfg.Do("login", func() (any, error) {
-		// Double-check after winning the singleflight race: another goroutine
-		// may have logged in while we waited.
+		// Re-check after winning the race: another goroutine may have
+		// already logged in.
 		if p.tokenValid() {
 			return nil, nil
 		}
@@ -48,9 +47,9 @@ func (p *Provider) tokenValid() bool {
 	return p.token != "" && time.Since(p.tokenTime) < tokenExpiry
 }
 
-// login performs the unauthenticated /login round trip and stores the returned
-// token, server host, and VIP status. A suspicious base_url redirect is dropped
-// so a compromised login response can't divert the Bearer token elsewhere.
+// login performs the unauthenticated /login round trip and stores the
+// returned token, server host, and VIP status. A suspicious base_url
+// redirect is dropped so a compromised response can't divert the token.
 func (p *Provider) login(ctx context.Context) error {
 	slog.Debug("opensubtitles logging in")
 	loginPayload, marshalErr := json.Marshal(map[string]string{
@@ -104,13 +103,9 @@ func (p *Provider) serverURL() string {
 }
 
 // isValidServerHost validates that a base_url from the login response is a
-// clean hostname in the opensubtitles.com domain family. Rejects hosts
-// containing path separators, port suffixes, userinfo (@), or other
-// URL-special characters that could redirect authenticated requests to
-// unintended destinations. Requires the host to pass SSRF public-host
-// checks and to be either opensubtitles.com or a subdomain thereof so a
-// compromised login response can't redirect our Bearer token to an
-// attacker-controlled host.
+// clean opensubtitles.com hostname, rejecting path separators, ports,
+// userinfo, and any host that isn't opensubtitles.com or a subdomain — so a
+// compromised login response can't redirect our Bearer token elsewhere.
 func isValidServerHost(host string) bool {
 	if strings.ContainsAny(host, "/:@?#") {
 		return false
@@ -124,21 +119,16 @@ func isValidServerHost(host string) bool {
 
 // --- Rate Limiting ---
 
-// rateLimit enforces the per-account request rate (VIP: 5/s, free: 1/s)
-// using a channel-based token bucket. Concurrent callers block on the channel
-// until a token is available, then schedule a refill after the rate-limit
-// interval. This allows overlapping response parsing with the next request's
-// rate-limit wait (unlike the previous mutex pattern which held the lock
-// during the sleep, blocking all work).
+// rateLimit enforces the per-account request rate (VIP: 5/s, free: 1/s) with
+// a channel-based token bucket, letting response parsing overlap the next
+// request's rate-limit wait instead of holding a lock during the sleep.
 func (p *Provider) rateLimit(ctx context.Context) error {
-	// Wait for a token (blocks if another request is in-flight within the interval).
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-p.rateCh:
 	}
 
-	// Determine the refill interval based on VIP status.
 	p.tokenMu.RLock()
 	vip := p.vip
 	p.tokenMu.RUnlock()
@@ -148,14 +138,12 @@ func (p *Provider) rateLimit(ctx context.Context) error {
 		limit = vipRateLimit
 	}
 
-	// Schedule a token refill after the rate-limit interval.
-	// time.AfterFunc uses a runtime timer instead of a parked goroutine,
-	// avoiding unbounded goroutine accumulation under burst load.
+	// time.AfterFunc uses a runtime timer, avoiding unbounded goroutine
+	// accumulation under burst load.
 	time.AfterFunc(limit, func() {
 		select {
 		case p.rateCh <- struct{}{}:
 		default:
-			// Channel already has a token; discard to avoid overfilling.
 		}
 	})
 

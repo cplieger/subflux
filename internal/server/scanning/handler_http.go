@@ -37,8 +37,7 @@ type ScanGuard struct {
 	once  sync.Once
 }
 
-// sem returns the capacity-1 token channel, created lazily so the zero
-// value stays usable.
+// sem returns the capacity-1 token channel, created lazily.
 func (g *ScanGuard) sem() chan struct{} {
 	g.once.Do(func() { g.token = make(chan struct{}, 1) })
 	return g.token
@@ -474,13 +473,13 @@ func (h *Handler) HandleScanMovie(w http.ResponseWriter, r *http.Request) {
 		})
 }
 
-// extractSegment extracts the path segment after a prefix.
+// extractSegment extracts the path segment after a prefix, rejecting a
+// trailing slash or sub-path for single-segment endpoints.
 func extractSegment(path, prefix string) string {
 	s := strings.TrimPrefix(path, prefix)
 	if s == "" || s == path {
 		return ""
 	}
-	// Reject trailing slashes or sub-paths for single-segment endpoints.
 	if strings.Contains(s, "/") {
 		return ""
 	}

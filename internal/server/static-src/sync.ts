@@ -36,10 +36,9 @@ import type { SubtitleEntry, MediaType } from "./api-types.js";
 
 // --- Subtitle Sync Dialog ---
 
-// Resolved on first use, not at import. `dialog()` is a getElementById, so
-// reading it at module scope made merely IMPORTING this module require a
-// document already containing #syncDialog — which is why nothing could test it.
-// Cached because the element is never replaced once the page is built.
+// Resolved on first use, not at import: `dialog()` is a getElementById,
+// so reading it at module scope would require a document already
+// containing #syncDialog at import time.
 let syncDlgCache: HTMLDialogElement | null = null;
 
 function syncDialogEl(): HTMLDialogElement {
@@ -47,9 +46,8 @@ function syncDialogEl(): HTMLDialogElement {
   return syncDlgCache;
 }
 
-// Common fields shared across all sync states. Subtitles are addressed by
-// FileRef (built from the selected entry via subtitleRef) and the video by
-// MediaRef (arr id + season/episode) — the client never handles paths (S7).
+// Subtitles are addressed by FileRef and the video by MediaRef (arr id +
+// season/episode) — the client never handles paths.
 interface SyncStateBase {
   /** Index of the selected subtitle in `entries`. */
   selIdx: number;
@@ -105,18 +103,14 @@ function currentRef(): FileRefArgs | null {
   return subtitleRef(syncState.fileMediaType, sub);
 }
 
-// Single source of truth for the current manual offset (ms). Recreated per
-// openSyncDialog so each dialog instance gets a fresh signal; an effect
-// (created alongside the Reset button) toggles its visibility whenever the
-// offset crosses zero, replacing the scattered manual hidden-toggles.
+// Recreated per openSyncDialog so each dialog instance gets a fresh signal;
+// an effect toggles Reset-button visibility on zero-crossing.
 let offset = signal(0);
 let stopOffsetEffect: (() => void) | null = null;
 let stopSaveBinding: (() => void) | null = null;
 
-// The open dialog's async-sync attachment: the watched job's unwatch
-// disposer and the inline result panel it renders into. Closing the dialog
-// drops the WATCH only — the analysis is server-owned and continues; a
-// reopen re-attaches via the jobs read.
+// Closing the dialog drops the WATCH only — the analysis is server-owned
+// and continues; a reopen re-attaches via the jobs read.
 let syncUnwatch: (() => void) | null = null;
 let audioResultEl: HTMLElement | null = null;
 
@@ -128,8 +122,6 @@ function stopWatchingSyncJob(): void {
 }
 
 // Drain any in-flight ffmpeg stream + revoke blob URL on page unload.
-// Browsers handle this naturally on real navigation; the registration
-// adds deterministic teardown for tests + soft-navigation cases.
 registerCleanup(() => {
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
     syncState.ffmpegAbort.abort();
@@ -168,7 +160,6 @@ export function openSyncDialog(
 ): void {
   const dlg = syncDialogEl();
 
-  // Push sync URL (mirrors search popup pattern).
   const currentPath = location.pathname.replace(/\/sync$/, "");
   const syncPath = `${currentPath}/sync`;
   if (location.pathname !== syncPath) {
@@ -179,8 +170,7 @@ export function openSyncDialog(
   }
 
   const initialOffset = entries[0]?.offset_ms ?? 0;
-  // Fresh offset signal for this dialog instance. Dispose any effect left
-  // over from a prior open that wasn't closed (reopen-without-close).
+  // Dispose any effect left over from a prior open that wasn't closed.
   if (stopOffsetEffect) {
     stopOffsetEffect();
     stopOffsetEffect = null;
@@ -190,8 +180,8 @@ export function openSyncDialog(
     stopSaveBinding = null;
   }
   offset = signal(initialOffset);
-  // The video MediaRef: season/episode parse from the entry's media_id
-  // ("tvdb-...-s01e05"); movies parse to 0/0, which the server ignores.
+  // season/episode parse from the entry's media_id ("tvdb-...-s01e05");
+  // movies parse to 0/0, which the server ignores.
   const se = parseSeasonEpisode(entries[0]?.media_id ?? "");
   syncState = {
     status: "idle",
@@ -209,7 +199,6 @@ export function openSyncDialog(
 
   const labeled = buildSyncSubLabels(entries);
 
-  // Header: title + subtitle dropdown + close.
   const subSel = el("select", {
     id: "sync-sub-sel",
     "aria-label": "Subtitle",
@@ -228,13 +217,10 @@ export function openSyncDialog(
     syncState.selIdx = idx;
     offset.value = entry.sub.offset_ms ?? 0;
     updateTimecodeDisplay(offset.peek());
-    // Reload subtitle track on the video with the new language.
     if (syncState.status === "preview") {
       updatePreviewTrack();
     }
-    // The result panel follows the selection: drop the old watch and
-    // re-attach for the newly selected file (live job, newest terminal, or
-    // nothing).
+    // Drop the old watch and re-attach for the newly selected file.
     stopWatchingSyncJob();
     if (audioResultEl) {
       audioResultEl.hidden = true;
@@ -270,7 +256,6 @@ export function openSyncDialog(
 
   const body = el("div", { className: "dlg-body" });
 
-  // Help text.
   body.appendChild(
     el(
       "div",
@@ -283,8 +268,7 @@ export function openSyncDialog(
   );
 
   // Audio sync button and result.
-  const audioResultDiv = el("div", {
-    className: "sync-audio-result",
+  const audioResultDiv = el("div", {    className: "sync-audio-result",
     hidden: true,
   });
   audioResultEl = audioResultDiv;
@@ -300,9 +284,8 @@ export function openSyncDialog(
   );
   body.appendChild(el("div", { className: "sync-audio" }, audioBtn, audioResultDiv));
 
-  // RELOAD RE-ATTACH: a job dispatched before a reload (or from a closed
-  // dialog) is still the server's; the jobs read answers queued state,
-  // running progress, or a completed-while-away outcome for this file.
+  // A job dispatched before a reload (or from a closed dialog) is still
+  // the server's; the jobs read answers its current state.
   stopWatchingSyncJob();
   void reattachSyncJob(audioResultDiv, false);
 
@@ -312,10 +295,8 @@ export function openSyncDialog(
     body.appendChild(preview);
   }
 
-  // Manual offset controls.
   const timecode = buildTimecodeInput(initialOffset, (newMs: number) => {
-    // Widget self-edited its own display; only sync the signal (an
-    // updateTimecodeDisplay call here would feed back into the widget).
+    // Widget self-edited its own display; only sync the signal.
     offset.value = newMs;
     if (syncState.status === "preview") {
       updatePreviewTrack();
@@ -336,8 +317,6 @@ export function openSyncDialog(
     "Save Offset",
   ) as HTMLButtonElement;
   footer.appendChild(saveBtn);
-  // Disable + aria-busy while the save is in flight (the action-feedback
-  // contract: no silent seconds-long waits, no swallowed double-clicks).
   stopSaveBinding = bindLoadingState("sync.save_offset", saveBtn);
   const resetBtn = el(
     "button",
@@ -350,9 +329,7 @@ export function openSyncDialog(
   );
   footer.appendChild(resetBtn);
 
-  // Single source of truth for Reset-button visibility. The effect runs
-  // synchronously on creation (seeding from initialOffset) and re-runs on
-  // every offset change, replacing the scattered manual hidden-toggles.
+  // Single source of truth for Reset-button visibility.
   stopOffsetEffect = effect(() => {
     resetBtn.hidden = offset.value === 0;
   });
@@ -361,21 +338,14 @@ export function openSyncDialog(
   if (dlg.open) {
     dlg.close();
   }
-  // openDialog cancels a pending is-leaving fade before showing, so a reopen
-  // within the fade window renders visible and the stale close no-ops.
+  // openDialog cancels a pending is-leaving fade before showing, so a
+  // reopen within the fade window renders visible and the stale close no-ops.
   openDialog(dlg);
-  // Keep keyboard focus INSIDE the modal (the dialog itself has
-  // tabindex="-1"); the previous blur() dropped focus to <body>, leaving
-  // keyboard/SR users with no position. The dialog-level arrow handler below
-  // works regardless of which element holds focus, so no blur is needed to
-  // make arrows feel "global".
+  // Keep keyboard focus inside the modal (dialog has tabindex="-1").
   dlg.focus();
 
-  // Arrow keys adjust the active timecode segment from anywhere in the
-  // dialog — EXCEPT inside form controls: the subtitle <select> (and any
-  // input) needs its own arrow keys, and a segment is always pre-selected so
-  // the handler would otherwise swallow them. Use onkeydown property to
-  // avoid accumulating listeners across reopens.
+  // Arrow keys adjust the active timecode segment, except inside form
+  // controls (select/input/textarea need their own arrow keys).
   dlg.onkeydown = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
     if (t?.closest("select, input, textarea")) {
@@ -387,11 +357,8 @@ export function openSyncDialog(
   wireSyncDialogChrome(dlg);
 }
 
-// Whether the permanent dialog element's chrome (backdrop dismissal + the
-// Escape override) is wired. Once per dialog (F3): the sync elements resolve
-// lazily on first open — the module must import without a DOM — so "at boot"
-// is the first open here. The old per-open wiring leaked one `close` and one
-// `cancel` listener per open.
+// Once per dialog: sync elements resolve lazily on first open (the module
+// must import without a DOM), so "at boot" is the first open here.
 let dialogChromeWired = false;
 
 function wireSyncDialogChrome(dlg: HTMLDialogElement): void {
@@ -399,19 +366,18 @@ function wireSyncDialogChrome(dlg: HTMLDialogElement): void {
     return;
   }
   dialogChromeWired = true;
-  // Close on backdrop click.
   onBackdropClose(dlg, closeSyncDialog);
-  // Close on Escape: prevent the browser's default close so
-  // closeSyncDialog can run the animated close, video cleanup, and URL fixup.
+  // Prevent the browser's default close so closeSyncDialog can run the
+  // animated close, video cleanup, and URL fixup.
   dlg.addEventListener("cancel", (e: Event) => {
     e.preventDefault();
     closeSyncDialog();
   });
 }
 
-// Build the video preview container with poster background and play overlay.
-// Requires the arr MediaRef (arr id) — without it the server cannot resolve
-// the video file, so the preview section is omitted.
+/** Video preview container with poster background and play overlay.
+ *  Requires the arr MediaRef — without it the server cannot resolve the
+ *  video file, so the section is omitted. */
 function buildVideoPreview(): HTMLElement | null {
   if (!syncState.mediaId) {
     return null;
@@ -453,7 +419,6 @@ function buildVideoPreview(): HTMLElement | null {
 }
 
 function closeSyncDialog(): void {
-  // Dispose the Reset-button visibility effect for this dialog instance.
   if (stopOffsetEffect) {
     stopOffsetEffect();
     stopOffsetEffect = null;
@@ -463,24 +428,21 @@ function closeSyncDialog(): void {
     stopSaveBinding = null;
   }
   // Drop the job WATCH, never the job: the analysis is server-owned and
-  // continues after the dialog closes; reopening re-attaches via the jobs
-  // read.
+  // continues after the dialog closes; reopening re-attaches via the jobs read.
   stopWatchingSyncJob();
   audioResultEl = null;
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
     syncState.ffmpegAbort.abort();
   }
   syncState = { ...syncState, status: "idle" };
-  // Revoke any outstanding blob URL that sourceopen didn't clean up.
   if (syncState.blobUrl) {
     URL.revokeObjectURL(syncState.blobUrl);
     syncState.blobUrl = "";
   }
-  // Stop hold-repeat timers in the timecode widget so a pending tick
-  // can't fire on the detached element after the dialog closes.
+  // Stop hold-repeat timers so a pending tick can't fire on the detached
+  // element after the dialog closes.
   const tc = document.getElementById("sync-offset-val") as TimecodeInput | null;
   tc?.dispose();
-  // Clean up video before closing.
   const video = syncDialogEl().querySelector("video");
   if (video) {
     video.pause();
@@ -488,9 +450,8 @@ function closeSyncDialog(): void {
     video.load();
   }
   closeDialog(syncDialogEl());
-  // Remove the /sync history entry. history.back() fires popstate
-  // which calls applyRoute(); the popstate handler checks
-  // syncClosing to skip the redundant re-render.
+  // history.back() fires popstate -> applyRoute(); syncClosing lets the
+  // popstate handler skip the redundant re-render.
   if (syncPushedHistory && location.pathname.endsWith("/sync")) {
     syncPushedHistory = false;
     syncClosing = true;
@@ -519,7 +480,6 @@ async function applyManualOffset(): Promise<void> {
   if (r === null) {
     return;
   }
-  // Update the cached entry so reopening the dialog shows the new offset.
   sub.offset_ms = currentOffset;
   notify.success(`Offset saved: ${formatOffsetMs(currentOffset)}`);
   closeSyncDialog();
@@ -590,11 +550,10 @@ function watchDialogSyncJob(jobId: number, resultDiv: HTMLElement, label: string
   syncUnwatch = watchSyncJob(jobId, (ev: SyncDoneEvent | null) => {
     syncUnwatch = null;
     if (audioResultEl !== resultDiv) {
-      return; // the dialog closed or rebuilt while the job ran
+      return; // dialog closed or rebuilt while the job ran
     }
     if (ev === null) {
-      // Boot changed and no held settlement covered this job: the
-      // correlation is lost; re-attach via the jobs read.
+      // Boot changed with no held settlement for this job: re-attach.
       void reattachSyncJob(resultDiv, true);
       return;
     }
@@ -662,17 +621,17 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
   btn.textContent = "Requesting\u2026";
   resultDiv.hidden = true;
   try {
-    // One dispatch, NO retry: an instant 202 hands over {activity_id,
-    // job_id}; the analysis result arrives via sync:done matched on job_id.
+    // Instant 202 hands over {activity_id, job_id}; the result arrives via
+    // sync:done matched on job_id.
     const outcome = await audioSyncAction.dispatch({ ...ref, dry_run: true }).outcome;
     if (outcome.status === "cancelled") {
       return;
     }
     if (outcome.status === "error") {
       if (isCapacityRefusal(outcome.error)) {
-        // THE 429 ARM: the typed cap refusal renders through the dialog's
-        // inline result path — exactly ONE visible surface (error: false
-        // keeps the framework toast off, and no notify fires here).
+        // The typed cap refusal renders through the dialog's inline
+        // result path — the only visible surface (error: false keeps the
+        // framework toast off).
         resultDiv.hidden = false;
         resultDiv.className = "sync-audio-result";
         resultDiv.textContent =
@@ -730,7 +689,7 @@ async function toggleVideoPreview(container: HTMLElement): Promise<void> {
     ),
   );
 
-  // Find dialogue-dense start point. Falls back to startSec=0 silently.
+  // Find dialogue-dense start point; falls back to startSec=0 silently.
   let startSec = 0;
   const ref = currentRef();
   const r = ref ? await previewStart({ ...ref }) : null;
@@ -867,8 +826,7 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
   );
   seekRow.appendChild(playPauseBtn);
 
-  // Keep the accessible name in sync with the state the button will
-  // trigger, not a static "Play/Pause" that never reflects either.
+  // Keep the accessible name in sync with the button's next action.
   video.addEventListener("play", () => {
     playPauseBtn.replaceChildren(icon("pause"));
     playPauseBtn.setAttribute("aria-label", "Pause");
@@ -897,9 +855,7 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
   return seekRow;
 }
 
-// Start MSE-based fMP4 streaming. Fetches the chunked fMP4 from the
-// server and feeds it into a SourceBuffer for instant playback on all
-// browsers including Safari.
+// Start MSE-based fMP4 streaming for instant playback on all browsers.
 function startMSEStream(video: HTMLVideoElement, startSec: number): void {
   // Abort any previous stream.
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
@@ -917,9 +873,8 @@ function startMSEStream(video: HTMLVideoElement, startSec: number): void {
     "sourceopen",
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
     async () => {
-      // Revoke the object URL once the MediaSource is connected to the
-      // video element. The connection persists after revocation; this
-      // just frees the URL→blob mapping to prevent memory leaks.
+      // Free the URL->blob mapping once the MediaSource is connected;
+      // the connection persists after revocation.
       URL.revokeObjectURL(objectUrl);
       syncState.blobUrl = "";
       const mime = 'video/mp4; codecs="avc1.42E01E,mp4a.40.2"';
@@ -944,7 +899,6 @@ function startMSEStream(video: HTMLVideoElement, startSec: number): void {
           if (done) {
             break;
           }
-          // Wait for the SourceBuffer to finish updating before appending.
           if (sb.updating) {
             await new Promise<void>((resolve) => {
               sb.addEventListener(
@@ -988,9 +942,8 @@ function startMSEStream(video: HTMLVideoElement, startSec: number): void {
   );
 }
 
-// Reload the subtitle track on the video element. Called on initial load,
-// seek, and manual offset changes. Removes old track and creates a new one
-// with the correct start position and user offset.
+// Reload the subtitle track on the video element (initial load, seek,
+// manual offset changes).
 function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
   if (!video) {
     video = document.querySelector(".sync-preview video");
@@ -1017,9 +970,8 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
     shift: String(offset.peek() || 0),
   });
   const trackUrl = `${PATH_PREVIEW_SUBTITLE}?${trackParams.toString()}`;
-  // Declare the track's REAL language to the platform (caption menus, SR
-  // announcements): a hardcoded srclang="en" mislabeled every non-English
-  // subtitle.
+  // Declare the track's real language: a hardcoded srclang="en" mislabeled
+  // every non-English subtitle for caption menus / SR announcements.
   const entryLang = selectedEntry()?.language ?? "";
   const lang = entryLang === "" ? "en" : entryLang;
   const track = el("track", {
@@ -1035,7 +987,6 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
     track.track.mode = "showing";
   };
   track.addEventListener("load", show, { once: true });
-  // Also try immediately for browsers that load synchronously.
   requestAnimationFrame(show);
 }
 
@@ -1054,7 +1005,7 @@ function seekPreview(video: HTMLVideoElement, deltaSec: number): void {
   if (absTarget >= bufStart && absTarget <= bufEnd) {
     video.currentTime = absTarget - bufStart;
   } else {
-    // Seek outside buffer: restart the stream from the new position.
+    // Outside buffer: restart the stream from the new position.
     syncState.previewStart = absTarget;
     if (!syncState.previewBuffered) {
       startMSEStream(video, absTarget);
@@ -1078,8 +1029,7 @@ function updatePreviewTrack(): void {
   reloadSubtitleTrack(null);
 }
 
-// syncIcon builds a waveform SVG inline because it uses a custom
-// path that doesn't map to the CSS mask-image icon system.
+// Inline waveform SVG: uses a custom path with no mask-image equivalent.
 function syncIcon(): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "14");
@@ -1091,15 +1041,13 @@ function syncIcon(): SVGSVGElement {
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
-  // Waveform icon
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", "M2 12h2l3-7 4 14 4-14 3 7h2");
   svg.appendChild(path);
   return svg;
 }
 
-// previewPlayIcon builds a large play button SVG (48x48) with
-// filled shapes, unlike the stroke-based icon system.
+// Large filled play button (48x48), unlike the stroke-based icon system.
 function previewPlayIcon(): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "48");
@@ -1122,17 +1070,14 @@ function previewPlayIcon(): SVGSVGElement {
   return svg;
 }
 
-// --- Season sync (D2/D3): ONE POST, a server-owned batch ---
+// --- Season sync: ONE POST, a server-owned batch ---
 //
-// The dialog dispatches POST /api/sync/season and then only OBSERVES: the
+// The dialog dispatches POST /api/sync/season and then only observes: the
 // server enumerates the season's files, runs them sequentially, and owns
-// every per-item fact in the job registry. The view drives from the batch
-// aggregate derived over the registry rows (filtered by batch_activity_id)
-// plus each item's own sync:done; closing the dialog or the tab abandons
-// nothing, and reopening re-attaches through the jobs read.
+// every per-item fact in the job registry. Closing the dialog or the tab
+// abandons nothing; reopening re-attaches through the jobs read.
 
-// Disposers for the open batch view's per-item watches. Dropping a WATCH
-// never touches the job; the batch is the server's.
+// Dropping a WATCH never touches the job; the batch is the server's.
 let seasonUnwatchers: (() => void)[] = [];
 
 function stopSeasonWatches(): void {
@@ -1249,9 +1194,8 @@ async function renderSeasonBatch(
       className: "ghost",
       onclick: () => {
         (stopBtn as HTMLButtonElement).disabled = true;
-        // The batch is THE cancellation unit: one stop request; queued
-        // items settle cancelled server-side (no per-item events), so
-        // re-read the registry for the settled rows.
+        // The batch is the cancellation unit: one stop request settles
+        // queued items server-side with no per-item events, so re-read.
         void cancelActivity(batchId).then(() => renderSeasonBatch(dlg, label, batchId, closeFn));
       },
     },
@@ -1261,8 +1205,7 @@ async function renderSeasonBatch(
   const footer = el("div", { className: "dlg-foot" }, stopBtn, closeBtn);
 
   if (!jobs || jobs.length === 0) {
-    // Nothing to attach to: the registry dropped the batch (server restart)
-    // or the read failed. Reported instead of a spinner that never settles.
+    // The registry dropped the batch (server restart) or the read failed.
     aggregate.textContent =
       jobs === null
         ? "Could not load the batch state. Close and reopen to retry."
@@ -1295,7 +1238,7 @@ async function renderSeasonBatch(
 
   let refreshQueued = false;
   const refresh = (): void => {
-    // Coalesced re-read: covers rows that settle WITHOUT their own event
+    // Coalesced re-read: covers rows that settle without their own event
     // (queued items cancelled by a stop settle server-side only).
     if (refreshQueued) {
       return;
@@ -1313,7 +1256,7 @@ async function renderSeasonBatch(
         return;
       }
       if (ev === null) {
-        // Boot change: correlation lost; re-attach through the jobs read.
+        // Boot change: correlation lost; re-attach.
         refresh();
         return;
       }
@@ -1328,9 +1271,8 @@ async function renderSeasonBatch(
       }
       settle();
       if (ev.outcome === "cancelled") {
-        // A stopped item means the batch was stopped: its siblings then
-        // settle cancelled with no events of their own. One re-read
-        // reconciles whatever the registry now says. A crash does NOT stop
+        // A stopped item means the batch was stopped: siblings settle
+        // cancelled with no events of their own. A crash does not stop
         // the batch, so it needs no re-read.
         refresh();
       }
@@ -1339,12 +1281,10 @@ async function renderSeasonBatch(
   }
 
   if (!allDone()) {
-    // Batch terminals that publish no per-item sync:done — a popup stop
-    // landing between items, a queued batch cancelled outright — settle the
-    // remaining rows server-side in silence. The batch ACTIVITY's terminal
-    // transition (or its removal, once seen) is the delivery: re-read the
-    // registry then. The re-render skips this registration once every row
-    // is done, so a settled batch's lingering activity re-reads nothing.
+    // Batch terminals that publish no per-item sync:done (a popup stop
+    // between items, a queued batch cancelled outright) settle remaining
+    // rows server-side in silence; the activity's terminal transition (or
+    // removal) is the signal to re-read.
     let seen = false;
     const unobserve = observeActivities((activities) => {
       if (!dlg.open) {
@@ -1364,9 +1304,8 @@ async function renderSeasonBatch(
 }
 
 /**
- * Season sync entry point: confirm, then ONE POST — the server owns the
- * batch from acceptance. A live batch for this season (this tab or a
- * reload ago) re-attaches instead of re-confirming.
+ * Season sync entry point: confirm, then ONE POST. A live batch for this
+ * season re-attaches instead of re-confirming.
  */
 export function confirmSeasonSync(
   seriesTitle: string,
@@ -1441,9 +1380,8 @@ export function confirmSeasonSync(
   patch(dlg, header, body, footer);
   ctrl.open();
 
-  // RELOAD RE-ATTACH: a batch dispatched before a reload (or from a closed
-  // dialog) is still the server's; show ITS progress instead of offering a
-  // second start (which the server would answer with the same batch anyway).
+  // A batch dispatched before a reload is still the server's; show its
+  // progress instead of offering a second start.
   void findLiveSeasonBatch(seriesId, seasonNum).then((batchId) => {
     if (batchId !== null && dlg.open) {
       void renderSeasonBatch(dlg, label, batchId, closeFn);
@@ -1470,8 +1408,7 @@ async function startSeasonSync(
   if (outcome.status === "error") {
     startBtn.disabled = false;
     if (isCapacityRefusal(outcome.error)) {
-      // THE 429 ARM: the typed cap refusal renders inline — exactly ONE
-      // visible surface (error: false keeps the framework toast off).
+      // The typed cap refusal renders inline — the only visible surface.
       status.hidden = false;
       status.textContent =
         "Sync queue is full \u2014 wait for a running sync to finish, then try again.";

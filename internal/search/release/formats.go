@@ -10,7 +10,6 @@ type Format struct {
 	Normalize string   // Normalized label for scoring (e.g. "h265", "bluray")
 }
 
-// Normalized source labels.
 const (
 	NormRemux    = "remux"
 	NormBluray   = "bluray"
@@ -229,7 +228,6 @@ func init() {
 	CompiledAnimeReleaseGroup = regexp.MustCompile(`(?i)` + sonarrAnimeReleaseGroupRegex)
 }
 
-// compileFormats compiles each format's PCRE regex via CompilePCRE.
 func compileFormats(formats []Format) []Format {
 	out := make([]Format, len(formats))
 	copy(out, formats)

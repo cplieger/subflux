@@ -32,7 +32,6 @@ import (
 // numbering parity with .NET but never participate (divergence class (k),
 // documented contract).
 
-// nodeKind identifies the parse-tree node variants.
 type nodeKind uint8
 
 const (
@@ -45,7 +44,6 @@ const (
 // seq is one alternation branch: a concatenation of nodes.
 type seq []*node
 
-// node is a parse-tree node.
 type node struct {
 	text    string // nAtom/nAnchor: raw source text
 	quant   string // quantifier suffix incl. laziness ("", "?", "*", "+", "{m,n}", ...)
@@ -76,7 +74,6 @@ type node struct {
 	contOK    bool // nAssert: contSrc is assertion- and capture-free
 }
 
-// isZeroWidth reports whether the node consumes no input.
 func (n *node) isZeroWidth() bool {
 	return n.kind == nAnchor || n.kind == nAssert
 }
@@ -161,10 +158,8 @@ func (ps *parser) parseElement(depth int) (*node, error) {
 	}
 }
 
-// zeroWidthEscapes are escapes that consume no input.
 var zeroWidthEscapes = map[byte]bool{'b': true, 'B': true, 'A': true, 'z': true}
 
-// parseEscape parses a backslash escape.
 func (ps *parser) parseEscape() (*node, error) {
 	start := ps.pos
 	if ps.pos+1 >= len(ps.src) {
@@ -185,8 +180,6 @@ func (ps *parser) parseEscape() (*node, error) {
 	return &node{kind: nAtom, text: txt, minRep: 1, minW: 1, srcOff: start}, nil
 }
 
-// lookaroundPrefix classifies a lookaround opening at s, returning
-// (positive, ahead, prefixLen).
 func lookaroundPrefix(s string) (positive, ahead bool, prefixLen int) {
 	switch {
 	case strings.HasPrefix(s, "(?="):
@@ -289,7 +282,6 @@ func (ps *parser) parseFlagsGroup(rest string, start, depth int) (*node, error) 
 	return nil, compileErr(head(rest, 3), start, "unsupported group syntax")
 }
 
-// head returns at most n leading bytes of s.
 func head(s string, n int) string {
 	if len(s) > n {
 		return s[:n]
@@ -297,7 +289,6 @@ func head(s string, n int) string {
 	return s
 }
 
-// parseGroupBody parses a group's alternation body and its closing paren.
 func (ps *parser) parseGroupBody(n *node, depth int) (*node, error) {
 	body, err := ps.parseAlt(depth + 1)
 	if err != nil {
@@ -311,7 +302,6 @@ func (ps *parser) parseGroupBody(n *node, depth int) (*node, error) {
 	return n, nil
 }
 
-// parseLookaroundNode extracts a lookaround assertion's raw inner text.
 func (ps *parser) parseLookaroundNode(positive, ahead bool, prefixLen int) (*node, error) {
 	start := ps.pos
 	s := ps.src[ps.pos:]
@@ -392,7 +382,7 @@ func countCapturesIn(s string) int {
 // a lookbehind.
 func isCaptureOpen(s string) bool {
 	if len(s) < 2 || s[1] != '?' {
-		return true // plain (
+		return true
 	}
 	if len(s) < 3 || (s[2] != '<' && s[2] != 'P') {
 		return false
@@ -403,7 +393,6 @@ func isCaptureOpen(s string) bool {
 	return true
 }
 
-// attachQuantifier parses an optional quantifier following an element.
 func (ps *parser) attachQuantifier(n *node) error {
 	if ps.pos >= len(ps.src) {
 		return nil
@@ -445,8 +434,6 @@ func (ps *parser) attachQuantifier(n *node) error {
 	return nil
 }
 
-// parseRepeat parses a {m}, {m,}, or {m,n} repetition. Returns the minimum
-// count, bytes consumed, and whether the text is a well-formed repetition.
 func parseRepeat(s string) (minRep, consumed int, ok bool) {
 	i := 1
 	m := 0
@@ -473,8 +460,6 @@ func parseRepeat(s string) (minRep, consumed int, ok bool) {
 
 // --- pass 2: analyze ---
 
-// analyzeAlt computes minimum widths bottom-up, resolves assertion retry
-// chains, and rejects assertions inside quantified groups.
 func analyzeAlt(alts []seq, src string) (minW int, tail, tailPath []*node, hasAssert bool, err error) {
 	for i, sq := range alts {
 		w, t, tp, ha, err := analyzeSeq(sq, src)
@@ -492,7 +477,6 @@ func analyzeAlt(alts []seq, src string) (minW int, tail, tailPath []*node, hasAs
 	return minW, tail, tailPath, hasAssert, nil
 }
 
-// analyzeSeq analyzes one concatenation left to right.
 func analyzeSeq(sq seq, src string) (minW int, tail, tailPath []*node, hasAssert bool, err error) {
 	for i, n := range sq {
 		switch n.kind {
@@ -610,7 +594,6 @@ type emitter struct {
 	nCore   int
 }
 
-// emitAlt emits an alternation body.
 func (em *emitter) emitAlt(alts []seq) {
 	for i, sq := range alts {
 		if i > 0 {
@@ -620,7 +603,6 @@ func (em *emitter) emitAlt(alts []seq) {
 	}
 }
 
-// emitSeq emits one concatenation.
 func (em *emitter) emitSeq(sq seq) {
 	for _, n := range sq {
 		em.emitNode(n)
@@ -658,7 +640,6 @@ func (em *emitter) emitPlain(n *node) {
 	}
 }
 
-// emitGroup emits a group node with its original prefix and quantifier.
 func (em *emitter) emitGroup(n *node) {
 	if n.capturing {
 		em.nCore++
@@ -713,8 +694,6 @@ func CompilePCRE(pat string) (*Pattern, error) {
 // the tree walk mirrors the parser's left-to-right scan, shifting every
 // already-assigned source index that follows an assertion's inner groups.
 func assignAssertInnerGroups(alts []seq, nSrc *int) {
-	// Walk in source order collecting nodes; assertion inner captures
-	// insert numbering slots, shifting subsequent capturing groups.
 	var walk func(alts []seq, shift int) int
 	walk = func(alts []seq, shift int) int {
 		for _, sq := range alts {
@@ -728,7 +707,6 @@ func assignAssertInnerGroups(alts []seq, nSrc *int) {
 				case nAssert:
 					shift += countCapturesIn(n.inner)
 				case nAtom, nAnchor:
-					// no capture bookkeeping
 				}
 			}
 		}
@@ -738,7 +716,6 @@ func assignAssertInnerGroups(alts []seq, nSrc *int) {
 	*nSrc += total
 }
 
-// compileBranch emits and compiles one top-level branch.
 func compileBranch(sq seq, nSrcGroups int, src string) (*branchPattern, error) {
 	em := &emitter{remap: make(map[int]int)}
 	em.emitSeq(sq)
@@ -974,8 +951,6 @@ func buildRetryPlan(an *node, src string) *retryPlan {
 	return plan
 }
 
-// collectCaptureGroups appends the core indices of all capturing groups in
-// a node subtree.
 func collectCaptureGroups(n *node, out *[]int) {
 	if n.kind == nGroup && n.capturing {
 		*out = append(*out, n.coreGroup)

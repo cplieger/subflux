@@ -17,7 +17,7 @@ import (
 
 // This file holds the KeyStore half of AuthStore: the durable auth_api_keys
 // bucket plus the ix_apikey_user index. It mirrors the old SQLite
-// store/authdb/apikeys.go behaviour exactly (Requirements 16.4, 16.6, 16.7).
+// store/authdb/apikeys.go behaviour exactly.
 //
 // auth_api_keys is PRIMARY-keyed by the raw key_hash, so the API-auth hot path
 // — APIKeyByHash — is a single point get (matching how passkeys are keyed by
@@ -39,7 +39,7 @@ import (
 //
 // Every durable mutation runs in one s.update transaction (uniqueness check,
 // put, index maintenance), so it is crash-durable on commit and a failure rolls
-// back leaving no partial primary/index state (Requirements 9.1, 9.2).
+// back leaving no partial primary/index state.
 
 // keyRec is the JSON value stored in the auth_api_keys bucket. It carries every
 // auth.Key field — including the json:"-" KeyHash — so the API key round-trips
@@ -109,11 +109,11 @@ func apiKeyUserIndexKey(userID int64, hash string) []byte {
 }
 
 // CreateAPIKey inserts a new API key, rejecting a duplicate key hash with
-// errConflict before any write (Requirement 9.3 hash uniqueness), and sets the
+// errConflict before any write, and sets the
 // surrogate ID on the supplied struct. CreatedAt is stamped to now when zero,
 // mirroring the SQLite CURRENT_TIMESTAMP default. The primary row and its
 // ix_apikey_user entry are written together in one Update, crash-durable on
-// commit (Requirements 9.1, 9.2); on a conflict nothing is written.
+// commit; on a conflict nothing is written.
 func (s *Store) CreateAPIKey(_ context.Context, key *auth.Key) error {
 	if key == nil {
 		return errors.New("authstore: CreateAPIKey: nil key")
@@ -247,7 +247,7 @@ func collectAPIKeysByUser(tx *bbolt.Tx, userID int64) ([]auth.Key, error) {
 }
 
 // DeleteAPIKey removes the API key ref identifies, but only when it belongs to
-// ref.UserID (Requirement 16.4, mirroring the SQLite
+// ref.UserID (mirroring the SQLite
 // `DELETE ... WHERE id=? AND user_id=?`). It resolves the key hash via a
 // user-scoped index walk, so it can only ever delete the supplied user's own
 // key. It deletes the primary row and its ix_apikey_user entry in one Update; a

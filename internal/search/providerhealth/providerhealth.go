@@ -29,7 +29,7 @@ type Config struct {
 	Now       func() time.Time // Clock function; nil defaults to time.Now.
 	Threshold int              // failures within window to trigger (default: DefaultThreshold)
 	Window    time.Duration    // sliding window (default: DefaultWindow)
-	Cooldown  time.Duration    // cooldown after triggering
+	Cooldown  time.Duration
 }
 
 // DefaultThreshold is the number of failures within the window that triggers
@@ -51,7 +51,7 @@ const DefaultWindow = 10 * time.Minute
 // import the events bus.
 type OnChange func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool)
 
-// New creates a provider timeout tracker with the given config.
+// New creates a Tracker.
 func New(cfg Config) *Tracker {
 	if cfg.Threshold <= 0 {
 		cfg.Threshold = DefaultThreshold
@@ -93,7 +93,7 @@ type Tracker struct {
 	threshold int
 }
 
-// SetOnChange installs the timeout-transition observer (see OnChange).
+// SetOnChange installs the OnChange observer.
 func (it *Tracker) SetOnChange(fn OnChange) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -241,7 +241,6 @@ func (it *Tracker) Reset() {
 	slog.Info("provider timeouts reset, all providers re-enabled")
 }
 
-// countAfter returns how many timestamps are strictly after cutoff.
 func countAfter(times []time.Time, cutoff time.Time) int {
 	count := 0
 	for _, t := range times {

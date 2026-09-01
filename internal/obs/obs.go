@@ -40,7 +40,7 @@ type Metrics struct {
 	httpPanics   *metrics.Counter
 	registry     *metrics.Registry
 
-	// Store observability (Requirement 17).
+	// Store observability.
 	storeFileBytes     *metrics.Gauge
 	storeFreelistBytes *metrics.Gauge
 	reconcileDuration  *metrics.Gauge
@@ -131,7 +131,7 @@ func New() *Metrics {
 }
 
 // SetPollCursorsDirty records how many poll cursors currently have a failing
-// durable persist (S13 dirty-cursor observability; 0 when healthy).
+// durable persist (0 when healthy).
 func (m *Metrics) SetPollCursorsDirty(n int) {
 	m.pollCursorsDirty.Set(float64(n))
 }
@@ -205,7 +205,7 @@ func (m *Metrics) Handler() http.HandlerFunc {
 	return m.registry.Handler()
 }
 
-// --- Store observability (Requirement 17) ---
+// --- Store observability ---
 
 // RecordStoreFileSize records the current bbolt database file size.
 func (m *Metrics) RecordStoreFileSize(bytes int64) {

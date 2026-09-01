@@ -279,7 +279,6 @@ type branchEval struct {
 	hasMonotone bool
 }
 
-// newBranchEval builds the per-call evaluation state.
 func newBranchEval(b *branchPattern, s string) *branchEval {
 	ev := &branchEval{b: b, s: s}
 	ev.hasMonotone = slices.ContainsFunc(b.assertions, func(a assertion) bool { return a.monotoneDot })
@@ -321,7 +320,6 @@ func (ev *branchEval) checkAssertions(cand []int) bool {
 	return true
 }
 
-// holdsAt evaluates assertion i at byte offset pos.
 func (ev *branchEval) holdsAt(i int, a *assertion, pos int) bool {
 	if a.monotoneDot && ev.monotoneOK {
 		return a.positive == (pos <= ev.threshold(i, a))

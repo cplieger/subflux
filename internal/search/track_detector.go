@@ -23,7 +23,6 @@ type TrackDetector interface {
 // so "none" must be said out loud rather than left nil).
 type NoopDetector struct{}
 
-// DetectTracks reports no embedded tracks.
 func (NoopDetector) DetectTracks(_ context.Context, _ string) ([]subflux.EmbeddedTrack, error) {
 	return nil, nil
 }

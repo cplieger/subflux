@@ -31,7 +31,7 @@ const (
 	providerName     = subflux.ProviderNameAnimeTosho
 	feedURL          = "https://feed.animetosho.org/json"
 	storageURL       = "https://animetosho.org/storage/attach/"
-	maxSearchEntries = 6 // Max torrent entries to check for subtitles.
+	maxSearchEntries = 6
 
 	statusComplete     = "complete"
 	attachTypeSubtitle = "subtitle"
@@ -59,8 +59,8 @@ type Provider struct {
 // Name returns the provider identifier for AnimeTosho.
 func (p *Provider) Name() subflux.ProviderID { return providerName }
 
-// Search queries AnimeTosho for subtitles matching req. Tries AniDB episode ID
-// lookup first (more precise for anime), then falls back to title+season search.
+// Search tries AniDB episode ID lookup first (more precise for anime), then
+// falls back to title+season search.
 func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.MediaType != subflux.MediaTypeEpisode {
 		slog.Debug("animetosho: not an episode, skipping",
@@ -72,7 +72,6 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, nil
 	}
 
-	// Try AniDB episode ID search first (more precise for anime).
 	if req.TvdbID > 0 {
 		result := p.anidbMapper.Resolve(ctx, req.TvdbID, req.Season, req.Episode)
 		if result != nil && result.AniDBEpisodeID > 0 {
@@ -94,12 +93,10 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		}
 	}
 
-	// Fallback: title + season search.
 	results, err := p.searchByTitle(ctx, req)
 	if err != nil {
 		// The provider-sweep boundary logs this with the provider name; the
-		// media label and which of the two legs failed are what it cannot
-		// reconstruct, so they ride the error.
+		// media label and which leg failed are what it cannot reconstruct.
 		return nil, fmt.Errorf("title search for %s: %w", req.MediaLabel(), err)
 	}
 	slog.Info("animetosho search complete",
@@ -108,7 +105,6 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 }
 
 // Download fetches the subtitle content for the given search result.
-// The download URL is validated against SSRF before the request is made.
 func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
@@ -133,9 +129,9 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 		return nil, err
 	}
 
-	// cap+1 detect-and-error idiom (see anidb's anime-list fetch): a payload
-	// at the cap is far more likely truncated than exactly-cap-sized, and a
-	// silently truncated archive would fail extraction with a confusing error.
+	// cap+1 detect-and-error idiom: a payload at the cap is far more likely
+	// truncated than exactly-cap-sized, and a silently truncated archive
+	// would fail extraction with a confusing error.
 	data, readErr := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes+1))
 	if readErr != nil {
 		return nil, readErr
@@ -170,17 +166,14 @@ func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest
 	return p.collectSubtitles(ctx, entries, req), nil
 }
 
-// collectSubtitles fetches and deduplicates subtitles from a set of feed
-// entries. Shared by searchByEpisodeID and searchByTitle.
-// Fetches entry details concurrently (bounded at maxSearchEntries) since
-// AnimeTosho has no documented rate limit and entries are independent.
+// collectSubtitles fetches entries concurrently, bounded at maxSearchEntries,
+// since AnimeTosho has no documented rate limit and entries are independent.
 func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) []subflux.Subtitle {
 	type entryResult struct {
 		title string
 		subs  []subflux.Subtitle
 	}
 
-	// Fetch all entries concurrently with bounded concurrency.
 	results := make([]entryResult, len(entries))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxSearchEntries)
@@ -206,7 +199,6 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 	}
 	_ = g.Wait()
 
-	// Collect and deduplicate results in original order.
 	var out []subflux.Subtitle
 	seen := make(map[string]bool)
 	for _, r := range results {
@@ -225,7 +217,6 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 	return out
 }
 
-// searchEntriesByEID queries AnimeTosho by AniDB episode ID.
 func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry, error) {
 	slog.Debug("animetosho searching by anidb eid", "eid", eid)
 
@@ -240,10 +231,8 @@ func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry
 	return filtered, nil
 }
 
-// fetchJSON performs a GET request and decodes the response body (capped at
-// 5 MB) into v. Returns typed provider errors from CheckHTTPStatus so
-// callers preserve Retry-After hints for 429 responses. Callers own any
-// structured debug logging around the request.
+// fetchJSON returns typed provider errors from CheckHTTPStatus so callers
+// preserve Retry-After hints for 429 responses.
 func (p *Provider) fetchJSON(ctx context.Context, reqURL string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
@@ -266,10 +255,8 @@ type feedEntry struct {
 	ID     int    `json:"id"`
 }
 
-// searchEntries queries the AnimeTosho feed API for torrent entries matching
-// the given title and season. Uses a season-level query to catch both
-// per-episode entries and season packs. Returns only complete entries,
-// capped at maxSearchEntries.
+// searchEntries uses a season-level query to catch both per-episode entries
+// and season packs.
 func (p *Provider) searchEntries(ctx context.Context,
 	title string, season int,
 ) ([]feedEntry, error) {
@@ -288,10 +275,6 @@ func (p *Provider) searchEntries(ctx context.Context,
 	return filtered, nil
 }
 
-// fetchSubtitlesForEntry fetches the detail page for a single torrent entry
-// and extracts subtitle attachments matching the requested languages.
-// For season packs (multiple files), only the file matching the target
-// episode is used.
 func (p *Provider) fetchSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
 	season, episode, absEpisode int,
@@ -307,7 +290,6 @@ func (p *Provider) fetchSubtitlesForEntry(ctx context.Context,
 	return filterAttachments(result, languages, season, episode, absEpisode), nil
 }
 
-// entryDetail holds the JSON structure returned by the AnimeTosho entry API.
 type entryDetail struct {
 	Files []entryFile `json:"files"`
 }
@@ -328,9 +310,6 @@ type attachmentInfo struct {
 	Name string `json:"name"`
 }
 
-// filterCompleteEntries returns entries with status "complete", capped at
-// maxSearchEntries. Pure function extracted from searchEntries for
-// testability.
 func filterCompleteEntries(entries []feedEntry) []feedEntry {
 	var filtered []feedEntry
 	for _, e := range entries {
@@ -344,11 +323,6 @@ func filterCompleteEntries(entries []feedEntry) []feedEntry {
 	return filtered
 }
 
-// filterAttachments converts raw AnimeTosho entry data into Subtitle values,
-// applying type, ID, language, and episode filters. For entries with multiple
-// files (season packs), only the file matching the target season+episode is
-// used. For single-file entries, all subtitle attachments are returned.
-// Pure function extracted from fetchSubtitlesForEntry for testability.
 func filterAttachments(result entryDetail, languages []string,
 	season, episode, absEpisode int,
 ) []subflux.Subtitle {
@@ -365,11 +339,6 @@ func filterAttachments(result entryDetail, languages []string,
 	return subs
 }
 
-// attachmentToSubtitle converts a single AnimeTosho attachment into a Subtitle,
-// applying the type, ID, and language filters. Returns ok=false when the
-// attachment is not a usable subtitle in one of the requested languages.
-// Unknown languages default to English; Brazilian Portuguese is detected from
-// the subtitle name.
 func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subtitle, bool) {
 	if att.Type != attachTypeSubtitle {
 		return subflux.Subtitle{}, false
@@ -381,7 +350,6 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subt
 	if lang == "" {
 		lang = "en" // AnimeTosho defaults to English.
 	}
-	// Detect Brazilian Portuguese from subtitle name.
 	if lang == "pt" && strings.Contains(
 		strings.ToLower(att.Info.Name), "brazil",
 	) {
@@ -403,16 +371,14 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subt
 	}, true
 }
 
-// matchFiles returns the files from an entry that match the target episode.
-// For single-file entries (per-episode releases), returns all files.
-// For multi-file entries (season packs), returns only files whose filename
-// contains the matching S##E## pattern.
+// matchFiles returns all files for a single-file entry; for a season pack
+// (multiple files) it returns only files whose filename contains the
+// matching S##E## pattern.
 func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile {
 	if len(files) <= 1 {
 		return files
 	}
 
-	// Multi-file entry: filter to the matching episode.
 	var matched []entryFile
 	for _, f := range files {
 		if fileMatchesEpisode(f.Filename, season, episode, absEpisode) {
@@ -424,22 +390,19 @@ func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile 
 		return matched
 	}
 
-	// No filename matched the episode pattern. This can happen with
-	// non-standard naming. Skip rather than returning all files.
+	// No filename matched the episode pattern (non-standard naming). Skip
+	// rather than returning all files.
 	slog.Debug("animetosho: no file matched target episode in pack",
 		"season", season, "episode", episode,
 		"files", len(files))
 	return nil
 }
 
-// fileMatchesEpisode checks if a filename contains a S##E## pattern
-// matching the target season and episode. Also matches standalone episode
-// numbers for anime (e.g. " - 01 " or " E01"). The e## pattern requires
-// a non-letter character before it to avoid false positives inside words
-// like "Release01". Only falls back to standalone patterns when no S##E##
-// pattern exists in the filename, probing the AIRED number first and then the
-// ABSOLUTE number (batch entries dominantly name files by absolute number,
-// e.g. "[Group] Show - 26.mkv" for S02E01).
+// fileMatchesEpisode also matches standalone episode numbers for anime
+// (e.g. " - 01 " or " E01"). Only falls back to standalone patterns when no
+// S##E## pattern exists in the filename, probing the AIRED number first and
+// then the ABSOLUTE number (batch entries dominantly name files by absolute
+// number, e.g. "[Group] Show - 26.mkv" for S02E01).
 func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
 	if filename == "" {
 		return false
@@ -449,11 +412,9 @@ func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
 			return true
 		}
 	}
-	// Also try matching " - EP " or " - NN " patterns common in anime.
-	// Only match if the entry has no S##E## pattern at all (pure absolute).
-	// Presence is checked at the marker-shape level, not against the parsed
-	// markers above: a name carrying an unreadable marker still numbers its
-	// episodes explicitly, so it must not fall through to absolute numbering.
+	// Presence is checked at the marker-shape level, not the parsed markers
+	// above: a name with an unreadable marker still numbers its episodes
+	// explicitly, so it must not fall through to absolute numbering.
 	if epmarker.Present(filename) {
 		return false
 	}
@@ -464,8 +425,7 @@ func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
 		standaloneNumberMatch(filename, absEpisode)
 }
 
-// standaloneNumberMatch probes a filename for the standalone episode-number
-// patterns common in anime naming: "e##" (word boundary before it, so
+// standaloneNumberMatch matches "e##" (word boundary before it, so
 // "Release01" never matches), " ## ", and " - ##".
 func standaloneNumberMatch(filename string, number int) bool {
 	lower := strings.ToLower(filename)

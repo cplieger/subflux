@@ -50,7 +50,7 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 type Provider struct {
 	client    *http.Client
 	apiKey    string
-	dlBaseURL string // download base URL; defaults to dlBaseURL const
+	dlBaseURL string
 }
 
 // Name returns the provider identifier for SubDL.
@@ -176,9 +176,8 @@ func checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
 		return nil, nil
 	}
 	if result.Error != "" {
-		// The upstream error string is untrusted text that callers pass to
-		// slog; neutralize control/bidi runes at construction (single-line,
-		// since error strings are one-line by convention).
+		// Untrusted upstream text passed to slog; neutralize control/bidi
+		// runes at construction.
 		return nil, fmt.Errorf("subdl API: %w: %s", errSubDLNotFound, result.Error.SingleLine())
 	}
 	slog.Warn("subdl: API returned status=false with no error message", "media", label)
@@ -226,8 +225,8 @@ func filterResults(items []subtitleItem, isEpisode bool, matchedBy subflux.Match
 // Download fetches the subtitle content for the given search result.
 // SubDL download URLs are relative paths; absolute URLs are rejected.
 func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// DownloadURL from the API is a relative path (e.g. "/sd/...").
-	// Reject absolute URLs to prevent URL injection via crafted API responses.
+	// DownloadURL is a relative path (e.g. "/sd/..."); reject absolute
+	// URLs to prevent injection via a crafted API response.
 	if !strings.HasPrefix(sub.DownloadURL, "/") {
 		return nil, fmt.Errorf("subdl: unexpected download path: %q", sub.DownloadURL)
 	}
@@ -261,10 +260,9 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 }
 
 // doAPIRequest performs a GET against the SubDL subtitles endpoint and
-// returns the decoded response. HTTP/decode errors are wrapped and any
-// api_key embedded in transport errors is redacted. API-level failures
-// (result.Status == false) are NOT handled here; caller inspects the
-// returned apiResponse via checkAPIStatus.
+// returns the decoded response. Transport errors are wrapped and any
+// api_key embedded in them is redacted. Caller inspects result.Status via
+// checkAPIStatus.
 func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiResponse, error) {
 	u := apiURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
@@ -299,7 +297,7 @@ func handleDownloadResponse(resp *http.Response, want epmarker.Target) ([]byte, 
 			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
-	// SubDL returns 500 with a tiny body when the download limit is exceeded.
+	// 500 with a tiny body signals the download limit was exceeded.
 	// ContentLength is -1 when unknown; only match when explicitly small.
 	if resp.StatusCode == http.StatusInternalServerError && resp.ContentLength >= 0 && resp.ContentLength < 100 {
 		return nil, &subflux.RateLimitError{

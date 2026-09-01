@@ -11,8 +11,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// SubtitleProcessor is the narrow interface for subtitle operations
-// needed by preview handlers.
+// SubtitleProcessor is the subtitle operations preview handlers need.
 type SubtitleProcessor interface {
 	NormalizeEncoding(data []byte) []byte
 	ParseSRT(data []byte) ([]subflux.SubtitleCue, error)

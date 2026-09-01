@@ -1,12 +1,9 @@
-// wizard.ts — The single first-boot flow (admin creation hands off here):
-// ONE wizard for config-file users and from-scratch users, dynamically
-// accelerated. It boots from the FULL structured config (+ secret presence
-// flags) and config_valid, prefills every step, collapses steps the config
-// already answers (config_valid AND differs-from-example), walks the rest,
-// and finishes with a GET-overlay-PUT of the FULL section map followed by
-// the post-activation passkey offer and a SINGLE navigation into the app.
-// Decision logic lives in wizard-state.ts (pure, vitest-covered); this
-// module owns DOM and flow.
+// wizard.ts — The single first-boot flow (admin creation hands off here).
+// It boots from the FULL structured config (+ secret presence flags) and
+// config_valid, prefills every step, collapses steps the config already
+// answers, walks the rest, and finishes with a GET-overlay-PUT of the FULL
+// section map followed by the passkey offer and one navigation into the
+// app. Decision logic lives in wizard-state.ts; this module owns DOM and flow.
 
 import { patch } from "@cplieger/reactive";
 import {
@@ -88,28 +85,19 @@ export let langRules: { audio: string; code: string; variant: string }[] = [];
 export let langDefault: { code: string; variant: string }[] = [];
 export let mediaRoots: string[] = [];
 
-/** _resetForTest returns every module-scope binding to its initial value.
+/** Returns every module-scope binding to its initial value.
  *
- *  This module cannot be re-evaluated to get a fresh graph. Browser Mode keys
- *  its module map by URL, so `vi.resetModules()` hands back the CACHED
- *  instance, and the `./wizard.ts?boot=N` specifier that works for the other
- *  modules in this package is closed here: wizard-steps.ts and
- *  wizard-providers.ts import `schemaByKey`/`wizardValues`/`secretSaved`/
- *  `mediaRoots` back from "./wizard.js", so a busted specifier mints a
- *  DUPLICATE instance that sets `fullSchema` on itself while the single shared
- *  step modules keep reading the original's, which stays empty. Measured: the
- *  busted arr step renders its heading and not one field. An explicit reset is
- *  what the rest of the fleet uses for this -- `_resetForTest` in
- *  @cplieger/ui-primitives, `resetActionFramework` in @cplieger/actions.
+ *  This module cannot be re-evaluated to get a fresh graph: Browser Mode
+ *  keys its module map by URL, so `vi.resetModules()` hands back the
+ *  cached instance, and a `?boot=N` specifier is closed here because
+ *  wizard-steps.ts and wizard-providers.ts import the shared bindings back
+ *  from "./wizard.js" — a busted specifier would mint a duplicate instance
+ *  whose sibling step modules keep reading the original's, which stays empty.
  *
- *  EVERY module-scope `let` in this file must be listed here, including
- *  `navWired`/`validationAbort`/`stepFadeTimer` further down. `navWired` is
- *  the one whose staleness actually bites: left true, `wireWizardNav()`
- *  no-ops and a freshly mounted page gets no nav listeners at all, so nothing
- *  a test clicks does anything. `stepFadeTimer` is the one that bit the
- *  COVERAGE number: a pending step render outlived the test that scheduled
- *  it, rendered into the next test's page, and made wizard-steps.ts read
- *  43/50/57 covered statements across runs of one commit. */
+ *  Every module-scope `let` in this file must be listed here. `navWired`
+ *  left true makes `wireWizardNav()` no-op on a freshly mounted page.
+ *  `stepFadeTimer` left running renders a pending step into the next
+ *  test's page. */
 export function _resetForTest(): void {
   abortValidation(); // aborts and nulls validationAbort
   clearTimeout(stepFadeTimer ?? undefined);
@@ -130,15 +118,14 @@ export function _resetForTest(): void {
   navWired = false;
 }
 
-/** secretSaved reports whether the config file already holds a value for a
- *  schema secret (dotted path, e.g. "sonarr.api_key"): the steps render a
- *  saved placeholder and count the credential as present. */
+/** Reports whether the config file already holds a value for a schema
+ *  secret (dotted path): the steps render a saved placeholder and count
+ *  the credential as present. */
 export function secretSaved(path: string): boolean {
   return boot.secretsPresent.has(path);
 }
 
-/** bootSections exposes the boot snapshot's sections to the step modules
- *  (read-only by convention; steps consult it for config-blessed state). */
+/** Read-only by convention: steps consult it for config-blessed state. */
 export function bootSections(): Sections {
   return boot.sections;
 }
@@ -161,11 +148,10 @@ function currentModel(): WizardModel {
   return { wizardValues, providerEnabled, langRules, langDefault, mediaRoots };
 }
 
-/** saveDraft persists the wizard's progress. The stored model is
- *  schema-sanitized (buildDraftJSON): secret fields never reach
- *  localStorage — an abandoned wizard must not leave credentials behind
- *  across browser restarts. Newly typed secrets are re-entered after a
- *  reload; saved-secret presence rides the boot presence flags instead. */
+/** Persists the wizard's progress. The stored model is schema-sanitized:
+ *  secret fields never reach localStorage. Newly typed secrets are
+ *  re-entered after a reload; saved-secret presence rides the boot
+ *  presence flags instead. */
 function saveDraft(): void {
   try {
     localStorage.setItem(
@@ -193,13 +179,8 @@ function clearDraft(): void {
 
 // --- Shared field builders (consumed by the step modules) ---
 //
-// A field's schema `help` text goes through dom.ts's withHelp, the one carrier
-// for both this wizard and the settings dialog. The wizard used to append its
-// own bordered "i" circle per field; it rendered EMPTY, because el() writes an
-// unknown string prop as an attribute, so `textContent: "i"` became
-// textcontent="i" and the glyph never existed. Two patterns for one concern,
-// and the broken one also added 20px to every label, which pushed the input
-// out of line on any label wider than the min-width floor.
+// A field's schema `help` text goes through dom.ts's withHelp, the one
+// carrier for both this wizard and the settings dialog.
 
 export function wizField(
   id: string,
@@ -231,10 +212,9 @@ export function wizToggle(
   checked: boolean,
   tip: string | undefined,
 ): HTMLElement {
-  // `for` is what gives the checkbox its accessible name: the .wiz-toggle
-  // wrapper holds only the slider span, so without it the control announces
-  // as unlabelled (axe `label`, critical). It also makes the text a hit
-  // target, matching cfgCheckbox in the settings dialog.
+  // `for` gives the checkbox its accessible name: the .wiz-toggle wrapper
+  // holds only the slider span, so without it the control announces
+  // unlabelled.
   const lbl = withHelp(el("label", { for: id }, label), tip);
   const cb = el("input", { type: "checkbox", id }) as HTMLInputElement;
   cb.checked = checked;
@@ -243,8 +223,8 @@ export function wizToggle(
 }
 
 export function langSelect(id: string, value: string, placeholder: string): HTMLElement {
-  // The placeholder doubles as the accessible name: these rows caption their
-  // selects with a layout element, not a <label>.
+  // The placeholder doubles as the accessible name: these rows caption
+  // their selects with a layout element, not a label.
   const sel = el("select", {
     id,
     className: "wiz-lang-select",
@@ -276,22 +256,16 @@ export function variantSelect(id: string, value: string): HTMLElement {
 export async function startConfigWizard(entry: WizardEntry): Promise<void> {
   setupPassword = entry.password ?? "";
 
-  // Give the wizard an address before anything can fail. A reload then comes
-  // back here — including out of the init-error state, where a refresh is the
-  // retry — instead of resolving to the app shell, which is what an
-  // authenticated request for "/" gets once the admin exists. replaceState
-  // rather than pushState: the wizard is where the operator IS, not somewhere
-  // Back should return to, and login.html is already the served document.
+  // Give the wizard an address before anything can fail, so a reload comes
+  // back here rather than resolving to the app shell.
   if (window.location.pathname !== SETUP_PATH) {
     history.replaceState(null, "", SETUP_PATH);
   }
 
-  // BOTH fetches must succeed before any wizard state initializes. A failed
-  // structured fetch must never be substituted with {}: Finish PUTs the FULL
-  // section map from the boot snapshot, so an empty baseline would DELETE
-  // every untouched section (logging, backup, auth, trusted_proxies) and
-  // their secrets. A valid unconfigured server answers non-null with empty
-  // sections — null is strictly transport/decode failure.
+  // Both fetches must succeed before any wizard state initializes. A
+  // failed structured fetch must never be substituted with {}: Finish PUTs
+  // the full section map, so an empty baseline would delete every
+  // untouched section and its secrets.
   const [schema, structured] = await Promise.all([configSchema(), configStructured()]);
   if (!schema || !structured) {
     renderWizardInitError(entry);
@@ -305,7 +279,7 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
   bootFingerprint = fingerprintBoot(sections, [...present]);
 
   // Fresh prefill from the server snapshot; a fingerprint-valid draft
-  // overlays ONLY its touched fields (a stale or unparseable draft drops).
+  // overlays only its touched fields.
   let model = prefillModel(sections);
   touched = new Set();
   let draft: WizardDraft | null = null;
@@ -332,9 +306,8 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
     buildPostProcessStep(),
   ];
 
-  // Active walk: steps NOT auto-collapsed by the satisfied gate, plus any
-  // step the draft already touched (never hide the user's own edits), then
-  // the review/finish screen. A fresh volume walks EVERYTHING.
+  // Active walk: steps not auto-collapsed, plus any step the draft
+  // already touched, then the review screen. A fresh visit walks everything.
   const satisfied = satisfiedSteps(boot);
   const walk = allSteps.filter((s) => {
     const id = s.stepId as StepID;
@@ -349,8 +322,7 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
       wizardIndex = idx;
     }
   } else if (fastPathAvailable(boot)) {
-    // R3.5: everything mandatory is satisfied — open directly on the
-    // "everything looks configured — finish" summary.
+    // Everything mandatory is satisfied — open on the finish summary.
     wizardIndex = activeSteps.length - 1;
   }
 
@@ -359,11 +331,9 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
   wireWizardNav();
 }
 
-/** renderWizardInitError renders the retryable initialization failure
- *  state: the wizard page without any step content, navigation, or Finish
- *  (a Finish from a partial boot snapshot would destroy config), plus a
- *  Retry button that re-runs the boot fetches. No draft is read or written
- *  here — nothing may overlay a boot that never happened. */
+/** Renders the retryable init-failure state: the wizard page with no
+ *  step content, navigation, or Finish, plus a Retry button. No draft is
+ *  read or written — nothing may overlay a boot that never happened. */
 function renderWizardInitError(entry: WizardEntry): void {
   showPage("configWizardPage");
   for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
@@ -418,11 +388,9 @@ function renderCurrentStep(): void {
     return;
   }
 
-  // Persist against the step now on screen. The nav handlers also save before
-  // validating (so a rejected Next keeps what was typed), but they run BEFORE
-  // the index moves, which recorded the step being LEFT — a reload resumed one
-  // step back. Saving here also covers the first step, which no nav handler has
-  // reached yet.
+  // Persist against the step now on screen: the nav handlers also save
+  // before validating, but they run before the index moves, which
+  // recorded the step being LEFT. Saving here covers the first step too.
   saveDraft();
 
   const isEmpty = container.children.length === 0;
@@ -453,26 +421,22 @@ function populateStep(container: HTMLElement, step: WizardStep): void {
   updateWizardNav();
 }
 
-/** renderWizardProgress recomputes the accessible progress over the ACTIVE
- *  walk (collapsed steps are excluded, so counts stay honest — R3.9). */
+/** Recomputes the accessible progress over the active walk (collapsed
+ *  steps excluded). */
 function renderWizardProgress(): void {
   const container = $("wizardProgress");
   if (!container) {
     return;
   }
   const step = activeSteps[wizardIndex];
-  // The dots need a role for the label to count: aria-label on a role-less div
-  // is prohibited, so it was announcing nothing (axe `aria-prohibited-attr`,
-  // serious). role="img" over role="progressbar" because html-validate's
-  // prefer-native-element rule reads the latter as a <progress> that should
-  // have been written natively, and a native <progress> cannot be this dot
-  // strip. img also makes the dots presentational, which they are.
+  // role="img" over role="progressbar": html-validate's prefer-native-element
+  // rule reads progressbar as a <progress> that should have been written
+  // natively, and a native <progress> cannot be this dot strip.
   container.setAttribute(
     "aria-label",
     `Step ${String(wizardIndex + 1)} of ${String(activeSteps.length)}: ${step?.title ?? ""}`,
   );
-  // Keyed by step index so a step change only flips the changed dots' class
-  // (patch syncs className) instead of recreating every dot.
+  // Keyed by step index so a step change only flips the changed dots.
   const dots = activeSteps.map((_, i) => {
     const cls =
       i === wizardIndex ? "wizard-dot active" : i < wizardIndex ? "wizard-dot done" : "wizard-dot";
@@ -499,8 +463,8 @@ function updateWizardNav(): void {
   }
 }
 
-/** markTouched records a real step visit/edit for the draft overlay and the
- *  save-time section overlay (the review screen is never "touched"). */
+/** Records a real step visit/edit for the draft overlay and the save-time
+ *  section overlay (the review screen is never "touched"). */
 function markTouched(step: WizardStep): void {
   if (step.stepId !== "review") {
     touched.add(step.stepId);
@@ -510,10 +474,8 @@ function markTouched(step: WizardStep): void {
 // All three are module-scope state: keep them listed in `_resetForTest` above.
 let navWired = false;
 let validationAbort: AbortController | null = null;
-// The pending step-render timer from renderCurrentStep's fade path. Held so a
-// second advance cancels the first, and so `_resetForTest` can cancel one that
-// would otherwise fire into a torn-down page — the same reason the reset aborts
-// an in-flight validation.
+// Held so a second advance cancels the first, and so `_resetForTest` can
+// cancel one that would otherwise fire into a torn-down page.
 let stepFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function abortValidation(): void {
@@ -523,10 +485,7 @@ function abortValidation(): void {
   }
 }
 
-/** Run an awaited wizard operation with visible busy feedback: the nav
- *  buttons are disabled, the active one carries aria-busy and a progress
- *  label ("Checking…"/"Saving…") for the duration, and everything is
- *  restored in a finally. */
+/** Run an awaited wizard operation with visible busy feedback. */
 async function withWizardBusy<T>(
   btn: HTMLElement,
   label: string,
@@ -558,8 +517,6 @@ function wireWizardNav(): void {
     return;
   }
   navWired = true;
-  // Drain any in-flight validation on page unload so the timeout signal
-  // doesn't fire into a torn-down DOM.
   registerCleanup(() => {
     abortValidation();
   });
@@ -620,7 +577,7 @@ function wireWizardNav(): void {
   $("wizardFinish")?.addEventListener("click", finishWizard);
 }
 
-// --- Review / summary step (R3.5 fast path + R3.9 reviewable steps) ---
+// --- Review / summary step ---
 
 function buildReviewStep(): WizardStep {
   return {
@@ -678,8 +635,8 @@ function buildReviewStep(): WizardStep {
   };
 }
 
-/** editStep jumps to a step from the review screen, splicing collapsed
- *  steps into the active walk on demand (right before Review). */
+/** Jumps to a step from the review screen, splicing collapsed steps into
+ *  the active walk on demand. */
 function editStep(id: StepID): void {
   let idx = activeSteps.findIndex((s) => s.stepId === id);
   if (idx < 0) {
@@ -709,11 +666,9 @@ async function finishWizardInner(): Promise<void> {
   abortValidation();
   hideError("wizardError");
 
-  // The wizard holds the full boot snapshot and overlays ONLY touched
-  // sections; untouched sections (logging, backup, auth, trusted_proxies,
-  // post_processing, ...) survive by round-trip. Completion is idempotent:
-  // the actions framework retries network blips, a duplicate PUT re-runs
-  // activation harmlessly, and the server's worker latch absorbs it.
+  // The wizard holds the full boot snapshot and overlays only touched
+  // sections; untouched sections survive by round-trip. Completion is
+  // idempotent: retries and a duplicate PUT re-run activation harmlessly.
   const sections = buildSaveSections(boot.sections, currentModel(), touched);
   const o = await saveWizardConfigAction.dispatch(sections).outcome;
   if (o.status === "error") {
@@ -727,10 +682,7 @@ async function finishWizardInner(): Promise<void> {
   await showPasskeyOffer();
 }
 
-/** Save the wizard's full structured section map (the settings-dialog save
- *  path; zero server changes). retryNetwork + RETRY_STANDARD recover from
- *  transient blips; dedupe protects against rapid Finish clicks; failures
- *  surface inline via showError, not toast. */
+/** Save the wizard's full structured section map. */
 const saveWizardConfigAction = apiAction<Sections>({
   name: "wizard.save_config",
   dedupe: true,
@@ -745,11 +697,9 @@ const saveWizardConfigAction = apiAction<Sections>({
   error: false,
 });
 
-// --- Passkey offer (R3.1: AFTER activation; skip carries the reason) ---
+// --- Passkey offer (after activation; skip carries the reason) ---
 
-/** navigateToApp is the flow's SINGLE navigation (the wizard lives on
- *  login.html, a separate document; "no reload tricks" means no loops or
- *  polling, not zero navigation). */
+/** The flow's single navigation (the wizard lives on login.html). */
 function navigateToApp(): void {
   window.location.href = "/";
 }
@@ -773,11 +723,9 @@ async function showPasskeyOffer(): Promise<void> {
   container.replaceChildren();
   container.appendChild(el("h3", { className: "wizard-section-title" }, "Add a passkey?"));
 
-  // Availability probe: signal-data 400s while WebAuthn is unconfigured
-  // (a blank install has nil WebAuthn until a config supplies an RP ID).
+  // Availability probe: signal-data 400s while WebAuthn is unconfigured.
   const signal = await webauthnSignalData();
-  // Runtime feature detection; Boolean() widens away the always-defined DOM
-  // typing so the checks below stay honest conditions.
+  // Runtime feature detection; Boolean() widens away the always-defined DOM typing.
   const browserSupport = Boolean(window.PublicKeyCredential);
 
   const continueBtn = el(
@@ -839,9 +787,8 @@ async function showPasskeyOffer(): Promise<void> {
   container.appendChild(el("div", { className: "wiz-offer-actions" }, addBtn, skipBtn));
 }
 
-/** registerOfferPasskey runs the full registration ceremony with the
- *  remembered password. Idempotent from the flow's perspective: a failure
- *  leaves the offer on screen with the error inline and skip available. */
+/** Runs the full registration ceremony with the remembered password.
+ *  A failure leaves the offer on screen with the error inline. */
 async function registerOfferPasskey(): Promise<boolean> {
   try {
     const begin = await webauthnRegisterBegin({ password: setupPassword });

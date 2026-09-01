@@ -15,10 +15,8 @@ import (
 )
 
 // doPostDownload performs a rate-limited, authenticated POST to the default
-// (non-VIP) baseURL + path. The /download endpoint must not use the VIP
-// server host returned by login — it returns 503 from Varnish. Returns a
-// 10 MB-capped ReadCloser. 401 responses invalidate the cached token so
-// the next API call triggers a fresh login.
+// (non-VIP) baseURL + path. /download must not use the VIP host from
+// login — it returns 503 from Varnish. 401 invalidates the cached token.
 func (p *Provider) doPostDownload(ctx context.Context, path string,
 	body io.Reader,
 ) (io.ReadCloser, error) {
@@ -44,14 +42,11 @@ func (p *Provider) doPostDownload(ctx context.Context, path string,
 }
 
 // logQuota records the per-account download quota telemetry returned by
-// /download. The API reports `requests` (used today) and `remaining`, which
-// sum to the daily cap (10 for free, 1000 for VIP). Logs info on every
-// call, warn when ≥70% utilization so operators can retune / upgrade
-// before the next 406 wall.
+// /download: `requests` (used) and `remaining` sum to the daily cap (10
+// free, 1000 VIP). Warns at ≥70% utilization.
 func (p *Provider) logQuota(dl *downloadResponse) {
 	total := dl.Requests + dl.Remaining
 	if total == 0 {
-		// No quota information in the response; do not spam INFO.
 		return
 	}
 	slog.Info("opensubtitles quota",
@@ -59,8 +54,6 @@ func (p *Provider) logQuota(dl *downloadResponse) {
 		"requests_used", dl.Requests,
 		"remaining", dl.Remaining,
 		"reset_utc", dl.ResetTimeUTC)
-	// Warn when ≤30% of the daily cap remains (mirrors the docker-cron
-	// ≥70% utilization convention — see operations.md).
 	if dl.Remaining*10 < total*3 {
 		slog.Warn("opensubtitles quota low",
 			"vip", p.vip,
@@ -152,13 +145,11 @@ func (p *Provider) setHeaders(req *http.Request) {
 	}
 }
 
-// checkStatus maps OpenSubtitles HTTP responses to typed errors. 406 is the
-// OpenSubtitles-specific daily download-quota signal, mapped to RateLimitError
-// with the quota reset (next UTC midnight) as fallback when no Retry-After
-// hint is present. Everything else defers to httpwire.CheckHTTPStatus, which
-// handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError for
-// other 4xx/5xx. 401s surface as *subflux.AuthError, which the call sites'
-// invalidateTokenOn401 hook uses to force a fresh login.
+// checkStatus maps OpenSubtitles responses to typed errors. 406 is the
+// daily download-quota signal (mapped to RateLimitError, falling back to
+// next UTC midnight when no Retry-After is present); everything else
+// defers to httpwire.CheckHTTPStatus. 401 surfaces as *subflux.AuthError
+// for invalidateTokenOn401 to act on.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusNotAcceptable {
 		retryAfter := httpwire.ParseRetryAfter(resp)

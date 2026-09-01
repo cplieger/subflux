@@ -31,12 +31,8 @@ const (
 	baseURL      = "https://api.opensubtitles.com/api/v1"
 	tokenExpiry  = 12 * time.Hour
 
-	// Rate limits per OpenSubtitles API tier (source: API documentation).
-	// VIP tier (paid subscription): 5 requests/second.
-	// Free tier (default): 1 request/second.
-	// These are request rate limits only; the daily download quota
-	// (governed by the user's subscription level) is enforced separately
-	// by the API and does not affect request pacing.
+	// VIP (paid): 5 req/s. Free (default): 1 req/s. Request-rate limits
+	// only; the daily download quota is enforced separately by the API.
 	vipRateLimit    = 200 * time.Millisecond // 5 req/s
 	freeRateLimit   = time.Second            // 1 req/s
 	schemeAired     = "aired"
@@ -56,17 +52,14 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	if ps.APIKey == "" {
 		return nil, errors.New("opensubtitles: api_key required")
 	}
-	// use_hash's default (true) is declared ONCE, in the providerEntries
-	// schema entry: the registry normalizes absent declared fields from
-	// their schema Default before this factory runs (P14). A bare map here
-	// (unit tests, direct construction) therefore reads false — the typed
-	// accessor's zero — not the product default.
+	// use_hash's default (true) comes from the providerEntries schema entry
+	// (P14); a bare settings map (unit tests) reads false, the typed zero.
 	useHash := ps.UseHash
 	includeAI := provider.SettingBool(settings, provider.KeyIncludeAI, false)
 	includeMT := provider.SettingBool(settings, provider.KeyIncludeMT, false)
 
-	// Channel-based token bucket: capacity 1, pre-filled so the first request
-	// proceeds immediately. A background ticker refills at the rate limit interval.
+	// Channel token bucket, capacity 1, pre-filled; a background ticker
+	// refills at the rate-limit interval.
 	rateCh := make(chan struct{}, 1)
 	rateCh <- struct{}{}
 
@@ -117,7 +110,6 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, fmt.Errorf("auth: %w", err)
 	}
 
-	// For episodes with alternate numbering, search each scheme and merge.
 	numberings := episodeNumberings(req)
 	if len(numberings) <= 1 {
 		return p.searchNumbering(ctx, req, req.Season, req.Episode)
@@ -126,9 +118,9 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	perScheme := p.searchNumberingsConcurrent(ctx, req, numberings)
 	merged, lastErr := mergeNumberingResults(perScheme)
 
-	// If all numbering schemes failed with errors and we got no results,
-	// propagate the last error so the caller doesn't penalize the provider
-	// with adaptive backoff for a transient API failure.
+	// Propagate the last error when every scheme failed, so the caller
+	// doesn't penalize the provider with adaptive backoff for a transient
+	// API failure.
 	if len(merged) == 0 && lastErr != nil {
 		return nil, fmt.Errorf("all numbering schemes failed: %w", lastErr)
 	}
@@ -190,18 +182,16 @@ func mergeNumberingResults(perScheme []numberingResult) ([]subflux.Subtitle, err
 	return merged, lastErr
 }
 
-// CountShowSubtitles returns the total number of subtitles available for a
-// show (by IMDB ID) in a single language, without specifying season/episode.
-// This enables show-level pre-checks: if a show has very few subtitles
-// relative to its episode count, the caller can skip the entire series.
-// Implements the optional show-level count provider.ResolveShowCounter finds.
+// CountShowSubtitles returns the total subtitle count for a show (by IMDB ID)
+// in one language, without season/episode — used for show-level pre-checks
+// that skip an entire series with too few subtitles. Implements the optional
+// provider.ResolveShowCounter interface.
 func (p *Provider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	imdbID, lang := q.ImdbID, q.Language
 	sanitized := classify.SanitizeImdbID(imdbID)
 	if sanitized == "" {
-		// Placeholder inputs like "tt0" / "tt00000" sanitize to empty.
-		// Calling the API with parent_imdb_id= is a guaranteed zero-result
-		// round trip, so short-circuit before rate-limiting a dead call.
+		// e.g. "tt0"/"tt00000" sanitize to empty; parent_imdb_id= would be
+		// a guaranteed zero-result round trip.
 		slog.Debug("opensubtitles show count skipped — empty imdb",
 			"imdb", imdbID, "lang", lang)
 		return 0, nil
@@ -253,9 +243,8 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 	slog.Debug("opensubtitles downloading subtitle", "file_id", fileID)
 
-	// Request download link. The /download endpoint must always use the
-	// default base URL (api.opensubtitles.com), not the VIP server host
-	// returned by login. The VIP host is for search queries only.
+	// /download must always use the default base URL, not the VIP host
+	// returned by login (VIP host is search-only).
 	reqBody, err := json.Marshal(map[string]any{
 		"file_id":    fileID,
 		"sub_format": "srt",
@@ -266,8 +255,6 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 	body, err := p.doPostDownload(ctx, "/download", bytes.NewReader(reqBody))
 	if err != nil {
-		// file_id is the one attribute neither the retry wrapper nor the
-		// engine's download boundary can reconstruct.
 		return nil, fmt.Errorf("request download (file_id %d): %w", fileID, err)
 	}
 	defer httpx.DrainClose(body)
@@ -284,7 +271,6 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	slog.Debug("opensubtitles download link received", "file_id", fileID)
 	p.logQuota(&dlResp)
 
-	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(dlResp.Link); err != nil {
 		return nil, fmt.Errorf("download URL rejected: %w", err)
 	}

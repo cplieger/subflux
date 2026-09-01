@@ -15,10 +15,10 @@ import (
 )
 
 // decompressIfGzipped returns data unchanged if it is not gzip-compressed.
-// If it starts with the gzip magic bytes (0x1F 0x8B), it decompresses and
-// returns the result, capped at maxBytes. AniDB's wiki explicitly warns
-// that clients may have to handle gzip manually, so this defends against
-// transport-level decompression being disabled upstream.
+// If it starts with the gzip magic bytes, it decompresses and returns the
+// result, capped at maxBytes. AniDB's wiki warns that clients may have to
+// handle gzip manually, so this defends against transport-level
+// decompression being disabled upstream.
 func decompressIfGzipped(data []byte, maxBytes int64) ([]byte, error) {
 	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
 		return data, nil
@@ -39,17 +39,15 @@ func decompressIfGzipped(data []byte, maxBytes int64) ([]byte, error) {
 	return out, nil
 }
 
-// XML types for anime-list.xml.
 type animeList struct {
 	Animes []animeEntry `xml:"anime"`
 }
 
 // mappingLimits bounds the anime-list mapping dump before encoding/xml
-// tokenizes it. This is the catalogue-scale document in this provider: tens of
-// thousands of <anime> records, each with a handful of attribute-only children,
-// so MaxElements is sized well above the real catalogue while still refusing a
-// body orders of magnitude larger. The shape is otherwise shallow and its text
-// values are short titles, which is what keeps the per-token bounds tight.
+// tokenizes it. This is a catalogue-scale document: tens of thousands of
+// <anime> records with a handful of attribute-only children each, so
+// MaxElements is sized well above the real catalogue while still refusing
+// a body orders of magnitude larger.
 var mappingLimits = xmlx.Limits{
 	MaxTextRunBytes: 16 << 10,
 	MaxTokenBytes:   32 << 10,
@@ -58,9 +56,8 @@ var mappingLimits = xmlx.Limits{
 	MaxElements:     2_000_000,
 }
 
-// episodeLimits bounds one AniDB HTTP-API response: a single <anime> with its
-// episode list, or the <error> envelope AniDB returns with HTTP 200. Far smaller
-// than the mapping dump, so the element bound is correspondingly tighter.
+// episodeLimits bounds one AniDB HTTP-API response: a single <anime> with
+// its episode list, or the <error> envelope AniDB returns with HTTP 200.
 var episodeLimits = xmlx.Limits{
 	MaxTextRunBytes: 16 << 10,
 	MaxTokenBytes:   32 << 10,
@@ -88,7 +85,6 @@ type mapping struct {
 	Offset      int    `xml:"offset,attr"`
 }
 
-// candidate holds a potential AniDB match with its episode offset.
 type candidate struct {
 	anidbID int
 	offset  int
@@ -127,13 +123,12 @@ func findInMapping(list *animeList, tvdbID, season, episode int) (anidbID, epNo 
 // resolveAbsoluteMapping handles entries with DefaultTVDBSeason="a" and
 // explicit mapping lists. Returns (anidbID, epNo, found).
 //
-// Anime-list.xml sometimes exposes multiple <mapping> entries for the same
-// tvdbseason (e.g. one with explicit per-episode Text plus a second with a
-// bulk Offset). We iterate every matching entry and prefer an exact text
-// match; if none matches, we fall back to the first positive offset-based
-// resolution seen. A single entry whose offset underflows (ep <= 0) no
-// longer short-circuits the whole lookup — a sibling entry may still
-// resolve (F10).
+// anime-list.xml sometimes carries multiple <mapping> entries for the same
+// tvdbseason (an explicit per-episode Text plus a bulk Offset). Every
+// matching entry is checked; an exact text match wins, otherwise the first
+// positive offset-based resolution is used. An entry whose offset
+// underflows (ep <= 0) does not short-circuit the lookup — a sibling entry
+// may still resolve.
 func resolveAbsoluteMapping(a *animeEntry, season, episode int) (anidbID, epNo int, found bool) {
 	if a.MappingList == nil {
 		return 0, 0, false

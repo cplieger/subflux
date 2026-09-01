@@ -18,7 +18,6 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// previewTimeout is the maximum duration for a single preview stream.
 const previewTimeout = 10 * time.Minute
 
 // bufferedMaxDuration limits buffered (Safari) previews to 30 seconds.
@@ -86,7 +85,6 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// streamVideo runs ffmpeg to transcode video to 360p H.264 + AAC as fMP4.
 func (h *Handler) streamVideo(ctx context.Context, w http.ResponseWriter,
 	path string, startSec float64,
 ) error {
@@ -94,7 +92,6 @@ func (h *Handler) streamVideo(ctx context.Context, w http.ResponseWriter,
 	return h.runFFmpegStream(ctx, w, args)
 }
 
-// serveBuffered runs ffmpeg to a temp file, then serves it with Content-Length.
 func (h *Handler) serveBuffered(ctx context.Context, w http.ResponseWriter,
 	r *http.Request, path string, startSec float64,
 ) error {
@@ -147,7 +144,6 @@ func (h *Handler) serveBuffered(ctx context.Context, w http.ResponseWriter,
 	return nil
 }
 
-// runFFmpegStream executes ffmpeg and streams stdout to the HTTP response.
 func (h *Handler) runFFmpegStream(ctx context.Context, w http.ResponseWriter,
 	args []string,
 ) error {
@@ -264,7 +260,7 @@ func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 	writePosterResponse(w, r, resp, posterURL)
 }
 
-// writePosterResponse relays an upstream poster response to the client. A
+// writePosterResponse relays an upstream poster response to the client: a
 // non-200 upstream status becomes a 404, and a missing or non-image upstream
 // content type defaults to image/jpeg.
 func writePosterResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, posterURL string) {
@@ -288,7 +284,6 @@ func writePosterResponse(w http.ResponseWriter, r *http.Request, resp *http.Resp
 	}
 }
 
-// resolveArrConfig returns the arr base URL and API key for the given media type.
 func resolveArrConfig(ls *LiveState, mediaType string) (arrURL, apiKey string, ok bool) {
 	switch mediaType {
 	case "movie":
@@ -422,10 +417,8 @@ func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// maxSyncSubSize caps subtitle file reads for preview operations.
 const maxSyncSubSize int64 = 10 << 20 // 10 MB
 
-// readAndParseSRT reads a subtitle file, normalizes encoding, and parses SRT.
 func (h *Handler) readAndParseSRT(path string) ([]byte, []subflux.SubtitleCue, error) {
 	data, err := h.deps.ReadBounded(context.Background(), path, maxSyncSubSize)
 	if err != nil {
@@ -439,7 +432,6 @@ func (h *Handler) readAndParseSRT(path string) ([]byte, []subflux.SubtitleCue, e
 	return data, cues, nil
 }
 
-// shiftAndFilterCues applies a timing shift and removes cues ending before zero.
 func shiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []subflux.SubtitleCue {
 	if totalShift == 0 {
 		return cues
@@ -458,7 +450,6 @@ func shiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []
 	return filtered
 }
 
-// findDialogueDenseStart finds the timestamp (ms) of the densest 60-second window.
 func findDialogueDenseStart(cues []subflux.SubtitleCue) int64 {
 	if len(cues) == 0 {
 		return 0
@@ -482,7 +473,6 @@ func findDialogueDenseStart(cues []subflux.SubtitleCue) int64 {
 	return max(bestStart-leadInMs, 0)
 }
 
-// srtToWebVTT converts parsed SRT cues to WebVTT format string.
 func srtToWebVTT(cues []subflux.SubtitleCue) string {
 	var b strings.Builder
 	b.WriteString("WEBVTT\n\n")

@@ -1,21 +1,14 @@
 package manualops
 
-// resolve_query.go implements GET /api/search/resolve: mapping a user query
-// (title / imdb / tmdb, optional type, optional season/episode narrowing)
-// onto arr media items. It returns the API-wide (media_type, media_id)
-// identity — the Sonarr series ID / Radarr movie ID every existing endpoint
-// uses and S7's MediaRef standardizes — plus the stable search IDs the
-// search leg forwards. No filesystem path and no new ID kind.
-//
-// The exact-match primitive (strings.EqualFold on titles, equality on
-// stable IDs) moved here near-verbatim from the deleted internal/clisearch
-// resolver (matchSeries / matchMovie); the selection rules around it are
-// the spec-settled ones: stable IDs outrank title, contradictory
-// identifiers answer 400 with a machine code, equal-titled matches answer
-// a typed ambiguity result disambiguated by year, and the absent-type
-// fallback preserves the deleted code's series-then-movie order — flipped
-// movie-first when a TMDB id (a movie-only criterion) was supplied, so the
-// supplied stable ID is evaluated before any series title match can win.
+// GET /api/search/resolve maps a user query (title/imdb/tmdb, optional
+// type, optional season/episode narrowing) onto arr media items, returning
+// the API-wide (media_type, media_id) identity plus the stable search IDs
+// the search leg forwards. Selection: stable IDs outrank title,
+// contradictory identifiers answer 400 with a machine code, equal-titled
+// matches answer a typed ambiguity result disambiguated by year, and the
+// absent-type fallback tries series then movies — flipped movie-first when
+// a TMDB id (a movie-only criterion) was supplied, so the supplied stable
+// ID is evaluated before any series title match can win.
 
 import (
 	"context"
@@ -35,7 +28,7 @@ import (
 )
 
 // resolveTimeout caps a resolve pass (full library listing + episode
-// expansion), matching the deleted local resolver's budget.
+// expansion).
 const resolveTimeout = 2 * time.Minute
 
 // Resolve `type` parameter vocabulary: which arm(s) to consult. Distinct
@@ -51,7 +44,7 @@ const (
 const mediaTypeSeries = subflux.MediaType("series")
 
 // errResolveConflict marks contradictory identifiers (an ID resolving to
-// item A while the title resolves to item B). Answered as 400 with the
+// item A while the title resolves to item B); answered as 400 with the
 // resolve_conflict machine code.
 var errResolveConflict = errors.New("conflicting identifiers")
 
@@ -67,8 +60,6 @@ type ResolveRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// ResolveSearchIDs carries the stable identifiers of a resolved item for
-// the follow-up search call.
 type ResolveSearchIDs struct {
 	Imdb string `json:"imdb,omitempty"`
 	Tvdb int    `json:"tvdb,omitempty"`
@@ -76,9 +67,8 @@ type ResolveSearchIDs struct {
 }
 
 // ResolvedItem is one searchable media item: an episode of the matched
-// series (file-bearing only) or the matched movie. MediaID is the arr ID
-// (Sonarr series ID / Radarr movie ID) — the same identity the search and
-// download endpoints consume.
+// series (file-bearing only) or the matched movie. MediaID is the arr ID,
+// the same identity the search and download endpoints consume.
 type ResolvedItem struct {
 	MediaType subflux.MediaType `json:"media_type"`
 	Title     string            `json:"title"`
@@ -89,8 +79,6 @@ type ResolvedItem struct {
 	Episode   int               `json:"episode,omitempty"`
 }
 
-// ResolveCandidate is one ambiguity candidate; Year disambiguates equal
-// titles.
 type ResolveCandidate struct {
 	MediaType subflux.MediaType `json:"media_type"`
 	Title     string            `json:"title"`
@@ -99,8 +87,8 @@ type ResolveCandidate struct {
 }
 
 // ResolveResponse is the typed result of GET /api/search/resolve. Exactly
-// one of the following holds: Resolved with Items (success), Candidates
-// (ambiguous — the client disambiguates), or all empty (no match).
+// one holds: Resolved with Items (success), Candidates (ambiguous), or all
+// empty (no match).
 type ResolveResponse struct {
 	Items      []ResolvedItem     `json:"items,omitempty"`
 	Candidates []ResolveCandidate `json:"candidates,omitempty"`
@@ -122,7 +110,7 @@ type ResolveQueryParams struct {
 }
 
 // parseResolveParams validates the raw query. errMsg is non-empty on a
-// validation failure (the handler's 400).
+// validation failure.
 func parseResolveParams(q url.Values) (p ResolveQueryParams, errMsg string) {
 	p = ResolveQueryParams{
 		Title: strings.TrimSpace(q.Get("title")),
@@ -167,7 +155,6 @@ func parseNarrowingParam(q url.Values, name string) (val *int, errMsg string) {
 	return &n, ""
 }
 
-// HandleSearchResolve handles GET /api/search/resolve.
 func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
@@ -197,13 +184,12 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 
 // ResolveQuery maps the validated query onto arr media items. With an
 // explicit type only that arm runs (an unconfigured arr is then an error);
-// with no type the deleted local resolver's fallback is preserved: series
-// first, movies only when the series arm found nothing and no
-// season/episode narrowing was requested — EXCEPT when a TMDB id was
-// supplied, which is a movie-only criterion and therefore resolves the
-// movie identity first (a supplied stable ID always outranks a title
-// match). A conflict short-circuits; an arm failure surfaces only when the
-// healthy arm could not satisfy the query (partial-arr rule).
+// with no type, series runs first and movies only when the series arm
+// found nothing and no season/episode narrowing was requested — EXCEPT
+// when a TMDB id was supplied, which resolves the movie identity first
+// since a supplied stable ID always outranks a title match. A conflict
+// short-circuits; an arm failure surfaces only when the healthy arm could
+// not satisfy the query (partial-arr rule).
 func ResolveQuery(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (ResolveResponse, error) {
 	switch p.Type {
 	case resolveTypeSeries:
@@ -215,9 +201,9 @@ func ResolveQuery(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (Re
 	}
 }
 
-// episodic reports whether season/episode narrowing was supplied. Presence,
-// not value, marks the query episodic: an explicit season=0 (specials)
-// narrows exactly like season=3.
+// episodic reports whether season/episode narrowing was supplied by
+// presence, not value: an explicit season=0 (specials) narrows exactly
+// like season=3.
 func (p *ResolveQueryParams) episodic() bool {
 	return p.Season != nil || p.Episode != nil
 }
@@ -270,13 +256,8 @@ func resolveWithFallback(ctx context.Context, ls *LiveState, p *ResolveQueryPara
 // title supplied alongside the id is checked against the movie candidates
 // inside the arm — title resolving to a different movie answers the
 // resolve_conflict 400, while a title matching no movie never overrides
-// the id (selectByIdentity's ID-precedence rule).
-//
-// When the movie arm finds nothing, the supplied id matched nothing, and a
-// bare title must not rescue it via the series arm (mirroring the in-arm
-// rule that an unmatched stable ID answers empty despite a title match).
-// The series arm therefore runs only when imdb — a series-matchable stable
-// ID — was also supplied.
+// the id. When the movie arm finds nothing, a bare title must not rescue
+// it via the series arm; that arm runs only when imdb was also supplied.
 func resolveMovieFirst(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (ResolveResponse, error) {
 	movieRes, movieErr := resolveMovieArm(ctx, ls.RadarrLib, p, false)
 	if errors.Is(movieErr, errResolveConflict) {
@@ -303,14 +284,11 @@ func resolveMovieFirst(ctx context.Context, ls *LiveState, p *ResolveQueryParams
 	return ResolveResponse{}, seriesErr
 }
 
-// decisive reports whether the arm produced an answer (items or an
-// ambiguity) rather than an empty fall-through.
 func (r *ResolveResponse) decisive() bool {
 	return len(r.Items) > 0 || len(r.Candidates) > 0
 }
 
-// armCandidate is the arm-internal match unit before item expansion: the
-// identity fields the precedence/conflict/ambiguity rules operate on.
+// armCandidate is the arm-internal match unit before item expansion.
 type armCandidate struct {
 	title string
 	imdb  string
@@ -342,9 +320,8 @@ func resolveSeriesArm(ctx context.Context, sonarr ResolveSonarrClient, p *Resolv
 			id: s.ID, title: s.Title, year: s.Year, imdb: s.ImdbID, tvdb: s.TvdbID,
 		})
 	}
-	// tmdb is not a series matching criterion (matchSeries matched on imdb
-	// and title only); a tmdb-only query therefore matches nothing here and
-	// falls through to the movie arm.
+	// tmdb is not a series matching criterion, so a tmdb-only query matches
+	// nothing here and falls through to the movie arm.
 	matched, err := selectByIdentity(cands, p.Imdb, 0, p.Title)
 	if err != nil {
 		return ResolveResponse{}, err
@@ -492,8 +469,6 @@ func matchSets(cands []armCandidate, imdb string, tmdb int, title string) (byImd
 	return byImdb, byTmdb, byTitle
 }
 
-// matchCriterion pairs a supplied identifier with its match set for the
-// pairwise contradiction check.
 type matchCriterion struct {
 	name    string
 	matches []armCandidate
@@ -514,8 +489,6 @@ func checkCriterionConflicts(supplied []matchCriterion) error {
 	return nil
 }
 
-// shareCandidate reports whether the two match sets have any arr ID in
-// common.
 func shareCandidate(a, b []armCandidate) bool {
 	ids := make(map[int]struct{}, len(a))
 	for i := range a {
@@ -529,8 +502,6 @@ func shareCandidate(a, b []armCandidate) bool {
 	return false
 }
 
-// unionByID merges match sets, deduplicating by arr ID and preserving
-// encounter order.
 func unionByID(sets ...[]armCandidate) []armCandidate {
 	var out []armCandidate
 	seen := make(map[int]struct{})

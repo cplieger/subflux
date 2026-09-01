@@ -17,47 +17,40 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// MediaSonarrClient is the Sonarr surface the media browser uses.
 type MediaSonarrClient interface {
 	Series(ctx context.Context) ([]arrapi.Series, error)
 	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
-// MediaRadarrClient is the Radarr surface the media browser uses.
 type MediaRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// Deps holds the dependencies for media handlers.
 type Deps struct {
 	StateFunc func() *LiveState
 	// ServerCtx returns the server-level context (outlives individual
-	// requests). The arr-read wrapper owns coalescing and caching for the list
-	// reads; this decides only which lifetime a cold read charges against, so a
-	// client that walks away mid-fetch does not turn one into a 502 nobody
-	// reads.
+	// requests), so a client that walks away mid-fetch does not turn a cold
+	// read into a 502 nobody reads. The arr-read wrapper owns coalescing and
+	// caching for the list reads; this decides only which lifetime a cold
+	// read charges against.
 	ServerCtx func() context.Context
 }
 
-// LiveState holds the runtime state needed by media handlers. It carries no
-// configuration: the media browser lists what the arrs know, and reads 0 of
-// the 37 values the config offers.
+// LiveState holds the runtime state needed by media handlers. It carries
+// no configuration: the media browser lists what the arrs know.
 type LiveState struct {
 	Sonarr MediaSonarrClient // nil when sonarr not configured
 	Radarr MediaRadarrClient // nil when radarr not configured
 }
 
-// Handler provides HTTP handlers for the /api/media/* endpoints.
 type Handler struct {
 	deps Deps
 }
 
-// NewHandler creates a media Handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
 	return &Handler{deps: deps}
 }
 
-// SeriesItem is the JSON shape returned by GET /api/media/series.
 type SeriesItem struct {
 	Title    string `json:"title"`
 	ImdbID   string `json:"imdb_id,omitempty"`
@@ -68,8 +61,8 @@ type SeriesItem struct {
 	Episodes int    `json:"episodes"`
 }
 
-// HandleMediaSeries returns all series from Sonarr for the media browser.
-// GET /api/media/series
+// HandleMediaSeries handles GET /api/media/series, returning all series
+// from Sonarr for the media browser.
 func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
@@ -77,9 +70,9 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, []SeriesItem{})
 		return
 	}
-	// The arr-read wrapper beneath coalesces concurrent readers of the series
-	// list into one upstream call and holds the result for its TTL, so this
-	// handler keeps no flight of its own.
+	// The arr-read wrapper beneath coalesces concurrent readers into one
+	// upstream call and holds the result for its TTL, so this handler keeps
+	// no flight of its own.
 	series, err := ls.Sonarr.Series(h.deps.ServerCtx())
 	if err != nil {
 		slog.Error("media browser: failed to fetch series", "error", err)
@@ -104,9 +97,9 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, out)
 }
 
-// MovieItem is the JSON shape returned by GET /api/media/movies. It carries
-// no file path (S7): clients address the video by MediaRef (id = arr ID) and
-// the server resolves paths.
+// MovieItem is the JSON shape returned by GET /api/media/movies. It
+// carries no file path: clients address the video by MediaRef (id = arr
+// ID) and the server resolves paths.
 type MovieItem struct {
 	Title     string `json:"title"`
 	ImdbID    string `json:"imdb_id,omitempty"`
@@ -117,8 +110,8 @@ type MovieItem struct {
 	HasFile   bool   `json:"has_file"`
 }
 
-// HandleMediaMovies returns all movies from Radarr for the media browser.
-// GET /api/media/movies
+// HandleMediaMovies handles GET /api/media/movies, returning all movies
+// from Radarr for the media browser.
 func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
@@ -126,8 +119,6 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, []MovieItem{})
 		return
 	}
-	// Same rationale as HandleMediaSeries: the wrapper owns the movie list's
-	// coalescing and TTL.
 	movies, err := ls.Radarr.Movies(h.deps.ServerCtx())
 	if err != nil {
 		slog.Error("media browser: failed to fetch movies", "error", err)
@@ -154,7 +145,7 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 }
 
 // EpisodeItem is the JSON shape for a single episode. It carries no file
-// path (S7): clients address the video by MediaRef (series arr ID + season +
+// path: clients address the video by MediaRef (series arr ID + season +
 // episode) and the server resolves paths.
 type EpisodeItem struct {
 	Title                 string `json:"title"`
@@ -168,15 +159,14 @@ type EpisodeItem struct {
 	HasFile               bool   `json:"has_file"`
 }
 
-// SeasonGroup groups episodes by season number.
 type SeasonGroup struct {
 	Episodes []EpisodeItem `json:"episodes"`
 	Season   int           `json:"season"`
 }
 
-// HandleMediaEpisodes returns episodes for a series, grouped by season.
-// Honors ?recovery=1 by marking the request context for the arr-read wrapper.
-// GET /api/media/series/{id}/episodes
+// HandleMediaEpisodes handles GET /api/media/series/{id}/episodes,
+// returning episodes for a series grouped by season. Honors ?recovery=1 by
+// marking the request context for the arr-read wrapper.
 func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
@@ -222,9 +212,8 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 }
 
 // markRecovery returns the request context, marked for wave admission when
-// the request carries ?recovery=1 (the coveragehandlers helper, mirrored).
-// Episodes-by-series is this family's one honoring endpoint; the series and
-// movie lists never call it.
+// the request carries ?recovery=1. Episodes-by-series is this family's one
+// honoring endpoint; the series and movie lists never call it.
 func markRecovery(r *http.Request) context.Context {
 	if r.URL.Query().Get("recovery") == "1" {
 		return arrsvc.WithRecovery(r.Context())
@@ -233,12 +222,12 @@ func markRecovery(r *http.Request) context.Context {
 }
 
 // writeEpisodesReadError maps an episodes-read failure onto the wire: the
-// wrapper's refusal sentinel answers 429 (a refusal to keep waiting, never a
-// 500; deliberately no Retry-After — the client's latch ladder is the retry
-// policy), the ordered gate's post-wave miss answers 404 with no upstream
-// call made, a client walk-away (only r.Context().Err() reports it) gets no
-// error log and no write, and everything else — wave execution failures
-// included — keeps the family's upstream-failure 502.
+// wrapper's refusal sentinel answers 429 (never a 500; deliberately no
+// Retry-After — the client's latch ladder is the retry policy), the
+// ordered gate's post-wave miss answers 404 with no upstream call made, a
+// client walk-away (only r.Context().Err() reports it) gets no error log
+// and no write, and everything else keeps the family's upstream-failure
+// 502.
 func writeEpisodesReadError(w http.ResponseWriter, r *http.Request, err error, seriesID int) {
 	switch {
 	case errors.Is(err, arrsvc.ErrRecoveryRefused):
@@ -253,7 +242,6 @@ func writeEpisodesReadError(w http.ResponseWriter, r *http.Request, err error, s
 	}
 }
 
-// groupEpisodesBySeason groups episodes by season number, sorted ascending.
 func groupEpisodesBySeason(episodes []EpisodeItem) []SeasonGroup {
 	seasonMap := make(map[int][]EpisodeItem)
 	for _, ep := range episodes {
@@ -273,7 +261,6 @@ func groupEpisodesBySeason(episodes []EpisodeItem) []SeasonGroup {
 	return out
 }
 
-// extractPathSegment extracts the segment between prefix and suffix in a URL path.
 func extractPathSegment(path, prefix, suffix string) string {
 	if !strings.HasPrefix(path, prefix) {
 		return ""
