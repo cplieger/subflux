@@ -220,6 +220,7 @@ type LiveState struct {
 // ScanOutcome is a type alias for subflux.ScanOutcome.
 type ScanOutcome = subflux.ScanOutcome
 
+// ScanFound and its siblings are ScanOutcome aliases for subflux's scan outcomes.
 const (
 	ScanFound     = subflux.ScanFound
 	ScanSkipped   = subflux.ScanSkipped

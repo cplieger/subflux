@@ -17,15 +17,18 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
+// MediaSonarrClient is the Sonarr read surface the media handlers need.
 type MediaSonarrClient interface {
 	Series(ctx context.Context) ([]arrapi.Series, error)
 	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
+// MediaRadarrClient is the Radarr read surface the media handlers need.
 type MediaRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
+// Deps holds the media handlers' constructor-injected collaborators.
 type Deps struct {
 	StateFunc func() *LiveState
 	// ServerCtx returns the server-level context (outlives individual
@@ -43,14 +46,17 @@ type LiveState struct {
 	Radarr MediaRadarrClient // nil when radarr not configured
 }
 
+// Handler serves the /api/media/* endpoints.
 type Handler struct {
 	deps Deps
 }
 
+// NewHandler constructs a Handler from its dependencies.
 func NewHandler(deps Deps) *Handler {
 	return &Handler{deps: deps}
 }
 
+// SeriesItem is the JSON shape returned by GET /api/media/series.
 type SeriesItem struct {
 	Title    string `json:"title"`
 	ImdbID   string `json:"imdb_id,omitempty"`
@@ -159,6 +165,7 @@ type EpisodeItem struct {
 	HasFile               bool   `json:"has_file"`
 }
 
+// SeasonGroup is a season's episodes in the GET /api/media/series/{id}/episodes response.
 type SeasonGroup struct {
 	Episodes []EpisodeItem `json:"episodes"`
 	Season   int           `json:"season"`

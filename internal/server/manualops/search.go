@@ -51,6 +51,7 @@ func ParseSearchQuery(r *http.Request) (req subflux.SearchRequest, lang string, 
 	return req, lang, mediaType, QueryInt(q, "media_id")
 }
 
+// QueryInt parses a non-negative integer query parameter, returning 0 when absent or invalid.
 func QueryInt(q interface{ Get(string) string }, key string) int {
 	v := q.Get(key)
 	if v == "" {
@@ -63,6 +64,7 @@ func QueryInt(q interface{ Get(string) string }, key string) int {
 	return n
 }
 
+// TryComputeHash computes and sets the request's video hash, best-effort, when a file path is available.
 func TryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchRequest, filePath string) {
 	if filePath == "" || req.VideoHash != "" {
 		return
@@ -131,6 +133,7 @@ type ManualSearchResponse struct {
 	Results []SearchResult `json:"results"`
 }
 
+// RunSearch queries every configured provider and returns the scored manual-search response.
 func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *subflux.SearchRequest, lang string, mediaType subflux.MediaType, filePath string,
 ) ManualSearchResponse {

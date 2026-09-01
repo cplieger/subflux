@@ -10,6 +10,7 @@ type Format struct {
 	Normalize string   // Normalized label for scoring (e.g. "h265", "bluray")
 }
 
+// NormRemux and its siblings are the normalized source labels used for scoring.
 const (
 	NormRemux    = "remux"
 	NormBluray   = "bluray"

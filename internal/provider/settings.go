@@ -16,6 +16,7 @@ const valTrue = "true"
 // and enabling IDE navigation.
 type SettingKey string
 
+// KeyAPIKey and its siblings enumerate the provider setting keys.
 const (
 	KeyAPIKey          SettingKey = "api_key"
 	KeyUsername        SettingKey = "username"

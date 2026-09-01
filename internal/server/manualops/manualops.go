@@ -14,8 +14,10 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
+// MaxResults caps the number of results a manual search returns.
 const MaxResults = 50
 
+// SearchResult is one scored manual-search candidate in the API response.
 type SearchResult struct {
 	Matches     map[string]int     `json:"matches,omitempty"`
 	Provider    subflux.ProviderID `json:"provider"`
@@ -39,6 +41,7 @@ type WarnRecorder interface {
 	RecordWarn(source, msg string)
 }
 
+// SearchDeps holds the dependencies a manual search or download pass needs.
 type SearchDeps struct {
 	DB       Store
 	Activity ActivityTracker
@@ -148,6 +151,7 @@ type ErrorNotice struct {
 	UI string
 }
 
+// NotifyError records an error notice to both the operator alert log and the user notify bus.
 func NotifyError(deps *SearchDeps, n ErrorNotice) {
 	deps.Alerts.RecordWarn(n.Source, n.Alert)
 	deps.Events.PublishNotify(events.NotifyError, n.UI)
