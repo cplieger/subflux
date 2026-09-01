@@ -47,6 +47,7 @@ func (c *Cache) Set(key string, skip bool) {
 	c.mu.Unlock()
 }
 
+// Prune removes expired entries from the cache.
 func (c *Cache) Prune() {
 	c.mu.Lock()
 	now := time.Now()

@@ -42,10 +42,12 @@ type BGTracker interface {
 	Go(f func())
 }
 
+// Handler serves the manual search/download HTTP endpoints.
 type Handler struct {
 	deps HandlerDeps
 }
 
+// NewHandler constructs a Handler from its dependencies.
 func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: callers pass by value
 	return &Handler{deps: deps}
 }
@@ -128,6 +130,7 @@ func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType subflux.Medi
 	return path
 }
 
+// HandleClearLock handles POST /api/search/clear-lock.
 func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodPost {
@@ -180,6 +183,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }
 
+// HandleManualDownload handles POST /api/search/download.
 func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
@@ -240,6 +244,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DownloadAccepted is the 202 response body for an accepted manual download.
 type DownloadAccepted struct {
 	ActivityID string `json:"activity_id"`
 	Status     string `json:"status"`

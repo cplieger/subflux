@@ -33,6 +33,7 @@ type DownloadRequest struct {
 // called by the HTTP handler after MediaRef resolution.
 func (req *DownloadRequest) SetVideoPath(path string) { req.videoPath = path }
 
+// VideoPath returns the server-resolved video path.
 func (req *DownloadRequest) VideoPath() string { return req.videoPath }
 
 // Validation errors returned by ValidateDownloadRequest.

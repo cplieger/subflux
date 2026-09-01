@@ -60,6 +60,7 @@ type ResolveRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
+// ResolveSearchIDs carries the stable search identifiers a resolved item forwards to the search leg.
 type ResolveSearchIDs struct {
 	Imdb string `json:"imdb,omitempty"`
 	Tvdb int    `json:"tvdb,omitempty"`
@@ -79,6 +80,7 @@ type ResolvedItem struct {
 	Episode   int               `json:"episode,omitempty"`
 }
 
+// ResolveCandidate is one ambiguous match in a resolve response's candidate list.
 type ResolveCandidate struct {
 	MediaType subflux.MediaType `json:"media_type"`
 	Title     string            `json:"title"`
@@ -155,6 +157,7 @@ func parseNarrowingParam(q url.Values, name string) (val *int, errMsg string) {
 	return &n, ""
 }
 
+// HandleSearchResolve handles GET /api/search/resolve.
 func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)

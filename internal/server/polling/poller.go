@@ -56,6 +56,7 @@ type pollerCfg interface {
 // PollSource identifies the arr system that produced an import event.
 type PollSource string
 
+// PollSourceSonarr and PollSourceRadarr are the two supported PollSource values.
 const (
 	PollSourceSonarr PollSource = "sonarr"
 	PollSourceRadarr PollSource = "radarr"

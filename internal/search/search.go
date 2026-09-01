@@ -97,14 +97,19 @@ type Engine struct {
 // Option configures the search Engine.
 type Option func(*Engine)
 
+// WithStore sets the engine's persistence backend.
 func WithStore(s Store) Option { return func(e *Engine) { e.store = s } }
 
+// WithConfig sets the engine's configuration source.
 func WithConfig(c Cfg) Option { return func(e *Engine) { e.cfg = c } }
 
+// WithMetrics sets the engine's metrics sink.
 func WithMetrics(m Metrics) Option { return func(e *Engine) { e.metrics = m } }
 
+// WithScorer sets the engine's release scorer.
 func WithScorer(s Scorer) Option { return func(e *Engine) { e.scorer = s } }
 
+// WithSyncer sets the engine's subtitle syncer.
 func WithSyncer(s SubtitleSyncer) Option { return func(e *Engine) { e.syncer = s } }
 
 // WithSyncExec sets the executor for the engine's own heavy sync calls (the
@@ -112,6 +117,7 @@ func WithSyncer(s SubtitleSyncer) Option { return func(e *Engine) { e.syncer = s
 // sync-worker client so alignment memory lives in a disposable child.
 func WithSyncExec(x syncing.SyncExec) Option { return func(e *Engine) { e.syncExec = x } }
 
+// WithTracks sets the engine's embedded-track detector.
 func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t } }
 
 // WithTimeout sets the provider health tracker. When not set, the engine
@@ -196,6 +202,7 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	return e
 }
 
+// ScoreSubtitles filters results by identity and returns them scored against req.
 func (e *Engine) ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult {
 	results, _ = scoring.FilterByIdentity(results, req)
 	video := videoInfoFromRequest(req)
@@ -244,6 +251,7 @@ func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStat
 	return s, true
 }
 
+// ResetTimeouts clears all provider timeout state.
 func (e *Engine) ResetTimeouts() {
 	e.timeout.Reset()
 }
@@ -256,6 +264,7 @@ func (e *Engine) SetProviderHealthHook(fn providerhealth.OnChange) {
 	e.timeout.SetOnChange(fn)
 }
 
+// SimulateScore returns the score a subtitle release would get against a video release.
 func (e *Engine) SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult {
 	video := videoInfoFromRequest(&subflux.SearchRequest{
 		MediaType:   mediaType,

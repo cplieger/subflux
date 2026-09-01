@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
+// DownloadTimeout bounds a single manual download's run.
 const DownloadTimeout = 5 * time.Minute
 
 // RunDownload performs the download, post-processing, and save. actID is
@@ -177,6 +178,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	return subPath, true
 }
 
+// ResolveMediaIDs resolves the coverage and history media IDs for a manual download.
 func ResolveMediaIDs(ctx context.Context, ls *LiveState,
 	mediaType subflux.MediaType, arrID, season, episode int,
 ) (coverageID, historyID string) {
@@ -202,6 +204,7 @@ func ResolveMediaIDs(ctx context.Context, ls *LiveState,
 	return coverageID, historyID
 }
 
+// LookupMovieMediaID resolves a Radarr movie's stable media ID by arr ID.
 func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	if ls.Radarr == nil {
 		return ""
@@ -214,6 +217,7 @@ func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	return "tmdb-" + strconv.Itoa(m.TmdbID)
 }
 
+// LookupEpisodeMediaID resolves a Sonarr episode's stable media ID by series ID, season, and episode.
 func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, episode int) string {
 	if ls.Sonarr == nil {
 		return ""
@@ -226,6 +230,7 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 	return mediaid.Episode(ser.TvdbID, ser.ImdbID, mediaid.SeasonEpisode{Season: season, Episode: episode})
 }
 
+// LookupMediaTitle resolves a media item's title by arr ID.
 func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, arrID int) string {
 	if arrID <= 0 {
 		return ""
@@ -242,6 +247,7 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.Medi
 	return ""
 }
 
+// PostDownloadUpdate records the coverage file and triggers an arr rescan after a manual download.
 func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
 	req *DownloadRequest, mediaType subflux.MediaType, coverageMediaID, subPath string, variant subflux.Variant,
 ) {

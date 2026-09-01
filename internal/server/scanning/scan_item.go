@@ -121,6 +121,7 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	return ScanNoResult, 0, queried
 }
 
+// SceneOrPath returns sceneName if set, otherwise filePath.
 func SceneOrPath(sceneName, filePath string) string {
 	if sceneName != "" {
 		return sceneName
@@ -128,6 +129,7 @@ func SceneOrPath(sceneName, filePath string) string {
 	return filePath
 }
 
+// ExtractAltTitles returns the alternate titles distinct from primary, case-insensitively deduped.
 func ExtractAltTitles(alts []arrapi.AlternateTitle, primary string) []string {
 	if len(alts) == 0 {
 		return nil
