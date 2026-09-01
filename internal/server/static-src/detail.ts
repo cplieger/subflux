@@ -1102,7 +1102,8 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (headerEl) {
     // Replace, not append: a same-movie refresh re-runs this with fresh rows.
-    headerEl.querySelector('[data-nav="sync"]')?.remove();    const firstExtSub = extSubs[0];
+    headerEl.querySelector('[data-nav="sync"]')?.remove();
+    const firstExtSub = extSubs[0];
     if (extSubs.length > 0 && firstExtSub) {
       const syncBtn = el(
         "button",

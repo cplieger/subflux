@@ -103,8 +103,8 @@ async function loadConfig(): Promise<void> {
     }
     renderConfigForm();
 
-  // Auto-open settings when unconfigured, through the controller so the
-  // open path is uniform with openConfig().
+    // Auto-open settings when unconfigured, through the controller so the
+    // open path is uniform with openConfig().
     if (store.get("isUnconfigured") && !cfgDlg.open) {
       cfgCtl().open();
     }
