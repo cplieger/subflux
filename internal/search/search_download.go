@@ -86,7 +86,7 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	best *scoredSub, videoPath string, mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant,
 ) (string, error) {
 	slog.Debug("downloading subtitle",
-		"media", req.MediaLabel(), "lang", lang,
+		"media", logsafe.Field(req.MediaLabel()), "lang", lang,
 		"provider", best.sub.Provider, "score", best.score,
 		"release", logsafe.Field(best.sub.ReleaseName),
 		"matched_by", best.sub.MatchedBy,
@@ -149,7 +149,7 @@ func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest
 	}
 
 	slog.Info("subtitle saved",
-		"media", req.MediaLabel(), "media_type", mediaType,
+		"media", logsafe.Field(req.MediaLabel()), "media_type", mediaType,
 		"lang", lang, "provider", best.sub.Provider,
 		"score", best.score, "path", subPath)
 

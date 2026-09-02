@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -162,7 +163,7 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 
 	if to := (searchOutcome{providers: provResults}).timedOut(); len(to) > 0 {
 		slog.Debug("providers timed out, skipping",
-			"providers", to, "media", req.MediaLabel(), "lang", req.Languages)
+			"providers", to, "media", logsafe.Field(req.MediaLabel()), "lang", req.Languages)
 	}
 
 	return searchOutcome{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/langcode"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -82,7 +83,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("manual search requested",
-		"title", req.Title, "imdb", req.ImdbID,
+		"title", logsafe.Field(req.Title), "imdb", logsafe.Field(req.ImdbID),
 		"lang", lang, "type", mediaType,
 		"season", req.Season, "episode", req.Episode)
 

@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -162,7 +163,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 
 	_ = g.Wait()
 
-	slog.Info("hdbits search complete", "results", len(results), "media", req.MediaLabel())
+	slog.Info("hdbits search complete", "results", len(results), "media", logsafe.Field(req.MediaLabel()))
 	return results, nil
 }
 

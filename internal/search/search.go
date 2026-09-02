@@ -9,6 +9,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/providerhealth"
@@ -433,7 +434,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	videoPath string, targets []subflux.SubtitleTarget,
 ) (subflux.SearchResult, error) {
 	slog.Debug("SearchTargets entry",
-		"media", req.MediaLabel(), "media_type", req.MediaType,
+		"media", logsafe.Field(req.MediaLabel()), "media_type", req.MediaType,
 		"imdb", req.ImdbID, "targets", len(targets),
 		"video_path", videoPath)
 
