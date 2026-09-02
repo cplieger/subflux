@@ -43,7 +43,7 @@
   "overrides": {
     "rolldown": "1.2.1 || >=1.2.3",
     "typed-rest-client": {
-      "qs": "6.15.3"
+      "qs": "6.16.0"
     }
   }
 }
