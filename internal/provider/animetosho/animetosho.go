@@ -80,7 +80,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 			subs, err := p.searchByEpisodeID(ctx, result.AniDBEpisodeID, req)
 			if err == nil && len(subs) > 0 {
 				slog.Info("animetosho search complete (anidb)",
-					"results", len(subs), "media", req.MediaLabel())
+					"results", len(subs), "media", logsafe.Field(req.MediaLabel()))
 				return subs, nil
 			}
 			if err != nil {
@@ -97,10 +97,10 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	if err != nil {
 		// The provider-sweep boundary logs this with the provider name; the
 		// media label and which leg failed are what it cannot reconstruct.
-		return nil, fmt.Errorf("title search for %s: %w", req.MediaLabel(), err)
+		return nil, fmt.Errorf("title search for %s: %w", logsafe.Field(req.MediaLabel()), err)
 	}
 	slog.Info("animetosho search complete",
-		"results", len(results), "media", req.MediaLabel())
+		"results", len(results), "media", logsafe.Field(req.MediaLabel()))
 	return results, nil
 }
 

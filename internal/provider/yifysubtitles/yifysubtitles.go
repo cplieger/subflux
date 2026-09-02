@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -72,7 +73,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 
 	results := parseResults(body, req.Languages)
 
-	slog.Info("yifysubtitles search complete", "results", len(results), "media", req.MediaLabel())
+	slog.Info("yifysubtitles search complete", "results", len(results), "media", logsafe.Field(req.MediaLabel()))
 	return results, nil
 }
 

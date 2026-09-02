@@ -183,7 +183,7 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 			"top_provider", scored[0].Sub.Provider)
 	} else {
 		slog.Info("manual search: no results",
-			"title", req.Title, "lang", lang, "media_type", mediaType)
+			"title", logsafe.Field(req.Title), "lang", lang, "media_type", mediaType)
 	}
 
 	var refs []subflux.DownloadedRef

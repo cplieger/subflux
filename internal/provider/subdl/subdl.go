@@ -22,6 +22,7 @@ import (
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -81,7 +82,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, err
 	}
 
-	items, statusErr := checkAPIStatus(result, req.MediaLabel())
+	items, statusErr := checkAPIStatus(result, logsafe.Field(req.MediaLabel()))
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -92,7 +93,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	subs := filterResults(items, req.MediaType == subflux.MediaTypeEpisode, inferMatchedBy(params))
 
 	slog.Info("subdl search complete", "results", len(subs),
-		"media", req.MediaLabel())
+		"media", logsafe.Field(req.MediaLabel()))
 	return subs, nil
 }
 

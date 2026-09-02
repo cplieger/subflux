@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -27,7 +28,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	upgradeCutoff time.Time,
 ) subflux.LangOutcome {
 	lang := targets[0].Code
-	label := req.MediaLabel()
+	label := logsafe.Field(req.MediaLabel())
 	out := subflux.LangOutcome{Lang: lang}
 
 	// Manual locks are checked per target (per variant) inside
@@ -68,10 +69,10 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	if dropped > 0 {
 		if len(kept) == 0 {
 			slog.Info("identity filter dropped all results",
-				"media", req.MediaLabel(), "dropped", dropped)
+				"media", logsafe.Field(req.MediaLabel()), "dropped", dropped)
 		} else {
 			slog.Debug("identity filter dropped results",
-				"media", req.MediaLabel(), "dropped", dropped, "kept", len(kept))
+				"media", logsafe.Field(req.MediaLabel()), "dropped", dropped, "kept", len(kept))
 		}
 	}
 	outcome.results = kept

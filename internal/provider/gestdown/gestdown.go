@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -168,12 +169,12 @@ func aggregateResults(perLang []langResult, req *subflux.SearchRequest) ([]subfl
 
 	if attempted > 0 && failed == attempted {
 		slog.Warn("gestdown search complete (all calls failed)",
-			"attempts", attempted, "media", req.MediaLabel())
+			"attempts", attempted, "media", logsafe.Field(req.MediaLabel()))
 		return nil, fmt.Errorf("gestdown: all %d attempts failed", attempted)
 	}
 
 	slog.Info("gestdown search complete", "results", len(results),
-		"media", req.MediaLabel())
+		"media", logsafe.Field(req.MediaLabel()))
 	return results, nil
 }
 

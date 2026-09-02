@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -101,7 +102,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	results := filterSubtitleEntries(subs, req.Languages, req.Season, req.Episode)
 
 	slog.Info("betaseries search complete",
-		"results", len(results), "media", req.MediaLabel())
+		"results", len(results), "media", logsafe.Field(req.MediaLabel()))
 	return results, nil
 }
 
