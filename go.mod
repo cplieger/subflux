@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	github.com/cplieger/arrapi/v2 v2.0.5
 	github.com/cplieger/atomicfile/v3 v3.0.1
-	github.com/cplieger/auth/v5 v5.0.2
+	github.com/cplieger/auth/v5 v5.0.3
 	github.com/cplieger/envx/v2 v2.0.3
 	github.com/cplieger/envx/yamlenv/v2 v2.0.1
 	github.com/cplieger/health v1.7.1
@@ -32,7 +32,7 @@ require (
 )
 
 require (
-	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
