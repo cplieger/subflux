@@ -10,7 +10,15 @@ import type { QueryValue } from "./wire/client.gen.js";
 import type { StateEntry } from "./wire/types.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
-import { signal, effect, createCollection, bindList, patch, batch } from "@cplieger/reactive";
+import {
+  signal,
+  effect,
+  createCollection,
+  bindList,
+  patch,
+  batch,
+  touch,
+} from "@cplieger/reactive";
 import { historyView } from "./view-scope.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { HISTORY_DEPTH_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
@@ -420,7 +428,7 @@ function ensureMounted(): void {
   scope.add(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
   scope.add(
     effect(() => {
-      void renderTick.value;
+      touch(renderTick);
       const loaded = history.ids.value.length;
       const empty = loaded === 0;
       const filtered = anyFilterActive();

@@ -35,7 +35,7 @@ import {
   registerCollectionPair,
   setCoveragePair,
 } from "./coverage-store.js";
-import { signal, computed, effect, bindList, patch, batch } from "@cplieger/reactive";
+import { signal, computed, effect, bindList, patch, batch, touch } from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 
 // --- Coverage view ---
@@ -50,7 +50,7 @@ const pageLimit = signal(COV_PAGE_SIZE);
 
 // Filtered + sorted full list (reactive on the collection + filter changes).
 const filteredItems = computed(() => {
-  void filterTick.value; // dep: re-run when a filter/sort control changes
+  touch(filterTick); // dep: re-run when a filter/sort control changes
   return applyFilters(coverageItems());
 });
 
