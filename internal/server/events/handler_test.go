@@ -136,6 +136,31 @@ func TestHandleEpochShape(t *testing.T) {
 	}
 }
 
+// TestHandleAdvertisesReconnectDelayOnce pins that the hub is CONSTRUCTED with
+// the reconnect hint. Without the option the browser picks its own delay and
+// the two disagree (Chrome 3s, Firefox 5s), which nothing else in the suite
+// would notice: the field is not a frame, so parseFrames skips it.
+func TestHandleAdvertisesReconnectDelayOnce(t *testing.T) {
+	t.Parallel()
+	bus := New(0)
+	publishN(bus, 2)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	Handle(bus, rec, req)
+	body := rec.Body.String()
+
+	want := fmt.Sprintf("retry: %d\n\n", SSEReconnectDelay.Milliseconds())
+	if n := strings.Count(body, "retry: "); n != 1 {
+		t.Fatalf("body carries %d retry: lines, want exactly 1 (it is a property of the connection, not of a frame); body = %q", n, body)
+	}
+	if !strings.HasPrefix(body, want) {
+		t.Errorf("body does not open with %q; the delay must be in effect before the first drop, so it precedes the replay and the epoch. body = %q", want, body)
+	}
+}
+
 func TestHandleReplayFromMidRing(t *testing.T) {
 	t.Parallel()
 	bus := New(0)
