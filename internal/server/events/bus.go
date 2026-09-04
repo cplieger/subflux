@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/webhttp/v2/sse"
@@ -26,6 +27,15 @@ const SSERing = 1024
 // cheaper than a bulk replay). It is the fourth disjunct of the handler's
 // pre-check and covers hidden-window growth and native retries alike.
 const ReplayBudget = 256
+
+// SSEReconnectDelay is the stream's advertised `retry:` field, governing the
+// reconnect the BROWSER performs by itself after a transient drop. The app's
+// own ladder in events.ts covers only the readyState CLOSED case, so without
+// this the two browsers disagree and neither is reachable from here: Chrome
+// waits 3s, Firefox 5s. It is deliberately not lower, because the spec routes
+// a connection to a DOWN server through the same timer, and permits but does
+// not require a user agent to back off above it.
+const SSEReconnectDelay = 1500 * time.Millisecond
 
 // EventBus publishes subflux's typed events to connected SSE clients.
 // A nil *EventBus is safe to publish to (no-op), so optional wiring needs
@@ -48,7 +58,11 @@ func New(maxClients int) *EventBus {
 		maxClients = DefaultMaxSSEClients
 	}
 	return &EventBus{
-		hub:    sse.NewHub(sse.WithMaxClients(maxClients), sse.WithReplay(SSERing)),
+		hub: sse.NewHub(
+			sse.WithMaxClients(maxClients),
+			sse.WithReplay(SSERing),
+			sse.WithReconnectDelay(SSEReconnectDelay),
+		),
 		bootID: newBootID(),
 	}
 }
