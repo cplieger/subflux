@@ -5,14 +5,14 @@ go 1.27.1
 require (
 	github.com/cplieger/arrapi/v2 v2.0.5
 	github.com/cplieger/atomicfile/v3 v3.0.1
-	github.com/cplieger/auth/v5 v5.0.6
+	github.com/cplieger/auth/v5 v5.0.7
 	github.com/cplieger/envx/v2 v2.0.3
 	github.com/cplieger/envx/yamlenv/v2 v2.0.1
 	github.com/cplieger/health v1.7.1
 	github.com/cplieger/httpx/v5 v5.0.3
 	github.com/cplieger/jsonx/v2 v2.0.1
 	github.com/cplieger/keyenc v1.0.7
-	github.com/cplieger/langtag/v2 v2.0.1
+	github.com/cplieger/langtag/v2 v2.0.2
 	github.com/cplieger/metrics/v4 v4.0.1
 	github.com/cplieger/pathinside/v2 v2.0.1
 	github.com/cplieger/runesafe/v2 v2.0.1
@@ -44,7 +44,7 @@ require (
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/crypto v0.56.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
