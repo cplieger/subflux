@@ -26,8 +26,8 @@ github.com/cplieger/pathinside/v2 v2.0.1 h1:tsCGs+7/U1v/c2q7lcHK9UYUbiyYrvjUxL2h
 github.com/cplieger/pathinside/v2 v2.0.1/go.mod h1:M+uGHbsTS0Zb1hqRMbkoMI/3RkryUZRnJ+P0gxhBjyE=
 github.com/cplieger/runesafe/v2 v2.0.1 h1:TWTX4OPjz4pqgidBavkbglEh3XdwrJgq8dC/LFf89u0=
 github.com/cplieger/runesafe/v2 v2.0.1/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
-github.com/cplieger/slogx v1.6.4 h1:3VqDvuVPI15rK6RZ6dmnnjfQYhTxiDOWnFMZHSOxJZ0=
-github.com/cplieger/slogx v1.6.4/go.mod h1:Ac6vL8Ymaa8USg++ELEQKwNIBgk0nG2HWO+6wDuQNmw=
+github.com/cplieger/slogx v1.6.5 h1:KzQqC5QcfA83CnpMlkikoEFzMgo0+7bsyi6+dipUys0=
+github.com/cplieger/slogx v1.6.5/go.mod h1:Ac6vL8Ymaa8USg++ELEQKwNIBgk0nG2HWO+6wDuQNmw=
 github.com/cplieger/ssrf/v4 v4.1.2 h1:SPktUyG4+abBdBW7qb0gSS2X1cdUaZv4kQhcpcFTn9A=
 github.com/cplieger/ssrf/v4 v4.1.2/go.mod h1:xmmAC+LEi7AWKsaBaVEk2ohT1ojtJU6d4Hnjhh/W1bY=
 github.com/cplieger/webhttp/v2 v2.1.0 h1:+uczCpVxI5QmHJcjSQA8MGPcT+HtNaOMMt2vBfS7pB0=
