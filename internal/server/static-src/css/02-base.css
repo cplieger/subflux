@@ -104,15 +104,6 @@ input[type="search"] {
   background-size: var(--icon);
 }
 
-/* Safari/iOS date input: fix height and add visual hint when empty */
-input[type="date"] {
-  appearance: none;
-}
-
-input[type="date"]:invalid {
-  color: var(--muted);
-}
-
 /* --- Buttons --- */
 :where(button) {
   background: var(--accent);
@@ -292,8 +283,7 @@ input[type="date"]:invalid {
     gap: var(--sp-4);
   }
 
-  [data-page="history"] .controls select,
-  [data-page="history"] .controls input[type="date"] {
+  [data-page="history"] .controls select {
     flex: 1 1 40%;
     min-width: 40%;
   }
