@@ -436,3 +436,14 @@ method (*CachedRadarr).Close
 #           added beside it is the only guard there can be.
 method (*gzipResponseWriter).Flush
 method (*gzipResponseWriter).Unwrap
+
+
+# --- One test helper, 22 consuming test packages (EU1001 by design) ---------
+# internal/testsupport/slogswap.go holds a single export, SwapDefaultLogger,
+# and 22 packages' _test.go files call it. Go has no cross-package unexported
+# access, so the export is what makes one copy possible; unexporting it means
+# 22 copies of the same eight-line explanation of why slog.SetDefault has to be
+# undone in three places, which is what this file replaced. Distinct from the
+# single-consumer seam block above: that one is structurally forced by WHERE the
+# data and its guard must live, this one by HOW MANY callers there are.
+function SwapDefaultLogger
