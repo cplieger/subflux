@@ -228,6 +228,14 @@ describe("dom: onBackdropClose()", () => {
     const closeFn = vi.fn();
     const d = dlg();
     onBackdropClose(d, closeFn);
+    // close() QUEUES its close event on a task queue that is not ordered
+    // against timers, so a setTimeout tick resolves BEFORE the latch re-arms
+    // roughly three times in four here — wait for the event itself. Registered
+    // ahead of the spy so the listener assertion below stays honest, and after
+    // onBackdropClose so its own re-arm listener runs first.
+    const closed = new Promise<void>((resolve) => {
+      d.addEventListener("close", () => resolve(), { once: true });
+    });
     const listeners = vi.spyOn(d, "addEventListener");
 
     d.showModal();
@@ -235,9 +243,7 @@ describe("dom: onBackdropClose()", () => {
     expect(closeFn).toHaveBeenCalledTimes(1);
 
     d.close();
-    // close() QUEUES its close event as a task; the latch re-arms when it
-    // lands.
-    await new Promise((r) => setTimeout(r, 0));
+    await closed;
     d.showModal();
     press(d);
 
