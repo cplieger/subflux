@@ -13,6 +13,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 var errMock = errors.New("mock error")
@@ -503,9 +504,7 @@ func TestHandleMediaEpisodes_sentinel_mapping(t *testing.T) {
 // captures the process-global slog default.
 func TestHandleMediaEpisodes_client_abort_is_silent(t *testing.T) {
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // the client walked away mid-wave-wait

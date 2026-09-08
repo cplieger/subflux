@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,6 +29,18 @@ import (
 // This file holds the package-wide shared test fakes and the test-server
 // builder used across the server suite. Behavior-specific fakes live next to
 // the tests that use them; only the cross-file fakes belong here.
+
+// --- Default logger capture ---
+
+// captureSlog redirects the default logger into a buffer for the duration of
+// the test. A test using it must NOT call t.Parallel: the default logger is
+// process-wide, so a parallel sibling's lines would land in this buffer.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	return &buf
+}
 
 // --- Authenticator double ---
 

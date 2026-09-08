@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,10 +54,7 @@ func TestApplyTrustedProxies_pushes_the_live_set_into_client_ip_resolution(t *te
 // dropped arr URL invisible in the record.
 func TestHotReload_logs_the_candidate_it_activates(t *testing.T) {
 	// No t.Parallel: this test swaps the global slog default logger.
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	buf := captureSlog(t)
 
 	s, _ := newActivationTestServer(t)
 	// The base config configures sonarr and never radarr.

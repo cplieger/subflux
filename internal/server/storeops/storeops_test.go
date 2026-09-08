@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 func TestPruneBackups_keepsNewestAndSkipsLiveDB(t *testing.T) {
@@ -55,9 +56,7 @@ func TestPruneBackups_keepsNewestAndSkipsLiveDB(t *testing.T) {
 // everything it meant to must say nothing. Serial (default logger).
 func TestPruneBackups_successful_prune_is_silent(t *testing.T) {
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	dir := t.TempDir()
 	for _, n := range []string{

@@ -1,10 +1,8 @@
 package scanning
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log/slog"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -272,10 +270,7 @@ func TestShowLevelSkip_count_equals_threshold(t *testing.T) {
 // "show skip check error" warning on a clean run.
 func TestShouldSkipShow_no_spurious_errgroup_warn(t *testing.T) {
 	// No t.Parallel: this test swaps the global slog default logger.
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	defer slog.SetDefault(prev)
+	buf := captureLogs(t)
 
 	mock := &mockShowCounter{counts: map[string]int{"tt1-en": 100, "tt1-fr": 100}}
 	st := newSeasonTracker(mock, showskip.New(time.Hour), seedDeps{})

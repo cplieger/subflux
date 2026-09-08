@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,10 +74,7 @@ func TestDeleteSubtitleFiles_removesThroughTheConfinedRoot(t *testing.T) {
 // sends someone hunting for a permission problem that never happened.
 // Serial: asserts on the default logger.
 func TestDeleteSubtitleFiles_reports_the_outcome_it_had(t *testing.T) {
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	buf := captureSlog(t)
 
 	base := t.TempDir()
 	root := filepath.Join(base, "media")

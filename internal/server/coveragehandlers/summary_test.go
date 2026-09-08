@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // summarySonarrFake is the sonarr double for the summary and collection
@@ -696,9 +697,7 @@ func TestHandleCoverageSeriesSummary_store_error_returns_500(t *testing.T) {
 // either. Serial: captures the process-global slog default.
 func TestCoverageHandlers_client_abort_is_silent(t *testing.T) {
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // the client walked away mid-wave-wait

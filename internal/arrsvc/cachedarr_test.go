@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // fakeSonarr is a controllable sonarrReads implementation.
@@ -282,9 +283,7 @@ func TestExcludeTags_emptyNameSetSkipsUpstream(t *testing.T) {
 func captureSlog(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, nil)))
 	return &buf
 }
 
