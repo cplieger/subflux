@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -907,9 +909,7 @@ func TestAlign_secondPassAdmitsAMatchExactlyAtItsWindowEdge(t *testing.T) {
 // No t.Parallel: this swaps the process-wide default logger.
 func TestAlign_rejectsADegenerateDurationAtTheDurationGuard(t *testing.T) {
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	tests := []struct {
 		name string

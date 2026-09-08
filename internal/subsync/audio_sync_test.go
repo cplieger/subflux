@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/testsupport"
 	"pgregory.net/rapid"
 )
 
@@ -375,9 +376,7 @@ func logField(line, key string) (string, bool) {
 func TestAudioSyncFromPCM_logs_the_completed_sync(t *testing.T) {
 	// Not parallel: this swaps the process-wide default logger.
 	var buf bytes.Buffer
-	restore := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(restore) })
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, nil)))
 
 	// Eleven seconds of audio: no other test in this package uses that
 	// duration, so the reported duration identifies this run's line even when

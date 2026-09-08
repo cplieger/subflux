@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // captureSlog swaps the default slog logger for one writing JSON to a
@@ -16,9 +18,7 @@ import (
 func captureSlog(t *testing.T, fn func()) []map[string]any {
 	t.Helper()
 	var buf bytes.Buffer
-	prev := slog.Default()
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	fn()
 

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // --- Test helpers ---
@@ -16,14 +18,12 @@ var minScanDelay = Duration{D: 5 * time.Second}
 
 // captureLogs runs fn with the default slog logger swapped for a text handler
 // writing to a buffer, and returns the captured output. The previous default
-// logger is restored on return. Tests using it must not call t.Parallel(),
-// since the logger swap is process-wide.
+// logger is restored when the test ends. Tests using it must not call
+// t.Parallel(), since the logger swap is process-wide.
 func captureLogs(t *testing.T, fn func()) string {
 	t.Helper()
 	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	defer slog.SetDefault(prev)
+	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	fn()
 	return buf.String()
 }
