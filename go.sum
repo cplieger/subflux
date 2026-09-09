@@ -1,7 +1,7 @@
 github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBqoWM=
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/arrapi/v2 v2.0.5 h1:ZjeczsQlqZ8YVBiiZ6324NNeTQAvp3NyWrDnKo5+uWY=
-github.com/cplieger/arrapi/v2 v2.0.5/go.mod h1:C3aDtiCZTlQKX27aRsJI9EO9B6kXhN9XwVWnsJ17YSw=
+github.com/cplieger/arrapi/v2 v2.0.6 h1:WlzgmpWdBwsiixZUcBM/68h3SMC9+dMaAdgouAI/FVY=
+github.com/cplieger/arrapi/v2 v2.0.6/go.mod h1:OYgYksuBRcroa59yFV+2PsdIlur9qY9miNZrpP/03ys=
 github.com/cplieger/atomicfile/v3 v3.0.1 h1:F5MZQ8Tvn9K0imJ59rFVofgtnGR5Gtf94Ivk9v3gC7o=
 github.com/cplieger/atomicfile/v3 v3.0.1/go.mod h1:jhxOw5RQn5pYB0eAo5SLRPXKYChRxT/bW/TnTcLZa78=
 github.com/cplieger/auth/v5 v5.0.8 h1:VVDzTJiEz9VNHqv1zrnoZpEdTzoPSKfvcg9a+5rG4fg=
@@ -28,8 +28,8 @@ github.com/cplieger/runesafe/v2 v2.1.0 h1:MTFMH5VDk9+bhbUces9LweBAO9Bsayy/hKLFBO
 github.com/cplieger/runesafe/v2 v2.1.0/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
 github.com/cplieger/slogx v1.6.5 h1:KzQqC5QcfA83CnpMlkikoEFzMgo0+7bsyi6+dipUys0=
 github.com/cplieger/slogx v1.6.5/go.mod h1:Ac6vL8Ymaa8USg++ELEQKwNIBgk0nG2HWO+6wDuQNmw=
-github.com/cplieger/ssrf/v4 v4.1.2 h1:SPktUyG4+abBdBW7qb0gSS2X1cdUaZv4kQhcpcFTn9A=
-github.com/cplieger/ssrf/v4 v4.1.2/go.mod h1:xmmAC+LEi7AWKsaBaVEk2ohT1ojtJU6d4Hnjhh/W1bY=
+github.com/cplieger/ssrf/v4 v4.1.3 h1:vW32FzbwVUmCGh18qG7g9pDumU7UK121INo40NSU+S0=
+github.com/cplieger/ssrf/v4 v4.1.3/go.mod h1:aoFkA+rp5MjLn3HSwxN8XltHUYGyJhLIqT4JAmFdgRE=
 github.com/cplieger/webhttp/v2 v2.2.0 h1:o1iHw6ZxWKPRbUaL7arO36XAewhYXgq2arZ8KjkVwyc=
 github.com/cplieger/webhttp/v2 v2.2.0/go.mod h1:g0vbWk/TRByvS72jimOby/VGBdCJzx7/hvUXG+KbeXE=
 github.com/cplieger/wiregen/v3 v3.0.3 h1:DKJdHCrVBnjcDZro4bOc6DkSQjSjrzCbKxh4n7bdti0=
