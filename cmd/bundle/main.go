@@ -59,7 +59,9 @@ func run() error {
 // modules from older builds (or the pre-bundler tsc-emit layout: loose
 // per-module .js files, vendor/, wire/, lib/) never linger into the embed.
 // Committed assets (index.html, login.html, favicon.svg, icons/) are
-// untouched: only the patterns the bundle owns are removed.
+// untouched: only the patterns the bundle owns are removed. The .map pattern
+// stays load-bearing even though bundleOptions emits none: it is what keeps a
+// sourcemap left by an older build out of the embed.
 func cleanOutputs() error {
 	for _, dir := range []string{"chunks", "vendor", "wire", "lib", "actions"} {
 		if err := os.RemoveAll(filepath.Join(outDir, dir)); err != nil {
@@ -93,12 +95,23 @@ func cleanOutputs() error {
 // rewriting; cache correctness comes from the server's ETag revalidation
 // (assets are no-cache, HTML is no-store).
 func bundleEntries() error {
-	result := api.Build(api.BuildOptions{
-		EntryPoints: []string{
-			filepath.Join(srcDir, "app.ts"),
-			filepath.Join(srcDir, "login.ts"),
-		},
-		Outdir:            outDir,
+	result := api.Build(bundleOptions([]string{
+		filepath.Join(srcDir, "app.ts"),
+		filepath.Join(srcDir, "login.ts"),
+	}, outDir))
+	if len(result.Errors) > 0 {
+		msgs := api.FormatMessages(result.Errors, api.FormatMessagesOptions{Kind: api.ErrorMessage, Color: false})
+		return fmt.Errorf("bundle failed:\n%s", strings.Join(msgs, "\n"))
+	}
+	return nil
+}
+
+// bundleOptions is the esbuild configuration bundleEntries runs, taken as
+// arguments so a test can drive the same option set over a fixture tree.
+func bundleOptions(entryPoints []string, outdir string) api.BuildOptions {
+	return api.BuildOptions{
+		EntryPoints:       entryPoints,
+		Outdir:            outdir,
 		Bundle:            true,
 		Format:            api.FormatESModule,
 		Splitting:         true,
@@ -107,16 +120,15 @@ func bundleEntries() error {
 		MinifyWhitespace:  true,
 		MinifyIdentifiers: true,
 		MinifySyntax:      true,
-		Sourcemap:         api.SourceMapLinked,
-		Charset:           api.CharsetUTF8,
-		LogLevel:          api.LogLevelWarning,
-		Write:             true,
-	})
-	if len(result.Errors) > 0 {
-		msgs := api.FormatMessages(result.Errors, api.FormatMessagesOptions{Kind: api.ErrorMessage, Color: false})
-		return fmt.Errorf("bundle failed:\n%s", strings.Join(msgs, "\n"))
+		// No sourcemap: go:embed ships everything this writes into static/ and
+		// the server serves those assets to unauthenticated callers, so a map
+		// would publish the TypeScript sources to anyone who can reach the
+		// port and carry them in every binary and image.
+		Sourcemap: api.SourceMapNone,
+		Charset:   api.CharsetUTF8,
+		LogLevel:  api.LogLevelWarning,
+		Write:     true,
 	}
-	return nil
 }
 
 // buildCSS assembles the served stylesheets exactly as the former

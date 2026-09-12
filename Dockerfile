@@ -258,9 +258,9 @@ COPY --from=ts-builder /src/static-src/node_modules/ internal/server/static-src/
 # (esbuild via its Go API — a Go library, no Node, no npm): app.ts +
 # login.ts bundle to /app.js + /login.js as ESM with code splitting (shared
 # modules become hashed chunks under /chunks/, cached across the login → app
-# transition), the CSS manifests concatenate to style.css / login.css,
-# ui-primitives.css is copied standalone, and every emitted text asset gets
-# a precompressed .gz sibling the server hands to gzip-accepting clients.
+# transition), the CSS manifests concatenate to style.css / login.css, and
+# ui-primitives.css is copied standalone. No sourcemaps and no precompressed
+# .gz siblings are emitted; the server gzips the embedded originals itself.
 # Types were already gated in ts-builder; esbuild only bundles. go:embed
 # ships the result inside the binary below.
 # hadolint ignore=DL3062

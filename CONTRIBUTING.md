@@ -220,13 +220,15 @@ concatenates the per-feature CSS splits listed in the `MANIFEST` files
 (`MANIFEST` → `style.css`, `login.MANIFEST` → `login.css`), and copies
 `ui-primitives.css`. It emits no precompressed `.gz` siblings; the server
 gzip-compresses the embedded assets itself at startup and serves those to
-gzip-accepting clients. tsc runs `--noEmit` as the type gate
-(esbuild does not typecheck). In the Docker build the ts-builder stage
-typechecks and fetches the pinned `@cplieger/*` packages; the Go builder
-stage then runs `go run ./cmd/bundle` and embeds the output. Everything
-generated under `internal/server/static/` is gitignored (only the HTML
-entrypoints, favicon, and icons are committed). Go-only changes need none
-of this; rebuild the image to pick up frontend edits.
+gzip-accepting clients. It emits no sourcemaps either: everything the bundler
+writes is embedded in the binary and served without authentication, so a map
+would hand the TypeScript sources to any caller who can reach the port. tsc
+runs `--noEmit` as the type gate (esbuild does not typecheck). In the Docker
+build the ts-builder stage typechecks and fetches the pinned `@cplieger/*`
+packages; the Go builder stage then runs `go run ./cmd/bundle` and embeds the
+output. Everything generated under `internal/server/static/` is gitignored
+(only the HTML entrypoints, favicon, and icons are committed). Go-only changes
+need none of this; rebuild the image to pick up frontend edits.
 
 To iterate on `static-src/` locally, install the dev toolchain and use the
 package scripts (plus the bundle command from the repo root):
