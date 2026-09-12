@@ -20,8 +20,8 @@ github.com/cplieger/keyenc v1.0.7 h1:WlTRDm84eHjWqhiNVlT7mmVcNLIehMAzFFHSU05zz1w
 github.com/cplieger/keyenc v1.0.7/go.mod h1:7T7DG6yK2b+DJWmQxXfbMADV5h3fWLFTnbXpAWVaKa4=
 github.com/cplieger/langtag/v2 v2.0.2 h1:hgalQcWYHbO4w/8JfjLXCNGN7ZBQaukgumWPLzBJqEw=
 github.com/cplieger/langtag/v2 v2.0.2/go.mod h1:lmWq8nccvTMYvG2Eqx/olupr3gZuS6WEqVwiueS8oCM=
-github.com/cplieger/metrics/v4 v4.0.1 h1:B1cacAbdPvJdlO+GoZ85Jn7H/syBMAvu1B+FEgv7mr0=
-github.com/cplieger/metrics/v4 v4.0.1/go.mod h1:DTbCsiZH50cWzGoBW4lWpGMnyJNQ+POKRcfUhKsR9+c=
+github.com/cplieger/metrics/v4 v4.0.2 h1:G7iaUPOmT8eDDzKwTjPuD2dTRk87eOuijSTN3QM5moA=
+github.com/cplieger/metrics/v4 v4.0.2/go.mod h1:DTbCsiZH50cWzGoBW4lWpGMnyJNQ+POKRcfUhKsR9+c=
 github.com/cplieger/pathinside/v2 v2.0.1 h1:tsCGs+7/U1v/c2q7lcHK9UYUbiyYrvjUxL2h46awO2A=
 github.com/cplieger/pathinside/v2 v2.0.1/go.mod h1:M+uGHbsTS0Zb1hqRMbkoMI/3RkryUZRnJ+P0gxhBjyE=
 github.com/cplieger/runesafe/v2 v2.1.0 h1:MTFMH5VDk9+bhbUces9LweBAO9Bsayy/hKLFBOqewj8=

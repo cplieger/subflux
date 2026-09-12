@@ -13,7 +13,7 @@ require (
 	github.com/cplieger/jsonx/v2 v2.0.1
 	github.com/cplieger/keyenc v1.0.7
 	github.com/cplieger/langtag/v2 v2.0.2
-	github.com/cplieger/metrics/v4 v4.0.1
+	github.com/cplieger/metrics/v4 v4.0.2
 	github.com/cplieger/pathinside/v2 v2.0.1
 	github.com/cplieger/runesafe/v2 v2.1.0
 	github.com/cplieger/slogx v1.6.5
