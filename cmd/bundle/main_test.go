@@ -9,8 +9,9 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-// Anything bundleOptions writes into the output directory is embedded by
-// go:embed and served by handleUI's public asset branch, so a sourcemap in
+// Anything bundleOptions writes into the output directory is embedded by the
+// server's go:embed directive and served by handleUI's public asset branch, so
+// a sourcemap in
 // there is a published artifact: it hands the TypeScript sources to any
 // unauthenticated caller and rides along in every binary and image. Drive the
 // real option set over a fixture entrypoint and assert both halves of the
