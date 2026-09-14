@@ -28,8 +28,8 @@ github.com/cplieger/runesafe/v2 v2.1.0 h1:MTFMH5VDk9+bhbUces9LweBAO9Bsayy/hKLFBO
 github.com/cplieger/runesafe/v2 v2.1.0/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
 github.com/cplieger/slogx v1.6.5 h1:KzQqC5QcfA83CnpMlkikoEFzMgo0+7bsyi6+dipUys0=
 github.com/cplieger/slogx v1.6.5/go.mod h1:Ac6vL8Ymaa8USg++ELEQKwNIBgk0nG2HWO+6wDuQNmw=
-github.com/cplieger/sse v1.0.0 h1:ORVShs1oFrLyBGcpuXlTw1anyYyPnSqiTPf/ODRcrKU=
-github.com/cplieger/sse v1.0.0/go.mod h1:4uVOvv4Xt8OFmb41b0/vW28+xOaq8vEb1oycl9PEi1I=
+github.com/cplieger/sse v1.1.0 h1:SlByDp0QtsclxDdbIelSq/CYmKPV/HQfGZpO2QKM1RU=
+github.com/cplieger/sse v1.1.0/go.mod h1:4uVOvv4Xt8OFmb41b0/vW28+xOaq8vEb1oycl9PEi1I=
 github.com/cplieger/ssrf/v4 v4.1.3 h1:vW32FzbwVUmCGh18qG7g9pDumU7UK121INo40NSU+S0=
 github.com/cplieger/ssrf/v4 v4.1.3/go.mod h1:aoFkA+rp5MjLn3HSwxN8XltHUYGyJhLIqT4JAmFdgRE=
 github.com/cplieger/webhttp/v3 v3.0.0 h1:CHA5wZyGXVb9wb6VYEbxrhQRIwDpiJs42AVulR4WCns=
