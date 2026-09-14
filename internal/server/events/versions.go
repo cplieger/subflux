@@ -43,8 +43,8 @@ var ErrUnknownSubject = errors.New("events: unknown digest subject")
 // a restart clears every client's map, so no persistence is needed.
 // Safe for concurrent use.
 type Versions struct {
-	epoch string
 	n     map[string]uint64
+	epoch string
 	mu    sync.Mutex
 }
 

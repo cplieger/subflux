@@ -14,9 +14,16 @@ import (
 func TestVersions_resolve_reports_the_bump_count_per_key(t *testing.T) {
 	t.Parallel()
 	keys := []sse.Subject{
-		{Kind: SubjectSeries}, {Kind: SubjectMovies}, {Kind: SubjectHistory},
-		{Kind: SubjectActivity}, {Kind: SubjectAlerts}, {Kind: SubjectProviders}, {Kind: SubjectJobs},
-		{Kind: SubjectDetail, Ref: "tvdb-1"}, {Kind: SubjectDetail, Ref: "tvdb-22"}, {Kind: SubjectDetail, Ref: "tmdb-3"},
+		{Kind: SubjectSeries},
+		{Kind: SubjectMovies},
+		{Kind: SubjectHistory},
+		{Kind: SubjectActivity},
+		{Kind: SubjectAlerts},
+		{Kind: SubjectProviders},
+		{Kind: SubjectJobs},
+		{Kind: SubjectDetail, Ref: "tvdb-1"},
+		{Kind: SubjectDetail, Ref: "tvdb-22"},
+		{Kind: SubjectDetail, Ref: "tmdb-3"},
 	}
 	rapid.Check(t, func(rt *rapid.T) {
 		v := newVersions("0123456789abcdef")

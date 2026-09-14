@@ -2,6 +2,7 @@ package events
 
 import (
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/cplieger/sse"
@@ -34,18 +35,18 @@ func TestVersions_resolve_answers_one_state_per_held_key_in_order(t *testing.T) 
 	v.Bump(SubjectDetail, "tmdb-9")
 	v.Bump(SubjectDetail, "tmdb-9")
 	held := []sse.Held{
-		{Subject: sse.Subject{Kind: SubjectDetail, Ref: "tmdb-9"}, Version: "1"},
-		{Subject: sse.Subject{Kind: SubjectSeries}, Version: "1"},
-		{Subject: sse.Subject{Kind: SubjectJobs}, Version: "0"},
+		{Kind: SubjectDetail, Ref: "tmdb-9", Version: "1"},
+		{Kind: SubjectSeries, Version: "1"},
+		{Kind: SubjectJobs, Version: "0"},
 	}
 	got, err := v.Resolve(t.Context(), held)
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 	want := []sse.State{
-		{Subject: sse.Subject{Kind: SubjectDetail, Ref: "tmdb-9"}, Version: "2", Status: sse.StatusCurrent},
-		{Subject: sse.Subject{Kind: SubjectSeries}, Version: "1", Status: sse.StatusCurrent},
-		{Subject: sse.Subject{Kind: SubjectJobs}, Version: "0", Status: sse.StatusCurrent},
+		{Kind: SubjectDetail, Ref: "tmdb-9", Version: "2", Status: sse.StatusCurrent},
+		{Kind: SubjectSeries, Version: "1", Status: sse.StatusCurrent},
+		{Kind: SubjectJobs, Version: "0", Status: sse.StatusCurrent},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("Resolve() = %d states, want %d: %+v", len(got), len(want), got)
@@ -75,7 +76,7 @@ func TestVersions_resolve_refuses_keys_outside_the_registry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			v := newVersions("0123456789abcdef")
-			_, err := v.Resolve(t.Context(), []sse.Held{{Subject: sse.Subject{Kind: tc.kind, Ref: tc.ref}, Version: "0"}})
+			_, err := v.Resolve(t.Context(), []sse.Held{{Kind: tc.kind, Ref: tc.ref, Version: "0"}})
 			if !errors.Is(err, ErrUnknownSubject) {
 				t.Errorf("Resolve(%s, %q) error = %v, want ErrUnknownSubject", tc.kind, tc.ref, err)
 			}
@@ -157,9 +158,7 @@ func TestPublish_mints_the_subjects_an_event_moved(t *testing.T) {
 			bus := New(0, nil)
 			bus.Publish(tc.event)
 			want := map[string]string{}
-			for k, v := range zero {
-				want[k] = v
-			}
+			maps.Copy(want, zero)
 			for _, k := range tc.bumped {
 				want[k] = "1"
 			}
