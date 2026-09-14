@@ -90,7 +90,7 @@ func New(maxClients int, m Metrics) *EventBus {
 		sse.WithReplayTTL(SSEReplayTTL),
 		sse.WithReplyMaxEvents(ReplyMaxEvents),
 		sse.WithReconnectDelay(SSEReconnectDelay),
-		sse.WithPresence(eb.onPresence),
+		sse.WithPresence(func(ev sse.PresenceEvent) { eb.onPresence(&ev) }),
 	)
 	eb.versions = newVersions(eb.hub.Position().Epoch)
 	return eb
@@ -107,11 +107,11 @@ func (eb *EventBus) Versions() *Versions {
 // OnConnect hook in Handle (which knows the legacy split), so this side
 // counts departures only; the client gauge and the presence table move on
 // both.
-func (eb *EventBus) onPresence(ev sse.PresenceEvent) {
+func (eb *EventBus) onPresence(ev *sse.PresenceEvent) {
 	switch ev.Kind {
-	case "connected":
+	case sse.PresenceConnected:
 		eb.presence.connected(ev.Tag, ev.At)
-	case "disconnected":
+	case sse.PresenceDisconnected:
 		eb.presence.disconnected(ev.Tag)
 		eb.metrics.RecordSSEDisconnect(string(ev.Cause))
 	}
@@ -129,12 +129,6 @@ func (eb *EventBus) Presence() *Presence {
 // under a route timeout (it does not stream).
 func (eb *EventBus) DigestHandler() http.Handler {
 	return eb.hub.DigestHandler(eb.versions.Resolve)
-}
-
-// Epoch returns the hub's epoch: the 16-hex process identity every cursor,
-// hello and stamp carries. Immutable for the life of the bus.
-func (eb *EventBus) Epoch() string {
-	return eb.hub.Position().Epoch
 }
 
 // SetMaxClients applies a new client cap (<= 0 means DefaultMaxSSEClients) to

@@ -42,7 +42,7 @@ func TestStamp_carries_the_subject_version_and_epoch(t *testing.T) {
 		t.Fatalf("status = %d, want 200", code)
 	}
 	got := decodeStamp(t, raw)
-	want := events.Stamp{Kind: events.SubjectActivity, Ref: "", Version: "3", Epoch: s.events.Epoch()}
+	want := events.Stamp{Kind: events.SubjectActivity, Ref: "", Version: "3", Epoch: hubEpoch(s)}
 	if got != want {
 		t.Errorf("Subject-Stamp = %+v, want %+v", got, want)
 	}
@@ -82,7 +82,7 @@ func TestStamp_series_detail_ref_is_the_tvdb_root(t *testing.T) {
 
 	_, raw := stampedGet(t, h, "/api/coverage/series/42")
 	got := decodeStamp(t, raw)
-	want := events.Stamp{Kind: events.SubjectDetail, Ref: "tvdb-42", Version: "1", Epoch: s.events.Epoch()}
+	want := events.Stamp{Kind: events.SubjectDetail, Ref: "tvdb-42", Version: "1", Epoch: hubEpoch(s)}
 	if got != want {
 		t.Errorf("Subject-Stamp for /42 = %+v, want %+v", got, want)
 	}
@@ -104,11 +104,17 @@ func TestStamp_movie_detail_ref_is_the_tmdb_root(t *testing.T) {
 
 	_, raw := stampedGet(t, mux.ServeHTTP, "/api/coverage/movies/7/subs")
 	got := decodeStamp(t, raw)
-	want := events.Stamp{Kind: events.SubjectDetail, Ref: "tmdb-7", Version: "0", Epoch: s.events.Epoch()}
+	want := events.Stamp{Kind: events.SubjectDetail, Ref: "tmdb-7", Version: "0", Epoch: hubEpoch(s)}
 	if got != want {
 		t.Errorf("Subject-Stamp for movie 7 = %+v, want %+v", got, want)
 	}
 	if _, raw := stampedGet(t, mux.ServeHTTP, "/api/coverage/movies/seven/subs"); raw != "" {
 		t.Errorf("Subject-Stamp for a non-numeric tmdb id = %q, want none", raw)
 	}
+}
+
+// hubEpoch reads the epoch the way production does, off a stamp.
+func hubEpoch(s *Server) string {
+	st, _ := s.events.Versions().Stamp(events.SubjectActivity, "")
+	return st.Epoch
 }

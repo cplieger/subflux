@@ -81,7 +81,8 @@ func postDigest(t *testing.T, h *activityhandlers.Handler, body string) (int, di
 func TestHandleEventsSync_answers_the_digest_over_the_bus_versions(t *testing.T) {
 	t.Parallel()
 	h, bus := newEventsHandler(t, nil)
-	body := `{"epoch":"` + bus.Epoch() + `","subjects":[{"kind":"activity","ref":"","version":"0"}]}`
+	st, _ := bus.Versions().Stamp(events.SubjectActivity, "")
+	body := `{"epoch":"` + st.Epoch + `","subjects":[{"kind":"activity","ref":"","version":"0"}]}`
 
 	code, reply := postDigest(t, h, body)
 	if code != http.StatusOK || reply.Checked != 1 || reply.MustRefetch || len(reply.Changed) != 0 {

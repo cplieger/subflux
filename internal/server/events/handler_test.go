@@ -137,7 +137,13 @@ func publishN(bus *EventBus, n int) {
 }
 
 func cursor(bus *EventBus, offset uint64) string {
-	return sse.Cursor{Epoch: bus.Epoch(), Offset: offset}.String()
+	return sse.Cursor{Epoch: hubEpoch(bus), Offset: offset}.String()
+}
+
+// hubEpoch reads the epoch the way production does, off a stamp.
+func hubEpoch(bus *EventBus) string {
+	st, _ := bus.Versions().Stamp(SubjectActivity, "")
+	return st.Epoch
 }
 
 func TestHandle_legacy_connect_writes_epoch_frame(t *testing.T) {
@@ -151,8 +157,8 @@ func TestHandle_legacy_connect_writes_epoch_frame(t *testing.T) {
 	if f.id != "" {
 		t.Errorf("epoch frame carries id %q, want none (must never become a cursor)", f.id)
 	}
-	if ep.BootID != bus.Epoch() {
-		t.Errorf("epoch boot_id = %q, want the hub epoch %q", ep.BootID, bus.Epoch())
+	if ep.BootID != hubEpoch(bus) {
+		t.Errorf("epoch boot_id = %q, want the hub epoch %q", ep.BootID, hubEpoch(bus))
 	}
 	// A legacy tab only ever reaches this server on a reconnect (a fresh page
 	// load fetches the v3 bundle), and its own reconnect path carries no
@@ -186,8 +192,8 @@ func TestHandle_v3_connect_writes_no_epoch_frame(t *testing.T) {
 	if h.Verdict != sse.VerdictFresh || h.Resumed {
 		t.Errorf("hello = %+v, want verdict fresh and resumed false", h)
 	}
-	if h.Epoch != bus.Epoch() || h.Head != 3 {
-		t.Errorf("hello epoch/head = %q/%d, want %q/3", h.Epoch, h.Head, bus.Epoch())
+	if h.Epoch != hubEpoch(bus) || h.Head != 3 {
+		t.Errorf("hello epoch/head = %q/%d, want %q/3", h.Epoch, h.Head, hubEpoch(bus))
 	}
 }
 
