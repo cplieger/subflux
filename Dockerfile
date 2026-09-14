@@ -2,7 +2,7 @@
 
 # --- Build args (global - declared before any FROM so all stages can adopt
 # the default via a bare `ARG NAME` inside the stage) ---
-ARG FFMPEG_VERSION=8.1
+ARG FFMPEG_VERSION=8.1.2
 # x264 publishes NO tags and no versioned artifact (only the master/stable/
 # GPLv2-only branches; VideoLAN's snapshot tarballs stopped in 2019), so the
 # commit is the only identifier upstream offers. The marker below is the
