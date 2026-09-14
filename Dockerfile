@@ -16,7 +16,7 @@ ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-ARG FFMPEG_VERSION=8.1
+ARG FFMPEG_VERSION
 ARG X264_COMMIT
 # Alpine package versions are implicitly pinned via the base-image digest
 # above; pinning each apk package separately drifts faster than it helps
