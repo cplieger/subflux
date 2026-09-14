@@ -35,7 +35,7 @@ export function coverageSignalFor(rootKey: string): ReadonlySignal<CoverageItem>
 let pairLanded = false;
 // Collections a landed pair registered for later transaction collection legs
 // (task 9 reads registeredCollections ∪ the current route's needs). Tab
-// state — survives SSE boot_id changes.
+// state — survives server restarts.
 const registeredCollectionNames = new Set<string>();
 
 // --- Transaction seams: tombstones, covered writers, the leg join ---

@@ -17,7 +17,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // serveAndWait builds the global middleware chain, binds the HTTP listener, and
@@ -65,14 +65,16 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// The pre-drain hook flips readiness off before webhttp.Run drains in-flight
 	// requests, so /api/health reports unready during the drain window,
 	// preserving the pre-webhttp teardown ordering for load balancers.
-	preDrain := func(context.Context) {
+	preDrain := func(ctx context.Context) {
 		s.ready.Set(false)
 		slog.Info("shutting down HTTP server", "sse_clients", s.events.ClientCount())
-		// Drain the SSE hub: cancel every live stream and refuse reconnects
+		// Drain the SSE hub: reset every live stream and refuse reconnects
 		// with 503. Without this, long-lived event streams count as in-flight
 		// requests and hold webhttp.Run's graceful drain open for the whole
 		// grace budget on every shutdown.
-		s.events.Shutdown()
+		if err := s.events.Shutdown(ctx); err != nil {
+			slog.Warn("SSE hub drain did not finish within the grace budget", "error", err)
+		}
 	}
 
 	if err := webhttp.Run(ctx, srv, ln, nil, webhttp.WithPreDrain(preDrain)); err != nil {
@@ -148,12 +150,13 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 			webhttp.WithLogger(slog.Default()),
 			webhttp.WithSkipPaths("/api/events"),
 			// /api/health (Docker HEALTHCHECK CLI is file-marker, but Gatus
-			// HTTP-probes it every 30s) and /metrics (Prometheus/Alloy
-			// scrapes) ride the fleet-standard ProbeLogLevel: healthy probes
-			// at Debug instead of an Info line per probe, failures surfaced
-			// at Warn/Error. The SSE stream above stays fully skipped (one
-			// open-to-close line would be misleading by shape).
-			webhttp.ProbeLogLevel("/api/health", "/metrics"),
+			// HTTP-probes it every 30s), /metrics (Prometheus/Alloy
+			// scrapes) and /api/events/alive (one 204 per keepalive per
+			// browser profile) ride the fleet-standard ProbeLogLevel: healthy
+			// probes at Debug instead of an Info line per probe, failures
+			// surfaced at Warn/Error. The SSE stream above stays fully
+			// skipped (one open-to-close line would be misleading by shape).
+			webhttp.ProbeLogLevel("/api/health", "/metrics", "/api/events/alive"),
 			webhttp.WithClientIPFunc(authhandlers.ClientIP),
 			// http_requests_total is subflux's one unauthenticated
 			// unbounded-cardinality surface: this hook fires from the

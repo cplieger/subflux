@@ -33,7 +33,7 @@ const (
 	Notify         EventType = "notify"     // toast notification for the UI
 	ScanStart      EventType = "scan:start" // scan activity started (any scope)
 	ScanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
-	Epoch          EventType = "epoch"      // per-connection handshake (never replayed, no id)
+	Epoch          EventType = "epoch"      // legacy per-connection handshake, written only without SSE-Wire (never replayed, no id)
 	ActivityDelta  EventType = "activity"   // activity log delta (upsert/remove)
 	AlertDelta     EventType = "alert"      // alert raised or dismissed
 	ProviderDelta  EventType = "provider"   // provider timeout raised or cleared
@@ -88,16 +88,14 @@ type ScanEvent struct {
 
 func (ScanEvent) eventData() {}
 
-// EpochEvent is the per-connection SSE handshake, written exactly once per
-// connection by the events handler: after any Last-Event-ID replay, before
-// live delivery, with NO id field (it must never become a resume cursor).
-// BootID identifies the server process (one random id per process start), so
-// the client can tell a restart from a reconnect. Gap is the server's
-// authoritative replay verdict: true means the presented cursor could not be
-// covered (above head, below the ring floor, or past the replay budget) and
-// the replay was withheld. Head is the newest event id the connection's
-// replay covered; every id at or below it was either replayed or predates
-// the client's cursor.
+// EpochEvent is the legacy per-connection SSE handshake, built from the
+// library's hello and written exactly once, only to a connection that
+// presented no SSE-Wire header (a pre-v3 EventSource bundle): after any
+// replay, before live delivery, with NO id field (it must never become a
+// resume cursor). BootID is the hub epoch, so the client can tell a restart
+// from a reconnect. Gap is the inverse of the hello's resumed: true means
+// the presented cursor could not be covered and the replay was withheld.
+// Head is the hub head at subscribe.
 type EpochEvent struct {
 	BootID string `json:"boot_id"`
 	Head   uint64 `json:"head"`

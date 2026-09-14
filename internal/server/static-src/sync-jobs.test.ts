@@ -1,6 +1,8 @@
 // Behaviour of the client-side sync job settlement registry (D3): watchers
-// settle by job_id, replay is idempotent per job_id, the boot-change clear
-// resolves pending watchers null, and re-attach prefers a live job.
+// settle by job_id, replay is idempotent per job_id, the restart clear
+// resolves pending watchers null, re-attach prefers a live job, the stream's
+// jobs leg releases the watchers whose job is no longer live, and the `jobs`
+// digest subject is held exactly while a watcher exists.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const syncJobsRead = vi.hoisted(() => vi.fn());
@@ -13,11 +15,20 @@ vi.mock("./wire/client.gen.js", async (importOriginal) => ({
 import {
   attachSyncJob,
   clearSyncCorrelation,
+  reattachSyncWatches,
   syncDoneFromEvent,
   watchSyncJob,
   _resetSyncJobsForTest,
 } from "./sync-jobs.js";
+import { SUBJECT_JOBS, _resetSubjectsForTest, versionMap } from "./subjects.js";
 import type { Job, SyncDoneEvent } from "./wire/types.gen.js";
+
+const EPOCH = "aaaaaaaaaaaaaaaa";
+
+/** The jobs GET landed: the transport recorded its stamp. */
+function holdJobs(): void {
+  versionMap().observe(SUBJECT_JOBS, "1", EPOCH);
+}
 
 function doneEvent(jobId: number, over: Partial<SyncDoneEvent> = {}): SyncDoneEvent {
   return {
@@ -59,11 +70,13 @@ function job(jobId: number, state: Job["state"], over: Partial<Job> = {}): Job {
 
 beforeEach(() => {
   _resetSyncJobsForTest();
+  _resetSubjectsForTest();
   syncJobsRead.mockReset();
 });
 
 afterEach(() => {
   _resetSyncJobsForTest();
+  _resetSubjectsForTest();
 });
 
 describe("watchSyncJob + syncDoneFromEvent", () => {
@@ -169,5 +182,94 @@ describe("attachSyncJob (the reload re-attach)", () => {
   it("answers none when the read fails", async () => {
     syncJobsRead.mockResolvedValue(null);
     expect(await attachSyncJob(ref)).toEqual({ kind: "none" });
+  });
+});
+
+describe("reattachSyncWatches (the stream's jobs leg)", () => {
+  it("releases a watcher whose job the registry shows terminal, so its owner re-attaches", async () => {
+    holdJobs();
+    const seen: (SyncDoneEvent | null)[] = [];
+    watchSyncJob(9, (ev) => seen.push(ev));
+    syncJobsRead.mockResolvedValue([job(9, "done", { outcome: "result" })]);
+
+    await reattachSyncWatches();
+
+    expect(seen).toStrictEqual([null]);
+    expect(syncJobsRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases a watcher whose job is GONE from the registry", async () => {
+    holdJobs();
+    const seen: (SyncDoneEvent | null)[] = [];
+    watchSyncJob(9, (ev) => seen.push(ev));
+    syncJobsRead.mockResolvedValue([job(12, "queued")]);
+
+    await reattachSyncWatches();
+
+    expect(seen).toStrictEqual([null]);
+  });
+
+  it("keeps a watcher whose job is still live; its sync:done settles it later", async () => {
+    holdJobs();
+    const seen: (SyncDoneEvent | null)[] = [];
+    watchSyncJob(9, (ev) => seen.push(ev));
+    syncJobsRead.mockResolvedValue([job(9, "running")]);
+
+    await reattachSyncWatches();
+    expect(seen).toStrictEqual([]);
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(true); // still watched, still held
+
+    syncDoneFromEvent(doneEvent(9));
+    expect(seen.map((e) => e?.job_id)).toStrictEqual([9]);
+  });
+
+  it("with no watcher it reads nothing and drops the jobs subject", async () => {
+    holdJobs();
+
+    await reattachSyncWatches();
+
+    expect(syncJobsRead).not.toHaveBeenCalled();
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(false);
+  });
+
+  it("passes the run's signal to the read and fails the leg when the read fails", async () => {
+    holdJobs();
+    watchSyncJob(9, () => undefined);
+    syncJobsRead.mockResolvedValue(null);
+    const ctrl = new AbortController();
+
+    await expect(reattachSyncWatches(ctrl.signal)).rejects.toThrow("jobs leg failed");
+    expect(syncJobsRead).toHaveBeenCalledWith(undefined, { signal: ctrl.signal });
+  });
+});
+
+describe("the jobs subject is held exactly while a watcher exists", () => {
+  it("the last watcher's settlement drops it", () => {
+    holdJobs();
+    watchSyncJob(7, () => undefined);
+    watchSyncJob(8, () => undefined);
+
+    syncDoneFromEvent(doneEvent(7));
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(true);
+    syncDoneFromEvent(doneEvent(8));
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(false);
+  });
+
+  it("unwatching the last watcher drops it", () => {
+    holdJobs();
+    const unwatch = watchSyncJob(7, () => undefined);
+
+    unwatch();
+
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(false);
+  });
+
+  it("a restart drops it with the correlation", () => {
+    holdJobs();
+    watchSyncJob(7, () => undefined);
+
+    clearSyncCorrelation();
+
+    expect(versionMap().has(SUBJECT_JOBS)).toBe(false);
   });
 });

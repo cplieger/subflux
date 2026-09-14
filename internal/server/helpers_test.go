@@ -241,7 +241,7 @@ func newTestServer(t *testing.T, db *qhMockStore) *Server {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(0),
+		events:   events.New(0, nil),
 		// context.Background(): no *testing.T in scope, and this is the server's own long-lived context rather than a per-test one.
 		lifetime: context.Background(),
 		loadConfig: func([]byte) (*config.Config, error) {

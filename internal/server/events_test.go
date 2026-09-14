@@ -8,7 +8,7 @@ import (
 )
 
 // The EventBus transport (fan-out, replay, eviction, caps) lives in
-// github.com/cplieger/webhttp/v2/sse and is tested there; the typed wrapper's
+// github.com/cplieger/sse and is tested there; the typed wrapper's
 // wire contract is pinned in internal/server/events. These tests keep the
 // server-level construction path honest.
 
@@ -50,9 +50,9 @@ func TestSSEClientCap_resolves_the_configured_cap(t *testing.T) {
 
 func TestEventBusConstruction(t *testing.T) {
 	t.Parallel()
-	eb := events.New(0)
+	eb := events.New(0, nil)
 	if eb == nil {
-		t.Fatal("events.New(0) returned nil")
+		t.Fatal("events.New(0, nil) returned nil")
 	}
 	if got := eb.ClientCount(); got != 0 {
 		t.Errorf("ClientCount() = %d on a fresh bus, want 0", got)

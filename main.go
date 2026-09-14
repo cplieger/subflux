@@ -39,7 +39,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/subflux/internal/wiring"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // Compile-time interface satisfaction checks. Each of these is a cross-package

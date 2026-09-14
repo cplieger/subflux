@@ -74,7 +74,7 @@ func newFileHandler(store FileStore, cfg *fakePathGuard) *Handler {
 			State: func() *resolve.State { return &resolve.State{Cfg: cfg} },
 		},
 		StateFunc: func() *LiveState { return &LiveState{Cfg: cfg} },
-		Events:    events.New(0),
+		Events:    events.New(0, nil),
 	})
 }
 

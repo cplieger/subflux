@@ -22,5 +22,11 @@
     "allowUnusedLabels": false
   },
   "include": ["*.ts", "wire/*.ts", "lib/**/*.ts"],
-  "exclude": ["vitest.config.ts", "fc-strict-setup.ts", "**/*.test.ts"]
+  "exclude": [
+    "vitest.config.ts",
+    "fc-strict-setup.ts",
+    "worker-url-setup.ts",
+    "**/*.test.ts",
+    "sse-worker.ts"
+  ]
 }

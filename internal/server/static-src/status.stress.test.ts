@@ -60,6 +60,11 @@ vi.mock("./popover-menu.js", () => ({
 }));
 
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
+import type { StreamTransition } from "./status.js";
+
+// The two transitions the poll floor keys on, as the library reports them.
+const OPEN: StreamTransition = { kind: "state", from: "connecting", to: "open", generation: 1 };
+const BACKOFF: StreamTransition = { kind: "state", from: "open", to: "backoff", generation: 2 };
 import type * as StatusModule from "./status.js";
 
 const WINDOW_MS = 5 * 60_000;
@@ -96,30 +101,30 @@ describe("status stress: steady-state request rates over a 5-minute window", () 
   });
 
   afterEach(() => {
-    status.setStatusDegraded(false);
+    status.setStatusDegraded(OPEN);
     vi.useRealTimers();
   });
 
-  it("SSE-UP: the reconcile tick costs exactly one poll per 60s — 5 in 5 minutes", async () => {
+  it("SSE-UP: one boot load, then exactly one poll per 60s — 6 in 5 minutes", async () => {
     status.initStatusReconcile();
-    expect(pollCount()).toBe(0);
+    expect(pollCount()).toBe(1); // the boot load
 
     // Minute-by-minute: the count never exceeds 1 fetch per 60s of
     // simulated time (the ≤1/60s bound, asserted at every minute edge).
     for (let minute = 1; minute <= 5; minute++) {
       await vi.advanceTimersByTimeAsync(STATUS_RECONCILE_MS);
-      expect(pollCount()).toBe(minute);
+      expect(pollCount()).toBe(1 + minute);
     }
-    expect(pollCount()).toBe(5);
+    expect(pollCount()).toBe(6);
     console.warn(
       `[stress] status SSE-up: ${String(pollCount())} polls / ${String(WINDOW_MS / 1000)}s window ` +
-        `(≤1 per ${String(STATUS_RECONCILE_MS / 1000)}s reconcile tick)`,
+        `(1 boot load + ≤1 per ${String(STATUS_RECONCILE_MS / 1000)}s reconcile tick)`,
     );
   });
 
   it("SSE-DOWN: the 5s degraded cadence costs 61 polls in 5 minutes and stops on recovery", async () => {
     // Entering the down period costs one immediate catch-up fetch…
-    status.setStatusDegraded(true);
+    status.setStatusDegraded(BACKOFF);
     expect(pollCount()).toBe(1);
 
     // …then the 5s cadence: 12 per simulated minute.
@@ -131,7 +136,7 @@ describe("status stress: steady-state request rates over a 5-minute window", () 
     expect(downTotal).toBe(61);
 
     // Recovery: events own status again; the floor poll stops cold.
-    status.setStatusDegraded(false);
+    status.setStatusDegraded(OPEN);
     await vi.advanceTimersByTimeAsync(WINDOW_MS);
     expect(pollCount()).toBe(downTotal);
     console.warn(

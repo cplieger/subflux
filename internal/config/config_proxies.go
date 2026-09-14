@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // TrustedProxyNets returns the parsed trusted reverse-proxy CIDR set used for

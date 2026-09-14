@@ -100,7 +100,7 @@ interface TrackedDownload {
 
 const trackedDownloads = new Map<string, TrackedDownload>();
 
-// Bumped on a server restart (events.ts, boot_id change): a tracked download
+// Bumped on a server restart (events.ts, a new epoch): a tracked download
 // from an earlier boot is resolved by the next snapshot instead of waiting
 // forever; one from the current boot is left alone.
 let bootGeneration = 0;

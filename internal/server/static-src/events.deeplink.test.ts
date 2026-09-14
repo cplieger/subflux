@@ -1,15 +1,29 @@
 // events.deeplink.test.ts — the deep-link boot seam (R2.3/A7): the REAL
 // router, page-leg dispatcher, and coverage modules composed under the real
-// SSE transaction. The class of defect this file exists for: every per-task
-// suite green while the composition fetches the collection pair on a boot
-// that must load none — the router sets currentPage="library" synchronously
-// while detailCtx lands only with the summary, so only the real
+// stream. The class of defect this file exists for: every per-task suite
+// green while the composition fetches the collection pair on a boot that
+// must load none — the router sets currentPage="library" synchronously while
+// detailCtx lands only with the summary, so only the real
 // prepareDetailView-before-detailCtx window can prove the collection leg
 // stays EMPTY. Only the network edge (wire client), status, notify, the
 // detail renderers, and the router's popup collaborators are replaced.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SUMMARY_COALESCE_MS } from "./constants.js";
-import { FakeEventSource, lastFakeES } from "./events-fakes.js";
+import { EPOCH_A, fakeSSE, type FakeSSE } from "./events-fakes.js";
+
+const server = vi.hoisted(() => ({ current: null as FakeSSE | null }));
+// The real transport stays (the generated client dispatches through it);
+// only the stream's fetch and the 401 seam move.
+vi.mock("./api-client.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  authFetch: (input: RequestInfo | URL, init?: RequestInit) => {
+    if (!server.current) {
+      throw new Error("fake server not installed");
+    }
+    return server.current.fetch(input, init);
+  },
+  handleSessionExpiry: vi.fn(),
+}));
 
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 // Real coverage pulls the actions surface; only the unload hook is neutered.
@@ -20,11 +34,13 @@ vi.mock("@cplieger/actions", async (importOriginal) => ({
 
 const status = vi.hoisted(() => ({ polls: 0 }));
 vi.mock("./status.js", () => ({
-  pollStatus: async () => {
+  pollStatus: () => {
     status.polls += 1;
+    return Promise.resolve();
   },
   abortPoll: vi.fn(),
   setStatusDegraded: vi.fn(),
+  setStatusAttached: vi.fn(),
   applyActivityEvent: vi.fn(),
   applyAlertEvent: vi.fn(),
   applyProviderEvent: vi.fn(),
@@ -151,6 +167,7 @@ import { on, BusEvent } from "./bus.js";
 import { _resetCoverageForTest } from "./coverage.js";
 import { coverageItems, libraryLoaded, registeredCollections } from "./coverage-store.js";
 import { _resetHealForTest } from "./coverage-heal.js";
+import { _resetSubjectsForTest, versionMap } from "./subjects.js";
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
 
 // router.ts resolves the four filter controls at IMPORT time, so it must
@@ -187,12 +204,14 @@ function seriesSummary(tvdb: number): Record<string, unknown> {
 }
 
 async function settle(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(0);
+  for (let i = 0; i < 6; i++) {
+    await vi.advanceTimersByTimeAsync(0);
+  }
 }
 
 /** Emit a coverage frame and flush the heal coalescer's window. */
-async function healFrame(tvdb: number, id: number): Promise<void> {
-  lastFakeES().frame(
+async function healFrame(tvdb: number, offset: number): Promise<void> {
+  server.current!.last().frame(
     "coverage",
     {
       media_type: "episode",
@@ -201,28 +220,31 @@ async function healFrame(tvdb: number, id: number): Promise<void> {
       variant: "standard",
       source: "auto",
     },
-    id,
+    `${EPOCH_A}:${String(offset)}`,
   );
   await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+  await settle();
 }
 
-/** A COLD deep-link boot on /series/42, wired exactly like app.ts: the boot
- *  gate releases applyRoute, the epoch's transaction runs beside it. */
+/** A COLD deep-link boot on /series/42, wired exactly like app.ts: the route
+ *  loader IS the boot load, the stream connects beside it and its hello's
+ *  revalidate runs over whatever the loaders hold. */
 async function bootDeepLink(): Promise<void> {
   history.replaceState(null, "", "/series/42");
   wire.summaries.set("series:42", { ok: true, status: 200, data: seriesSummary(42) });
-  void events.bootGate().then(() => {
-    void applyRoute();
-  });
   events.connect();
-  lastFakeES().open();
-  lastFakeES().epoch("boot-a", false, 5);
+  void applyRoute();
+  await settle();
+  server.current!.last().hello(EPOCH_A, { head: 5 });
   await settle();
 }
 
 beforeEach(() => {
-  vi.stubGlobal("EventSource", FakeEventSource);
   vi.useFakeTimers();
+  server.current = fakeSSE();
+  // The browser project runs in real Chromium, where SharedWorker exists;
+  // these suites pin the per-tab stream, so the worker branch is closed.
+  vi.stubGlobal("SharedWorker", undefined);
   vi.spyOn(Math, "random").mockReturnValue(0);
   status.polls = 0;
   rendered.series = 0;
@@ -245,11 +267,10 @@ beforeEach(() => {
 
 afterEach(() => {
   events._resetEventsForTest();
-  vi.runOnlyPendingTimers();
-  events._resetEventsForTest();
+  _resetSubjectsForTest();
   _resetHealForTest();
   _resetCoverageForTest();
-  FakeEventSource.instances = [];
+  server.current = null;
   vi.useRealTimers();
   vi.clearAllMocks();
   history.replaceState(null, "", HOME);
@@ -267,9 +288,11 @@ describe("cold deep-link boot on /series/{id}", () => {
     expect(wire.series).toBe(0);
     expect(wire.movies).toBe(0);
 
-    // The transaction still committed (empty leg + page leg + status).
-    expect(events._stateForTest().watermark).toBe(5);
-    expect(status.polls).toBe(1);
+    // The stream is up and its boot digest named nothing: no leg, no poll.
+    expect(events._stateForTest().stream?.kind).toBe("open");
+    expect(server.current!.digestCalls).toHaveLength(1);
+    expect(server.current!.digestCalls[0]?.subjects).toStrictEqual([]);
+    expect(status.polls).toBe(0);
 
     // The deep-link insert leaves the library incomplete: gate closed,
     // nothing registered for later collection legs.
@@ -297,13 +320,16 @@ describe("cold deep-link boot on /series/{id}", () => {
     expect(wire.series).toBe(0);
   });
 
-  it("back-nav to the library still loads the pair via the loader", async () => {
+  it("back-nav to the library still loads the pair via the loader, and forgets the detail's subject", async () => {
     await bootDeepLink();
     expect(wire.series).toBe(0);
+    // The detail's summary GET landed: the transport recorded its stamp.
+    versionMap().observe({ kind: "detail", ref: "tvdb-42" }, "1", EPOCH_A);
 
     // The user navigates back to the library (the deep-link insert left the
     // pair unloaded): the ROUTE LOADER fetches it — the load that sets
-    // libraryLoaded and opens the heal gate.
+    // libraryLoaded and opens the heal gate — and the leave path drops the
+    // departed detail from the held vector.
     wire.pairRows = [seriesSummary(42)];
     history.replaceState(null, "", "/");
     await applyRoute();
@@ -313,5 +339,6 @@ describe("cold deep-link boot on /series/{id}", () => {
     expect(wire.movies).toBe(1);
     expect(libraryLoaded()).toBe(true);
     expect([...registeredCollections()].sort()).toStrictEqual(["movies", "series"]);
+    expect(versionMap().has({ kind: "detail", ref: "tvdb-42" })).toBe(false);
   });
 });

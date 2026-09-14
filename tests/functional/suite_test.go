@@ -3,6 +3,7 @@
 package functional
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -17,7 +18,7 @@ import (
 )
 
 // The suite mirrors run.sh: shared mutable state (last HTTP status/body,
-// saved original config, pass/fail/skip counters) threaded through 26
+// saved original config, pass/fail/skip counters) threaded through 27
 // ordered sections. Output lines reproduce the bash suite's format without
 // ANSI colors: "[TEST] msg", "  PASS msg", "  FAIL msg", "  SKIP msg" and
 // the final summary block.
@@ -31,9 +32,10 @@ type suite struct {
 	baseURL string
 	section string // SECTION env filter, default "all"
 
-	lastStatus string // "000" on transport error, like curl's %{http_code}
-	lastBody   []byte // raw last response body
-	original   string // saved config, $()-style trailing-newline stripped
+	lastStatus string      // "000" on transport error, like curl's %{http_code}
+	lastHeader http.Header // response headers of the last request; nil on transport error
+	lastBody   []byte      // raw last response body
+	original   string      // saved config, $()-style trailing-newline stripped
 
 	passCount int
 	failCount int
@@ -97,6 +99,11 @@ func (s *suite) skip(msg string) {
 // "000" on transport errors) and raw body, and returning the body with
 // trailing newlines stripped the way bash's $(api_get ...) captures do.
 func (s *suite) doRequest(timeout time.Duration, method, url, contentType, body string) string {
+	return s.doRequestHeaders(timeout, method, url, contentType, body, nil)
+}
+
+// doRequestHeaders is doRequest with extra request headers (curl's -H).
+func (s *suite) doRequestHeaders(timeout time.Duration, method, url, contentType, body string, headers map[string]string) string {
 	// context.Background(): no *testing.T in scope on the suite receiver.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -107,20 +114,26 @@ func (s *suite) doRequest(timeout time.Duration, method, url, contentType, body 
 	req, err := http.NewRequestWithContext(ctx, method, url, rdr)
 	if err != nil {
 		s.lastStatus = "000"
+		s.lastHeader = nil
 		s.lastBody = nil
 		return ""
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	resp, err := s.client.Do(req)
 	if err != nil {
 		s.lastStatus = "000"
+		s.lastHeader = nil
 		s.lastBody = nil
 		return ""
 	}
 	defer resp.Body.Close()
 	s.lastStatus = strconv.Itoa(resp.StatusCode)
+	s.lastHeader = resp.Header
 	raw, _ := io.ReadAll(resp.Body) // a body-read error keeps the partial body
 	s.lastBody = raw
 	return strings.TrimRight(string(raw), "\n")
@@ -198,6 +211,69 @@ func (s *suite) sseProbe(timeout time.Duration, url string) string {
 	}
 	resp.Body.Close()
 	return strconv.Itoa(resp.StatusCode)
+}
+
+// sseFrame is one parsed server-sent event: a frame is the lines up to a
+// blank one; a lone retry: field is reported as a frame of its own.
+type sseFrame struct {
+	event string
+	data  string
+	id    string
+	retry string
+}
+
+// sseRead connects to a streaming endpoint with the given request headers
+// and reads it for the whole timeout, returning the status code ("000" on a
+// transport error) and every complete frame received. The stream never
+// ends on its own, so the deadline is how a read finishes.
+func (s *suite) sseRead(timeout time.Duration, url string, headers map[string]string) (string, []sseFrame) {
+	// context.Background(): no *testing.T in scope on the suite receiver.
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "000", nil
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "000", nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return strconv.Itoa(resp.StatusCode), nil
+	}
+	var frames []sseFrame
+	var cur sseFrame
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() { // ends with a context error at the deadline
+		line := sc.Text()
+		if line == "" {
+			if cur != (sseFrame{}) {
+				frames = append(frames, cur)
+			}
+			cur = sseFrame{}
+			continue
+		}
+		field, value, _ := strings.Cut(line, ":")
+		value = strings.TrimPrefix(value, " ")
+		switch field {
+		case "event":
+			cur.event = value
+		case "data":
+			if cur.data != "" {
+				cur.data += "\n"
+			}
+			cur.data += value
+		case "id":
+			cur.id = value
+		case "retry":
+			cur.retry = value
+		}
+	}
+	return strconv.Itoa(resp.StatusCode), frames
 }
 
 // --- Assertions ---------------------------------------------------------------
@@ -411,9 +487,11 @@ type section struct {
 	fn   func(*suite)
 }
 
-// sections lists the 26 sections in the exact order run.sh executes them.
+// sections lists the sections in the exact order run.sh executed them; sse
+// (added after the port) follows health, the other arr-free basics.
 var sections = []section{
 	{"health", (*suite).sectionHealth},
+	{"sse", (*suite).sectionSSE},
 	{"auth", (*suite).sectionAuth},
 	{"config", (*suite).sectionConfig},
 	{"providers", (*suite).sectionProviders},
@@ -441,7 +519,7 @@ var sections = []section{
 	{"real_providers", (*suite).sectionRealProviders},
 }
 
-// TestFunctional drives a live subflux instance through all 26 sections in
+// TestFunctional drives a live subflux instance through all 27 sections in
 // order, sharing one suite state, exactly like `bash run.sh`. Sections can
 // be filtered with the SECTION env var (bash parity) or with
 // -run 'TestFunctional/<name>'.

@@ -27,7 +27,7 @@ func TestHandleGetActivity_does_not_prune(t *testing.T) {
 			Activity: log,
 			Alerts:   activity.NewAlertLog(10),
 			Stops:    &activity.StopRegistry{},
-			Events:   events.New(1),
+			Events:   events.New(1, nil),
 		})
 		log.End(log.Start("Scan", "d", activity.SourceManual))
 

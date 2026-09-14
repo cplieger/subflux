@@ -47,6 +47,7 @@ import (
 
 	"github.com/cplieger/auth/v5"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.
@@ -133,8 +134,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	// --- user: requires a session or valid API key ---
 
-	// Server-sent events (always available, config-independent).
+	// Server-sent events (always available, config-independent): the stream,
+	// the state digest the client reconciles through on wake, and the
+	// keepalive acknowledgement that feeds the presence table.
 	user.Add("GET /api/events", s.activityH.HandleEvents)
+	user.Add("POST /api/events/sync", s.activityH.HandleEventsSync)
+	user.Add("POST /api/events/alive", s.activityH.HandleEventsAlive)
 
 	// Self-service account endpoints. These never delete credentials or
 	// mint long-lived tokens, so reauth is not required here. Operations
@@ -153,11 +158,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	user.Add("GET /api/config/schema", s.configH.HandleConfigSchema)
 
 	// Alerts (read + dismiss).
-	user.Add("GET /api/alerts", s.activityH.HandleGetAlerts)
+	user.Add("GET /api/alerts", s.stamp(events.SubjectAlerts, nil)(s.activityH.HandleGetAlerts))
 	user.Add("DELETE /api/alerts", s.activityH.HandleDismissAlert)
 
 	// Activity feed (user-visible history; config-independent).
-	user.Add("GET /api/activity", s.activityH.HandleGetActivity)
+	user.Add("GET /api/activity", s.stamp(events.SubjectActivity, nil)(s.activityH.HandleGetActivity))
 	user.Add("DELETE /api/activity", s.activityH.HandleDismissActivity)
 
 	// Credential management on your own account (delete own passkey, unlink
@@ -210,14 +215,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	userConfigured.Add("GET /api/search", s.manualH.HandleManualSearch)
 	userConfigured.Add("GET /api/search/resolve", s.manualH.HandleSearchResolve)
 	userConfigured.Add("GET /api/search/targets", s.queryH.HandleSearchTargets)
-	userConfigured.Add("GET /api/state", s.queryH.HandleState)
+	userConfigured.Add("GET /api/state", s.stamp(events.SubjectHistory, nil)(s.queryH.HandleState))
 	userConfigured.Add("GET /api/state/stats", s.queryH.HandleStateStats)
 	userConfigured.Add("GET /api/state/ids", s.fileH.HandleHistoryIDs)
 	userConfigured.Add("GET /api/backoff", s.queryH.HandleBackoff)
 	userConfigured.Add("GET /api/backoff/prefix", s.queryH.HandleBackoffByPrefix)
 	userConfigured.Add("GET /api/locks", s.queryH.HandleLocks)
 	userConfigured.Add("GET /api/providers", s.queryH.HandleProviders)
-	userConfigured.Add("GET /api/providers/timeout", s.queryH.HandleProviderTimeout)
+	userConfigured.Add("GET /api/providers/timeout", s.stamp(events.SubjectProviders, nil)(s.queryH.HandleProviderTimeout))
 
 	// Media browser (proxies Sonarr/Radarr).
 	userConfigured.Add("GET /api/media/series", s.mediaH.HandleMediaSeries)
@@ -228,13 +233,13 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// trailing-slash detail prefix under ServeMux specificity: {tvdbId}/summary
 	// is the more specific pattern, everything else under the prefix still
 	// reaches the detail handler.
-	userConfigured.Add("GET /api/coverage/series", s.coverageH.HandleCoverageSeries)
-	userConfigured.Add("GET /api/coverage/movies", s.coverageH.HandleCoverageMovies)
-	userConfigured.Add("GET /api/coverage/series/", s.coverageH.HandleCoverageDetail)
+	userConfigured.Add("GET /api/coverage/series", s.stamp(events.SubjectSeries, nil)(s.coverageH.HandleCoverageSeries))
+	userConfigured.Add("GET /api/coverage/movies", s.stamp(events.SubjectMovies, nil)(s.coverageH.HandleCoverageMovies))
+	userConfigured.Add("GET /api/coverage/series/", s.stamp(events.SubjectDetail, seriesDetailRef)(s.coverageH.HandleCoverageDetail))
 	userConfigured.Add("GET /api/coverage/scan-state", s.coverageH.HandleScanStates)
 	userConfigured.Add("GET /api/coverage/series/{tvdbId}/summary", s.coverageH.HandleCoverageSeriesSummary)
 	userConfigured.Add("GET /api/coverage/movies/{tmdbId}/summary", s.coverageH.HandleCoverageMovieSummary)
-	userConfigured.Add("GET /api/coverage/movies/{tmdbId}/subs", s.coverageH.HandleCoverageMovieSubs)
+	userConfigured.Add("GET /api/coverage/movies/{tmdbId}/subs", s.stamp(events.SubjectDetail, movieDetailRef)(s.coverageH.HandleCoverageMovieSubs))
 
 	// Write endpoints.
 	userConfigured.Add("POST /api/search/download", s.manualH.HandleManualDownload)
@@ -250,7 +255,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	userConfigured.Add("POST /api/sync/audio", s.syncH.HandleSyncAudio)
 	userConfigured.Add("POST /api/sync/season", s.syncH.HandleSyncSeason)
 	userConfigured.Add("POST /api/sync/offset", s.syncH.HandleSyncOffset)
-	userConfigured.Add("GET /api/sync/jobs", s.syncH.HandleSyncJobs)
+	userConfigured.Add("GET /api/sync/jobs", s.stamp(events.SubjectJobs, nil)(s.syncH.HandleSyncJobs))
 
 	// Preview endpoints.
 	userConfigured.Add("GET /api/preview/start", s.previewH.HandlePreviewStart)

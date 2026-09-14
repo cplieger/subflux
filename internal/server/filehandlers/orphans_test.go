@@ -372,7 +372,7 @@ func newFileHandlerArr(store FileStore, sonarr FileSonarrClient, radarr FileRada
 			State: func() *resolve.State { return &resolve.State{Cfg: cfg} },
 		},
 		StateFunc: func() *LiveState { return &LiveState{Cfg: cfg, Sonarr: sonarr, Radarr: radarr} },
-		Events:    events.New(0),
+		Events:    events.New(0, nil),
 	})
 }
 

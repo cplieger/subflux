@@ -151,6 +151,10 @@ type Deps struct {
 	Stops *activity.StopRegistry
 	// PublishDone publishes the sync:done event (EventBus.PublishSyncDone).
 	PublishDone func(ev *events.SyncDoneEvent)
+	// OnChange runs after every registry transition GET /api/sync/jobs can
+	// observe (accept, admission, settle, batch finish, prune), outside mu;
+	// the server mints the jobs digest version from it. Optional.
+	OnChange func()
 	// RegistryCap overrides DefaultRegistryCap when positive (tests).
 	RegistryCap int
 }
@@ -209,13 +213,28 @@ func New(deps Deps) *Dispatcher {
 	}
 }
 
+// changed runs the OnChange hook. Callers invoke it after releasing mu.
+func (d *Dispatcher) changed() {
+	if d.deps.OnChange != nil {
+		d.deps.OnChange()
+	}
+}
+
 // Dispatch enqueues one single-file job: non-blocking, atomically reserving
 // an admission slot. A live job for the same subtitle file answers its
 // EXISTING ids (even at cap); a full lease answers ErrCapacity (429 on the
 // wire, never auto-retried by the client).
 func (d *Dispatcher) Dispatch(in *ExecInput) (Accepted, error) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	acc, err := d.dispatchLocked(in)
+	d.mu.Unlock()
+	if err == nil && !acc.Existing {
+		d.changed()
+	}
+	return acc, err
+}
+
+func (d *Dispatcher) dispatchLocked(in *ExecInput) (Accepted, error) {
 	if d.closed {
 		return Accepted{}, ErrShuttingDown
 	}
@@ -290,6 +309,7 @@ func (d *Dispatcher) Cancel(activityID string) CancelOutcome {
 		d.queue = slices.DeleteFunc(d.queue, func(e queueEntry) bool { return e.batch == nil && e.jobID == id })
 		d.settleLocked(j, ExecResult{Outcome: subflux.JobCancelled, Err: context.Canceled})
 		d.mu.Unlock()
+		d.changed()
 		d.deps.Log.FinishCancelled(activityID)
 		return CancelledQueued
 	case j.record.State == StateQueued:
@@ -415,6 +435,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 		actID := j.record.ActivityID
 		d.mu.Unlock()
 		if !settled {
+			d.changed()
 			d.deps.Log.FinishCancelled(actID)
 		}
 		return
@@ -440,6 +461,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 		j.record.State = StateRunning
 		j.record.StartedAt = &now
 		d.mu.Unlock()
+		d.changed()
 		d.deps.Log.SetQueued(j.record.ActivityID, false)
 		return true
 	}
@@ -456,6 +478,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 	d.settleLocked(j, res)
 	rec := j.record
 	d.mu.Unlock()
+	d.changed()
 
 	switch res.Outcome {
 	case subflux.JobResult:
@@ -516,6 +539,9 @@ func (d *Dispatcher) drain() {
 		acts = append(acts, j.record.ActivityID)
 	}
 	d.mu.Unlock()
+	if len(acts) > 0 {
+		d.changed()
+	}
 	for _, id := range acts {
 		d.deps.Log.FinishCancelled(id)
 	}
@@ -553,7 +579,7 @@ func (d *Dispatcher) Jobs(batchActivityID string) []Job {
 func (d *Dispatcher) Prune(maxAge time.Duration) {
 	cutoff := time.Now().Add(-maxAge)
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	removed := 0
 	for id, j := range d.jobs {
 		if j.batch != nil && j.batch.state != StateDone {
 			continue
@@ -561,12 +587,17 @@ func (d *Dispatcher) Prune(maxAge time.Duration) {
 		if j.record.State == StateDone && j.record.EndedAt != nil && j.record.EndedAt.Before(cutoff) {
 			delete(d.jobs, id)
 			delete(d.byActivity, j.record.ActivityID)
+			removed++
 		}
 	}
 	for id, b := range d.batches {
 		if b.state == StateDone && b.endedAt.Before(cutoff) {
 			delete(d.batches, id)
 		}
+	}
+	d.mu.Unlock()
+	if removed > 0 {
+		d.changed()
 	}
 }
 

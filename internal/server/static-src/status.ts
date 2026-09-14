@@ -32,6 +32,7 @@ import type {
 } from "./wire/types.gen.js";
 import { fmtTime } from "./utils.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
+import type { ClientState, LifecycleEvent } from "@cplieger/sse";
 import type { ActivityEntry } from "./api-types.js";
 import { runningScans, type RunningScansByScope } from "./scan-scope.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
@@ -316,10 +317,25 @@ export function abortPoll(): void {
 }
 
 /** Dispatch a single status poll. Used by event handlers and direct
- *  refresh paths (config save, activity dismiss, SSE state change).
- *  pollStatusAction's dedupe coalesces with any in-flight poll. */
-export async function pollStatus(): Promise<void> {
-  await pollStatusAction.dispatch(undefined);
+ *  refresh paths (config save, activity dismiss, the stream's revalidate
+ *  body, which passes its signal so a stopped or timed-out run aborts the
+ *  poll it started). pollStatusAction's dedupe coalesces with any in-flight
+ *  poll. */
+export async function pollStatus(signal?: AbortSignal): Promise<void> {
+  const handle = pollStatusAction.dispatch(undefined);
+  if (signal !== undefined) {
+    const onAbort = (): void => {
+      handle.abort();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    try {
+      await handle;
+    } finally {
+      signal.removeEventListener("abort", onAbort);
+    }
+    return;
+  }
+  await handle;
 }
 
 // --- The event-fed status store (E2) ---
@@ -500,16 +516,45 @@ function reconcileStoppingOverlay(activities: readonly ActivityEntry[]): void {
 
 // --- The poll floor (E2) ---
 //
-// One fetch at connect/boot: the transaction's status leg. While connected,
-// events feed the store and the 60s reconcile tick is the drift belt. Only
-// while the stream is down does status ride the 5s poll.
+// One fetch at boot (initStatusReconcile). While connected, events feed the
+// store and the 60s reconcile tick is the drift belt. Only while the stream
+// is down does status ride the 5s poll.
 
 let stopDownPoll: (() => void) | null = null;
 
-/** SSE connection state, driven by events.ts. A refused connect or the
- *  post-CLOSED reconnect ladder puts status on the 5s poll; a live stream
- *  stops it. CONNECTING blips never enter here. */
-export function setStatusDegraded(down: boolean): void {
+/** The stream's state change as the library reports it, whether the stream
+ *  runs in this tab or in the profile's worker. */
+export type StreamTransition = Extract<LifecycleEvent, { kind: "state" }>;
+
+/** The states that are a DOWN period on their own: the backoff ladder and an
+ *  offline browser. */
+function downState(kind: ClientState["kind"]): boolean {
+  return kind === "backoff" || kind === "offline";
+}
+
+/** Whether a transition enters a DOWN period for status: the backoff ladder,
+ *  an offline browser, and the connect a backoff retries. A first attempt
+ *  (from stopped, from a stream that ended stable, from the network or the
+ *  tab coming back), a deliberate hidden close and a stopped stream are not. */
+export function streamDegraded(t: StreamTransition): boolean {
+  return downState(t.to) || (t.to === "connecting" && t.from === "backoff");
+}
+
+/** SSE connection state, driven by events.ts on every state change. A down
+ *  period puts status on the 5s poll; a live stream stops it. */
+export function setStatusDegraded(t: StreamTransition): void {
+  setDownPoll(streamDegraded(t));
+}
+
+/** The state a tab attached into, from the record the worker sends it: a tab
+ *  joining a backoff or offline stream polls at once rather than from the
+ *  stream's next transition. A connect in flight reports itself within the
+ *  attempt, so it is not a down period here. */
+export function setStatusAttached(state: ClientState["kind"]): void {
+  setDownPoll(downState(state));
+}
+
+function setDownPoll(down: boolean): void {
   if (down === (stopDownPoll !== null)) {
     return;
   }
@@ -521,10 +566,12 @@ export function setStatusDegraded(down: boolean): void {
   }
 }
 
-/** Put the status poll on the shared 60s reconcile cadence: the drift belt
- *  while SSE is connected, covering alert TTL expiry, alert cap eviction,
- *  and a provider cooldown expiring unqueried. Skips while hidden. */
+/** Fetch status once at boot, then put the poll on the shared 60s reconcile
+ *  cadence: the drift belt while SSE is connected, covering alert TTL
+ *  expiry, alert cap eviction, and a provider cooldown expiring unqueried.
+ *  Skips while hidden. */
 export function initStatusReconcile(): void {
+  void pollStatus();
   registerReconcileTask(() => {
     void pollStatus();
   });

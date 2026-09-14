@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // trustedProxies holds the parsed reverse-proxy CIDR set consulted by ClientIP.

@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, onTestFinished } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import type * as ApiClientModule from "./api-client.js";
 import { clientRequest, clientRequestOK, clientRequestRaw, fillPath } from "./api-client.js";
+import { SUBJECT_STAMP_HEADER, _resetSubjectsForTest, stampOf, versionMap } from "./subjects.js";
 
 // The client's request core is @cplieger/fetch, which reads a response body
 // via res.text() + JSON.parse (not res.json()) and builds request headers as a
@@ -22,6 +23,11 @@ const passthrough = <T>(v: unknown): T => v as T;
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  _resetSubjectsForTest();
+});
+
+afterEach(() => {
+  _resetSubjectsForTest();
 });
 
 describe("clientRequestRaw", () => {
@@ -299,6 +305,109 @@ describe("verb dispatch", () => {
   });
 });
 
+const EPOCH = "aaaaaaaaaaaaaaaa";
+const ACTIVITY_STAMP = JSON.stringify({ kind: "activity", ref: "", version: "3", epoch: EPOCH });
+
+describe("the success envelope and the subject stamp", () => {
+  it("carries the response headers on a 2xx", async () => {
+    stubFetch(JSON.stringify({ a: 1 }), {
+      status: 200,
+      headers: { ...JSON_HEADERS, ETag: '"v3"' },
+    });
+
+    const r = await clientRequestRaw("GET", "/api/x", undefined, passthrough);
+
+    expect(r.ok).toBe(true);
+    expect(r.headers?.get("ETag")).toBe('"v3"');
+  });
+
+  it("a GET's Subject-Stamp is observed into the version map, epoch included", async () => {
+    stubFetch(JSON.stringify([]), {
+      status: 200,
+      headers: { ...JSON_HEADERS, [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP },
+    });
+
+    await clientRequest("GET", "/api/activity", undefined, passthrough);
+
+    expect(versionMap().snapshot()).toStrictEqual({
+      epoch: EPOCH,
+      held: [{ kind: "activity", ref: "", version: "3" }],
+    });
+  });
+
+  it("every client flavor observes: the OK-flag transport too", async () => {
+    stubFetch(null, {
+      status: 204,
+      headers: { [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP },
+    });
+
+    await clientRequestOK("GET", "/api/activity");
+
+    expect(versionMap().has({ kind: "activity", ref: "" })).toBe(true);
+  });
+
+  it("a mutation's stamp observes nothing: it is the pre-mutation version", async () => {
+    stubFetch(JSON.stringify({}), {
+      status: 200,
+      headers: { ...JSON_HEADERS, [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP },
+    });
+
+    await clientRequestRaw("DELETE", "/api/activity?id=1", undefined, passthrough);
+
+    expect(versionMap().has({ kind: "activity", ref: "" })).toBe(false);
+  });
+
+  it("a failed GET observes nothing, so the subject reads changed next time", async () => {
+    stubFetch(JSON.stringify({ error: "boom" }), {
+      status: 500,
+      headers: { ...JSON_HEADERS, [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP },
+    });
+
+    await clientRequestRaw("GET", "/api/activity", undefined, passthrough);
+
+    expect(versionMap().has({ kind: "activity", ref: "" })).toBe(false);
+  });
+
+  it("a stamp minted under another epoch than the bound map is ignored", async () => {
+    versionMap().bind("bbbbbbbbbbbbbbbb");
+    stubFetch(JSON.stringify([]), {
+      status: 200,
+      headers: { ...JSON_HEADERS, [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP },
+    });
+
+    await clientRequestRaw("GET", "/api/activity", undefined, passthrough);
+
+    expect(versionMap().has({ kind: "activity", ref: "" })).toBe(false);
+    expect(versionMap().epoch()).toBe("bbbbbbbbbbbbbbbb");
+  });
+
+  it.each<[string, string]>([
+    ["not JSON", "activity:3"],
+    ["a non-object", '"activity"'],
+    ["an empty kind", JSON.stringify({ kind: "", ref: "", version: "3", epoch: EPOCH })],
+    ["a numeric version", JSON.stringify({ kind: "activity", ref: "", version: 3, epoch: EPOCH })],
+    [
+      "a padded version",
+      JSON.stringify({ kind: "activity", ref: "", version: "03", epoch: EPOCH }),
+    ],
+    ["a short epoch", JSON.stringify({ kind: "activity", ref: "", version: "3", epoch: "abc" })],
+    ["a missing ref", JSON.stringify({ kind: "activity", version: "3", epoch: EPOCH })],
+  ])("a malformed stamp (%s) reads as no stamp", (_name, raw) => {
+    expect(stampOf(new Headers({ [SUBJECT_STAMP_HEADER]: raw }))).toBeNull();
+  });
+
+  it("a well-formed stamp reads all four fields", () => {
+    expect(stampOf(new Headers({ [SUBJECT_STAMP_HEADER]: ACTIVITY_STAMP }))).toStrictEqual({
+      kind: "activity",
+      ref: "",
+      version: "3",
+      epoch: EPOCH,
+    });
+    expect(stampOf(new Headers())).toBeNull();
+    expect(stampOf(undefined)).toBeNull();
+  });
+});
+
 describe("error envelope diagnostics", () => {
   it("carries the response headers on the error envelope", async () => {
     // login.ts reads Retry-After off a 429 to time its rate-limit countdown.
@@ -560,5 +669,30 @@ describe("session expiry", () => {
     // The latch holds: the second 401 must not restart the navigation, so the
     // recorded list is exactly one entry long.
     expect(nav.targets).toEqual(["/login?next=%2Fsettings"]);
+  });
+});
+
+describe("authFetch: the stream's and the digest's fetch", () => {
+  it("passes a response through unchanged", async () => {
+    const { authFetch } = await freshClient();
+    const nav = watchRedirects("/settings");
+    stubFetch("data: x\n\n", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+
+    const res = await authFetch("/api/events", { headers: { "SSE-Wire": "1" } });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("data: x\n\n");
+    expect(nav.targets).toEqual([]);
+  });
+
+  it("a 401 redirects to the login page exactly as an API call's does", async () => {
+    const { authFetch } = await freshClient();
+    const nav = watchRedirects("/series/42");
+    stubFetch(null, { status: 401 });
+
+    const res = await authFetch("/api/events/sync", { method: "POST", body: "{}" });
+
+    expect(res.status).toBe(401); // the library still sees its refusal
+    expect(nav.targets).toEqual(["/login?next=%2Fseries%2F42"]);
   });
 });

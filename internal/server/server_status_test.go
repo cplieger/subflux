@@ -184,7 +184,7 @@ func newManualDownloadServer(cfg *config.Config, radarr resolve.RadarrMovie) *Se
 		db:       &qhMockStore{},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(0),
+		events:   events.New(0, nil),
 	}
 	s.live.Store(&liveState{cfg: cfg})
 	resolver := &resolve.Resolver{

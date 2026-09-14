@@ -4,13 +4,17 @@ package functional
 
 import (
 	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // This file ports run.sh's first eight sections: health, auth, config,
 // providers, media_browser, coverage, state, files. Assertion messages are
-// verbatim from the bash suite; helper semantics live in suite_test.go.
+// verbatim from the bash suite; helper semantics live in suite_test.go. The
+// sse section, added after the port, sits between health and auth.
 
 func (s *suite) sectionHealth() {
 	s.log("=== Health & Basics ===")
@@ -59,6 +63,159 @@ func (s *suite) sectionHealth() {
 	} else {
 		s.logf("Health DELETE: HTTP %s", s.lastStatus)
 	}
+}
+
+// sseReadWindow is how long each stream read lasts: the handshake (retry,
+// hello, the legacy epoch frame) is flushed at connect and the first
+// keepalive is 15s out, so two seconds sees everything a connect writes.
+const sseReadWindow = 2 * time.Second
+
+var hexEpoch = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// frameNamed returns the first frame carrying the event name and whether one
+// exists.
+func frameNamed(frames []sseFrame, event string) (sseFrame, bool) {
+	for _, f := range frames {
+		if f.event == event {
+			return f, true
+		}
+	}
+	return sseFrame{}, false
+}
+
+// sectionSSE pins the server side of the SSE contract: the v3 handshake,
+// the header-gated legacy epoch frame, the state digest with a stamped GET
+// feeding it, and the keepalive acknowledgement. Arr-free.
+func (s *suite) sectionSSE() {
+	s.log("=== Server-Sent Events ===")
+
+	// (a) A v3 connect: retry first, then the hello, and no epoch frame.
+	status, frames := s.sseRead(sseReadWindow, s.baseURL+"/api/events", map[string]string{"SSE-Wire": "1"})
+	if status != "200" {
+		s.fail(fmt.Sprintf("SSE v3 connect: expected HTTP 200, got %s", status))
+		return
+	}
+	s.pass("SSE v3 connect (HTTP 200)")
+	if len(frames) > 0 && frames[0].retry == "1500" && frames[0].event == "" {
+		s.pass("SSE v3: retry: 1500 precedes every frame")
+	} else {
+		s.fail(fmt.Sprintf("SSE v3: expected a leading retry: 1500 frame, got %+v", frames))
+	}
+	hello, ok := frameNamed(frames, "sse:hello")
+	if !ok {
+		s.fail("SSE v3: no sse:hello frame within the read window")
+		return
+	}
+	s.pass("SSE v3: sse:hello received")
+	s.assertJSON(hello.data, ".wire", "1", "SSE v3: hello wire == 1")
+	s.assertJSON(hello.data, ".verdict", "fresh", "SSE v3: hello verdict == fresh (no cursor presented)")
+	s.assertJSON(hello.data, ".keepalive_ms", "15000", "SSE v3: hello keepalive_ms == 15000")
+	epoch := fieldRaw(hello.data, ".epoch")
+	if hexEpoch.MatchString(epoch) {
+		s.pass("SSE v3: hello epoch is 16 hex")
+	} else {
+		s.fail(fmt.Sprintf("SSE v3: hello epoch %q, want 16 hex", epoch))
+	}
+	if _, legacyFrame := frameNamed(frames, "epoch"); legacyFrame {
+		s.fail("SSE v3: an epoch frame reached a client that sent SSE-Wire")
+	} else {
+		s.pass("SSE v3: no epoch frame (header-gated overlap)")
+	}
+
+	// (b) A legacy connect (no SSE-Wire): exactly one epoch frame after the
+	// hello, with no id, boot_id == the hub epoch, and gap following the
+	// verdict: true on a cursor-less connect, false over a covered cursor.
+	status, frames = s.sseRead(sseReadWindow, s.baseURL+"/api/events", nil)
+	if status != "200" {
+		s.fail(fmt.Sprintf("SSE legacy connect: expected HTTP 200, got %s", status))
+		return
+	}
+	epochFrames := 0
+	for _, f := range frames {
+		if f.event == "epoch" {
+			epochFrames++
+		}
+	}
+	if epochFrames == 1 {
+		s.pass("SSE legacy: exactly one epoch frame")
+	} else {
+		s.fail(fmt.Sprintf("SSE legacy: %d epoch frames, want 1 (frames: %+v)", epochFrames, frames))
+	}
+	legacyHello, _ := frameNamed(frames, "sse:hello")
+	legacyEpoch, _ := frameNamed(frames, "epoch")
+	if legacyEpoch.id == "" {
+		s.pass("SSE legacy: epoch frame carries no id")
+	} else {
+		s.fail(fmt.Sprintf("SSE legacy: epoch frame has id %q, must never become a cursor", legacyEpoch.id))
+	}
+	s.assertJSON(legacyEpoch.data, ".type", "epoch", "SSE legacy: epoch frame type")
+	s.assertJSON(legacyEpoch.data, ".data.boot_id", epoch, "SSE legacy: epoch boot_id == the v3 hello epoch")
+	s.assertJSON(legacyEpoch.data, ".data.gap", "true", "SSE legacy: gap == true on a cursor-less connect")
+	head := fieldRaw(legacyEpoch.data, ".data.head")
+	if _, err := strconv.ParseUint(head, 10, 64); err == nil {
+		s.pass("SSE legacy: epoch head is a JSON number")
+	} else {
+		s.fail(fmt.Sprintf("SSE legacy: epoch head %q is not numeric", head))
+	}
+	s.assertJSON(legacyEpoch.data, ".data.head", fieldRaw(legacyHello.data, ".head"), "SSE legacy: epoch head == hello head")
+
+	// A legacy reconnect presenting the hub's own head resumes, so gap is
+	// false: the frame follows the verdict, not the header.
+	_, frames = s.sseRead(sseReadWindow, s.baseURL+"/api/events", map[string]string{"Last-Event-ID": epoch + ":" + head})
+	resumedEpoch, ok := frameNamed(frames, "epoch")
+	if ok {
+		s.assertJSON(resumedEpoch.data, ".data.gap", "false", "SSE legacy: gap == false over a covered cursor")
+	} else {
+		s.fail("SSE legacy reconnect: no epoch frame within the read window")
+	}
+
+	// (c) The digest, fed by a stamped GET. The stamp on GET /api/activity
+	// names the version the server holds; a digest presenting it answers
+	// unchanged, and once an activity entry moves it answers changed.
+	s.apiGet("/api/activity")
+	s.assertStatus("200", "GET /api/activity")
+	stamp := s.lastHeader.Get("Subject-Stamp")
+	s.assertJSON(stamp, ".kind", "activity", "Subject-Stamp kind == activity on GET /api/activity")
+	s.assertJSON(stamp, ".epoch", epoch, "Subject-Stamp epoch == the hub epoch")
+	version := fieldRaw(stamp, ".version")
+	if _, err := strconv.ParseUint(version, 10, 64); err == nil {
+		s.pass("Subject-Stamp version is a decimal string")
+	} else {
+		s.fail(fmt.Sprintf("Subject-Stamp version %q is not a decimal string", version))
+	}
+	digestBody := fmt.Sprintf(`{"epoch":%q,"subjects":[{"kind":"activity","ref":"","version":%q}]}`, epoch, version)
+	r := s.apiPost("/api/events/sync", digestBody)
+	s.assertStatus("200", "POST /api/events/sync")
+	s.assertJSON(r, ".checked", "1", "Digest: checked == 1")
+	s.assertJSON(r, ".must_refetch", "false", "Digest: must_refetch == false for the current epoch")
+	s.assertJSON(r, ".epoch", epoch, "Digest: epoch == the hub epoch")
+	s.assertJSONLen(r, ".changed", "eq", 0, "Digest: unchanged against the stamped version")
+
+	// Any activity-producing call moves the counter; a manual search is the
+	// cheapest arr-free one (its entry starts and ends). The publish is
+	// coalesced, so poll the digest until it names activity.
+	s.apiGet("/api/search?title=Test+Movie&year=2024&lang=en&type=movie")
+	s.assertStatus("200", "GET /api/search (activity producer)")
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		r = s.apiPost("/api/events/sync", digestBody)
+		if fieldRaw(r, ".changed[0].kind") == "activity" || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.assertJSON(r, ".changed[0].kind", "activity", "Digest: changed names activity after an activity entry")
+	s.assertJSONNotEmpty(r, ".changed[0].version", "Digest: changed carries the new version")
+
+	r = s.apiPost("/api/events/sync", fmt.Sprintf(`{"epoch":"0000000000000000","subjects":[{"kind":"activity","ref":"","version":%q}]}`, version))
+	s.assertStatus("200", "POST /api/events/sync (foreign epoch)")
+	s.assertJSON(r, ".must_refetch", "true", "Digest: must_refetch == true for a foreign epoch")
+
+	// (d) The keepalive acknowledgement.
+	s.apiPost("/api/events/alive", "")
+	s.assertStatus("400", "POST /api/events/alive without SSE-Client")
+	s.doRequestHeaders(defaultTimeout, http.MethodPost, s.baseURL+"/api/events/alive", "", "", map[string]string{"SSE-Client": "functional-1"})
+	s.assertStatus("204", "POST /api/events/alive with SSE-Client")
 }
 
 func (s *suite) sectionAuth() {

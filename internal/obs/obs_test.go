@@ -244,6 +244,55 @@ func TestSetConfigured_toggles_gauge(t *testing.T) {
 	}
 }
 
+// --- SSE ---
+
+func TestSSE_families_carry_their_closed_label_domains(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	m.RecordSSEConnect("fresh", false)
+	m.RecordSSEConnect("gap_budget", true)
+	m.RecordSSEDisconnect("dead")
+	m.RecordSSEPresenceTransition("expired")
+	m.SetSSEClients(3)
+	m.SetSSEQueuedFrames(7)
+	m.SetSSEHead(42)
+
+	body := renderMetrics(t, m)
+	want := []string{
+		`subflux_sse_connects_total{verdict="fresh"} 1`,
+		`subflux_sse_connects_total{verdict="gap_budget"} 1`,
+		`subflux_sse_connects_total{verdict="resumed"} 0`,
+		`subflux_sse_connects_total{verdict="gap_floor"} 0`,
+		`subflux_sse_connects_total{verdict="gap_ahead"} 0`,
+		`subflux_sse_connects_total{verdict="epoch_changed"} 0`,
+		`subflux_sse_connects_total{verdict="cursor_invalid"} 0`,
+		`subflux_sse_legacy_connects_total{client="v3"} 1`,
+		`subflux_sse_legacy_connects_total{client="legacy"} 1`,
+		`subflux_sse_disconnects_total{cause="dead"} 1`,
+		`subflux_sse_disconnects_total{cause="closed"} 0`,
+		`subflux_sse_disconnects_total{cause="evicted"} 0`,
+		`subflux_sse_disconnects_total{cause="shutdown"} 0`,
+		`subflux_sse_disconnects_total{cause="hook_failed"} 0`,
+		`subflux_sse_presence_transitions_total{kind="expired"} 1`,
+		`subflux_sse_presence_transitions_total{kind="alive"} 0`,
+		"subflux_sse_clients 3",
+		"subflux_sse_queued_frames 7",
+		"subflux_sse_head 42",
+	}
+	for _, w := range want {
+		if !strings.Contains(body, w) {
+			t.Errorf("Handler() body missing %q\nbody:\n%s", w, body)
+		}
+	}
+	if n := strings.Count(body, "subflux_sse_connects_total{"); n != 7 {
+		t.Errorf("sse_connects_total has %d series, want the 7 verdicts", n)
+	}
+	if n := strings.Count(body, "subflux_sse_disconnects_total{"); n != 5 {
+		t.Errorf("sse_disconnects_total has %d series, want the 5 causes", n)
+	}
+}
+
 // --- TotalSearches ---
 
 func TestTotalSearches_sums_across_providers(t *testing.T) {

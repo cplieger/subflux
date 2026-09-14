@@ -44,7 +44,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/syncworker"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -118,6 +118,7 @@ type Metrics interface {
 	polling.PollerMetrics
 	queryhandlers.MetricsReader
 	scheduler.ReconcileMetrics
+	events.Metrics
 
 	TransportMetrics
 	StoreMetrics
@@ -192,7 +193,6 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 			sync:  db,
 		},
 		registry:      reg,
-		events:        events.New(events.DefaultMaxSSEClients),
 		activity:      activity.New(50),
 		alerts:        activity.NewAlertLog(100),
 		ceremonies:    authhandlers.NewCeremonyStore(),
@@ -203,6 +203,18 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	for _, o := range opts {
 		o(s)
 	}
+	// Metrics is REQUIRED, and it is checked here rather than at Start because
+	// the event bus below and initHandlers bind it into child Deps by value.
+	// Expressed as an Option it read as voluntary, and it never was:
+	// twenty-two sites dereference it unguarded, including the middleware
+	// chain and the /metrics mount. The single nil check that used to sit in
+	// initHandlers is what made a missing recorder look survivable — it
+	// postponed the panic to the first request instead of preventing it. Same
+	// shape as search.New's five required options.
+	if s.metrics == nil {
+		panic("server.New: WithMetrics is required")
+	}
+	s.events = events.New(events.DefaultMaxSSEClients, s.metrics)
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
 	}
@@ -220,16 +232,6 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	// the wave-admission ceiling spans reloads and both arr sides. Waves run
 	// under the server lifetime context and register with bgWg.
 	s.arrReads = arrsvc.NewReadGate(func() context.Context { return s.lifetime }, &s.bgWg)
-	// Metrics is REQUIRED, and it is checked here rather than at Start because
-	// initHandlers below binds it into four child Deps by value. Expressed as an
-	// Option it read as voluntary, and it never was: twenty-two sites dereference
-	// it unguarded, including the middleware chain and the /metrics mount. The
-	// single nil check that used to sit in initHandlers is what made a missing
-	// recorder look survivable — it postponed the panic to the first request
-	// instead of preventing it. Same shape as search.New's five required options.
-	if s.metrics == nil {
-		panic("server.New: WithMetrics is required")
-	}
 	// The typed sync core: the composition root passes the shared syncworker
 	// client (WithSyncRunner) so dispatched jobs and automatic syncs contend
 	// on ONE execution slot; a directly-constructed server without the

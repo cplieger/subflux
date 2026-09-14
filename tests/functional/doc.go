@@ -2,8 +2,8 @@
 
 // Package functional contains the black-box functional test suite that
 // drives a live subflux instance over its HTTP API. It is the Go port of
-// the retired tests/functional/run.sh: 26 ordered sections sharing one
-// suite state, with pass/fail/skip counters and per-assertion output lines
+// the retired tests/functional/run.sh: 26 ordered sections (plus sse, added
+// after the port) sharing one suite state, with pass/fail/skip counters and per-assertion output lines
 // reproduced verbatim (equivalence was proven on the sorted PASS/FAIL/SKIP
 // assertion lines of the 12 CI sections; incidental bash stdout noise such
 // as uncaptured response bodies is deliberately not reproduced, and ANSI

@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/sse"
 )
 
 // stream is one connected SSE client: the response status/headers, a line
@@ -19,8 +22,9 @@ type stream struct {
 	close  func()
 }
 
-// startStream connects an SSE client to a Handle server. The client cap
-// lives on the bus itself (construct with New(cap)). The response body never
+// startStream connects a v3 SSE client (SSE-Wire set, so no legacy epoch
+// frame follows the hello) to a Handle server. The client cap lives on the
+// bus itself (construct with New(cap, nil)). The response body never
 // escapes: it is owned here and closed via t.Cleanup and/or st.close.
 func startStream(t *testing.T, bus *EventBus) stream {
 	t.Helper()
@@ -28,7 +32,12 @@ func startStream(t *testing.T, bus *EventBus) stream {
 		Handle(bus, w, r)
 	}))
 	t.Cleanup(srv.Close)
-	resp, err := http.Get(srv.URL)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("SSE-Wire", "1")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +69,15 @@ func readUntil(t *testing.T, sc *bufio.Scanner, pred func(string) bool) []string
 	return nil
 }
 
+// readHello consumes the stream through the hello's data line, so the next
+// data: line a test reads is an application frame.
+func readHello(t *testing.T, sc *bufio.Scanner) {
+	t.Helper()
+	readUntil(t, sc, func(l string) bool {
+		return strings.HasPrefix(l, "data: ") && strings.Contains(l, `"verdict":`)
+	})
+}
+
 func waitClients(t *testing.T, bus *EventBus, want int) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -79,12 +97,12 @@ func TestPublishNilBusIsNoop(t *testing.T) {
 
 func TestPublishNoSubscribersDoesNotPanic(t *testing.T) {
 	t.Parallel()
-	New(0).Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "x"}})
+	New(0, nil).Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "x"}})
 }
 
 func TestClientCountZeroInitially(t *testing.T) {
 	t.Parallel()
-	if got := New(0).ClientCount(); got != 0 {
+	if got := New(0, nil).ClientCount(); got != 0 {
 		t.Errorf("ClientCount = %d", got)
 	}
 }
@@ -93,9 +111,9 @@ func TestClientCountZeroInitially(t *testing.T) {
 // NAMED SSE event whose data payload is the JSON-encoded Event (type +
 // data), exactly what static-src/events.ts addEventListener handlers parse.
 func TestWireFormat(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
 	bus.Publish(Event{Type: CoverageUpdate, Data: CoverageEvent{
@@ -113,9 +131,9 @@ func TestWireFormat(t *testing.T) {
 }
 
 func TestHandleClientCap(t *testing.T) {
-	bus := New(1)
+	bus := New(1, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
 	st2 := startStream(t, bus)
@@ -128,7 +146,7 @@ func TestHandleClientCap(t *testing.T) {
 	// not an unlimited hub.
 	bus.SetMaxClients(2)
 	st3 := startStream(t, bus)
-	readUntil(t, st3.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st3.sc)
 	waitClients(t, bus, 2)
 
 	if st4 := startStream(t, bus); st4.status != http.StatusServiceUnavailable {
@@ -137,12 +155,14 @@ func TestHandleClientCap(t *testing.T) {
 }
 
 func TestShutdownDrainsAndRefuses(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
-	bus.Shutdown()
+	if err := bus.Shutdown(t.Context()); err != nil {
+		t.Fatalf("Shutdown() with one reading client = %v, want nil", err)
+	}
 	waitClients(t, bus, 0)
 	st.close()
 
@@ -152,12 +172,14 @@ func TestShutdownDrainsAndRefuses(t *testing.T) {
 	}
 
 	var nilBus *EventBus
-	nilBus.Shutdown()       // must not panic
+	if err := nilBus.Shutdown(t.Context()); err != nil {
+		t.Errorf("nil bus Shutdown() = %v, want nil", err)
+	}
 	nilBus.SetMaxClients(5) // must not panic
 }
 
 func TestHandleHeaders(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
 	if ct := st.header.Get("Content-Type"); ct != "text/event-stream" {
 		t.Errorf("Content-Type = %q", ct)
@@ -165,5 +187,30 @@ func TestHandleHeaders(t *testing.T) {
 	if cc := st.header.Get("Cache-Control"); !strings.Contains(cc, "no-transform") {
 		t.Errorf("Cache-Control = %q, want no-transform (Caddy/nginx gzip defense)", cc)
 	}
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
+}
+
+// TestPublish_oversize_frame_is_logged_not_published pins the one Publish
+// refusal subflux can reach: a payload past sse.MaxFrameBytes consumes no
+// offset and costs one Warn naming the event type. Serial: it swaps the
+// default logger.
+func TestPublish_oversize_frame_is_logged_not_published(t *testing.T) {
+	sink := capture.Default(t)
+	bus := New(0, nil)
+	bus.Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "small"}})
+	before := bus.hub.Position().Head
+
+	bus.Publish(Event{Type: Notify, Data: NotifyEvent{
+		Level: NotifyInfo, Text: strings.Repeat("x", sse.MaxFrameBytes+1),
+	}})
+
+	if got := bus.hub.Position().Head; got != before {
+		t.Errorf("Position().Head = %d after an oversize publish, want unchanged %d", got, before)
+	}
+	if n := sink.CountExact("SSE: event refused by the hub"); n != 1 {
+		t.Errorf("refusal Warn lines = %d, want 1; messages: %v", n, sink.Messages())
+	}
+	if v, ok := sink.AttrValue("SSE: event refused by the hub", "type"); !ok || v != string(Notify) {
+		t.Errorf("refusal Warn type attr = %q (present %v), want %q", v, ok, Notify)
+	}
 }

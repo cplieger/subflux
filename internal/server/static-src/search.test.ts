@@ -1161,7 +1161,7 @@ describe("downloadFromPopup", () => {
   //
   // A server restart drops the activity log with the process, so the event
   // task 12 relies on for completion can never arrive for a download tracked
-  // across it. events.ts reports the restart on a boot_id change; every tracked
+  // across it. events.ts reports the restart on a new epoch; every tracked
   // download carries the boot it was DISPATCHED under, so the snapshots that
   // follow retire the dead boot's entries and leave a live one's alone
   // regardless of when the snapshot was read.

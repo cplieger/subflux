@@ -34,7 +34,7 @@ func newDismissHarness(canceller activityhandlers.SyncJobCanceller) (*activityha
 		Activity: log,
 		Alerts:   activity.NewAlertLog(10),
 		Stops:    &activity.StopRegistry{},
-		Events:   events.New(1),
+		Events:   events.New(1, nil),
 		SyncJobs: canceller,
 	})
 	return h, log

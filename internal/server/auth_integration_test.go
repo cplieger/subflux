@@ -19,7 +19,7 @@ import (
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // =============================================================================
@@ -182,6 +182,12 @@ func (noopMetrics) RecordReconcile(_ int, _ int64, _ time.Duration) {}
 func (noopMetrics) RecordBackupSuccess(_ time.Duration)             {}
 func (noopMetrics) SetConfigured(_ bool)                            {}
 func (noopMetrics) SetPollCursorsDirty(_ int)                       {}
+func (noopMetrics) RecordSSEConnect(_ string, _ bool)               {}
+func (noopMetrics) RecordSSEDisconnect(_ string)                    {}
+func (noopMetrics) RecordSSEPresenceTransition(_ string)            {}
+func (noopMetrics) SetSSEClients(_ int)                             {}
+func (noopMetrics) SetSSEQueuedFrames(_ int)                        {}
+func (noopMetrics) SetSSEHead(_ uint64)                             {}
 
 func TestIntegration_MiddlewareChain(t *testing.T) {
 	t.Parallel()

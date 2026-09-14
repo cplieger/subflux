@@ -1,6 +1,29 @@
-// The resumable SSE connection (E3). See subflux-ui.md "Live UI updates" for
-// the full protocol (boot epoch, watermark, ordered transaction).
+// events.ts — the live-update stream and its reconciliation body.
+//
+// The connection is @cplieger/sse's: one SharedWorker per browser profile
+// owns the stream (sse-worker.ts) and this tab attaches to it, or runs
+// createStream itself where the worker cannot be reached. Cursor resume, the
+// backoff ladder, the visibility and online folds, the silence watchdog and
+// hold-and-drain around a revalidation are the library's. What stays here is
+// subflux's: the typed frame table, the digest subjects the legs refetch, and
+// the ordered transaction that runs when the server cannot vouch for what
+// this tab holds. The digest is per tab in both topologies: the worker fans a
+// run to every tab and each tab asks about the subjects it holds.
 
+import {
+  attachToWorker,
+  bindListener,
+  createDigestClient,
+  createStream,
+  type ClientState,
+  type DigestClient,
+  type DigestResult,
+  type Frame,
+  type LifecycleEvent,
+  type RevalidateContext,
+  type Subject,
+  type TabAttachment,
+} from "@cplieger/sse";
 import * as notify from "./notify.js";
 import { healFromCoverageEvent, resetCoverageHeal, subsumeDirtyRoots } from "./coverage-heal.js";
 import { noteHistoryMutation } from "./history.js";
@@ -10,6 +33,7 @@ import {
   applyAlertEvent,
   applyProviderEvent,
   pollStatus,
+  setStatusAttached,
   setStatusDegraded,
 } from "./status.js";
 import { applyCoveragePair, abortInFlightPairFetch } from "./coverage.js";
@@ -20,25 +44,22 @@ import {
   setCollectionLegJoin,
 } from "./coverage-store.js";
 import { beginTransaction, settleTransaction } from "./transaction.js";
-import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
-import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
+import { currentRouteKey, dispatchTransactionPageLeg, routeSubject } from "./page-leg.js";
+import { clearSyncCorrelation, reattachSyncWatches, syncDoneFromEvent } from "./sync-jobs.js";
 import { noteServerRestart } from "./search.js";
+import { authFetch, handleSessionExpiry } from "./api-client.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
-  EPOCH_TIMEOUT_MS,
-  REPLAY_BUDGET,
-  SSE_RECONNECT_MS,
-  SSE_MAX_RECONNECT_MS,
-  VERDICT_BUFFER_CAP,
-  VISIBILITY_DEBOUNCE_MS,
-} from "./constants.js";
-import { PATH_EVENTS, coverageMoviesRaw, coverageSeriesRaw } from "./wire/client.gen.js";
-import type { QueryValue } from "./wire/client.gen.js";
+  PATH_EVENTS,
+  PATH_EVENTS_ALIVE,
+  PATH_EVENTS_SYNC,
+  coverageMoviesRaw,
+  coverageSeriesRaw,
+} from "./wire/client.gen.js";
 import {
   decodeActivityEvent,
   decodeAlertEvent,
   decodeCoverageEvent,
-  decodeEpochEvent,
   decodeNotifyEvent,
   decodeProviderEvent,
   decodeScanEvent,
@@ -48,360 +69,252 @@ import type {
   ActivityEvent,
   AlertEvent,
   CoverageEvent,
-  EpochEvent,
-  EventData,
   NotifyEvent,
   ProviderEvent,
   ScanEvent,
   SyncDoneEvent,
 } from "./wire/types.gen.js";
 import type { Decoder } from "./validators.js";
+import { forgetSubject, versionMap } from "./subjects.js";
 
 // --- Typed SSE event payloads ---
 
-// null on a malformed frame so a bad event can't throw out of a listener.
-function decodeSSE<T extends EventData>(e: MessageEvent, decoder: Decoder<T>): T | null {
+type AppFrame =
+  | { type: "coverage"; payload: CoverageEvent }
+  | { type: "notify"; payload: NotifyEvent }
+  | { type: "scan:start"; payload: ScanEvent }
+  | { type: "scan:done"; payload: ScanEvent }
+  | { type: "sync:done"; payload: SyncDoneEvent }
+  | { type: "activity"; payload: ActivityEvent }
+  | { type: "alert"; payload: AlertEvent }
+  | { type: "provider"; payload: ProviderEvent };
+
+// null on a malformed frame so a bad event can't throw out of the handler.
+function decodeSSE<T>(data: string, decoder: Decoder<T>): T | null {
   try {
-    const env = JSON.parse(e.data as string) as { data?: unknown };
+    const env = JSON.parse(data) as { data?: unknown };
     return decoder(env.data);
   } catch {
     return null;
   }
 }
 
+/** The frame table: the decoder is picked by the frame's event name, and a
+ *  name this bundle does not know (the header-gated legacy `epoch` frame
+ *  included) decodes to nothing. */
+function decodeFrame(frame: Frame): AppFrame | null {
+  const d = frame.data;
+  switch (frame.type) {
+    case "coverage": {
+      const payload = decodeSSE(d, decodeCoverageEvent);
+      return payload ? { type: "coverage", payload } : null;
+    }
+    case "notify": {
+      const payload = decodeSSE(d, decodeNotifyEvent);
+      return payload ? { type: "notify", payload } : null;
+    }
+    case "scan:start": {
+      const payload = decodeSSE(d, decodeScanEvent);
+      return payload ? { type: "scan:start", payload } : null;
+    }
+    case "scan:done": {
+      const payload = decodeSSE(d, decodeScanEvent);
+      return payload ? { type: "scan:done", payload } : null;
+    }
+    case "sync:done": {
+      const payload = decodeSSE(d, decodeSyncDoneEvent);
+      return payload ? { type: "sync:done", payload } : null;
+    }
+    case "activity": {
+      const payload = decodeSSE(d, decodeActivityEvent);
+      return payload ? { type: "activity", payload } : null;
+    }
+    case "alert": {
+      const payload = decodeSSE(d, decodeAlertEvent);
+      return payload ? { type: "alert", payload } : null;
+    }
+    case "provider": {
+      const payload = decodeSSE(d, decodeProviderEvent);
+      return payload ? { type: "provider", payload } : null;
+    }
+    default:
+      return null;
+  }
+}
+
 // --- Module state ---
 
-// `bootID` is the frame's SOURCE boot (stamped at classification or at hold
-// time), so a deferred application can tell an old-boot frame from a current one.
-interface BufferedFrame {
-  type:
-    | "coverage"
-    | "notify"
-    | "scan:start"
-    | "scan:done"
-    | "sync:done"
-    | "activity"
-    | "alert"
-    | "provider";
-  payload: EventData;
-  id: number | null;
-  bootID: string | null;
-}
+let attachment: TabAttachment | null = null;
+let digest: DigestClient | null = null;
+let unbind: (() => void) | null = null;
+// `restartedFor` makes the restart bookkeeping run once per epoch however many
+// binds announce it (the per-tab stream's on a hello, this module's on a
+// worker hello or a digest's must_refetch).
+let restartedFor: string | null = null;
 
-// `revoked` flips on abort — results already applied stay applied, but an
-// unlanded leg's landing becomes a no-op.
-interface Transaction {
-  head: number;
-  revoked: boolean;
-}
+const CLIENT_TAG_KEY = "subflux.sse_client";
 
-let eventSource: EventSource | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempt = 0;
-
-// The stored boot identity (null = boot: no epoch seen this page load). The
-// watermark is COMMIT-ONLY; real frames never advance it. appliedHigh
-// advances by max over applied frame ids and resets on boot change.
-let bootID: string | null = null;
-let watermark: number | null = null;
-let appliedHigh: number | null = null;
-
-// forceLatch is set by an abort (teardown + recreate with no cursor);
-// downPeriodLatch is set by an epoch-less down period and buys ONE
-// precautionary refetch. Both coalesce into one transaction and clear on commit.
-let forceLatch = false;
-let downPeriodLatch = false;
-
-// Per-connection state.
-let epochSeen = false;
-let presentedCursor = false;
-let latchedConnect = false;
-let epochTimer: ReturnType<typeof setTimeout> | null = null;
-let verdictBuffer: BufferedFrame[] = [];
-
-// Post-epoch frames > head during a transaction; applied ascending on
-// commit. On abort, KEPT for the next valid epoch — a same-boot frame
-// applies in full, an old-boot frame applies through the boot-change arm.
-let holdQueue: BufferedFrame[] = [];
-
-let txn: Transaction | null = null;
-
-// Toast dedupe, keyed (boot_id, frame_id); resets with the namespace on a
-// boot change, AFTER the old namespace's held payloads applied.
-const appliedToastKeys = new Set<string>();
-
-// Resolved by the first valid epoch or a degrade. app.ts gates the boot
-// route apply on it; a degraded boot's ungated load is superseded later
-// under B2's generation guard.
-let bootGateResolve: () => void = () => {
-  /* replaced below */
-};
-let bootGatePromise = new Promise<void>((res) => {
-  bootGateResolve = res;
-});
-let bootGateSettled = false;
-let degradedBoot = false;
-
-/** Resolves when the first epoch arrives or the gate degrades. */
-export function bootGate(): Promise<void> {
-  return bootGatePromise;
-}
-
-function settleBootGate(): void {
-  if (!bootGateSettled) {
-    bootGateSettled = true;
-    bootGateResolve();
+function storedClientTag(): string | null {
+  try {
+    return localStorage.getItem(CLIENT_TAG_KEY);
+  } catch {
+    return null;
   }
 }
 
-function degradeBoot(): void {
-  if (bootID === null && !bootGateSettled) {
-    degradedBoot = true;
+/** The per-profile presence tag (SSE-Client): 16 hex minted once and kept
+ *  in localStorage, so every tab of one profile presents the same one. */
+function clientTag(): string {
+  const stored = storedClientTag();
+  if (stored !== null && /^[0-9a-f]{16}$/.test(stored)) {
+    return stored;
   }
-  settleBootGate();
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const tag = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    localStorage.setItem(CLIENT_TAG_KEY, tag);
+  } catch {
+    /* a profile that cannot persist presents a per-page tag */
+  }
+  return tag;
 }
 
 // --- Connection lifecycle ---
 
-/** Synthetic cursor: presents ?last_id=watermark, withheld under the force
- *  latch or when appliedHigh - watermark exceeds REPLAY_BUDGET. */
-function connectURL(): string {
-  // A zero watermark is a commit at an empty ring, not a cursor (server ids
-  // start at 1).
-  if (forceLatch || watermark === null || watermark === 0) {
-    return PATH_EVENTS;
-  }
-  if (appliedHigh !== null && appliedHigh - watermark > REPLAY_BUDGET) {
-    return PATH_EVENTS;
-  }
-  return `${PATH_EVENTS}?last_id=${String(watermark)}`;
+/** The profile's worker, constructed by its content-hashed bundle URL: a
+ *  redeploy's tabs cannot attach to a worker still running the old script. */
+function spawnWorker(): SharedWorker {
+  const name = __SSE_WORKER_URL__.slice(__SSE_WORKER_URL__.lastIndexOf("/") + 1);
+  return new SharedWorker(__SSE_WORKER_URL__, {
+    name,
+    type: "classic",
+    credentials: "same-origin",
+  });
 }
 
 export function connect(): void {
-  if (eventSource) {
+  if (attachment) {
     return;
   }
-
+  const tag = clientTag();
+  const headers = { "SSE-Client": tag };
+  digest = createDigestClient({ url: PATH_EVENTS_SYNC, headers, fetch: authFetch });
+  unbind = bindListener(versionMap(), onBind);
+  attachment = attachToWorker({
+    spawn: spawnWorker,
+    // The fallback shares the digest's headers record, so the tag the tab
+    // writes into it is the one the digest already carries.
+    fallback: () => {
+      const versions = versionMap();
+      const stream = createStream({
+        url: PATH_EVENTS,
+        headers,
+        fetch: authFetch,
+        alive: { url: PATH_EVENTS_ALIVE },
+        versions,
+        onFrame,
+        onLifecycle,
+        revalidate,
+      });
+      return { stream, versions, headers };
+    },
+    onFrame,
+    onLifecycle,
+    revalidate,
+    tag,
+  });
   // registerCleanup guarantees teardown fires before an unload/soft-nav can
   // leave timers firing into a torn-down DOM.
   registerCleanup(disconnect);
-
-  const url = connectURL();
-  presentedCursor = url !== PATH_EVENTS;
-  latchedConnect = forceLatch;
-  epochSeen = false;
-  verdictBuffer = [];
-
-  eventSource = new EventSource(url);
-
-  eventSource.addEventListener("open", () => {
-    setStatusDegraded(false);
-    // Attempt counter resets only on a non-latched open and on commit, so a
-    // persistent outage costs at most one transaction per SSE_MAX_RECONNECT_MS.
-    if (!latchedConnect) {
-      reconnectAttempt = 0;
-    }
-    // EPOCH_TIMEOUT_MS prices a SILENT open stream only; refusals fail fast
-    // through the error path.
-    clearEpochTimer();
-    epochTimer = setTimeout(() => {
-      epochTimer = null;
-      undecodableEpoch();
-    }, EPOCH_TIMEOUT_MS);
-  });
-
-  eventSource.addEventListener("epoch", (e: MessageEvent) => {
-    // Must not read lastEventId: the epoch carries no id.
-    clearEpochTimer();
-    if (epochSeen) {
-      return; // server writes exactly one epoch per connection
-    }
-    const payload = decodeSSE(e, decodeEpochEvent);
-    if (!payload) {
-      undecodableEpoch();
-      return;
-    }
-    epochSeen = true;
-    void handleEpoch(payload);
-  });
-
-  eventSource.addEventListener("coverage", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeCoverageEvent);
-    if (payload) {
-      routeFrame("coverage", payload, e);
-    }
-  });
-  eventSource.addEventListener("notify", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeNotifyEvent);
-    if (payload) {
-      routeFrame("notify", payload, e);
-    }
-  });
-  eventSource.addEventListener("scan:start", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeScanEvent);
-    if (payload) {
-      routeFrame("scan:start", payload, e);
-    }
-  });
-  eventSource.addEventListener("scan:done", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeScanEvent);
-    if (payload) {
-      routeFrame("scan:done", payload, e);
-    }
-  });
-  eventSource.addEventListener("sync:done", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeSyncDoneEvent);
-    if (payload) {
-      routeFrame("sync:done", payload, e);
-    }
-  });
-  eventSource.addEventListener("activity", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeActivityEvent);
-    if (payload) {
-      routeFrame("activity", payload, e);
-    }
-  });
-  eventSource.addEventListener("alert", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeAlertEvent);
-    if (payload) {
-      routeFrame("alert", payload, e);
-    }
-  });
-  eventSource.addEventListener("provider", (e: MessageEvent) => {
-    const payload = decodeSSE(e, decodeProviderEvent);
-    if (payload) {
-      routeFrame("provider", payload, e);
-    }
-  });
-
-  eventSource.addEventListener("error", () => {
-    const es = eventSource;
-    if (!es) {
-      return;
-    }
-    if (txn) {
-      abortTransaction(txn);
-      return;
-    }
-    if (es.readyState === EventSource.CLOSED) {
-      // Refusals land here immediately: fail fast, without waiting the
-      // epoch deadline.
-      if (!epochSeen) {
-        degradeBoot();
-        downPeriodLatch = true;
-      }
-      verdictBuffer = [];
-      clearEpochTimer();
-      eventSource = null;
-      scheduleReconnect();
-    } else {
-      // Browser retries this connection itself, carrying the real
-      // Last-Event-ID header. Reset per-connection state so pre-epoch
-      // frames buffer again.
-      if (!epochSeen) {
-        degradeBoot();
-        downPeriodLatch = true;
-      }
-      verdictBuffer = [];
-      epochSeen = false;
-      clearEpochTimer();
-    }
-  });
 }
 
-function clearEpochTimer(): void {
-  if (epochTimer) {
-    clearTimeout(epochTimer);
-    epochTimer = null;
-  }
-}
-
-/** Undecodable epoch or deadline expiry on a silent open stream: the
- *  connection cannot be trusted. */
-function undecodableEpoch(): void {
-  degradeBoot();
-  downPeriodLatch = true;
-  verdictBuffer = [];
-  teardownConnection();
-  scheduleReconnect();
-}
-
-function teardownConnection(): void {
-  clearEpochTimer();
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-}
-
-function scheduleReconnect(): void {
-  setStatusDegraded(true);
-  if (reconnectTimer) {
-    return;
-  }
-  const base = SSE_RECONNECT_MS * Math.pow(2, reconnectAttempt);
-  const jitter = Math.random() * SSE_RECONNECT_MS;
-  const delay = Math.min(base + jitter, SSE_MAX_RECONNECT_MS);
-  reconnectAttempt++;
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    connect();
-  }, delay);
-}
-
-function disconnect(): void {
-  if (txn) {
-    // Kill deliberately (hidden tab, page unload): abort first so the
-    // reconnect it schedules is cancelled below, and the latch makes the
-    // next connect's epoch transact unconditionally.
-    abortTransaction(txn);
-  }
-  teardownConnection();
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-  // reconnectAttempt deliberately NOT reset: it resets only on a
-  // non-latched open and on commit. A deliberate teardown is not DOWN.
-  setStatusDegraded(false);
+function teardown(cause: "unload" | "logout"): void {
+  attachment?.detach(cause);
+  attachment = null;
+  digest = null;
+  unbind?.();
+  unbind = null;
   abortPoll();
 }
 
-// --- Frame routing, the replay table, and counter advancement ---
-
-function routeFrame(type: BufferedFrame["type"], payload: EventData, e: MessageEvent): void {
-  const id = e.lastEventId ? Number(e.lastEventId) : null;
-  if (!epochSeen) {
-    // Pre-epoch frames can only be replay; buffer until the verdict. The
-    // cap is a heuristic belt against unbounded buffering.
-    verdictBuffer.push({ type, payload, id, bootID: null });
-    if (verdictBuffer.length > VERDICT_BUFFER_CAP) {
-      verdictBuffer = [];
-      forceLatch = true;
-      teardownConnection();
-      scheduleReconnect();
-    }
-    return;
-  }
-  if (txn && id !== null && id > txn.head) {
-    // Post-epoch frame beyond the snapshot the legs are reading.
-    holdQueue.push({ type, payload, id, bootID });
-    return;
-  }
-  applyFrame({ type, payload, id, bootID }, true);
+function disconnect(): void {
+  teardown("unload");
 }
 
-/** Toast dedupe by (boot_id, frame_id); a frame without an id applies. */
-function dedupeToast(f: BufferedFrame): boolean {
-  if (f.id === null) {
-    return true;
+/** Called BEFORE the logout request: a `logout` detach ends the profile's
+ *  stream in the worker (every tab's) or this tab's own, so no frame minted
+ *  for the dying session is delivered once the server has dropped it. */
+export function disconnectForLogout(): void {
+  teardown("logout");
+}
+
+/** A bind that drops held versions is a restart: the map held versions
+ *  another server process minted, and the job registry and the download
+ *  tracking died with it, so their correlations are cleared once per epoch.
+ *  The per-tab stream binds on its hello; bindTo covers the worker path. */
+function onBind(epoch: string, dropped: number): void {
+  if (dropped === 0 || restartedFor === epoch) {
+    return;
   }
-  const key = `${f.bootID ?? ""}:${String(f.id)}`;
-  if (appliedToastKeys.has(key)) {
-    return false;
+  restartedFor = epoch;
+  clearSyncCorrelation();
+  noteServerRestart();
+}
+
+/** Binds the map to the epoch a hello, a full run or a digest names, so the
+ *  legs' stamps land under it. In worker mode the host's stream binds only
+ *  its own map, so this is where the tab's follows; a per-tab stream has
+ *  already bound it by the time its hello is reported. */
+function bindTo(epoch: string): void {
+  const versions = versionMap();
+  if (versions.epoch() !== epoch) {
+    versions.bind(epoch);
   }
-  appliedToastKeys.add(key);
-  return true;
+}
+
+function onLifecycle(ev: LifecycleEvent): void {
+  switch (ev.kind) {
+    case "hello":
+      bindTo(ev.epoch);
+      return;
+    case "state":
+      setStatusDegraded(ev);
+      return;
+    case "tab_attached":
+      setStatusAttached(ev.state);
+      return;
+    case "connect_failed":
+      if (ev.reason.kind === "status" && ev.reason.status === 401) {
+        handleSessionExpiry(401);
+      }
+      return;
+    case "auth_lost":
+      handleSessionExpiry(ev.status);
+      return;
+    case "worker_unavailable":
+      console.warn("sse: worker unavailable, this tab streams on its own", ev.cause);
+      return;
+    case "frame_rejected":
+      console.warn("sse: frame rejected", ev.type, ev.error);
+      return;
+    case "revalidate_failed":
+      console.warn("sse: revalidate failed", ev.cause);
+      return;
+    case "revalidate_timeout":
+      console.warn("sse: revalidate timed out");
+      return;
+    default:
+      return;
+  }
+}
+
+// --- The frame table ---
+
+function onFrame(frame: Frame): void {
+  const decoded = decodeFrame(frame);
+  if (decoded) {
+    applyFrame(decoded);
+  }
 }
 
 function showNotifyToast(payload: NotifyEvent): void {
@@ -414,346 +327,240 @@ function showNotifyToast(payload: NotifyEvent): void {
   }
 }
 
-/** THE REPLAY TABLE, exhaustive over the union. Idempotency per type:
- *  coverage/activity/alert/provider re-apply through idempotent appliers;
- *  notify/scan:start dedupe by (boot_id, frame_id); scan:done is a no-op
- *  (state rides the terminal activity upsert + per-root coverage events);
- *  sync:done is idempotent per job_id; epoch is never replayed (no id). */
-function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
+/** THE REPLAY TABLE, exhaustive over the union. A frame reaches here exactly
+ *  once (the library's cursor never redelivers one), so idempotency is per
+ *  type only where a replay from the server's ring can carry it again:
+ *  coverage/activity/alert/provider re-apply through idempotent appliers,
+ *  sync:done is idempotent per job_id, scan:done is a no-op (state rides the
+ *  terminal activity upsert + per-root coverage events). */
+function applyFrame(f: AppFrame): void {
   switch (f.type) {
     case "coverage":
       // History trigger observes OUTSIDE the heal gate: a poller import on
       // a fresh /history tab must reload even when no collection is loaded.
       noteHistoryMutation();
-      healFromCoverageEvent(f.payload as CoverageEvent);
+      healFromCoverageEvent(f.payload);
       break;
     case "notify":
-      if (dedupeToast(f)) {
-        showNotifyToast(f.payload as NotifyEvent);
-      }
+      showNotifyToast(f.payload);
       break;
-    case "scan:start": {
-      if (dedupeToast(f)) {
-        const p = f.payload as ScanEvent;
-        notify.info(`Scan started: ${p.detail || p.action || "Scan"}`);
-      }
+    case "scan:start":
+      notify.info(`Scan started: ${f.payload.detail || f.payload.action || "Scan"}`);
       break;
-    }
     case "scan:done":
       break;
-    case "activity": {
-      const p = f.payload as ActivityEvent;
-      applyActivityEvent(p);
-      if (p.op !== "remove" && p.entry?.done) {
+    case "activity":
+      applyActivityEvent(f.payload);
+      if (f.payload.op !== "remove" && f.payload.entry?.done) {
         noteHistoryMutation();
       }
       break;
-    }
     case "alert":
-      applyAlertEvent(f.payload as AlertEvent);
+      applyAlertEvent(f.payload);
       break;
     case "provider":
-      applyProviderEvent(f.payload as ProviderEvent);
+      applyProviderEvent(f.payload);
       break;
     case "sync:done":
-      syncDoneFromEvent(f.payload as SyncDoneEvent);
+      syncDoneFromEvent(f.payload);
       break;
   }
-  if (advanceCounters && f.id !== null) {
-    appliedHigh = appliedHigh === null ? f.id : Math.max(appliedHigh, f.id);
-  }
 }
 
-/** Boot-change application arm: from an old boot, ONLY the
- *  non-reconstructible payloads apply (notify toasts, sync:done — a restart
- *  drops the server's job registry, so a held settlement is the only
- *  delivery). State-bearing frames are skipped: the new transaction's legs
- *  are strictly newer authority. No counter advancement. */
-function applyOldBootFrame(f: BufferedFrame): void {
-  if (f.type === "notify" && dedupeToast(f)) {
-    showNotifyToast(f.payload as NotifyEvent);
+// --- The revalidate body: the digest and the ordered transaction ---
+
+type Leg = "pair" | "page" | "status" | "jobs";
+
+const ALL_LEGS: ReadonlySet<Leg> = new Set<Leg>(["pair", "page", "status", "jobs"]);
+
+/** Which legs a digest's `changed` subjects name. A subject this tab no
+ *  longer renders (a detail root that is not open, history off /history) is
+ *  forgotten instead: the map mirrors the open route. */
+function legsFor(changed: readonly Subject[]): Set<Leg> {
+  const legs = new Set<Leg>();
+  const open = routeSubject(currentRouteKey());
+  for (const s of changed) {
+    switch (s.kind) {
+      case "series":
+      case "movies":
+        legs.add("pair");
+        break;
+      case "detail":
+      case "history":
+        if (open !== null && open.kind === s.kind && open.ref === s.ref) {
+          legs.add("page");
+        } else {
+          forgetSubject(s);
+        }
+        break;
+      case "activity":
+      case "alerts":
+      case "providers":
+        legs.add("status");
+        break;
+      case "jobs":
+        legs.add("jobs");
+        break;
+      default:
+        break;
+    }
   }
-  if (f.type === "sync:done") {
-    syncDoneFromEvent(f.payload as SyncDoneEvent);
-  }
+  return legs;
 }
 
-// --- The epoch: triggers and the ordered transaction ---
-
-function maxKnown(a: number | null, b: number | null): number | null {
-  if (a === null) {
-    return b;
-  }
-  if (b === null) {
-    return a;
-  }
-  return Math.max(a, b);
-}
-
-async function handleEpoch(epoch: EpochEvent): Promise<void> {
-  const isBoot = bootID === null;
-  const bootChanged = !isBoot && bootID !== epoch.boot_id;
-  const latched = forceLatch || downPeriodLatch;
-
-  // Order matters: reset counters -> apply the abort-deferred holdQueue ->
-  // classify verdictBuffer -> legs -> commit -> drain. Classification runs
-  // BEFORE trigger evaluation, so a header-carried native retry advances
-  // appliedHigh to head without this module ever reading lastEventId.
-  if (bootChanged) {
-    watermark = null;
-    appliedHigh = null;
-  }
-
-  if (holdQueue.length > 0 && !txn) {
-    const held = holdQueue;
-    holdQueue = [];
-    held.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
-    for (const f of held) {
-      if (f.bootID === epoch.boot_id) {
-        applyFrame(f, true);
-      } else {
-        applyOldBootFrame(f);
-      }
+async function revalidate(ctx: RevalidateContext): Promise<void> {
+  if (ctx.full) {
+    // Nothing this tab holds can be vouched for (a restart cleared the map,
+    // or the worker re-admitted this tab after it missed frames): the whole
+    // body runs without asking.
+    if (ctx.epoch !== null) {
+      bindTo(ctx.epoch);
     }
-  }
-  if (bootChanged) {
-    // Sync correlation and download tracking are per-boot too: reported
-    // here so this transaction's status read resolves the dead boot's entries.
-    appliedToastKeys.clear();
-    clearSyncCorrelation();
-    noteServerRestart();
-  }
-  bootID = epoch.boot_id;
-
-  // Classify verdictBuffer: <= head applies and advances appliedHigh; > head
-  // is defensive (unreachable by webhttp's ordering, kept as a belt).
-  const buffered = verdictBuffer;
-  verdictBuffer = [];
-  const defensiveHold: BufferedFrame[] = [];
-  for (const f of buffered) {
-    f.bootID = epoch.boot_id;
-    if (f.id !== null && f.id > epoch.head) {
-      defensiveHold.push(f);
-    } else {
-      applyFrame(f, true);
-    }
-  }
-
-  // Triggers (coalesce with the latches into ONE transaction): epoch gap;
-  // boot_id change; a cursor-less non-boot connect whose head exceeds
-  // max(watermark, appliedHigh) or finds both unknown; plus boot itself.
-  const highWater = maxKnown(watermark, appliedHigh);
-  const trigger3 = !presentedCursor && !isBoot && (highWater === null || epoch.head > highWater);
-  const transact = isBoot || epoch.gap || bootChanged || latched || trigger3;
-
-  if (!transact) {
-    for (const f of defensiveHold) {
-      applyFrame(f, true);
-    }
-    settleBootGate();
+    await runLegs(ALL_LEGS, ctx.signal);
     return;
   }
+  if (!digest) {
+    return;
+  }
+  const versions = versionMap();
+  const r: DigestResult = await digest.check(versions.snapshot(), ctx.signal);
+  if (r.kind === "must_refetch") {
+    // Bind first, so the legs' stamps land in a map already at the new epoch
+    // and the hello that follows has nothing to clear.
+    bindTo(r.epoch);
+    await runLegs(ALL_LEGS, ctx.signal);
+    return;
+  }
+  for (const s of r.removed) {
+    versions.forget(s);
+  }
+  await runLegs(legsFor(r.changed), ctx.signal);
+}
 
-  // Created synchronously before resolving the boot gate, so the route
-  // loader finds the collection leg's join registered and joins it instead
-  // of double-fetching.
-  const t: Transaction = { head: epoch.head, revoked: false };
-  txn = t;
-  holdQueue.push(...defensiveHold);
+/** Run the named legs as ONE transaction: every leg lands before commit, a
+ *  failed or aborted leg rejects (the library keeps the connection unverified
+ *  and the map keeps the old versions, so the next digest names the subject
+ *  again), and a covered pair landing subsumes the heal's dirty set. */
+async function runLegs(legs: ReadonlySet<Leg>, runSignal: AbortSignal): Promise<void> {
+  if (legs.size === 0) {
+    return;
+  }
+  // One signal per transaction, chained from the run's: a leg that fails
+  // cancels its siblings, so no orphaned leg can land a snapshot older than
+  // the transaction that replaces this one.
+  const txn = new AbortController();
+  const { signal } = txn;
+  const onRunAbort = (): void => {
+    txn.abort();
+  };
+  if (runSignal.aborted) {
+    txn.abort();
+  }
+  runSignal.addEventListener("abort", onRunAbort, { once: true });
   beginTransaction();
-  const join = createCollectionLegJoin();
-  settleBootGate();
-  // One microtask so the gate-released applyRoute sets route state before
-  // the legs read it.
-  await Promise.resolve();
-
-  const recovery = !isBoot || degradedBoot;
   try {
-    // Legs apply on landing; commit is the point all legs have landed.
-    await Promise.all([
-      collectionLeg(recovery, t, join),
-      dispatchTransactionPageLeg(recovery),
-      pollStatus(),
-    ]);
-    if (t.revoked) {
-      return; // aborted while legs were landing
+    const pair = legs.has("pair") ? collectionLeg(signal) : Promise.resolve(false);
+    const work: Promise<unknown>[] = [pair];
+    if (legs.has("page")) {
+      work.push(dispatchTransactionPageLeg(true, signal));
     }
-    watermark = epoch.head;
-    txn = null;
-    const held = holdQueue;
-    holdQueue = [];
-    held.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
-    for (const f of held) {
-      applyFrame(f, true);
+    if (legs.has("status")) {
+      work.push(pollStatus(signal));
     }
-    forceLatch = false;
-    downPeriodLatch = false;
-    reconnectAttempt = 0;
-    if (join.covered) {
+    if (legs.has("jobs")) {
+      work.push(reattachSyncWatches(signal));
+    }
+    try {
+      await Promise.all(work);
+    } catch (e: unknown) {
+      txn.abort();
+      throw e;
+    }
+    if (signal.aborted) {
+      throw new Error("revalidate aborted");
+    }
+    if (await pair) {
       subsumeDirtyRoots();
     }
-  } catch {
-    abortTransaction(t);
   } finally {
-    if (txn === t) {
-      txn = null;
-    }
+    runSignal.removeEventListener("abort", onRunAbort);
     settleTransaction();
     releaseCoverageTombstones();
   }
 }
 
-/** Revoke unlanded legs (their landings become no-ops), keep the holdQueue
- *  for the next epoch, latch, and rejoin the ladder cursor-less. */
-function abortTransaction(t: Transaction): void {
-  if (t.revoked) {
-    return;
-  }
-  t.revoked = true;
-  if (txn === t) {
-    txn = null;
-  }
-  forceLatch = true;
-  teardownConnection();
-  scheduleReconnect();
-  settleTransaction();
-  releaseCoverageTombstones();
-}
-
 // --- The collection leg ---
 
-interface CollectionLegJoinHandle {
-  resolve: (r: "landed" | "failed" | "uncovered") => void;
-  covered: boolean;
-}
+type CollectionLegJoin = "landed" | "failed" | "uncovered";
 
-function createCollectionLegJoin(): CollectionLegJoinHandle {
-  const handle: CollectionLegJoinHandle = {
-    covered: false,
-    resolve: () => {
-      /* replaced below */
-    },
+/** Fetches the pair on the raw generated client (zero automatic retries,
+ *  ?recovery=1, the run's signal) and REJECTS on genuine transport failure,
+ *  never the loader's null-collapsing read. A /history or deep-link session's
+ *  leg is empty. Resolves whether the leg covered the pair; a loader arriving
+ *  meanwhile joins it through the coverage store instead of fetching. */
+async function collectionLeg(signal: AbortSignal): Promise<boolean> {
+  let resolveJoin: (r: CollectionLegJoin) => void = () => {
+    /* replaced below */
   };
-  const p = new Promise<"landed" | "failed" | "uncovered">((res) => {
-    handle.resolve = res;
-  });
-  setCollectionLegJoin(p);
-  return handle;
-}
-
-/** Fetches the pair on the raw generated client (zero automatic retries)
- *  and REJECTS on genuine transport failure, never the loader's
- *  null-collapsing read. A /history or deep-link session's leg is empty. */
-async function collectionLeg(
-  recovery: boolean,
-  t: Transaction,
-  join: CollectionLegJoinHandle,
-): Promise<void> {
+  setCollectionLegJoin(
+    new Promise<CollectionLegJoin>((res) => {
+      resolveJoin = res;
+    }),
+  );
   const needPair = registeredCollections().size > 0 || currentRouteKey() === "library";
   if (!needPair) {
-    join.resolve("uncovered");
+    resolveJoin("uncovered");
     setCollectionLegJoin(null);
-    return;
+    return false;
   }
-  join.covered = true;
   const endWrite = beginCoveredPairWrite();
   try {
-    const q: Record<string, QueryValue> | undefined = recovery ? { recovery: 1 } : undefined;
-    const [series, movies] = await Promise.all([coverageSeriesRaw(q), coverageMoviesRaw(q)]);
-    if (t.revoked) {
-      // An orphaned stale pair landing after the successor's fresher one
-      // must not revert healed rows.
-      join.resolve("failed");
-      return;
+    const q = { recovery: 1 };
+    const [series, movies] = await Promise.all([
+      coverageSeriesRaw(q, { signal }),
+      coverageMoviesRaw(q, { signal }),
+    ]);
+    if (signal.aborted) {
+      // A sibling leg failed or the run was stopped: this snapshot may be
+      // older than the transaction that replaces this one.
+      resolveJoin("failed");
+      throw new Error("collection leg aborted");
     }
     if (!series.ok || !movies.ok) {
-      join.resolve("failed");
+      resolveJoin("failed");
       const status = !series.ok ? series.status : movies.status;
       throw new Error(series.error ?? movies.error ?? `collection leg failed (${String(status)})`);
     }
     abortInFlightPairFetch();
     applyCoveragePair(series.data ?? [], movies.data ?? []);
-    join.resolve("landed");
+    resolveJoin("landed");
+    return true;
   } finally {
     endWrite();
     setCollectionLegJoin(null);
   }
 }
 
-// --- Visibility pause ---
-
-let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
-
-document.addEventListener("visibilitychange", () => {
-  if (visibilityTimer) {
-    clearTimeout(visibilityTimer);
-    visibilityTimer = null;
-  }
-  if (document.hidden) {
-    disconnect();
-  } else {
-    visibilityTimer = setTimeout(() => {
-      visibilityTimer = null;
-      connect();
-    }, VISIBILITY_DEBOUNCE_MS);
-  }
-});
-
 // --- Test seam ---
 
 /** Tear the connection down and reset EVERY piece of module state. */
 export function _resetEventsForTest(): void {
-  if (txn) {
-    txn.revoked = true;
-    txn = null;
-  }
-  teardownConnection();
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-  if (visibilityTimer) {
-    clearTimeout(visibilityTimer);
-    visibilityTimer = null;
-  }
-  reconnectAttempt = 0;
-  bootID = null;
-  watermark = null;
-  appliedHigh = null;
-  forceLatch = false;
-  downPeriodLatch = false;
-  epochSeen = false;
-  presentedCursor = false;
-  latchedConnect = false;
-  verdictBuffer = [];
-  holdQueue = [];
-  appliedToastKeys.clear();
-  bootGateSettled = false;
-  degradedBoot = false;
-  bootGatePromise = new Promise<void>((res) => {
-    bootGateResolve = res;
-  });
+  disconnect();
+  restartedFor = null;
+  settleTransaction();
   setCollectionLegJoin(null);
   resetCoverageHeal();
 }
 
-/** Test-only accessor for the counters and latches. */
+/** Test-only accessor for the connection state and the epoch bookkeeping. */
 export function _stateForTest(): {
-  bootID: string | null;
-  watermark: number | null;
-  appliedHigh: number | null;
-  forceLatch: boolean;
-  downPeriodLatch: boolean;
-  holdQueueLength: number;
-  reconnectAttempt: number;
+  mode: "worker" | "fallback" | null;
+  stream: ClientState | null;
+  knownEpoch: string | null;
 } {
   return {
-    bootID,
-    watermark,
-    appliedHigh,
-    forceLatch,
-    downPeriodLatch,
-    holdQueueLength: holdQueue.length,
-    reconnectAttempt,
+    mode: attachment?.mode() ?? null,
+    stream: attachment?.state() ?? null,
+    knownEpoch: versionMap().epoch(),
   };
 }

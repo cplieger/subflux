@@ -17,8 +17,24 @@ import (
 	"time"
 
 	"github.com/cplieger/metrics/v4"
+	"github.com/cplieger/sse"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
+)
+
+// The SSE counters' closed label domains, declared at zero when the registry
+// is built so an unseen verdict or cause reads 0 rather than as a missing
+// series. None of them is a request-supplied string.
+var (
+	sseVerdicts = []sse.Verdict{
+		sse.VerdictFresh, sse.VerdictResumed, sse.VerdictGapFloor, sse.VerdictGapBudget,
+		sse.VerdictGapAhead, sse.VerdictEpochChanged, sse.VerdictCursorInvalid,
+	}
+	sseCauses = []sse.PresenceCause{
+		sse.PresenceClosed, sse.PresenceDead, sse.PresenceEvicted, sse.PresenceShutdown, sse.PresenceHookFailed,
+	}
+	sseClients             = []string{"v3", "legacy"}
+	ssePresenceTransitions = []string{"alive", "expired"}
 )
 
 // Metrics holds all application metrics.
@@ -55,6 +71,15 @@ type Metrics struct {
 	// Poll-cursor durability (S13): >0 while a cursor's durable persist is
 	// failing (in-memory position ahead of disk; restart would replay).
 	pollCursorsDirty *metrics.Gauge
+
+	// SSE observability.
+	sseConnects            *metrics.LabeledCounter
+	sseLegacyConnects      *metrics.LabeledCounter
+	sseDisconnects         *metrics.LabeledCounter
+	ssePresenceTransitions *metrics.LabeledCounter
+	sseClients             *metrics.Gauge
+	sseQueuedFrames        *metrics.Gauge
+	sseHead                *metrics.Gauge
 
 	totalSearch atomic.Int64
 }
@@ -93,6 +118,27 @@ func New() *Metrics {
 		configured: metrics.NewGauge("configured", "1 when a valid configuration is active, 0 in unconfigured mode"),
 
 		pollCursorsDirty: metrics.NewGauge("poll_cursors_dirty", "Number of poll cursors whose durable persist is failing (in-memory ahead of disk)"),
+
+		// SSE observability.
+		sseConnects:            metrics.NewLabeledCounter("sse_connects_total", "Total SSE connections by hello verdict", []string{"verdict"}),
+		sseLegacyConnects:      metrics.NewLabeledCounter("sse_legacy_connects_total", "Total SSE connections by client generation (v3 sends SSE-Wire, legacy does not)", []string{"client"}),
+		sseDisconnects:         metrics.NewLabeledCounter("sse_disconnects_total", "Total SSE disconnections by cause", []string{"cause"}),
+		ssePresenceTransitions: metrics.NewLabeledCounter("sse_presence_transitions_total", "Total SSE presence-table transitions (alive: first acknowledgement after connect or expiry; expired: connected but unacknowledged past the window)", []string{"kind"}),
+		sseClients:             metrics.NewGauge("sse_clients", "Connected SSE clients"),
+		sseQueuedFrames:        metrics.NewGauge("sse_queued_frames", "SSE frames queued across all client channels"),
+		sseHead:                metrics.NewGauge("sse_head", "Newest SSE replay-ring offset published this epoch"),
+	}
+	for _, v := range sseVerdicts {
+		m.sseConnects.Add(0, string(v))
+	}
+	for _, c := range sseCauses {
+		m.sseDisconnects.Add(0, string(c))
+	}
+	for _, c := range sseClients {
+		m.sseLegacyConnects.Add(0, c)
+	}
+	for _, k := range ssePresenceTransitions {
+		m.ssePresenceTransitions.Add(0, k)
 	}
 
 	m.registry = metrics.NewRegistry("subflux")
@@ -125,9 +171,56 @@ func New() *Metrics {
 		m.backupDuration,
 		m.configured,
 		m.pollCursorsDirty,
+		m.sseConnects,
+		m.sseLegacyConnects,
+		m.sseDisconnects,
+		m.ssePresenceTransitions,
+		m.sseClients,
+		m.sseQueuedFrames,
+		m.sseHead,
 	)
 
 	return m
+}
+
+// --- SSE observability ---
+
+// RecordSSEConnect counts one accepted SSE connection under its hello verdict
+// and under its client generation. The generation label is decided by whether
+// the SSE-Wire header was present, never by its value.
+func (m *Metrics) RecordSSEConnect(verdict string, legacy bool) {
+	m.sseConnects.Inc(verdict)
+	client := "v3"
+	if legacy {
+		client = "legacy"
+	}
+	m.sseLegacyConnects.Inc(client)
+}
+
+// RecordSSEDisconnect counts one SSE departure under the hub's cause.
+func (m *Metrics) RecordSSEDisconnect(cause string) {
+	m.sseDisconnects.Inc(cause)
+}
+
+// RecordSSEPresenceTransition counts one presence-table transition (alive or
+// expired).
+func (m *Metrics) RecordSSEPresenceTransition(kind string) {
+	m.ssePresenceTransitions.Inc(kind)
+}
+
+// SetSSEClients records the connected SSE client count.
+func (m *Metrics) SetSSEClients(n int) {
+	m.sseClients.Set(float64(n))
+}
+
+// SetSSEQueuedFrames records the frames queued across all SSE client channels.
+func (m *Metrics) SetSSEQueuedFrames(n int) {
+	m.sseQueuedFrames.Set(float64(n))
+}
+
+// SetSSEHead records the newest replay-ring offset published this epoch.
+func (m *Metrics) SetSSEHead(n uint64) {
+	m.sseHead.Set(float64(n))
 }
 
 // SetPollCursorsDirty records how many poll cursors currently have a failing

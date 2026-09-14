@@ -42,7 +42,13 @@ export default [
       ecmaVersion: 2024,
       sourceType: "module",
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // The worker is excluded from tsconfig.json (its `self` needs the
+          // WebWorker lib the page program does not load) and lints under
+          // its own config.
+          allowDefaultProject: ["sse-worker.ts"],
+          defaultProject: "tsconfig.worker.json",
+        },
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {
@@ -197,6 +203,7 @@ export default [
       "**/*.fuzz.test.ts",
       "**/*.property.test.ts",
       "fc-strict-setup.ts",
+      "worker-url-setup.ts",
       "test-stubs/**",
     ],
     ...tseslint.configs.disableTypeChecked,

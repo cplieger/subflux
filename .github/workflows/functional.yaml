@@ -141,7 +141,7 @@ jobs:
       # -v surfaces the per-assertion output go test buffers on success.
       - name: Run arr-free functional sections
         run: |
-          for section in health auth config providers scoring backoff \
+          for section in health sse auth config providers scoring backoff \
             synthetic_provider provider_errors config_validation language_rules \
             adaptive_config hot_reload; do
             echo "::group::section: $section"

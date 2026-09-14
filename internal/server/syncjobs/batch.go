@@ -72,7 +72,15 @@ type batch struct {
 // full lease answers ErrCapacity (429 on the wire).
 func (d *Dispatcher) DispatchBatch(in *BatchInput) (BatchAccepted, error) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	acc, err := d.dispatchBatchLocked(in)
+	d.mu.Unlock()
+	if err == nil && !acc.Existing {
+		d.changed()
+	}
+	return acc, err
+}
+
+func (d *Dispatcher) dispatchBatchLocked(in *BatchInput) (BatchAccepted, error) {
 	if d.closed {
 		return BatchAccepted{}, ErrShuttingDown
 	}
@@ -149,6 +157,7 @@ func (d *Dispatcher) cancelBatchLocked(b *batch) CancelOutcome {
 		d.finishBatchLocked(b)
 		actID := b.activityID
 		d.mu.Unlock()
+		d.changed()
 		d.deps.Log.FinishCancelled(actID)
 		return CancelledQueued
 	case b.state == StateQueued:
@@ -213,6 +222,7 @@ func (d *Dispatcher) runBatch(ctx context.Context, b *batch) {
 		actID := b.activityID
 		d.mu.Unlock()
 		if !settled {
+			d.changed()
 			d.deps.Log.FinishCancelled(actID)
 		}
 		return
@@ -251,6 +261,7 @@ func (d *Dispatcher) runBatch(ctx context.Context, b *batch) {
 	d.finishBatchLocked(b)
 	actID, detail := b.activityID, b.detail
 	d.mu.Unlock()
+	d.changed()
 
 	if cancelled {
 		d.deps.Log.FinishCancelled(actID)
@@ -271,15 +282,17 @@ func (d *Dispatcher) runBatchItem(ctx context.Context, id int64) {
 
 	hook := func() bool {
 		d.mu.Lock()
-		defer d.mu.Unlock()
 		// A stop lands as the batch context's cancel (the pre-start cancel
 		// race is settled before any item runs).
 		if ctx.Err() != nil {
+			d.mu.Unlock()
 			return false
 		}
 		now := time.Now()
 		j.record.State = StateRunning
 		j.record.StartedAt = &now
+		d.mu.Unlock()
+		d.changed()
 		return true
 	}
 
@@ -295,6 +308,7 @@ func (d *Dispatcher) runBatchItem(ctx context.Context, id int64) {
 	d.settleLocked(j, res)
 	rec := j.record
 	d.mu.Unlock()
+	d.changed()
 
 	if ran || res.Outcome != subflux.JobCancelled {
 		// Each item publishes its OWN sync:done, batch_activity_id set —

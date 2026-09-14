@@ -1,6 +1,7 @@
 // Package activityhandlers serves the activity log, the alert list, and the SSE
-// event stream: the HTTP surface over the three in-memory registries that record
-// what the server is doing and what went wrong.
+// event stream with its digest and presence-acknowledgement routes: the HTTP
+// surface over the in-memory registries that record what the server is doing
+// and what went wrong.
 //
 // It exists because every other data package under internal/server acquired a
 // handlers sibling — coverage has coveragehandlers, config has confighandlers —
@@ -16,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/cplieger/auth/v5"
 	"github.com/cplieger/subflux/internal/httpapi"
@@ -24,6 +26,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // activityPageSize is the maximum number of recent activities returned.
@@ -61,13 +64,26 @@ type Deps struct {
 	SyncJobs SyncJobCanceller
 }
 
+// digestTimeout bounds one digest request: same-origin over in-memory
+// counters, so ten seconds is a comfortable multiple that still ends a
+// resolver parked on a lock, and it is below the client's 30s hold timeout
+// so the run rejects with a cause rather than a hold_timeout.
+const digestTimeout = 10 * time.Second
+
 // Handler serves the activity, alert and event routes.
 type Handler struct {
-	deps Deps
+	digest http.Handler
+	deps   Deps
 }
 
 // New returns a Handler over deps.
-func New(deps Deps) *Handler { return &Handler{deps: deps} }
+func New(deps Deps) *Handler {
+	h := &Handler{deps: deps}
+	if deps.Events != nil {
+		h.digest = webhttp.RouteTimeout(deps.Events.DigestHandler(), digestTimeout, "digest timed out")
+	}
+	return h
+}
 
 // --- Alerts ---
 
@@ -227,4 +243,24 @@ func (h *Handler) HandleCancelActivity(w http.ResponseWriter, r *http.Request) {
 // HandleEvents serves the SSE stream.
 func (h *Handler) HandleEvents(w http.ResponseWriter, r *http.Request) {
 	events.Handle(h.deps.Events, w, r)
+}
+
+// HandleEventsSync serves POST /api/events/sync, the library's state digest
+// over the bus's subject versions, under the route timeout.
+func (h *Handler) HandleEventsSync(w http.ResponseWriter, r *http.Request) {
+	h.digest.ServeHTTP(w, r)
+}
+
+// HandleEventsAlive serves POST /api/events/alive: the client's receipt for
+// one keepalive, keyed by the SSE-Client tag it also streams under. A tag
+// outside the hub's grammar is a 400; a tag no stream has presented records
+// nothing, because only the hub's connected event mints a presence row.
+func (h *Handler) HandleEventsAlive(w http.ResponseWriter, r *http.Request) {
+	tag := r.Header.Get("SSE-Client")
+	if !webhttp.ValidRequestID(tag) {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "SSE-Client header missing or invalid")
+		return
+	}
+	h.deps.Events.Presence().Alive(tag, time.Now())
+	w.WriteHeader(http.StatusNoContent)
 }
