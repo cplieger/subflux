@@ -122,13 +122,10 @@ void configParsed().then((pc) => {
 });
 
 // Route-based initialization: render the correct view for the current URL.
-// Boot page loads are epoch-gated on EVERY route (E3): the apply waits for
-// the first epoch or the gate's degrade (refusal/failure/deadline — refusals
-// fail fast, so a 401 redirect never waits out the deadline). On a clean
-// epoch the boot transaction's legs cover the loads (the route loader joins
-// the collection leg); a degraded boot's ungated load is superseded later
-// under the page-leg generation guard.
-void events.bootGate().then(() => applyRoute());
+// The route loader IS the boot load: it fetches what the route shows and the
+// transport records each response's subject stamp, so the stream's first
+// digest (an empty map on a fresh page) names nothing and fetches nothing.
+void applyRoute();
 
 // Listen for browser back/forward.
 window.addEventListener("popstate", () => {
@@ -154,11 +151,13 @@ window.addEventListener("popstate", () => {
 // Background cadences. Status is EVENT-DRIVEN while the SSE stream is up
 // (the server's status deltas feed the status store), and the poll becomes
 // a floor under it (E2):
-//   - ONE fetch at connect/boot — the transaction's status leg (events.ts);
+//   - ONE fetch at boot (initStatusReconcile);
 //   - a 60s reconcile tick while CONNECTED (skipped while hidden) owning
 //     the convergence cases no event carries;
 //   - a 5s poll ONLY while the stream is DOWN (events.ts drives
-//     status.setStatusDegraded; pause-when-hidden built into pollAction).
+//     status.setStatusDegraded from the stream's state changes, whether the
+//     stream runs in this tab or in the profile's worker; pause-when-hidden
+//     built into pollAction).
 // The live-timer tick lives in status.ts: it runs only while the status
 // popup is open (the popover's open/close hooks own it).
 initStatusReconcile();

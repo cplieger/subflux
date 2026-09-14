@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/syncjobs"
 )
 
@@ -20,9 +21,13 @@ import (
 func TestRunActivityPrune_prunes_on_ticker_and_fires_remove(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		// syncJobs rides the same ticker (one retention owner); an empty
-		// dispatcher keeps the tick's job-prune arm a no-op here.
-		s := &Server{activity: activity.New(10), syncJobs: syncjobs.New(syncjobs.Deps{})}
+		// syncJobs and the SSE bus ride the same ticker (one retention
+		// owner); an empty dispatcher and an idle bus keep those arms no-ops.
+		s := &Server{
+			activity: activity.New(10),
+			syncJobs: syncjobs.New(syncjobs.Deps{}),
+			events:   events.New(0, nil),
+		}
 		var (
 			mu      sync.Mutex
 			removed []activity.Entry

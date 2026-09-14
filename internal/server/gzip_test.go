@@ -13,7 +13,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/obs"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // gzipChain composes a handler the way buildHandler does — Recoverer outside,

@@ -300,6 +300,14 @@ func Endpoints() []wiregen.Endpoint {
 			Kind: wiregen.KindSSE, Doc: "Server-sent events stream (EventSource).",
 		},
 		{
+			Name: "eventsSync", Method: http.MethodPost, Path: "/api/events/sync", AuthGroup: GroupUser,
+			Kind: wiregen.KindRaw, Doc: "SSE state digest; the @cplieger/sse digest client owns the request and response shapes.",
+		},
+		{
+			Name: "eventsAlive", Method: http.MethodPost, Path: "/api/events/alive", AuthGroup: GroupUser,
+			Kind: wiregen.KindRaw, Doc: "SSE keepalive acknowledgement keyed by the SSE-Client header; 204, or 400 without a valid tag.",
+		},
+		{
 			Name: "me", Method: http.MethodGet, Path: "/api/auth/me", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[subflux.MeResponse](),
 		},

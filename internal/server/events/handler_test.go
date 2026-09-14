@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/webhttp/v2/sse"
+	"github.com/cplieger/sse"
 )
 
 // sseFrame is one parsed wire frame: the id/event fields (empty when the
@@ -20,8 +20,8 @@ type sseFrame struct {
 	data  string
 }
 
-// parseFrames splits a recorded SSE body into frames. Comment-only frames
-// (keepalives) are skipped.
+// parseFrames splits a recorded SSE body into frames. Blocks with no id,
+// event or data field (the retry: line) are skipped.
 func parseFrames(body string) []sseFrame {
 	var out []sseFrame
 	for block := range strings.SplitSeq(body, "\n\n") {
@@ -48,20 +48,19 @@ func parseFrames(body string) []sseFrame {
 }
 
 // handleOnce drives Handle with a pre-cancelled request context, so Serve
-// writes the replay and the epoch handshake synchronously and then exits its
-// live loop without delivering live frames. It returns the request it built
-// (so callers can assert Handle left it unchanged) and the parsed frames.
-func handleOnce(t *testing.T, bus *EventBus, target string, header map[string]string) (*http.Request, []sseFrame) {
+// writes the hello, the replay and the OnConnect frames synchronously and
+// then exits its live loop without delivering live frames.
+func handleOnce(t *testing.T, bus *EventBus, header map[string]string) []sseFrame {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	req := httptest.NewRequest(http.MethodGet, target, nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(ctx)
 	for k, v := range header {
 		req.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
 	Handle(bus, rec, req)
-	return req, parseFrames(rec.Body.String())
+	return parseFrames(rec.Body.String())
 }
 
 // epochEnvelope is the wire envelope the epoch frame carries — the same
@@ -71,16 +70,22 @@ type epochEnvelope struct {
 	Data EpochEvent `json:"data"`
 }
 
+// epochFrames returns the epoch frames in wire order.
+func epochFrames(frames []sseFrame) []sseFrame {
+	var found []sseFrame
+	for _, f := range frames {
+		if f.event == string(Epoch) {
+			found = append(found, f)
+		}
+	}
+	return found
+}
+
 // epochOf finds the single epoch frame, decodes its envelope, and fails the
 // test when there is not exactly one.
 func epochOf(t *testing.T, frames []sseFrame) (sseFrame, EpochEvent) {
 	t.Helper()
-	var found []sseFrame
-	for _, f := range frames {
-		if f.event == "epoch" {
-			found = append(found, f)
-		}
-	}
+	found := epochFrames(frames)
 	if len(found) != 1 {
 		t.Fatalf("epoch frames = %d, want exactly 1; frames: %+v", len(found), frames)
 	}
@@ -88,17 +93,37 @@ func epochOf(t *testing.T, frames []sseFrame) (sseFrame, EpochEvent) {
 	if err := json.Unmarshal([]byte(found[0].data), &env); err != nil {
 		t.Fatalf("epoch payload %q: %v", found[0].data, err)
 	}
-	if env.Type != "epoch" {
-		t.Fatalf("epoch envelope type = %q, want %q (the {type,data} shape Publish uses)", env.Type, "epoch")
+	if env.Type != string(Epoch) {
+		t.Fatalf("epoch envelope type = %q, want %q (the {type,data} shape Publish uses)", env.Type, Epoch)
 	}
 	return found[0], env.Data
 }
 
-// replayedIDs returns the ids of the non-epoch frames, in wire order.
+// helloOf finds the single sse:hello frame and decodes it.
+func helloOf(t *testing.T, frames []sseFrame) sse.Hello {
+	t.Helper()
+	var found []sseFrame
+	for _, f := range frames {
+		if f.event == "sse:hello" {
+			found = append(found, f)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("sse:hello frames = %d, want exactly 1; frames: %+v", len(found), frames)
+	}
+	var h sse.Hello
+	if err := json.Unmarshal([]byte(found[0].data), &h); err != nil {
+		t.Fatalf("hello payload %q: %v", found[0].data, err)
+	}
+	return h
+}
+
+// replayedIDs returns the ids of the application frames (neither the hello
+// nor the epoch), in wire order.
 func replayedIDs(frames []sseFrame) []string {
 	var ids []string
 	for _, f := range frames {
-		if f.event != "epoch" {
+		if f.event != string(Epoch) && f.event != "sse:hello" {
 			ids = append(ids, f.id)
 		}
 	}
@@ -111,28 +136,58 @@ func publishN(bus *EventBus, n int) {
 	}
 }
 
-func TestHandleEpochShape(t *testing.T) {
+func cursor(bus *EventBus, offset uint64) string {
+	return sse.Cursor{Epoch: bus.Epoch(), Offset: offset}.String()
+}
+
+func TestHandle_legacy_connect_writes_epoch_frame(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
+	bus := New(0, nil)
 	publishN(bus, 3)
 
-	_, frames := handleOnce(t, bus, "/api/events", nil)
+	frames := handleOnce(t, bus, nil)
 
 	f, ep := epochOf(t, frames)
 	if f.id != "" {
 		t.Errorf("epoch frame carries id %q, want none (must never become a cursor)", f.id)
 	}
-	if ep.BootID != bus.bootID {
-		t.Errorf("epoch boot_id = %q, want the bus boot id %q", ep.BootID, bus.bootID)
+	if ep.BootID != bus.Epoch() {
+		t.Errorf("epoch boot_id = %q, want the hub epoch %q", ep.BootID, bus.Epoch())
 	}
-	if ep.Gap {
-		t.Error("epoch gap = true on a cursor-less connect, want false")
+	// A legacy tab only ever reaches this server on a reconnect (a fresh page
+	// load fetches the v3 bundle), and its own reconnect path carries no
+	// header cursor, so "fresh" means "missed an unknown number of events":
+	// gap true is the honest verdict and the tab runs its transaction.
+	if !ep.Gap {
+		t.Error("epoch gap = false on a cursor-less connect, want true (fresh is not resumed)")
 	}
 	if ep.Head != 3 {
 		t.Errorf("epoch head = %d, want 3", ep.Head)
 	}
+	if !strings.Contains(f.data, `"head":3`) {
+		t.Errorf("epoch payload %q carries head as something other than a JSON number", f.data)
+	}
 	if got := replayedIDs(frames); len(got) != 0 {
 		t.Errorf("cursor-less connect replayed %v, want no replay", got)
+	}
+}
+
+func TestHandle_v3_connect_writes_no_epoch_frame(t *testing.T) {
+	t.Parallel()
+	bus := New(0, nil)
+	publishN(bus, 3)
+
+	frames := handleOnce(t, bus, map[string]string{"SSE-Wire": "1"})
+
+	if got := epochFrames(frames); len(got) != 0 {
+		t.Errorf("SSE-Wire connect received %d epoch frame(s), want none: %+v", len(got), got)
+	}
+	h := helloOf(t, frames)
+	if h.Verdict != sse.VerdictFresh || h.Resumed {
+		t.Errorf("hello = %+v, want verdict fresh and resumed false", h)
+	}
+	if h.Epoch != bus.Epoch() || h.Head != 3 {
+		t.Errorf("hello epoch/head = %q/%d, want %q/3", h.Epoch, h.Head, bus.Epoch())
 	}
 }
 
@@ -142,7 +197,7 @@ func TestHandleEpochShape(t *testing.T) {
 // would notice: the field is not a frame, so parseFrames skips it.
 func TestHandleAdvertisesReconnectDelayOnce(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
+	bus := New(0, nil)
 	publishN(bus, 2)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -157,231 +212,70 @@ func TestHandleAdvertisesReconnectDelayOnce(t *testing.T) {
 		t.Fatalf("body carries %d retry: lines, want exactly 1 (it is a property of the connection, not of a frame); body = %q", n, body)
 	}
 	if !strings.HasPrefix(body, want) {
-		t.Errorf("body does not open with %q; the delay must be in effect before the first drop, so it precedes the replay and the epoch. body = %q", want, body)
+		t.Errorf("body does not open with %q; the delay must be in effect before the first drop, so it precedes the hello. body = %q", want, body)
 	}
 }
 
-func TestHandleReplayFromMidRing(t *testing.T) {
+// TestHandle_options_reach_the_hub pins that ReplyMaxEvents is passed to the
+// hub: one offset inside the cap resumes with exactly that many frames, one
+// past it is gap_budget with no replay. The arithmetic is the library's; the
+// option reaching it is subflux's.
+func TestHandle_options_reach_the_hub(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
+	bus := New(0, nil)
+	publishN(bus, 300)
+
+	frames := handleOnce(t, bus, map[string]string{"SSE-Wire": "1", "Last-Event-ID": cursor(bus, 43)})
+	h := helloOf(t, frames)
+	if h.Verdict != sse.VerdictGapBudget || h.Resumed {
+		t.Errorf("hello at head-257 = %+v, want verdict gap_budget and resumed false", h)
+	}
+	if got := replayedIDs(frames); len(got) != 0 {
+		t.Errorf("gap_budget connect replayed %d frames, want none", len(got))
+	}
+
+	frames = handleOnce(t, bus, map[string]string{"SSE-Wire": "1", "Last-Event-ID": cursor(bus, 44)})
+	h = helloOf(t, frames)
+	if h.Verdict != sse.VerdictResumed || !h.Resumed {
+		t.Errorf("hello at head-256 = %+v, want verdict resumed", h)
+	}
+	if got := replayedIDs(frames); len(got) != ReplyMaxEvents {
+		t.Errorf("resumed connect replayed %d frames, want ReplyMaxEvents (%d)", len(got), ReplyMaxEvents)
+	}
+}
+
+// TestHandle_legacy_gap_follows_the_verdict pins the overlap frame's one
+// derived field: gap is the inverse of the hello's resumed, so a legacy tab
+// that presents a covered cursor reads gap false over a complete replay and
+// one past the cap reads gap true with nothing replayed.
+func TestHandle_legacy_gap_follows_the_verdict(t *testing.T) {
+	t.Parallel()
+	bus := New(0, nil)
 	publishN(bus, 10)
 
-	_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "5"})
-
+	frames := handleOnce(t, bus, map[string]string{"Last-Event-ID": cursor(bus, 5)})
 	_, ep := epochOf(t, frames)
 	if ep.Gap {
-		t.Error("gap = true for an in-ring cursor, want false")
+		t.Error("gap = true over a covered cursor, want false")
 	}
-	want := []string{"6", "7", "8", "9", "10"}
-	got := replayedIDs(frames)
-	if fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Errorf("replayed ids = %v, want %v", got, want)
+	if got := replayedIDs(frames); len(got) != 5 {
+		t.Errorf("covered cursor replayed %d frames, want 5", len(got))
 	}
-	// The ReplayBounds pin: the epoch head covers every replayed id.
-	if ep.Head < 10 {
-		t.Errorf("epoch head = %d, want >= 10 (>= every replayed id)", ep.Head)
-	}
-	// Replay precedes the epoch on the wire.
-	if frames[len(frames)-1].event != "epoch" {
-		t.Errorf("epoch not last of the synchronous frames: %+v", frames)
-	}
-}
 
-func TestHandleDerivedRequestInjection(t *testing.T) {
-	t.Parallel()
-	bus := New(0)
-	publishN(bus, 10)
-
-	req, frames := handleOnce(t, bus, "/api/events?last_id=7", nil)
-
-	_, ep := epochOf(t, frames)
-	if ep.Gap {
-		t.Error("gap = true for a covered derived cursor, want false")
+	frames = handleOnce(t, bus, map[string]string{"Last-Event-ID": cursor(bus, 11)})
+	_, ep = epochOf(t, frames)
+	if !ep.Gap {
+		t.Error("gap = false above head, want true")
 	}
-	want := []string{"8", "9", "10"}
-	if got := replayedIDs(frames); fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Errorf("derived cursor replayed %v, want %v", got, want)
-	}
-	// The injection happens on a clone: the caller's request is unchanged.
-	if h := req.Header.Get("Last-Event-ID"); h != "" {
-		t.Errorf("original request header mutated to %q, want untouched", h)
+	if got := replayedIDs(frames); len(got) != 0 {
+		t.Errorf("gap connect replayed %v, want none", got)
 	}
 }
 
-func TestHandleHeaderWinsOverQuery(t *testing.T) {
-	t.Parallel()
-	bus := New(0)
-	publishN(bus, 10)
-
-	// A native EventSource retry carries the header; a stale synthetic
-	// cursor may still sit in the recreate URL. The header wins.
-	_, frames := handleOnce(t, bus, "/api/events?last_id=2",
-		map[string]string{"Last-Event-ID": "8"})
-
-	want := []string{"9", "10"}
-	if got := replayedIDs(frames); fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Errorf("replayed %v, want %v (header cursor 8, not query cursor 2)", got, want)
-	}
-}
-
-func TestHandleCursorValidation(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name   string
-		target string
-		header map[string]string
-	}{
-		{"query zero", "/api/events?last_id=0", nil},
-		{"query invalid", "/api/events?last_id=abc", nil},
-		{"query negative", "/api/events?last_id=-3", nil},
-		{"query over 2^53-1", "/api/events?last_id=9007199254740992", nil},
-		{"query absent", "/api/events", nil},
-		{"header invalid", "/api/events", map[string]string{"Last-Event-ID": "junk"}},
-		{"header over 2^53-1", "/api/events", map[string]string{"Last-Event-ID": "9007199254740992"}},
-	}
-	for _, tc := range cases {
-		t.Run(strings.ReplaceAll(tc.name, " ", "_"), func(t *testing.T) {
-			t.Parallel()
-			bus := New(0)
-			publishN(bus, 5)
-			_, frames := handleOnce(t, bus, tc.target, tc.header)
-			_, ep := epochOf(t, frames)
-			if ep.Gap {
-				t.Error("gap = true, want false (an ignored cursor is no resume, not a gap)")
-			}
-			if got := replayedIDs(frames); len(got) != 0 {
-				t.Errorf("ignored cursor replayed %v, want none", got)
-			}
-		})
-	}
-}
-
-func TestHandleGapTruthTable(t *testing.T) {
-	t.Parallel()
-	// Fill past the ring so the floor moves: 1030 events in a 1024 ring
-	// leaves floor = 7, head = 1030.
-	filled := func(t *testing.T) *EventBus {
-		t.Helper()
-		bus := New(0)
-		publishN(bus, SSERing+6)
-		floor, head := bus.hub.Bounds()
-		if floor != 7 || head != uint64(SSERing+6) {
-			t.Fatalf("Bounds() = (%d, %d), want (7, %d)", floor, head, SSERing+6)
-		}
-		return bus
-	}
-
-	// At the production sizes the budget disjunct fires before the floor one
-	// ever can (a full 1024-ring puts floor-1 exactly 1024 behind head), so
-	// the floor-boundary rows isolate their disjunct on a small test ring.
-	// In-package struct literal: no production constructor changes.
-	smallRing := func(t *testing.T) *EventBus {
-		t.Helper()
-		bus := &EventBus{hub: sse.NewHub(sse.WithReplay(8)), bootID: newBootID()}
-		publishN(bus, 12) // floor = 5, head = 12
-		floor, head := bus.hub.Bounds()
-		if floor != 5 || head != 12 {
-			t.Fatalf("Bounds() = (%d, %d), want (5, 12)", floor, head)
-		}
-		return bus
-	}
-
-	t.Run("floor_minus_1_covered", func(t *testing.T) {
-		t.Parallel()
-		bus := smallRing(t)
-		// lastID 4: the next id needed is 5 == floor, so the ring covers it.
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "4"})
-		_, ep := epochOf(t, frames)
-		if ep.Gap {
-			t.Error("gap = true at floor-1, want covered")
-		}
-		if got := replayedIDs(frames); len(got) != 8 {
-			t.Errorf("replayed %d frames, want the whole ring (8)", len(got))
-		}
-	})
-
-	t.Run("below_floor_gap", func(t *testing.T) {
-		t.Parallel()
-		bus := smallRing(t)
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "3"})
-		_, ep := epochOf(t, frames)
-		if !ep.Gap {
-			t.Error("gap = false below the floor, want gap")
-		}
-		if got := replayedIDs(frames); len(got) != 0 {
-			t.Errorf("gap verdict replayed %v, want the strip (no frames)", got)
-		}
-	})
-
-	t.Run("above_head_gap", func(t *testing.T) {
-		t.Parallel()
-		bus := New(0)
-		publishN(bus, 5)
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "6"})
-		_, ep := epochOf(t, frames)
-		if !ep.Gap {
-			t.Error("gap = false above head, want gap")
-		}
-	})
-
-	t.Run("empty_ring_gap", func(t *testing.T) {
-		t.Parallel()
-		bus := New(0)
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "5"})
-		_, ep := epochOf(t, frames)
-		if !ep.Gap {
-			t.Error("gap = false on an empty ring with a cursor, want gap")
-		}
-		if ep.Head != 0 {
-			t.Errorf("head = %d, want 0", ep.Head)
-		}
-	})
-
-	t.Run("budget_boundary", func(t *testing.T) {
-		t.Parallel()
-		bus := New(0)
-		publishN(bus, 300)
-		// head - lastID == 256: within budget, replays.
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "44"})
-		_, ep := epochOf(t, frames)
-		if ep.Gap {
-			t.Error("gap = true at head-lastID == ReplayBudget, want covered")
-		}
-		if got := replayedIDs(frames); len(got) != ReplayBudget {
-			t.Errorf("replayed %d, want %d", len(got), ReplayBudget)
-		}
-		// head - lastID == 257: past the budget, gap.
-		_, frames = handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "43"})
-		_, ep = epochOf(t, frames)
-		if !ep.Gap {
-			t.Error("gap = false at head-lastID == ReplayBudget+1, want gap")
-		}
-	})
-
-	t.Run("header_carried_pre_gap_stripped", func(t *testing.T) {
-		t.Parallel()
-		bus := filled(t)
-		// A native retry header below the floor: the strip follows the
-		// verdict whatever the cursor's source — no replayed frame reaches
-		// the wire before the gap epoch.
-		_, frames := handleOnce(t, bus, "/api/events", map[string]string{"Last-Event-ID": "3"})
-		f, ep := epochOf(t, frames)
-		if !ep.Gap {
-			t.Error("gap = false, want gap")
-		}
-		if got := replayedIDs(frames); len(got) != 0 {
-			t.Errorf("header-carried pre-gap replayed %v, want stripped", got)
-		}
-		if frames[0] != f {
-			t.Errorf("first wire frame is %+v, want the epoch", frames[0])
-		}
-	})
-}
-
-// TestHandleEpochBeforeLive pins the ordering on a real stream: the epoch is
-// written after replay and before any live frame.
+// TestHandleEpochBeforeLive pins the ordering on a real legacy stream: the
+// hello first, then the replay, then the epoch frame, then live frames.
 func TestHandleEpochBeforeLive(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	publishN(bus, 2)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		Handle(bus, w, r)
@@ -392,7 +286,7 @@ func TestHandleEpochBeforeLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Last-Event-ID", "1")
+	req.Header.Set("Last-Event-ID", cursor(bus, 1))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -414,9 +308,9 @@ func TestHandleEpochBeforeLive(t *testing.T) {
 	for _, f := range parseFrames(body.String()) {
 		order = append(order, f.event+":"+f.id)
 	}
-	want := []string{"notify:2", "epoch:", "notify:3"}
+	want := []string{"sse:hello:", "notify:" + cursor(bus, 2), "epoch:", "notify:" + cursor(bus, 3)}
 	if fmt.Sprint(order) != fmt.Sprint(want) {
-		t.Errorf("wire order = %v, want replay, then epoch, then live (%v)", order, want)
+		t.Errorf("wire order = %v, want hello, replay, epoch, live (%v)", order, want)
 	}
 }
 
@@ -424,9 +318,9 @@ func TestHandleEpochBeforeLive(t *testing.T) {
 // Topic reaches every subscriber regardless of filter.
 func TestPublishIsTopicless(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
+	bus := New(0, nil)
 	publishN(bus, 1)
-	for _, ev := range bus.hub.Buffered() {
+	for _, ev := range bus.hub.Snapshot() {
 		if ev.Event.Topic != "" {
 			t.Errorf("published event carries topic %q, want topicless broadcast", ev.Event.Topic)
 		}
@@ -437,32 +331,29 @@ func TestPublishIsTopicless(t *testing.T) {
 // exactly SSERing events, so the floor moves once it fills.
 func TestRingCapacity(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
+	bus := New(0, nil)
 	publishN(bus, SSERing+1)
-	floor, head := bus.hub.Bounds()
-	if floor != 2 || head != uint64(SSERing+1) {
-		t.Errorf("Bounds() after SSERing+1 publishes = (%d, %d), want (2, %d)", floor, head, SSERing+1)
+	pos := bus.hub.Position()
+	if pos.Floor != 2 || pos.Head != uint64(SSERing+1) {
+		t.Errorf("Position() after SSERing+1 publishes = (floor %d, head %d), want (2, %d)", pos.Floor, pos.Head, SSERing+1)
 	}
 }
 
-// TestBootIDStableAcrossConnections pins one boot id per bus (per process
-// start): two connections see the same value, and a second bus differs.
-func TestBootIDStableAcrossConnections(t *testing.T) {
+// TestEpoch_stable_per_bus pins one epoch per bus (per process start): two
+// connections see the same value, and a second bus differs.
+func TestEpoch_stable_per_bus(t *testing.T) {
 	t.Parallel()
-	bus := New(0)
-	_, f1 := handleOnce(t, bus, "/api/events", nil)
-	_, f2 := handleOnce(t, bus, "/api/events", nil)
-	_, ep1 := epochOf(t, f1)
-	_, ep2 := epochOf(t, f2)
+	bus := New(0, nil)
+	_, ep1 := epochOf(t, handleOnce(t, bus, nil))
+	_, ep2 := epochOf(t, handleOnce(t, bus, nil))
 	if ep1.BootID != ep2.BootID {
-		t.Errorf("boot ids differ across connections: %q vs %q", ep1.BootID, ep2.BootID)
+		t.Errorf("epochs differ across connections: %q vs %q", ep1.BootID, ep2.BootID)
 	}
-	if ep1.BootID == "" {
-		t.Error("boot id empty")
+	if len(ep1.BootID) != 16 {
+		t.Errorf("epoch = %q, want 16 hex characters", ep1.BootID)
 	}
-	_, f3 := handleOnce(t, New(0), "/api/events", nil)
-	_, ep3 := epochOf(t, f3)
+	_, ep3 := epochOf(t, handleOnce(t, New(0, nil), nil))
 	if ep3.BootID == ep1.BootID {
-		t.Errorf("two buses share boot id %q, want distinct per process start", ep1.BootID)
+		t.Errorf("two buses share epoch %q, want distinct per process start", ep1.BootID)
 	}
 }

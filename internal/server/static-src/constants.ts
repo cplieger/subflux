@@ -1,8 +1,9 @@
 // Named constants for timeout and interval values used across the UI.
 
 // Degraded-mode status poll cadence (E2): ONLY while the SSE stream is DOWN
-// (a refused connect or post-CLOSED backoff — the reconnect ladder). While
-// connected, events feed status and STATUS_RECONCILE_MS is the floor.
+// (the library's backoff and offline states, and the connect a backoff
+// retries), per tab: the worker fans its state changes to every tab.
+// While connected, events feed status and STATUS_RECONCILE_MS is the floor.
 export const SSE_DOWN_POLL_MS = 5_000;
 export const STATUS_RECONCILE_MS = 60_000;
 // Per-root coverage-heal window: events arriving inside one window share one
@@ -12,18 +13,6 @@ export const SUMMARY_COALESCE_MS = 300;
 // next event, replay, or transaction.
 export const DIRTY_ROOT_CAP = 64;
 export const SEARCH_TIMEOUT_MS = 30_000;
-export const SSE_RECONNECT_MS = 5_000;
-export const SSE_MAX_RECONNECT_MS = 60_000;
-// The epoch deadline prices a SILENT open stream only (refusals fail fast);
-// expiry is handled like an undecodable epoch.
-export const EPOCH_TIMEOUT_MS = 10_000;
-// Client-side mirror of the server's replay budget (the 4th gap disjunct).
-// The client pre-filter is a cheap gate on presenting a synthetic cursor;
-// the server disjunct is authoritative.
-export const REPLAY_BUDGET = 256;
-// Pre-epoch buffer cap: 2× the server's replay ring (a stated heuristic —
-// overflow degrades safely into a latched recovery).
-export const VERDICT_BUFFER_CAP = 2_048;
 export const YAML_TIMEOUT_MS = 15_000;
 export const ROUTE_TRANSITION_MS = 200;
 // History depth cap (E4): the server clamps ?limit at 10 000 SILENTLY, so a
@@ -38,9 +27,6 @@ export const DEFAULT_VARIANT = "standard" as const;
 // Coverage source string for subtitles embedded in the video container
 // (mirrors Go's subflux.SourceEmbedded; persisted in subtitle_files rows).
 export const EMBEDDED_PROVIDER = "embedded" as const;
-
-// Debounce delay for SSE reconnect on visibility change.
-export const VISIBILITY_DEBOUNCE_MS = 2_000;
 
 // The setup wizard's own address. The wizard is a page-state of login.html
 // rather than a document of its own, so without an address a reload mid-setup

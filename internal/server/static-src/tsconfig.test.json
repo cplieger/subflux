@@ -4,5 +4,5 @@
     "types": ["vitest/globals", "node"]
   },
   "include": ["*.ts", "*.d.ts", "wire/*.ts", "lib/**/*.ts", "**/*.test.ts"],
-  "exclude": ["vitest.config.ts"]
+  "exclude": ["vitest.config.ts", "sse-worker.ts"]
 }

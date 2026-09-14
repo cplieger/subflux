@@ -14,9 +14,9 @@ import (
 // dispatch on (DiscriminatorMap: "activity"/"alert"/"provider").
 
 func TestWireFormat_activity_delta(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
 	entry := activity.Entry{ID: "7", Action: "Full Scan", Source: activity.SourceManual, Done: true}
@@ -35,9 +35,9 @@ func TestWireFormat_activity_delta(t *testing.T) {
 }
 
 func TestWireFormat_alert_delta(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
 	bus.PublishAlert(AlertRaise, &activity.Alert{
@@ -58,9 +58,9 @@ func TestWireFormat_alert_delta(t *testing.T) {
 }
 
 func TestWireFormat_provider_delta(t *testing.T) {
-	bus := New(0)
+	bus := New(0, nil)
 	st := startStream(t, bus)
-	readUntil(t, st.sc, func(l string) bool { return strings.Contains(l, `"type":"epoch"`) })
+	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
 	bus.PublishProvider(ProviderRaise, &ProviderTimeoutEntry{

@@ -6,6 +6,7 @@ import * as theme from "./theme.js";
 import { el, icon } from "./dom.js";
 import { me, PATH_LOGOUT } from "./wire/client.gen.js";
 import { openConfig } from "./config.js";
+import { disconnectForLogout } from "./events.js";
 import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
@@ -211,6 +212,9 @@ const logoutAction = apiAction<undefined>({
 });
 
 async function doLogout(): Promise<void> {
+  // The stream leaves first: the server deletes the session inside the POST,
+  // and a frame delivered after that would be the dying session's.
+  disconnectForLogout();
   // Best-effort; redirect regardless of server response. The apiAction
   // dispatch resolves (null on failure) rather than rejecting, so the
   // redirect always runs; identical semantics to the previous apiPost.

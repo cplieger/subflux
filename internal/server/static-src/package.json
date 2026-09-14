@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -project tsconfig.json",
+    "typecheck": "tsc -project tsconfig.json && tsc -project tsconfig.worker.json",
     "typecheck:tests": "tsc -project tsconfig.test.json",
     "test": "vitest --run",
     "test:watch": "vitest",
@@ -35,9 +35,10 @@
   },
   "dependencies": {
     "@cplieger/actions": "3.1.5",
-    "@cplieger/fetch": "2.1.2",
+    "@cplieger/fetch": "2.2.0",
     "@cplieger/keyenc": "1.0.7",
     "@cplieger/reactive": "2.1.0",
+    "@cplieger/sse": "1.0.0",
     "@cplieger/ui-primitives": "3.1.0"
   },
   "overrides": {

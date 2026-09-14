@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // WebWorker alone: the library reads window/document/navigator through
+    // globalThis, so this program is the proof that the worker touches no DOM.
+    "lib": ["ESNext", "WebWorker"]
+  },
+  "include": ["sse-worker.ts"],
+  "exclude": []
+}

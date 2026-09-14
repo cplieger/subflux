@@ -1,18 +1,33 @@
-// events.test.ts — the SSE connection lifecycle on the E3 contract: the
-// backoff ladder, the visibility pause, the epoch gate on frame dispatch,
-// and the replay-table handlers. The transaction machinery is pinned by
-// events.transaction.test.ts (mocked seams) and events.integration.test.ts
+// events.test.ts — the stream as this module wires it (the headers it
+// presents, the 401 seam, the degraded-poll mapping off the library's
+// states) and the replay-table handlers driven by frames on a fake stream.
+// The connection lifecycle itself (backoff, visibility, watchdog, cursor) is
+// the library's and is tested there; the revalidate body is pinned by
+// events.revalidate.test.ts (mocked seams) and events.integration.test.ts
 // (real coverage modules); here the legs are stubbed inert.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SSE_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
 // Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
 import type * as BusModule from "./bus.js";
-import { FakeEventSource, lastFakeES } from "./events-fakes.js";
+import { EPOCH_A, fakeSSE, type FakeSSE } from "./events-fakes.js";
+
+// The fake server behind the injected fetch; replaced per test, reached
+// through a hoisted slot because the api-client mock below is hoisted too.
+const server = vi.hoisted(() => ({ current: null as FakeSSE | null }));
+vi.mock("./api-client.js", () => ({
+  authFetch: (input: RequestInfo | URL, init?: RequestInit) => {
+    if (!server.current) {
+      throw new Error("fake server not installed");
+    }
+    return server.current.fetch(input, init);
+  },
+  handleSessionExpiry: vi.fn(),
+}));
 
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./sync-jobs.js", () => ({
   syncDoneFromEvent: vi.fn(),
   clearSyncCorrelation: vi.fn(),
+  reattachSyncWatches: vi.fn(async () => undefined),
 }));
 vi.mock("./coverage-heal.js", () => ({
   healFromCoverageEvent: vi.fn(),
@@ -24,6 +39,7 @@ vi.mock("./status.js", () => ({
   pollStatus: vi.fn(async () => undefined),
   abortPoll: vi.fn(),
   setStatusDegraded: vi.fn(),
+  setStatusAttached: vi.fn(),
   applyActivityEvent: vi.fn(),
   applyAlertEvent: vi.fn(),
   applyProviderEvent: vi.fn(),
@@ -40,8 +56,6 @@ vi.mock("./coverage.js", () => ({
   applyCoveragePair: vi.fn(),
   abortInFlightPairFetch: vi.fn(),
 }));
-// The row-store's own transaction seams (the open-transaction flag itself is
-// transaction.ts's, a leaf this suite lets run for real).
 vi.mock("./coverage-store.js", () => ({
   beginCoveredPairWrite: vi.fn(() => vi.fn()),
   registeredCollections: vi.fn(() => new Set<string>()),
@@ -50,10 +64,13 @@ vi.mock("./coverage-store.js", () => ({
 }));
 vi.mock("./page-leg.js", () => ({
   currentRouteKey: vi.fn(() => "history"),
+  routeSubject: vi.fn(() => null),
   dispatchTransactionPageLeg: vi.fn(async () => "applied"),
 }));
 vi.mock("./wire/client.gen.js", () => ({
   PATH_EVENTS: "/api/events",
+  PATH_EVENTS_SYNC: "/api/events/sync",
+  PATH_EVENTS_ALIVE: "/api/events/alive",
   coverageSeriesRaw: vi.fn(async () => ({ ok: true, status: 200, data: [] })),
   coverageMoviesRaw: vi.fn(async () => ({ ok: true, status: 200, data: [] })),
 }));
@@ -67,24 +84,34 @@ import {
   applyActivityEvent,
   applyAlertEvent,
   applyProviderEvent,
-  pollStatus,
   setStatusDegraded,
 } from "./status.js";
+import { handleSessionExpiry } from "./api-client.js";
 import { emit, BusEvent } from "./bus.js";
+import { _resetSubjectsForTest } from "./subjects.js";
 
 const events = await import("./events.js");
 
-function setHidden(hidden: boolean): void {
-  Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
-  document.dispatchEvent(new Event("visibilitychange"));
+/** Flush microtasks and due timers so the stream reader sees what was
+ *  written. One async tick drains a bounded number of promise hops, and the
+ *  reader, the digest POST and the legs chain more than that. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 6; i++) {
+    await vi.advanceTimersByTimeAsync(0);
+  }
 }
 
-/** Open the newest connection and deliver a clean boot epoch, so post-epoch
- *  frame dispatch (the replay table) is reachable. */
-async function openWithEpoch(head = 0): Promise<void> {
-  lastFakeES().open();
-  lastFakeES().epoch("boot-a", false, head);
-  await vi.runOnlyPendingTimersAsync();
+/** Connect and answer the connection with a fresh hello, so application
+ *  frames (the replay table) are reachable. */
+async function openStream(head = 0): Promise<void> {
+  events.connect();
+  await settle();
+  server.current?.last().hello(EPOCH_A, { head });
+  await settle();
+}
+
+function id(offset: number): string {
+  return `${EPOCH_A}:${String(offset)}`;
 }
 
 /** A decodable sync:done payload (job 7). */
@@ -106,218 +133,136 @@ const syncDonePayload = {
 };
 
 beforeEach(() => {
-  vi.stubGlobal("EventSource", FakeEventSource);
   vi.useFakeTimers();
   vi.spyOn(Math, "random").mockReturnValue(0); // deterministic backoff jitter
+  // The browser project runs in real Chromium, where SharedWorker exists;
+  // these suites pin the per-tab stream, so the worker branch is closed.
+  vi.stubGlobal("SharedWorker", undefined);
+  server.current = fakeSSE();
+  localStorage.removeItem("subflux.sse_client");
 });
 
 afterEach(() => {
   events._resetEventsForTest();
-  vi.runOnlyPendingTimers();
-  events._resetEventsForTest();
-  FakeEventSource.instances = [];
+  _resetSubjectsForTest();
+  server.current = null;
   vi.useRealTimers();
   vi.clearAllMocks();
 });
 
-describe("events: SSE connection", () => {
-  it("connect creates EventSource to /api/events, cursor-less on boot", () => {
+describe("events: the connection as this module presents it", () => {
+  it("connects to /api/events with the wire revision and a persisted client tag", async () => {
     events.connect();
-    expect(FakeEventSource.instances).toHaveLength(1);
-    expect(lastFakeES().url).toBe("/api/events");
+    await settle();
 
-    // Idempotent while a connection exists.
+    const conn = server.current!.last();
+    expect(conn.url).toBe("/api/events");
+    expect(conn.headers.get("SSE-Wire")).toBe("1");
+    expect(conn.cursor).toBeNull(); // a fresh page presents no cursor
+    const tag = conn.headers.get("SSE-Client");
+    expect(tag).toMatch(/^[0-9a-f]{16}$/);
+    expect(localStorage.getItem("subflux.sse_client")).toBe(tag);
+
+    // Idempotent while a stream exists.
     events.connect();
-    expect(FakeEventSource.instances).toHaveLength(1);
+    await settle();
+    expect(server.current!.connections).toHaveLength(1);
+  });
+
+  it("a second page load of the same profile presents the same tag", async () => {
+    localStorage.setItem("subflux.sse_client", "0123456789abcdef");
+    events.connect();
+    await settle();
+
+    expect(server.current!.last().headers.get("SSE-Client")).toBe("0123456789abcdef");
+  });
+
+  it("the digest carries the same client tag as the stream", async () => {
+    await openStream();
+
+    expect(server.current!.digestCalls).toHaveLength(1);
+    expect(server.current!.digestCalls[0]?.headers.get("SSE-Client")).toBe(
+      server.current!.last().headers.get("SSE-Client"),
+    );
+  });
+
+  it("a 401 on the stream routes through the session-expiry chokepoint", async () => {
+    server.current!.refuseStream = 401;
+    events.connect();
+    await settle();
+
+    expect(handleSessionExpiry).toHaveBeenCalledWith(401);
+  });
+
+  it("a 503 on the stream does not touch the session", async () => {
+    server.current!.refuseStream = 503;
+    events.connect();
+    await settle();
+
+    expect(handleSessionExpiry).not.toHaveBeenCalled();
+  });
+
+  it("the teardown stops the stream and aborts the status poll", async () => {
+    await openStream();
+    const conn = server.current!.last();
+
+    events._resetEventsForTest();
+
+    expect(conn.ended).toBe(true); // the aborted fetch tore the body down
+    expect(events._stateForTest().stream).toBeNull();
+    expect(abortPoll).toHaveBeenCalled();
   });
 
   it("open dispatches NO unconditional refetch (the deleted live bug)", async () => {
-    events.connect();
-    await openWithEpoch();
-    vi.mocked(emit).mockClear();
-    vi.mocked(pollStatus).mockClear();
-
-    // A later reconnect's open must not blanket-invalidate either: the epoch
-    // verdict owns recovery now.
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    lastFakeES().open();
+    await openStream();
 
     expect(emit).not.toHaveBeenCalledWith(BusEvent.DataInvalidate);
-    expect(pollStatus).not.toHaveBeenCalled();
-  });
-
-  it("disconnect closes EventSource, clears timers, aborts the poll", () => {
-    events.connect();
-    const es = lastFakeES();
-
-    events._resetEventsForTest(); // teardown path
-    expect(es.closed).toBe(true);
-
-    events.connect();
-    const es2 = lastFakeES();
-    setHidden(true); // the production disconnect path
-    expect(es2.closed).toBe(true);
-    expect(abortPoll).toHaveBeenCalled();
-    setHidden(false);
-
-    // A pending reconnect timer would create a new instance; only the
-    // visibility debounce may fire.
-    const count = FakeEventSource.instances.length;
-    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS);
-    expect(FakeEventSource.instances).toHaveLength(count + 1);
-    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
-    expect(FakeEventSource.instances).toHaveLength(count + 1);
-  });
-
-  it("reconnects with exponential backoff on error", () => {
-    events.connect();
-
-    // Attempt 0: base delay = SSE_RECONNECT_MS (jitter pinned to 0).
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS - 1);
-    expect(FakeEventSource.instances).toHaveLength(1);
-    vi.advanceTimersByTime(1);
-    expect(FakeEventSource.instances).toHaveLength(2);
-
-    // Attempt 1: doubled.
-    lastFakeES().fail();
-    vi.advanceTimersByTime(2 * SSE_RECONNECT_MS - 1);
-    expect(FakeEventSource.instances).toHaveLength(2);
-    vi.advanceTimersByTime(1);
-    expect(FakeEventSource.instances).toHaveLength(3);
-  });
-
-  it("resets the reconnect attempt counter on a NON-LATCHED open", () => {
-    events.connect();
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    lastFakeES().fail();
-    vi.advanceTimersByTime(2 * SSE_RECONNECT_MS);
-    expect(FakeEventSource.instances).toHaveLength(3);
-
-    // A successful non-latched open resets the attempt counter…
-    lastFakeES().open();
-    expect(events._stateForTest().reconnectAttempt).toBe(0);
-
-    // …so the next failure reconnects after the BASE delay again, not 4x.
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    expect(FakeEventSource.instances).toHaveLength(4);
-  });
-
-  it("a deliberate disconnect leaves the attempt counter untouched", () => {
-    events.connect();
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    lastFakeES().fail();
-    expect(events._stateForTest().reconnectAttempt).toBe(2);
-
-    setHidden(true); // the production disconnect path
-
-    // The counter resets only on a non-latched open and on COMMIT — never
-    // on a deliberate teardown, so tab flapping cannot shortcut the ladder.
-    expect(events._stateForTest().reconnectAttempt).toBe(2);
-    setHidden(false);
-  });
-
-  it("disconnects on visibilitychange hidden", () => {
-    events.connect();
-    const es = lastFakeES();
-
-    setHidden(true);
-
-    expect(es.closed).toBe(true);
-    expect(abortPoll).toHaveBeenCalled();
-  });
-
-  it("reconnects with debounce on visibilitychange visible", () => {
-    events.connect();
-    setHidden(true);
-    expect(lastFakeES().closed).toBe(true);
-    const count = FakeEventSource.instances.length;
-
-    setHidden(false);
-    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS - 1);
-    expect(FakeEventSource.instances).toHaveLength(count);
-    vi.advanceTimersByTime(1);
-    expect(FakeEventSource.instances).toHaveLength(count + 1);
-  });
-
-  it("a transient error while the connection is open schedules no reconnect", async () => {
-    events.connect();
-    await openWithEpoch();
-
-    // readyState stays OPEN: the browser retries this one itself.
-    lastFakeES().errorWhileOpen();
-    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
-
-    expect(FakeEventSource.instances).toHaveLength(1);
-  });
-
-  it("disconnect cancels a pending reconnect", () => {
-    events.connect();
-    lastFakeES().fail(); // schedules the backoff reconnect
-
-    setHidden(true); // disconnect clears the timer
-    setHidden(false);
-    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS); // the debounce reconnect
-    const count = FakeEventSource.instances.length;
-    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS); // the cancelled ladder slot must not fire
-
-    expect(FakeEventSource.instances).toHaveLength(count);
-  });
-
-  it("schedules no second reconnect while one is already pending", () => {
-    events.connect();
-    lastFakeES().fail(); // schedules reconnect A
-
-    // A connect() while A is still pending, and that connection drops too.
-    events.connect();
-    lastFakeES().fail();
-
-    // Only ONE timer handle is tracked; the tracked one fires once.
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    expect(FakeEventSource.instances).toHaveLength(3);
-    setHidden(true);
-    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
-    expect(FakeEventSource.instances).toHaveLength(3);
-    setHidden(false);
-  });
-
-  it("backoff jitter is additive, so the delay never falls below the base", () => {
-    vi.spyOn(Math, "random").mockReturnValue(1); // maximum jitter
-    events.connect();
-
-    lastFakeES().fail();
-    // base + jitter = 2x SSE_RECONNECT_MS at attempt 0 with jitter pinned high.
-    vi.advanceTimersByTime(2 * SSE_RECONNECT_MS - 1);
-    expect(FakeEventSource.instances).toHaveLength(1);
-    vi.advanceTimersByTime(1);
-    expect(FakeEventSource.instances).toHaveLength(2);
-  });
-
-  it("a second visibilitychange restarts the reconnect debounce", () => {
-    events.connect();
-    setHidden(true);
-    const count = FakeEventSource.instances.length;
-
-    setHidden(false);
-    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS - 1);
-    setHidden(false); // flapped back before the first debounce elapsed
-    vi.advanceTimersByTime(1);
-
-    // The first debounce was cancelled, so its deadline passes with no connect.
-    expect(FakeEventSource.instances).toHaveLength(count);
-    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS - 1);
-    expect(FakeEventSource.instances).toHaveLength(count + 1);
+    // The boot digest over an empty map named nothing, so no leg ran.
+    expect(server.current!.digestCalls[0]?.subjects).toStrictEqual([]);
   });
 });
 
-describe("events: SSE handlers (post-epoch, the replay table)", () => {
-  it("coverage dispatches its decoded payload to the heal coalescer", async () => {
+describe("events: the degraded poll follows the stream's state changes", () => {
+  it("a refused connect enters degraded polling; the next open leaves it", async () => {
+    server.current!.refuseStream = 503;
     events.connect();
-    await openWithEpoch();
+    await settle();
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(expect.objectContaining({ to: "backoff" }));
+
+    // The ladder's next attempt is answered with a stream and a hello.
+    server.current!.refuseStream = null;
+    await vi.advanceTimersByTimeAsync(2_000);
+    server.current!.last().hello(EPOCH_A);
+    await settle();
+
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(expect.objectContaining({ to: "open" }));
+  });
+
+  it("the first attempt is not a down period", async () => {
+    events.connect();
+    await settle();
+
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(
+      expect.objectContaining({ from: "stopped", to: "connecting" }),
+    );
+  });
+
+  it("a stream the server closes re-enters the ladder", async () => {
+    await openStream();
+    vi.mocked(setStatusDegraded).mockClear();
+
+    server.current!.last().end();
+    await settle();
+
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(
+      expect.objectContaining({ from: "open", to: "backoff" }),
+    );
+  });
+});
+
+describe("events: SSE handlers (the replay table)", () => {
+  it("coverage dispatches its decoded payload to the heal coalescer", async () => {
+    await openStream();
 
     const payload = {
       media_type: "episode",
@@ -326,7 +271,8 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
       variant: "standard",
       source: "opensubtitles",
     };
-    lastFakeES().frame("coverage", payload, 1);
+    server.current!.last().frame("coverage", payload, id(1));
+    await settle();
 
     // The coalescer owns parse/gate/coalesce; the handler owns only decode +
     // dispatch, and no longer touches the full-collection refresh path.
@@ -335,83 +281,75 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
   });
 
   it("an undecodable coverage frame is dropped without a heal dispatch", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
-    lastFakeES().frame("coverage", { media_type: 42 }, 1);
+    server.current!.last().frame("coverage", { media_type: 42 }, id(1));
+    await settle();
 
     expect(healFromCoverageEvent).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalledWith(BusEvent.DataInvalidate);
   });
 
-  it("notify dispatches by level", async () => {
-    events.connect();
-    await openWithEpoch();
+  it("a frame's id advances the cursor the next connect presents", async () => {
+    await openStream();
+    server.current!.last().frame("notify", { level: "info", text: "x" }, id(4));
+    await settle();
 
-    lastFakeES().frame("notify", { level: "error", text: "provider down" }, 1);
-    lastFakeES().frame("notify", { level: "info", text: "fyi" }, 2);
-    lastFakeES().frame("notify", { level: "success", text: "subtitle saved" }, 3);
+    server.current!.last().end();
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(server.current!.connections).toHaveLength(2);
+    expect(server.current!.last().cursor).toBe(id(4));
+  });
+
+  it("notify dispatches by level", async () => {
+    await openStream();
+
+    const conn = server.current!.last();
+    conn.frame("notify", { level: "error", text: "provider down" }, id(1));
+    conn.frame("notify", { level: "info", text: "fyi" }, id(2));
+    conn.frame("notify", { level: "success", text: "subtitle saved" }, id(3));
+    await settle();
 
     expect(notify.error).toHaveBeenCalledWith("provider down");
     expect(notify.info).toHaveBeenCalledWith("fyi");
     expect(notify.success).toHaveBeenCalledWith("subtitle saved");
   });
 
-  it("a REPLAYED notify shows ONE toast (dedupe keyed boot_id + frame_id)", async () => {
-    events.connect();
-    await openWithEpoch();
-    lastFakeES().frame("notify", { level: "info", text: "once" }, 7);
-    expect(notify.info).toHaveBeenCalledTimes(1);
+  it("scan:start shows its toast", async () => {
+    await openStream();
 
-    // The connection drops; the native retry replays the same frame.
-    lastFakeES().errorWhileOpen();
-    lastFakeES().frame("notify", { level: "info", text: "once" }, 7);
-    lastFakeES().epoch("boot-a", false, 7);
-    await vi.runOnlyPendingTimersAsync();
-
-    expect(notify.info).toHaveBeenCalledTimes(1);
-  });
-
-  it("scan:start shows its toast, deduped like notify's", async () => {
-    events.connect();
-    await openWithEpoch();
-
-    lastFakeES().frame(
+    const conn = server.current!.last();
+    conn.frame(
       "scan:start",
       { action: "scan", detail: "Breaking Bad", source: "scheduled" },
-      4,
+      id(4),
     );
-    lastFakeES().frame(
-      "scan:start",
-      { action: "scan", detail: "Breaking Bad", source: "scheduled" },
-      4,
-    );
+    await settle();
 
     expect(notify.info).toHaveBeenCalledExactlyOnceWith("Scan started: Breaking Bad");
   });
 
   it("scan:done applies nothing: no status poll, no page refresh, zero coverage fetches", async () => {
-    // Task 12: the terminal activity upsert owns the status flip and the
-    // history trigger; per-root coverage events own the row heals. Scan
-    // completion must not trigger a blanket refresh or any coverage fetch.
-    events.connect();
-    await openWithEpoch();
-    vi.mocked(pollStatus).mockClear();
+    // The terminal activity upsert owns the status flip and the history
+    // trigger; per-root coverage events own the row heals. Scan completion
+    // must not trigger a blanket refresh or any coverage fetch.
+    await openStream();
     vi.mocked(emit).mockClear();
 
-    lastFakeES().frame("scan:done", { action: "scan", detail: "", source: "scheduled" }, 5);
+    const conn = server.current!.last();
+    conn.frame("scan:done", { action: "scan", detail: "", source: "scheduled" }, id(5));
+    await settle();
 
-    expect(pollStatus).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
     expect(healFromCoverageEvent).not.toHaveBeenCalled();
     expect(noteHistoryMutation).not.toHaveBeenCalled();
   });
 
   it("a coverage frame notes the history trigger OUTSIDE the heal gate", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
-    lastFakeES().frame(
+    server.current!.last().frame(
       "coverage",
       {
         media_type: "episode",
@@ -420,8 +358,9 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
         variant: "standard",
         source: "opensubtitles",
       },
-      5,
+      id(5),
     );
+    await settle();
 
     // Both observers run: the gated heal (its own gate lives inside the
     // mocked module) and the history trigger beside it.
@@ -430,8 +369,7 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
   });
 
   it("a TERMINAL activity upsert notes the history trigger; a running one does not", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
     const entry = {
       started_at: "2026-08-30T10:00:00Z",
@@ -441,16 +379,18 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
       source: "manual",
       done: false,
     };
-    lastFakeES().frame("activity", { op: "upsert", entry }, 8);
+    const conn = server.current!.last();
+    conn.frame("activity", { op: "upsert", entry }, id(8));
+    await settle();
     expect(noteHistoryMutation).not.toHaveBeenCalled();
 
-    lastFakeES().frame("activity", { op: "upsert", entry: { ...entry, done: true } }, 9);
+    conn.frame("activity", { op: "upsert", entry: { ...entry, done: true } }, id(9));
+    await settle();
     expect(noteHistoryMutation).toHaveBeenCalledTimes(1);
   });
 
   it("an activity REMOVE never notes the history trigger, done or not", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
     const entry = {
       started_at: "2026-08-30T10:00:00Z",
@@ -460,16 +400,17 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
       source: "manual",
       done: true,
     };
-    lastFakeES().frame("activity", { op: "remove", entry }, 8);
+    server.current!.last().frame("activity", { op: "remove", entry }, id(8));
+    await settle();
 
     expect(noteHistoryMutation).not.toHaveBeenCalled();
   });
 
   it("sync:done routes its decoded payload to the settlement registry", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
-    lastFakeES().frame("sync:done", syncDonePayload, 6);
+    server.current!.last().frame("sync:done", syncDonePayload, id(6));
+    await settle();
 
     expect(syncDoneFromEvent).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ job_id: 7, applied: true, offset_ms: 250 }),
@@ -477,17 +418,16 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
   });
 
   it("an undecodable sync:done frame is dropped without a settlement", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
-    lastFakeES().frame("sync:done", { job_id: "not-a-number" }, 6);
+    server.current!.last().frame("sync:done", { job_id: "not-a-number" }, id(6));
+    await settle();
 
     expect(syncDoneFromEvent).not.toHaveBeenCalled();
   });
 
   it("activity deltas dispatch their decoded payload to the status store", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
     const payload = {
       op: "upsert",
@@ -500,14 +440,14 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
         done: false,
       },
     };
-    lastFakeES().frame("activity", payload, 8);
+    server.current!.last().frame("activity", payload, id(8));
+    await settle();
 
     expect(applyActivityEvent).toHaveBeenCalledExactlyOnceWith(payload);
   });
 
   it("alert deltas dispatch their decoded payload to the status store", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
     const payload = {
       op: "raise",
@@ -521,14 +461,14 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
         dismissed: false,
       },
     };
-    lastFakeES().frame("alert", payload, 9);
+    server.current!.last().frame("alert", payload, id(9));
+    await settle();
 
     expect(applyAlertEvent).toHaveBeenCalledExactlyOnceWith(payload);
   });
 
   it("provider deltas dispatch their decoded payload to the status store", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
     const payload = {
       op: "raise",
@@ -537,18 +477,20 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
         status: { recent_failures: 3, threshold: 5, timed_out: true },
       },
     };
-    lastFakeES().frame("provider", payload, 10);
+    server.current!.last().frame("provider", payload, id(10));
+    await settle();
 
     expect(applyProviderEvent).toHaveBeenCalledExactlyOnceWith(payload);
   });
 
   it("undecodable status deltas are dropped without an application", async () => {
-    events.connect();
-    await openWithEpoch();
+    await openStream();
 
-    lastFakeES().frame("activity", { op: "explode" }, 8);
-    lastFakeES().frame("alert", { op: 42 }, 9);
-    lastFakeES().frame("provider", { entry: "nope" }, 10);
+    const conn = server.current!.last();
+    conn.frame("activity", { op: "explode" }, id(8));
+    conn.frame("alert", { op: 42 }, id(9));
+    conn.frame("provider", { entry: "nope" }, id(10));
+    await settle();
 
     expect(applyActivityEvent).not.toHaveBeenCalled();
     expect(applyAlertEvent).not.toHaveBeenCalled();
@@ -556,10 +498,9 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
   });
 
   it("a REPLAYED activity delta re-applies — idempotence lives in the store, not here", async () => {
-    // Unlike notify, the status rows carry no toast dedupe: the replay table
-    // re-applies them and the store's keyed appliers make that a no-op.
-    events.connect();
-    await openWithEpoch();
+    // The status rows carry no dedupe: the replay table re-applies what the
+    // server's ring re-sends and the store's keyed appliers make that a no-op.
+    await openStream();
     const payload = {
       op: "upsert",
       entry: {
@@ -571,112 +512,39 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
         done: true,
       },
     };
-    lastFakeES().frame("activity", payload, 11);
+    server.current!.last().frame("activity", payload, id(11));
+    await settle();
     expect(applyActivityEvent).toHaveBeenCalledTimes(1);
 
-    // The connection drops; the native retry replays the same frame.
-    lastFakeES().errorWhileOpen();
-    lastFakeES().frame("activity", payload, 11);
-    lastFakeES().epoch("boot-a", false, 11);
-    await vi.runOnlyPendingTimersAsync();
+    // The connection drops; the resumed reconnect replays the same frame.
+    server.current!.last().end();
+    await vi.advanceTimersByTimeAsync(2_000);
+    server.current!.last().hello(EPOCH_A, { head: 11, resumed: true });
+    server.current!.last().frame("activity", payload, id(11));
+    await settle();
 
     expect(applyActivityEvent).toHaveBeenCalledTimes(2);
   });
 
-  it("malformed frames are dropped without side effects", async () => {
-    events.connect();
-    await openWithEpoch();
+  it("the legacy epoch frame decodes to nothing", async () => {
+    await openStream();
+    vi.mocked(emit).mockClear();
 
-    lastFakeES().frame("notify", { level: "nonsense-level", text: 42 }, 1);
+    server.current!.last().frame("epoch", { boot_id: EPOCH_A, gap: true, head: 3 });
+    await settle();
+
+    expect(emit).not.toHaveBeenCalled();
+    expect(events._stateForTest().stream?.kind).toBe("open");
+  });
+
+  it("malformed frames are dropped without side effects", async () => {
+    await openStream();
+
+    server.current!.last().frame("notify", { level: "nonsense-level", text: 42 }, id(1));
+    await settle();
 
     expect(notify.error).not.toHaveBeenCalled();
     expect(notify.info).not.toHaveBeenCalled();
     expect(notify.success).not.toHaveBeenCalled();
-  });
-});
-
-describe("events: the epoch gate on dispatch", () => {
-  it("pre-epoch frames buffer: nothing dispatches until the verdict", async () => {
-    events.connect();
-    lastFakeES().open();
-
-    lastFakeES().frame("notify", { level: "info", text: "replayed" }, 3);
-    expect(notify.info).not.toHaveBeenCalled();
-
-    lastFakeES().epoch("boot-a", false, 3);
-    await vi.runOnlyPendingTimersAsync();
-    expect(notify.info).toHaveBeenCalledWith("replayed");
-    expect(events._stateForTest().appliedHigh).toBe(3);
-  });
-
-  it("verdictBuffer frames of a condemned connection are never applied", async () => {
-    events.connect();
-    lastFakeES().open();
-    lastFakeES().frame("notify", { level: "info", text: "condemned" }, 3);
-
-    lastFakeES().fail(); // dies before its epoch: the buffer is discarded
-
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    lastFakeES().open();
-    lastFakeES().epoch("boot-a", false, 3);
-    await vi.runOnlyPendingTimersAsync();
-
-    expect(notify.info).not.toHaveBeenCalled();
-  });
-
-  it("the epoch handler never reads lastEventId", async () => {
-    events.connect();
-    lastFakeES().open();
-
-    // A hostile epoch frame carrying an id: the handler must not turn it
-    // into bookkeeping — no counter moves, and the next recreate carries no
-    // cursor derived from it.
-    lastFakeES().frame("epoch", { boot_id: "boot-a", gap: false, head: 0 }, 999);
-    await vi.runOnlyPendingTimersAsync();
-
-    expect(events._stateForTest().appliedHigh).toBeNull();
-    lastFakeES().fail();
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    expect(lastFakeES().url).toBe("/api/events");
-  });
-});
-
-describe("events: the status poll floor (E2)", () => {
-  it("a CLOSED connection enters degraded polling; the next open leaves it", () => {
-    events.connect();
-    expect(setStatusDegraded).not.toHaveBeenCalled();
-
-    // The browser gave up (refused connect / server gone): the reconnect
-    // ladder is a DOWN period, so status rides the 5s poll.
-    lastFakeES().fail();
-    expect(setStatusDegraded).toHaveBeenLastCalledWith(true);
-
-    vi.advanceTimersByTime(SSE_RECONNECT_MS);
-    lastFakeES().open();
-    expect(setStatusDegraded).toHaveBeenLastCalledWith(false);
-  });
-
-  it("a CONNECTING blip does not trigger degraded polling", async () => {
-    events.connect();
-    await openWithEpoch();
-    vi.mocked(setStatusDegraded).mockClear();
-
-    // readyState stays OPEN: the browser retries this one itself.
-    lastFakeES().errorWhileOpen();
-    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
-
-    expect(setStatusDegraded).not.toHaveBeenCalledWith(true);
-  });
-
-  it("a deliberate hidden-tab disconnect is not a down period", () => {
-    events.connect();
-    lastFakeES().fail();
-    expect(setStatusDegraded).toHaveBeenLastCalledWith(true);
-
-    // Hiding the tab cancels the ladder: no degraded poll may survive it (a
-    // hidden tab issues zero status polls).
-    setHidden(true);
-    expect(setStatusDegraded).toHaveBeenLastCalledWith(false);
-    setHidden(false);
   });
 });

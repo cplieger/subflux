@@ -16,7 +16,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // MaxDefaultBodySize is the default JSON body size cap for most handlers (1 MiB),

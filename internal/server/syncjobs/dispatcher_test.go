@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -106,13 +107,14 @@ func (f *fakeExec) execOrder() []string {
 }
 
 type harness struct {
-	d      *syncjobs.Dispatcher
-	log    *activity.Log
-	stops  *activity.StopRegistry
-	exec   *fakeExec
-	events chan *events.SyncDoneEvent
-	cancel context.CancelFunc
-	done   chan struct{}
+	d       *syncjobs.Dispatcher
+	log     *activity.Log
+	stops   *activity.StopRegistry
+	exec    *fakeExec
+	events  chan *events.SyncDoneEvent
+	cancel  context.CancelFunc
+	done    chan struct{}
+	changes atomic.Int64
 }
 
 func newHarness(t *testing.T) *harness {
@@ -133,6 +135,7 @@ func newHarness(t *testing.T) *harness {
 		Log:         h.log,
 		Stops:       h.stops,
 		PublishDone: func(ev *events.SyncDoneEvent) { h.events <- ev },
+		OnChange:    func() { h.changes.Add(1) },
 	})
 	go func() {
 		defer close(h.done)
@@ -213,6 +216,50 @@ func TestDispatch_runs_a_job_to_done_result(t *testing.T) {
 	if !ok || !entry.Done || entry.Failed || entry.Cancelled {
 		t.Errorf("activity entry = %+v, want a clean terminal", entry)
 	}
+}
+
+// waitChanges polls the OnChange count until it reaches want, then holds it
+// there briefly so an extra call still fails.
+func waitChanges(t *testing.T, h *harness, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for h.changes.Load() < want {
+		if time.Now().After(deadline) {
+			t.Fatalf("OnChange calls = %d, want %d", h.changes.Load(), want)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	time.Sleep(20 * time.Millisecond)
+	if got := h.changes.Load(); got != want {
+		t.Errorf("OnChange calls = %d, want exactly %d", got, want)
+	}
+}
+
+// TestOnChange_fires_once_per_registry_transition pins the jobs digest's
+// mint sites for one job: accept (queued), admission (running), settle
+// (done). A same-file re-dispatch that answers the existing ids changes
+// nothing GET /api/sync/jobs can see and mints nothing.
+func TestOnChange_fires_once_per_registry_transition(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	_, release := h.exec.blockOn("/media/movie.en.srt")
+
+	acc, err := h.d.Dispatch(input("/media/movie.en.srt"))
+	if err != nil {
+		t.Fatalf("Dispatch() error = %v", err)
+	}
+	jobByID(t, h.d, acc.JobID, syncjobs.StateRunning)
+	waitChanges(t, h, 2)
+
+	if again, err := h.d.Dispatch(input("/media/movie.en.srt")); err != nil || !again.Existing {
+		t.Fatalf("second Dispatch() = %+v, %v, want the existing job", again, err)
+	}
+	waitChanges(t, h, 2)
+
+	release <- syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true}
+	jobByID(t, h.d, acc.JobID, syncjobs.StateDone)
+	waitEvent(t, h)
+	waitChanges(t, h, 3)
 }
 
 // TestPublishDone_carries_each_terminal_outcome pins the event's typed

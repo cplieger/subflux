@@ -9,7 +9,7 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // enabledProviders returns the sorted names of the enabled providers in a

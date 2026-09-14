@@ -49,7 +49,7 @@ import (
 	"net/http"
 
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // Canonical JSON response keys and sentinel error messages shared

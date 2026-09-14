@@ -85,7 +85,7 @@ vi.mock("./popover-menu.js", () => ({
 }));
 
 import * as store from "./store.js";
-import { buildActivityItem } from "./status.js";
+import { buildActivityItem, streamDegraded, type StreamTransition } from "./status.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
@@ -1679,26 +1679,27 @@ describe("status: the poll floor (E2)", () => {
   });
 
   afterEach(() => {
-    h.status.setStatusDegraded(false);
+    h.status.setStatusDegraded(OPEN);
     setDocumentHidden(false);
     vi.useRealTimers();
   });
 
-  it("steady-state while connected: the reconcile tick costs one poll per interval", () => {
+  it("boot fetches status once, then the reconcile tick costs one poll per interval", () => {
     h.status.initStatusReconcile();
     const dispatch = dispatchers.get("status.poll");
+    expect(dispatch).toHaveBeenCalledTimes(1); // the boot load
 
     vi.advanceTimersByTime(STATUS_RECONCILE_MS - 1);
-    expect(dispatch).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(STATUS_RECONCILE_MS);
+    vi.advanceTimersByTime(1);
     expect(dispatch).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS);
+    expect(dispatch).toHaveBeenCalledTimes(3);
   });
 
   it("degraded mode polls on the 5s cadence and recovery stops it", async () => {
     const dispatch = dispatchers.get("status.poll");
-    h.status.setStatusDegraded(true);
+    h.status.setStatusDegraded(BACKOFF);
     // Entering the down period costs one immediate catch-up fetch…
     expect(dispatch).toHaveBeenCalledTimes(1);
 
@@ -1709,28 +1710,74 @@ describe("status: the poll floor (E2)", () => {
     expect(dispatch).toHaveBeenCalledTimes(3);
 
     // Reconnect: events own status again, the floor poll stops.
-    h.status.setStatusDegraded(false);
+    h.status.setStatusDegraded(OPEN);
     await vi.advanceTimersByTimeAsync(5 * SSE_DOWN_POLL_MS);
     expect(dispatch).toHaveBeenCalledTimes(3);
   });
 
-  it("re-entering the same degraded state does not stack pollers", async () => {
+  it("re-entering a down state does not stack pollers", async () => {
     const dispatch = dispatchers.get("status.poll");
-    h.status.setStatusDegraded(true);
-    // Every ladder re-entry funnels through here; only the first counts.
-    h.status.setStatusDegraded(true);
+    h.status.setStatusDegraded(BACKOFF);
+    // Every ladder step funnels through here; only the first counts.
+    h.status.setStatusDegraded(RETRYING);
+    h.status.setStatusDegraded(BACKOFF);
     expect(dispatch).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(SSE_DOWN_POLL_MS);
     expect(dispatch).toHaveBeenCalledTimes(2);
   });
 
-  it("a hidden tab issues ZERO status polls, degraded mode included", () => {
+  it("a hidden tab issues no status poll beyond the boot load, degraded mode included", () => {
     setDocumentHidden(true);
     h.status.initStatusReconcile();
-    h.status.setStatusDegraded(true);
+    h.status.setStatusDegraded(BACKOFF);
 
     vi.advanceTimersByTime(10 * STATUS_RECONCILE_MS);
-    expect(dispatchers.get("status.poll")).not.toHaveBeenCalled();
+    expect(dispatchers.get("status.poll")).toHaveBeenCalledTimes(1);
+  });
+
+  it("a tab attaching into a backoff or offline stream joins the poll at once; into a connecting or open one it does not", async () => {
+    const dispatch = dispatchers.get("status.poll");
+    h.status.setStatusAttached("connecting");
+    expect(dispatch).not.toHaveBeenCalled();
+
+    h.status.setStatusAttached("backoff");
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+
+    h.status.setStatusAttached("open");
+    await vi.advanceTimersByTimeAsync(5 * SSE_DOWN_POLL_MS);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+
+    h.status.setStatusAttached("offline");
+    expect(dispatch).toHaveBeenCalledTimes(3);
+  });
+});
+
+// The library's state changes as the stream reports them, in this tab or in
+// the profile's worker; only the two discriminants matter to the predicate.
+function transition(from: StreamTransition["from"], to: StreamTransition["to"]): StreamTransition {
+  return { kind: "state", from, to, generation: 1 };
+}
+const OPEN = transition("connecting", "open");
+const BACKOFF = transition("connecting", "backoff");
+const RETRYING = transition("backoff", "connecting");
+
+describe("streamDegraded: which stream transitions put status on the poll", () => {
+  it.each<[string, StreamTransition, boolean]>([
+    ["a connect that opens", OPEN, false],
+    ["a refused connect", BACKOFF, true],
+    ["a stream that ends young", transition("open", "backoff"), true],
+    ["the browser going offline", transition("open", "offline"), true],
+    ["the first attempt", transition("stopped", "connecting"), false],
+    ["a backoff retry", RETRYING, true],
+    ["a stable stream reconnecting in place", transition("open", "connecting"), false],
+    ["the network coming back", transition("offline", "connecting"), false],
+    ["the tab coming back", transition("hidden_closed", "connecting"), false],
+    ["a deliberate hidden close", transition("open", "hidden_closed"), false],
+    ["stop()", transition("open", "stopped"), false],
+  ])("%s", (_name, t, down) => {
+    expect(streamDegraded(t)).toBe(down);
   });
 });

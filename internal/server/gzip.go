@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // gzipMinBytes is the compression floor: an eligible JSON body must exceed

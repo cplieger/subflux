@@ -17,6 +17,8 @@ const (
 	PathWebauthnLoginBegin     = "/api/auth/webauthn/login/begin"
 	PathWebauthnLoginFinish    = "/api/auth/webauthn/login/finish"
 	PathEvents                 = "/api/events"
+	PathEventsSync             = "/api/events/sync"
+	PathEventsAlive            = "/api/events/alive"
 	PathMe                     = "/api/auth/me"
 	PathChangePassword         = "/api/auth/password"
 	PathUpdateProfile          = "/api/auth/profile"

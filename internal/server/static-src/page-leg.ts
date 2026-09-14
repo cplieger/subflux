@@ -31,6 +31,8 @@ import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
 import { dropDetailScopedDirtyRoots, setDetailRefresher } from "./coverage-heal.js";
 import { coverageRow } from "./coverage-store.js";
 import { releaseRouteViews } from "./view-scope.js";
+import { SUBJECT_HISTORY, detailSubject, forgetSubject } from "./subjects.js";
+import type { Subject } from "@cplieger/sse";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
  *  a route leave superseded it and the results were discarded. */
@@ -83,11 +85,30 @@ function isCurrent(key: string, gen: number, ctrl: AbortController): boolean {
   return !ctrl.signal.aborted && generations.get(key) === gen && currentRouteKey() === key;
 }
 
-/** The router's leave path: abort the departing route's in-flight page leg
- *  and release the views it mounted (a departing view's bindings, row
- *  effects and registry entries must not outlive it). Every route leave
- *  funnels through here. */
+/** The digest subject a route key holds, or null: a detail route holds its
+ *  root, /history holds `history`, the library and files hold nothing of
+ *  their own (the collection pair is held for as long as it is loaded). */
+export function routeSubject(key: string): Subject | null {
+  if (key === "history") {
+    return SUBJECT_HISTORY;
+  }
+  const m = /^(series|movie):(\d+)$/.exec(key);
+  if (m === null) {
+    return null;
+  }
+  return detailSubject(`${m[1] === "series" ? "tvdb" : "tmdb"}-${m[2] ?? ""}`);
+}
+
+/** The router's leave path: abort the departing route's in-flight page leg,
+ *  release the views it mounted (a departing view's bindings, row effects
+ *  and registry entries must not outlive it), and forget the digest subject
+ *  it held, so the held vector mirrors the open route and the digest never
+ *  names a leg this tab cannot run. Every route leave funnels through here. */
 export function abortPageLeg(): void {
+  const departing = routeSubject(currentRouteKey());
+  if (departing !== null) {
+    forgetSubject(departing);
+  }
   for (const [key, ctrl] of controllers) {
     generations.set(key, (generations.get(key) ?? 0) + 1);
     ctrl.abort();
@@ -238,30 +259,44 @@ export type TransactionLegOutcome = "applied" | "superseded";
  *  owns the pair), history runs its own settlement-aware extraction,
  *  recovery transactions send ?recovery=1, every fetch runs on the raw
  *  generated client with zero automatic retries, and a genuine transport
- *  failure or typed 429 refusal REJECTS (the transaction aborts). A
- *  route-leave mid-leg RE-ROUTES: the loop's next dispatch is the new
- *  route's page leg, and commit waits for it. */
+ *  failure or typed 429 refusal REJECTS (the transaction fails). The
+ *  transaction's own signal aborts the route controller, so a stopped or
+ *  timed-out run cancels the fetches it started. A route-leave mid-leg
+ *  RE-ROUTES: the loop's next dispatch is the new route's page leg, and
+ *  commit waits for it. */
 export async function dispatchTransactionPageLeg(
   recovery: boolean,
+  signal?: AbortSignal,
 ): Promise<TransactionLegOutcome> {
   for (;;) {
-    const r = await runTransactionLeg(recovery);
+    const r = await runTransactionLeg(recovery, signal);
     if (r !== "rerouted") {
       return r;
     }
   }
 }
 
-async function runTransactionLeg(recovery: boolean): Promise<TransactionLegOutcome | "rerouted"> {
+async function runTransactionLeg(
+  recovery: boolean,
+  signal?: AbortSignal,
+): Promise<TransactionLegOutcome | "rerouted"> {
   const key = currentRouteKey();
   const gen = (generations.get(key) ?? 0) + 1;
   generations.set(key, gen);
   controllers.get(key)?.abort();
   const ctrl = new AbortController();
   controllers.set(key, ctrl);
+  const onAbort = (): void => {
+    ctrl.abort();
+  };
+  if (signal?.aborted) {
+    ctrl.abort();
+  }
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
     return await transactionArm(key, gen, ctrl, recovery);
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     if (controllers.get(key) === ctrl) {
       controllers.delete(key);
     }

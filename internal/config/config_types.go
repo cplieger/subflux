@@ -11,7 +11,7 @@ import (
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/config/defaults"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 	"go.yaml.in/yaml/v3"
 )
 

@@ -11,6 +11,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
 	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/server/mediahandlers"
@@ -155,6 +156,7 @@ func (s *Server) initHandlers() {
 		Log:         s.activity,
 		Stops:       &s.stops,
 		PublishDone: s.events.PublishSyncDone,
+		OnChange:    func() { s.events.Versions().Bump(events.SubjectJobs, "") },
 	})
 	s.activityH = activityhandlers.New(activityhandlers.Deps{
 		Activity: s.activity,

@@ -17,7 +17,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // cspTemplate is the policy applied to every response, with a single %s

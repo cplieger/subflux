@@ -9,14 +9,15 @@
 //   - subflux's ApiResult shape: a loose interface (`ok` is a plain boolean
 //     with optional data/error), NOT fetch's discriminated ApiOk|ApiErr union,
 //     so existing call sites that read r.data / r.error without narrowing keep
-//     compiling. It also carries `headers` on the error envelope — sourced
-//     from fetch's ApiErr.headers (present whenever a real HTTP response was
-//     received); subflux's login rate-limit UI reads `Retry-After` off a 429
-//     (see login.ts).
+//     compiling. `headers` rides both envelopes whenever a real HTTP response
+//     was received: subflux's login rate-limit UI reads `Retry-After` off a
+//     429 (see login.ts), and the digest subjects read `Subject-Stamp` off
+//     every successful GET (subjects.ts).
 //   - the null-collapsing (T|null) + OK-flag sugar and the console diagnostics
 //     (silent on caller abort; one warn per failed call; one error at a decode
 //     boundary).
-//   - the session-expiry redirect chokepoint every call routes through.
+//   - the session-expiry redirect chokepoint every call routes through, the
+//     SSE stream and its digest included (authFetch).
 //
 // Modules do not call this transport directly: they use the CODE-GENERATED
 // typed functions in wire/client.gen.ts (one per JSON endpoint, decoder-bound,
@@ -31,6 +32,7 @@
 
 import { createFetch } from "@cplieger/fetch";
 import type { ApiResult as FetchApiResult, HttpMethod, RequestOptions } from "@cplieger/fetch";
+import { observeStamp } from "./subjects.js";
 
 /** Decoder<T> is owned by validators.ts (single source of truth); re-exported
  *  here so callers can import it from api-client as well as validators. */
@@ -41,7 +43,8 @@ import type { Decoder } from "./validators.js";
 // fetch's discriminated union: `ok` is a plain boolean with optional
 // data/error (so `r.data` / `r.error` reads at existing call sites need no
 // narrowing), plus the lifted `code` / `requestId` fields and `headers`
-// (populated on the error path only).
+// (present whenever an HTTP response was received, absent on a network,
+// timeout or cancelled failure).
 export interface ApiResult<T> {
   ok: boolean;
   status: number;
@@ -105,10 +108,16 @@ async function requestRaw<T>(
   }
 
   if (r.ok) {
+    // A landed GET is the commit point of every loader in this app, so its
+    // Subject-Stamp is observed here, once, for every client flavor. A
+    // mutation's stamp is the pre-mutation version and observes nothing.
+    if (method === "GET") {
+      observeStamp(r.headers);
+    }
     // Preserve subflux's empty-body contract: a 204 / empty 2xx collapses to
     // `data: null` (fetch yields `undefined`); a real JSON null/0/false/""
     // body is genuine data and passes through unchanged.
-    return { ok: true, status: r.status, data: (r.data ?? null) as T };
+    return { ok: true, status: r.status, data: (r.data ?? null) as T, headers: r.headers };
   }
 
   // fetch classifies a JSON-parse / decoder failure as code "decode". Keep
@@ -141,7 +150,10 @@ async function requestRaw<T>(
 // credentials and must not loop.
 let redirectingToLogin = false;
 
-function handleSessionExpiry(status: number): void {
+/** The session-expiry chokepoint: a 401 redirects to the login page with the
+ *  current view as the return target. Exported for the surfaces that do not
+ *  answer through requestRaw (the SSE stream's lifecycle, events.ts). */
+export function handleSessionExpiry(status: number): void {
   if (status !== 401 || redirectingToLogin) {
     return;
   }
@@ -152,6 +164,16 @@ function handleSessionExpiry(status: number): void {
   redirectingToLogin = true;
   window.location.href = `/login?next=${encodeURIComponent(pathname + search)}`;
 }
+
+/** The platform fetch with the session-expiry chokepoint on the way back,
+ *  for the two library surfaces that own their own requests (the SSE stream
+ *  and its digest client): a 401 on either redirects exactly as a 401 on any
+ *  API call does. */
+export const authFetch: typeof fetch = async (input, init) => {
+  const res = await globalThis.fetch(input, init);
+  handleSessionExpiry(res.status);
+  return res;
+};
 
 async function request<T>(
   method: HttpMethod,

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // --- Helpers ---

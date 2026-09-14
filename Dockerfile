@@ -185,9 +185,11 @@ ARG CPLIEGER_REACTIVE_VERSION=2.1.0
 # renovate: datasource=npm depName=@cplieger/ui-primitives
 ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.1.0
 # renovate: datasource=npm depName=@cplieger/fetch
-ARG CPLIEGER_FETCH_VERSION=2.1.2
+ARG CPLIEGER_FETCH_VERSION=2.2.0
 # renovate: datasource=npm depName=@cplieger/keyenc
 ARG CPLIEGER_KEYENC_VERSION=1.0.7
+# renovate: datasource=npm depName=@cplieger/sse
+ARG CPLIEGER_SSE_VERSION=1.0.0
 
 # Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
 # client compiles from the ARG-pinned npm tarballs below, while
@@ -210,7 +212,8 @@ RUN check_pin() { \
     check_pin reactive "$CPLIEGER_REACTIVE_VERSION" && \
     check_pin ui-primitives "$CPLIEGER_UI_PRIMITIVES_VERSION" && \
     check_pin fetch "$CPLIEGER_FETCH_VERSION" && \
-    check_pin keyenc "$CPLIEGER_KEYENC_VERSION"
+    check_pin keyenc "$CPLIEGER_KEYENC_VERSION" && \
+    check_pin sse "$CPLIEGER_SSE_VERSION"
 
 RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
@@ -227,13 +230,18 @@ RUN mkdir -p node_modules/@cplieger/fetch && \
 RUN mkdir -p node_modules/@cplieger/keyenc && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/keyenc/-/keyenc-${CPLIEGER_KEYENC_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/keyenc --strip-components=1
+RUN mkdir -p node_modules/@cplieger/sse && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/sse/-/sse-${CPLIEGER_SSE_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/sse --strip-components=1
 
 # Type gate: tsconfig.json is noEmit, so this only typechecks the app
 # sources against the pinned @cplieger lib sources fetched above — a lib/app
 # type conflict fails the build here, before the Go stage bundles. esbuild
 # (cmd/bundle, Go builder stage) transpiles without typechecking, so this
 # gate is what keeps type errors failing the image build exactly as before.
-RUN /tmp/package/lib/tsc --project tsconfig.json
+# The SSE worker is its own program (WebWorker lib), so it is gated beside.
+RUN /tmp/package/lib/tsc --project tsconfig.json \
+ && /tmp/package/lib/tsc --project tsconfig.worker.json
 
 # --- Go build ---
 FROM golang:1.27-alpine@sha256:7d5cbf6833f7331dafd25a2e8b9673477f559759ff8ed4ca8efabe6795ad08db AS builder

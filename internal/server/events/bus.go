@@ -1,78 +1,140 @@
 // Package events is subflux's typed server-sent-events layer: the sealed
 // Event/EventData types the app publishes, marshaled onto the shared
-// webhttp/sse broadcast hub. The transport (fan-out, replay ring with
-// Last-Event-ID resume, keepalives, proxy-defensive headers, slow-client
-// eviction) is the library's; this package owns only the subflux event
-// vocabulary and its wire encoding.
+// cplieger/sse broadcast hub. The transport (fan-out, replay ring with
+// Last-Event-ID resume, the hello handshake and its verdict, keepalives,
+// proxy-defensive headers, slow-client eviction, the state digest) is the
+// library's; this package owns the subflux event vocabulary, its wire
+// encoding, and the subject versions the digest compares.
 package events
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"context"
 	"encoding/json"
 	"log/slog"
+	"net/http"
 	"time"
 
+	"github.com/cplieger/sse"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/webhttp/v2/sse"
 )
 
-// SSERing is the replay-ring capacity, sized at 4x ReplayBudget so the
-// below-floor and over-budget verdicts stay distinct and the budget can rise
-// without a server change.
+// SSERing is the replay-ring capacity in events (sse.WithReplay).
 const SSERing = 1024
 
-// ReplayBudget is the largest replay a resume cursor may request; a cursor
-// further behind head answers a gap epoch instead (a refetch transaction is
-// cheaper than a bulk replay). It is the fourth disjunct of the handler's
-// pre-check and covers hidden-window growth and native retries alike.
-const ReplayBudget = 256
+// ReplyMaxEvents is the largest replay one reconnect may receive
+// (sse.WithReplyMaxEvents); a cursor further behind head earns gap_budget
+// and the client reconciles through the digest, which is cheaper than a
+// bulk replay.
+const ReplyMaxEvents = 256
 
-// SSEReconnectDelay is the stream's advertised `retry:` field, governing the
-// reconnect the BROWSER performs by itself after a transient drop. The app's
-// own ladder in events.ts covers only the readyState CLOSED case, so without
-// this the two browsers disagree and neither is reachable from here: Chrome
-// waits 3s, Firefox 5s. It is deliberately not lower, because the spec routes
-// a connection to a DOWN server through the same timer, and permits but does
-// not require a user agent to back off above it.
+// SSEReplayTTL is the longest a ring entry may be replayed after it was
+// published (sse.WithReplayTTL).
+const SSEReplayTTL = 10 * time.Minute
+
+// SSEReconnectDelay is the stream's advertised `retry:` field: the reconnect
+// wait a legacy EventSource performs by itself after a transient drop and the
+// floor of the v3 client's post-EOF backoff. Without it Chrome waits 3s and
+// Firefox 5s; it is deliberately not lower because the spec routes a
+// connection to a DOWN server through the same timer.
 const SSEReconnectDelay = 1500 * time.Millisecond
+
+// Metrics is the observability sink the bus records into: one counter per
+// hello verdict split by the legacy overlap, one per presence departure
+// cause, one per presence-table transition, and the three hub gauges.
+// *obs.Metrics satisfies it; nil at construction records nothing.
+type Metrics interface {
+	RecordSSEConnect(verdict string, legacy bool)
+	RecordSSEDisconnect(cause string)
+	RecordSSEPresenceTransition(kind string)
+	SetSSEClients(n int)
+	SetSSEQueuedFrames(n int)
+	SetSSEHead(n uint64)
+}
+
+// nopMetrics is the sink a nil Metrics resolves to.
+type nopMetrics struct{}
+
+func (nopMetrics) RecordSSEConnect(string, bool)      {}
+func (nopMetrics) RecordSSEDisconnect(string)         {}
+func (nopMetrics) RecordSSEPresenceTransition(string) {}
+func (nopMetrics) SetSSEClients(int)                  {}
+func (nopMetrics) SetSSEQueuedFrames(int)             {}
+func (nopMetrics) SetSSEHead(uint64)                  {}
 
 // EventBus publishes subflux's typed events to connected SSE clients.
 // A nil *EventBus is safe to publish to (no-op), so optional wiring needs
 // no guards.
 type EventBus struct {
-	hub    *sse.Hub
-	bootID string
+	hub      *sse.Hub
+	versions *Versions
+	presence *Presence
+	metrics  Metrics
 }
 
 // New creates the event bus with the given concurrent-client cap (<= 0 means
-// DefaultMaxSSEClients). The underlying hub keeps a replay ring (SSERing), so
-// a browser that reconnects after a transient drop resumes via the standard
-// Last-Event-ID header instead of silently missing events. The cap is
-// enforced by the hub atomically at admission; SetMaxClients re-applies a
-// hot-reloaded value without rebuilding the hub. The boot id is minted here,
-// once per process start, and rides every connection's epoch handshake so
-// clients can tell a server restart from a reconnect.
-func New(maxClients int) *EventBus {
+// DefaultMaxSSEClients) and metrics sink (nil records nothing). Every hub
+// option is a package constant, so a refused option set is a defect fixed
+// here rather than an error a caller could handle, which is what licenses
+// MustNew outside main.
+func New(maxClients int, m Metrics) *EventBus {
 	if maxClients <= 0 {
 		maxClients = DefaultMaxSSEClients
 	}
-	return &EventBus{
-		hub: sse.NewHub(
-			sse.WithMaxClients(maxClients),
-			sse.WithReplay(SSERing),
-			sse.WithReconnectDelay(SSEReconnectDelay),
-		),
-		bootID: newBootID(),
+	if m == nil {
+		m = nopMetrics{}
 	}
+	eb := &EventBus{metrics: m, presence: newPresence(m)}
+	eb.hub = sse.MustNew(
+		sse.WithMaxClients(maxClients),
+		sse.WithReplay(SSERing),
+		sse.WithReplayTTL(SSEReplayTTL),
+		sse.WithReplyMaxEvents(ReplyMaxEvents),
+		sse.WithReconnectDelay(SSEReconnectDelay),
+		sse.WithPresence(eb.onPresence),
+	)
+	eb.versions = newVersions(eb.hub.Position().Epoch)
+	return eb
 }
 
-// newBootID returns a random 16-hex-char process identity. crypto/rand
-// cannot fail on Go >= 1.24.
-func newBootID() string {
-	var b [8]byte
-	_, _ = rand.Read(b[:])
-	return hex.EncodeToString(b[:])
+// Versions is the digest's version table: Publish mints the event-fed
+// subjects into it, the sync-job registry mints jobs, and the stamp
+// middleware and the digest resolver read it.
+func (eb *EventBus) Versions() *Versions {
+	return eb.versions
+}
+
+// onPresence is the hub's presence hook. Connects are counted by the
+// OnConnect hook in Handle (which knows the legacy split), so this side
+// counts departures only; the client gauge and the presence table move on
+// both.
+func (eb *EventBus) onPresence(ev sse.PresenceEvent) {
+	switch ev.Kind {
+	case "connected":
+		eb.presence.connected(ev.Tag, ev.At)
+	case "disconnected":
+		eb.presence.disconnected(ev.Tag)
+		eb.metrics.RecordSSEDisconnect(string(ev.Cause))
+	}
+	eb.metrics.SetSSEClients(eb.hub.ClientCount())
+}
+
+// Presence is the per-tag presence table the alive route and the prune
+// ticker drive.
+func (eb *EventBus) Presence() *Presence {
+	return eb.presence
+}
+
+// DigestHandler is the library's state digest over this bus's version
+// table. Mount it inside the authentication and cross-origin middleware,
+// under a route timeout (it does not stream).
+func (eb *EventBus) DigestHandler() http.Handler {
+	return eb.hub.DigestHandler(eb.versions.Resolve)
+}
+
+// Epoch returns the hub's epoch: the 16-hex process identity every cursor,
+// hello and stamp carries. Immutable for the life of the bus.
+func (eb *EventBus) Epoch() string {
+	return eb.hub.Position().Epoch
 }
 
 // SetMaxClients applies a new client cap (<= 0 means DefaultMaxSSEClients) to
@@ -88,20 +150,21 @@ func (eb *EventBus) SetMaxClients(n int) {
 	eb.hub.SetMaxClients(n)
 }
 
-// Shutdown drains the hub: every connected stream is cancelled and later
-// connection attempts are refused with 503, so graceful shutdown is not held
-// open by long-lived SSE requests. No-op when the bus is nil.
-func (eb *EventBus) Shutdown() {
+// Shutdown drains the hub: every connected stream is sent sse:reset and
+// waited for, and later connection attempts are refused with 503, so
+// graceful shutdown is not held open by long-lived SSE requests. Returns
+// ctx.Err() when the drain outlives ctx. No-op when the bus is nil.
+func (eb *EventBus) Shutdown(ctx context.Context) error {
 	if eb == nil {
-		return
+		return nil
 	}
-	eb.hub.Shutdown()
+	return eb.hub.Shutdown(ctx)
 }
 
-// Publish broadcasts an event to every connected client. The wire payload
-// is the JSON-encoded Event (type + data), sent as a NAMED SSE event
-// (`event: <type>`) so the browser dispatches it to the matching
-// addEventListener handler. No-op when the bus is nil.
+// Publish mints the subject versions the event moved and broadcasts it to
+// every connected client. The wire payload is the JSON-encoded Event (type +
+// data), sent as a NAMED SSE event (`event: <type>`), the key the client's
+// frame table decodes by. No-op when the bus is nil.
 func (eb *EventBus) Publish(e Event) {
 	if eb == nil {
 		return
@@ -111,7 +174,10 @@ func (eb *EventBus) Publish(e Event) {
 		slog.Warn("SSE: failed to marshal event", "type", e.Type, "error", err)
 		return
 	}
-	eb.hub.Publish(sse.Event{Name: string(e.Type), Data: data})
+	eb.versions.bumpFor(e)
+	if _, err := eb.hub.Publish(sse.Event{Name: string(e.Type), Data: data}); err != nil {
+		slog.Warn("SSE: event refused by the hub", "type", e.Type, "error", err)
+	}
 }
 
 // PublishCoverageUpdate publishes a coverage-update event: a subtitle file
@@ -167,4 +233,13 @@ func (eb *EventBus) PublishSyncDone(ev *SyncDoneEvent) {
 // ClientCount returns the number of connected SSE clients.
 func (eb *EventBus) ClientCount() int {
 	return eb.hub.ClientCount()
+}
+
+// SampleGauges records the three hub gauges (clients, queued frames, head)
+// into the metrics sink. Driven by the server's prune ticker; the client
+// gauge also moves on every presence event.
+func (eb *EventBus) SampleGauges() {
+	eb.metrics.SetSSEClients(eb.hub.ClientCount())
+	eb.metrics.SetSSEQueuedFrames(eb.hub.QueuedFrames())
+	eb.metrics.SetSSEHead(eb.hub.Position().Head)
 }

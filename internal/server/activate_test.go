@@ -95,7 +95,7 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 	s = &Server{
 		db:      &qhMockStore{},
 		metrics: obs.New(),
-		events:  events.New(0),
+		events:  events.New(0, nil),
 		alerts:  activity.NewAlertLog(100),
 		wire:    okWire,
 		newSonarr: func(_, _ string, _ *arrsvc.ReadGate) (SonarrClient, error) {
@@ -561,7 +561,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	// Graft the activation deps onto the auth fixture.
 	s.db = &qhMockStore{}
 	s.metrics = obs.New()
-	s.events = events.New(0)
+	s.events = events.New(0, nil)
 	s.wire = okWire
 	s.newSonarr = func(_, _ string, _ *arrsvc.ReadGate) (SonarrClient, error) { return dummyArrClient{}, nil }
 	s.newRadarr = func(_, _ string, _ *arrsvc.ReadGate) (RadarrClient, error) { return dummyArrClient{}, nil }

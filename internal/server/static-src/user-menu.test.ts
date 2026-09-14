@@ -73,6 +73,12 @@ vi.mock("./config.js", () => ({
   },
 }));
 
+// doLogout's first call (see the header: never activated here); the seam
+// itself is pinned in events.worker.test.ts.
+vi.mock("./events.js", () => ({
+  disconnectForLogout: vi.fn(),
+}));
+
 /** The header markup app.ts ships: the trigger, the menu panel, and the two
  *  standalone controls the menu replaces. */
 function mountHeader(): void {
