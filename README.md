@@ -27,7 +27,7 @@ Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-epi
 
 - **~14 MB compressed image, ffmpeg included.** Distroless base, one static Go binary, no Python, no runtime dependencies.
 - **The library that broke Bazarr runs in a 1 GB container limit.** Arr responses are batch-fetched then iterated (the largest payload, 4,360 movies, decodes to 24 MB); goroutine pools are bounded; media probing streams instead of buffering.
-- **A purpose-built ffmpeg** (~5 MB, plus ~2 MB ffprobe): decoders for every mainstream video, audio, and subtitle codec, a single x264 encoder for the 360p preview, statically linked, no network support compiled in. It does track detection, subtitle/audio extraction, and the sync editor's live preview.
+- **A purpose-built ffmpeg** (~5 MB, plus ~2 MB ffprobe): decoders for every mainstream video and audio codec plus the common subtitle formats (SRT/ASS, MOV text, WebVTT, PGS, DVD, DVB), a single x264 encoder for the 360p preview, statically linked, no network support compiled in. It does track detection, subtitle/audio extraction, and the sync editor's live preview.
 - **One file of state.** Pure-Go bbolt (no SQLite, no CGO): crash-durable on commit, hot-backed-up on schedule, and reconciled against the filesystem so it heals itself after manual file changes.
 - amd64 + arm64 images, cosign-signed, with SBOM attestations.
 
