@@ -48,7 +48,7 @@
     "property-no-vendor-prefix": [
       true,
       {
-        "ignoreProperties": ["text-size-adjust", "font-smoothing", "tap-highlight-color"]
+        "ignoreProperties": ["-webkit-text-size-adjust", "-webkit-user-select"]
       }
     ],
     "value-no-vendor-prefix": [

@@ -160,23 +160,15 @@
   width: auto;
   transition:
     opacity var(--dur-standard) var(--ease-standard),
-    translate var(--dur-standard) var(--ease-standard);
+    translate var(--dur-standard) var(--ease-standard),
+    overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+    display var(--dur-standard) var(--ease-standard) allow-discrete;
 }
 
 /* The input shape spans the full width (the old prompt sizing). */
 /* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM shape modifier (uip-ask--input) */
 .uip-ask--input {
   width: 100%;
-}
-
-@supports (transition-behavior: allow-discrete) {
-  .uip-ask {
-    transition:
-      opacity var(--dur-standard) var(--ease-standard),
-      translate var(--dur-standard) var(--ease-standard),
-      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
-      display var(--dur-standard) var(--ease-standard) allow-discrete;
-  }
 }
 
 .uip-ask-title {

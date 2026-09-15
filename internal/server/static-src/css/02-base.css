@@ -30,7 +30,6 @@ body {
   scrollbar-gutter: stable;
   scrollbar-color: var(--border) transparent;
   scrollbar-width: thin;
-  text-wrap: pretty;
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0)
@@ -379,7 +378,9 @@ input[type="search"] {
   translate: 0 0.5rem;
   transition:
     opacity var(--dur-standard) var(--ease-standard),
-    translate var(--dur-standard) var(--ease-standard);
+    translate var(--dur-standard) var(--ease-standard),
+    overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+    display var(--dur-standard) var(--ease-standard) allow-discrete;
 
   &[open] {
     opacity: 1;
@@ -392,28 +393,14 @@ input[type="search"] {
   &::backdrop {
     background: oklch(0% 0 0deg / 50%);
     opacity: 0;
-    transition: opacity var(--dur-standard) var(--ease-standard);
+    transition:
+      opacity var(--dur-standard) var(--ease-standard),
+      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+      display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
 
   &[open]::backdrop {
     opacity: 1;
-  }
-}
-
-@supports (transition-behavior: allow-discrete) {
-  :where(dialog) {
-    transition:
-      opacity var(--dur-standard) var(--ease-standard),
-      translate var(--dur-standard) var(--ease-standard),
-      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
-      display var(--dur-standard) var(--ease-standard) allow-discrete;
-  }
-
-  :where(dialog)::backdrop {
-    transition:
-      opacity var(--dur-standard) var(--ease-standard),
-      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
-      display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
 }
 

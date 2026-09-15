@@ -53,6 +53,7 @@
   font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
+  -webkit-user-select: none;
   user-select: none;
   background: var(--raised);
   border-radius: var(--radius-sm);
@@ -191,6 +192,7 @@
   cursor: pointer;
   font-variant-numeric: tabular-nums;
   touch-action: manipulation;
+  -webkit-user-select: none;
   user-select: none;
   transition:
     background var(--dur-micro) var(--ease-micro),
