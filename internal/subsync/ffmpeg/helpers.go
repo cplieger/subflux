@@ -30,12 +30,16 @@ func shortStreamType(codecType string) string {
 
 // textSubtitleCodecs is the set of ffmpeg codec names that represent
 // text-based subtitle formats (as opposed to bitmap formats like PGS/VobSub).
+//
+// Every member must have a decoder in the image's ffmpeg build, because naming
+// a codec here is what makes SelectBestSubTrack pick that track — and once it
+// picks one, no other track is tried. A codec the binary cannot decode
+// therefore does not degrade to a fallback: extraction fails with "no decoder
+// found" and the subtitle is lost. The Dockerfile asserts the decoders below
+// are present; keep the two in step.
 var textSubtitleCodecs = map[string]bool{
 	CodecSubrip: true, CodecSRT: true, CodecASS: true, CodecSSA: true,
-	"mov_text": true, "webvtt": true, "text": true, "ttml": true,
-	"stl": true, "realtext": true, "subviewer": true,
-	"subviewer1": true, "microdvd": true, "mpl2": true,
-	"jacosub": true, "sami": true,
+	"mov_text": true, "webvtt": true, "text": true,
 }
 
 // IsTextSubtitleCodec reports whether the ffprobe codec name is a text-based

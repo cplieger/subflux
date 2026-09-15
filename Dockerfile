@@ -108,9 +108,15 @@ RUN export CC=clang \
 
 # Video decoders: H.264, H.265, AV1, VP9, VP8, MPEG-2, MPEG-4, VC-1, Theora, FLV.
 # Audio decoders: AAC, AC3, EAC3, DCA (DTS), TrueHD, MLP, MP3, FLAC, Vorbis, Opus, ALAC, WMA, PCM variants.
-# Subtitle decoders: SRT, ASS, MOV text, WebVTT, PGS, DVD, DVB.
+# Subtitle decoders: SRT, ASS, MOV text, raw text, WebVTT, PGS, DVD, DVB.
 # Video encoder: libx264 only (360p ultrafast preview). Audio encoder: AAC + PCM.
 # Filters: scale (resize), aresample, aformat. Muxer: MP4 (fMP4 streaming).
+#
+# configure DROPS an --enable-<kind>= name it does not know, without failing and
+# (when a sibling in the same list matched) without warning, so the assertions
+# after `make` read the built binary back. They use RUNTIME names, which are not
+# always the configure name: decoder `movtext` reports as `mov_text`, and the
+# `pcm_s16le` muxer reports as `s16le`.
 COPY --from=sources /tmp/ffmpeg /tmp/ffmpeg
 WORKDIR /tmp/ffmpeg
 RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
@@ -132,14 +138,18 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
         --enable-decoder=aac,aac_latm,ac3,eac3,dca,mp3,mp3float,flac,vorbis,opus \
         --enable-decoder=pcm_s16le,pcm_s16be,pcm_s24le,pcm_s32le,pcm_f32le \
         --enable-decoder=truehd,mlp,alac,wmav1,wmav2 \
-        --enable-decoder=subrip,ass,ssa,mov_text,webvtt,pgssub,dvdsub,dvbsub \
+        --enable-decoder=subrip,srt,ass,ssa,movtext,text,webvtt,pgssub,dvdsub,dvbsub \
         --enable-encoder=libx264,aac,pcm_s16le,srt,ass,webvtt \
         --enable-parser=h264,hevc,av1,vp9,mpeg4video,mpegvideo,aac,aac_latm,ac3,mpegaudio,flac,opus,vorbis,dca \
         --enable-muxer=mp4,srt,ass,webvtt,pcm_s16le,null \
         --enable-protocol=file,pipe \
     && make -j"$(nproc)" \
     && cp ffmpeg_g ffmpeg \
-    && cp ffprobe_g ffprobe
+    && cp ffprobe_g ffprobe \
+    && test "$(./ffmpeg -hide_banner -decoders | grep -cE '^ [A-Z.]{6} (subrip|srt|ass|ssa|mov_text|text|webvtt|pgssub|dvdsub|dvbsub) ')" = 10 \
+    && test "$(./ffmpeg -hide_banner -encoders | grep -cE '^ [A-Z.]{6} (libx264|aac|pcm_s16le|srt|ass|webvtt) ')" = 6 \
+    && test "$(./ffmpeg -hide_banner -muxers | grep -cE '^  E  (mp4|srt|ass|webvtt|s16le|null) ')" = 6 \
+    && test "$(./ffmpeg -hide_banner -filters | grep -cE '^ ..? (aresample|anull|aformat|scale) ')" = 4
 
 # --- TypeScript type gate (tsc --noEmit over static-src) ---
 # Uses the same tsc (TypeScript 7 native compiler) tarball pattern as

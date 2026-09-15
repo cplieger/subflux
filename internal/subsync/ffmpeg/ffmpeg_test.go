@@ -55,9 +55,7 @@ func TestNormalizeFFprobeLang(t *testing.T) {
 func TestIsTextSubtitleCodec(t *testing.T) {
 	t.Parallel()
 	text := []string{
-		"subrip", "srt", "ass", "ssa", "mov_text", "webvtt",
-		"text", "ttml", "stl", "realtext", "subviewer",
-		"subviewer1", "microdvd", "mpl2", "jacosub", "sami",
+		"subrip", "srt", "ass", "ssa", "mov_text", "webvtt", "text",
 	}
 	for _, c := range text {
 		if !IsTextSubtitleCodec(c) {
@@ -72,6 +70,20 @@ func TestIsTextSubtitleCodec(t *testing.T) {
 	for _, c := range bitmap {
 		if IsTextSubtitleCodec(c) {
 			t.Errorf("IsTextSubtitleCodec(%q) = true, want false", c)
+		}
+	}
+
+	// The image's ffmpeg has no decoder for these, so claiming them would make
+	// SelectBestSubTrack pick a track extraction then fails on. ttml has no
+	// decoder in ffmpeg at all; the rest are standalone subtitle-file formats
+	// that no demuxer the build enables can produce as a stream.
+	undecodable := []string{
+		"ttml", "stl", "realtext", "subviewer", "subviewer1",
+		"microdvd", "mpl2", "jacosub", "sami",
+	}
+	for _, c := range undecodable {
+		if IsTextSubtitleCodec(c) {
+			t.Errorf("IsTextSubtitleCodec(%q) = true, want false: no decoder in the build", c)
 		}
 	}
 }
