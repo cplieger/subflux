@@ -32,6 +32,7 @@ import { langName } from "./utils.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";
 import type { TimecodeInput } from "./sync-timecode.js";
 import { buildSyncSubLabels, parseSeasonEpisode } from "./sync-entries.js";
+import { buildPath, mediaParent, parseRoute, syncRouteFor } from "./route-path.js";
 import type { SubtitleEntry, MediaType } from "./api-types.js";
 
 // --- Subtitle Sync Dialog ---
@@ -160,9 +161,11 @@ export function openSyncDialog(
 ): void {
   const dlg = syncDialogEl();
 
-  const currentPath = location.pathname.replace(/\/sync$/, "");
-  const syncPath = `${currentPath}/sync`;
-  if (location.pathname !== syncPath) {
+  // The dialog's URL is DERIVED from the route on screen, so reopening on a
+  // /sync path yields the same path rather than appending a second segment.
+  const target = syncRouteFor(parseRoute(location.pathname));
+  const syncPath = target === null ? null : buildPath(target);
+  if (syncPath !== null && location.pathname !== syncPath) {
     history.pushState(null, "", syncPath);
     syncPushedHistory = true;
   } else {
@@ -448,16 +451,22 @@ function closeSyncDialog(): void {
     video.load();
   }
   closeDialog(syncDialogEl());
+  const route = parseRoute(location.pathname);
+  const parent =
+    route.kind === "series-sync" || route.kind === "movie-sync" ? mediaParent(route) : null;
+  if (parent === null) {
+    // The URL names no sync route, so it belongs to some other view.
+    return;
+  }
   // history.back() fires popstate -> applyRoute(); syncClosing lets the
   // popstate handler skip the redundant re-render.
-  if (syncPushedHistory && location.pathname.endsWith("/sync")) {
+  if (syncPushedHistory) {
     syncPushedHistory = false;
     syncClosing = true;
     history.back();
-  } else if (location.pathname.endsWith("/sync")) {
-    const parent = location.pathname.replace(/\/sync$/, "");
-    history.replaceState(null, "", parent || "/");
+    return;
   }
+  history.replaceState(null, "", buildPath(parent));
 }
 
 async function applyManualOffset(): Promise<void> {

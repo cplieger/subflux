@@ -15,6 +15,7 @@ import { apiAction, retryNetwork, registerCleanup } from "@cplieger/actions";
 import { observeActivities } from "./status.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS } from "./constants.js";
+import { buildPath, mediaParent, parseRoute } from "./route-path.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
 
 const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
@@ -276,13 +277,23 @@ export function openSearchPopup(
 
 export function closeSearchPopup(): void {
   closeDialog(searchDlg);
-  if (searchPushedHistory && location.pathname.includes("/search/")) {
+  // The pop is owed by the PUSH, not by the parse: openSearchPopup pushes
+  // `/series//search/en` for a media row carrying no id, which the route space
+  // cannot hold, so a parse-first order would leave that entry on the stack.
+  if (searchPushedHistory) {
     searchPushedHistory = false;
     history.back();
-  } else if (location.pathname.includes("/search/")) {
-    const parent: string = location.pathname.replace(/\/search\/[a-z]{2,3}$/, "");
-    history.replaceState(null, "", parent || "/");
+    return;
   }
+  const route = parseRoute(location.pathname);
+  const parent =
+    route.kind === "series-search" || route.kind === "movie-search" ? mediaParent(route) : null;
+  if (parent === null) {
+    // The URL names no search route, so it belongs to some other view: rewriting
+    // it would navigate somewhere nobody asked for.
+    return;
+  }
+  history.replaceState(null, "", buildPath(parent));
 }
 
 async function runPopupSearch(

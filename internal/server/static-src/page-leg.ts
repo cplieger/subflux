@@ -32,6 +32,8 @@ import { dropDetailScopedDirtyRoots, setDetailRefresher } from "./coverage-heal.
 import { coverageRow } from "./coverage-store.js";
 import { releaseRouteViews } from "./view-scope.js";
 import { SUBJECT_HISTORY, detailSubject, forgetSubject } from "./subjects.js";
+import { parseRoute } from "./route-path.js";
+import type { Route } from "./route-path.js";
 import type { Subject } from "@cplieger/sse";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
@@ -44,6 +46,25 @@ const generations = new Map<string, number>();
 // Route key → in-flight controller (at most one live run per route).
 const controllers = new Map<string, AbortController>();
 
+type MediaFamily = "series" | "movie";
+
+// A route KEY is this module's identity string for a page leg, not a URL:
+// route-path.ts owns the URL space and this owns the key space. Builder and
+// reader sit together so the two cannot spell a key differently.
+const MEDIA_KEY = /^(series|movie):(\d+)$/;
+
+function mediaKey(family: MediaFamily, id: number): string {
+  return `${family}:${String(id)}`;
+}
+
+function parseMediaKey(key: string): { readonly family: MediaFamily; readonly id: string } | null {
+  const m = MEDIA_KEY.exec(key);
+  if (m === null) {
+    return null;
+  }
+  return { family: m[1] === "series" ? "series" : "movie", id: m[2] ?? "" };
+}
+
 /** The dispatcher's route identity. Exported for the transaction's
  *  collection-leg routeRequired check. */
 export function currentRouteKey(): string {
@@ -55,28 +76,38 @@ export function currentRouteKey(): string {
     return "files";
   }
   if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
-    return `series:${ctx.tvdbId}`;
+    return mediaKey("series", ctx.tvdbId);
   }
   if (ctx && "movie" in ctx && ctx.movie) {
-    return `movie:${ctx.tmdbId}`;
+    return mediaKey("movie", ctx.tmdbId);
   }
   // No landed detail context: the router sets currentPage="library"
   // synchronously on boot while detailCtx lands only with the summary, so
   // store state alone would misread a deep-link boot as the library.
-  return routeKeyFromPath(location.pathname);
+  return routeKeyFor(parseRoute(location.pathname));
 }
 
-// URL → route identity before any detail context lands, mirroring the
-// router's own table. Unknown paths are the library (applyRoute's default).
-function routeKeyFromPath(path: string): string {
-  if (path === "/history") {
-    return "history";
+// The shared route space → this module's key space. Settings shares the
+// library's key: the drawer opens over the library page.
+function routeKeyFor(route: Route): string {
+  switch (route.kind) {
+    case "history":
+      return "history";
+    case "series-files":
+    case "movie-files":
+      return "files";
+    case "series":
+    case "series-search":
+    case "series-sync":
+      return mediaKey("series", route.id);
+    case "movie":
+    case "movie-search":
+    case "movie-sync":
+      return mediaKey("movie", route.id);
+    case "library":
+    case "settings":
+      return "library";
   }
-  if (/^\/(?:series|movie)\/\d+\/files$/.test(path)) {
-    return "files";
-  }
-  const m = /^\/(series|movie)\/(\d+)(?:\/sync|\/search\/[a-z]{2,3})?$/.exec(path);
-  return m ? `${m[1] ?? ""}:${m[2] ?? ""}` : "library";
 }
 
 // A run may apply only while un-aborted, newest for its route, and its route
@@ -92,11 +123,11 @@ export function routeSubject(key: string): Subject | null {
   if (key === "history") {
     return SUBJECT_HISTORY;
   }
-  const m = /^(series|movie):(\d+)$/.exec(key);
-  if (m === null) {
+  const media = parseMediaKey(key);
+  if (media === null) {
     return null;
   }
-  return detailSubject(`${m[1] === "series" ? "tvdb" : "tmdb"}-${m[2] ?? ""}`);
+  return detailSubject(`${media.family === "series" ? "tvdb" : "tmdb"}-${media.id}`);
 }
 
 /** The router's leave path: abort the departing route's in-flight page leg,

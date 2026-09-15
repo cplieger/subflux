@@ -3,9 +3,11 @@
 // Two properties are worth the most and both are invisible to any single-route
 // smoke test:
 //
-//  - the route table is ordered most-specific-first, so /series/42/search/fr
-//    must NOT be swallowed by /series/42. A regex reorder is a silent
-//    regression: every URL still resolves, just to the wrong view.
+//  - the route patterns are MUTUALLY EXCLUSIVE by construction: a URLPattern
+//    :name group spans exactly one path segment, so /series/:id cannot claim
+//    /series/42/sync and no pattern can swallow a deeper one's path. Nothing
+//    short of counting the kinds that claim each path asserts it, which is what
+//    kindsMatching exists for.
 //  - the library filters round-trip through the query string. The serialiser
 //    omits defaults and the restorer supplies them, so an asymmetry either
 //    loses a shared link's filters or writes noise into every URL.
@@ -19,6 +21,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as bus from "./bus.js";
 import * as store from "./store.js";
+import { kindsMatching } from "./route-path.js";
 import type { CoverageItem } from "./api-types.js";
 
 const coverage = vi.hoisted(() => ({
@@ -340,6 +343,43 @@ describe("navigate", () => {
   });
 });
 
+describe("route pattern exclusivity", () => {
+  it("claims every path the app produces with exactly one kind", () => {
+    expect(kindsMatching("/settings")).toStrictEqual(["settings"]);
+    expect(kindsMatching("/history")).toStrictEqual(["history"]);
+    expect(kindsMatching("/series/42")).toStrictEqual(["series"]);
+    expect(kindsMatching("/series/42/sync")).toStrictEqual(["series-sync"]);
+    expect(kindsMatching("/series/42/files")).toStrictEqual(["series-files"]);
+    expect(kindsMatching("/series/42/search/fr")).toStrictEqual(["series-search"]);
+    expect(kindsMatching("/movie/7")).toStrictEqual(["movie"]);
+    expect(kindsMatching("/movie/7/sync")).toStrictEqual(["movie-sync"]);
+    expect(kindsMatching("/movie/7/files")).toStrictEqual(["movie-files"]);
+    expect(kindsMatching("/movie/7/search/pb")).toStrictEqual(["movie-search"]);
+  });
+
+  it("lets no shallower kind claim a deeper path", () => {
+    // The hazard a prefix-matching route table carries: /series/42 is a prefix
+    // of every deeper series path, so a matcher whose group spanned more than
+    // one segment would send /series/42/search/fr to the plain detail view, and
+    // every URL would still resolve.
+    expect(kindsMatching("/series/42/sync")).not.toContain("series");
+    expect(kindsMatching("/series/42/files")).not.toContain("series");
+    expect(kindsMatching("/series/42/search/fr")).not.toContain("series");
+    expect(kindsMatching("/movie/7/sync")).not.toContain("movie");
+    expect(kindsMatching("/movie/7/files")).not.toContain("movie");
+    expect(kindsMatching("/movie/7/search/en")).not.toContain("movie");
+  });
+
+  it("claims a path outside the route space with no kind at all", () => {
+    // The library is applyRoute's default arm rather than a pattern, and
+    // /movies is a redirect, so neither is claimed by anything.
+    expect(kindsMatching("/")).toStrictEqual([]);
+    expect(kindsMatching("/movies")).toStrictEqual([]);
+    expect(kindsMatching("/series/42/nope")).toStrictEqual([]);
+    expect(kindsMatching("/series/42/sync/extra")).toStrictEqual([]);
+  });
+});
+
 describe("route table", () => {
   it("routes a bare series path to the detail view from the cache, zero-fetch", async () => {
     const opened: unknown[] = [];
@@ -354,10 +394,7 @@ describe("route table", () => {
     expect(coverage.loadCalls).toBe(0);
   });
 
-  it("prefers the more specific search route over the detail route", async () => {
-    // The whole reason the table is ordered: /series/42 also matches the
-    // PREFIX of this path, so a reorder sends the user to the plain detail
-    // view and the search popup never opens.
+  it("routes a series search path to the search popup with its language", async () => {
     at("/series/42/search/fr");
 
     await router.applyRoute();
@@ -414,7 +451,7 @@ describe("route table", () => {
     expect(opened).toStrictEqual([{ item: movie(7), skipPush: true }]);
   });
 
-  it("prefers the movie search route over the movie detail route", async () => {
+  it("routes a movie search path to the movie search popup", async () => {
     at("/movie/7/search/pb");
 
     await router.applyRoute();

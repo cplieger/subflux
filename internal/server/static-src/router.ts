@@ -13,6 +13,8 @@ import { abortPageLeg } from "./page-leg.js";
 import { viewTransition, setDocTitle, emptyState } from "./utils.js";
 import { contentView } from "./view-scope.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
+import { buildPath, parseRoute } from "./route-path.js";
+import type { LibraryFilters, Route } from "./route-path.js";
 import type { CoverageItem } from "./api-types.js";
 
 // --- Page navigation and client-side routing ---
@@ -37,36 +39,23 @@ const covFilter = input("cov-filter");
 const covMissing = input("cov-missing");
 const covSort = select("cov-sort");
 
-// Serialize current library filter state into URL query params.
-function buildLibraryQuery(): string {
-  const params = new URLSearchParams();
-  const type = covTypeFilter.value;
-  const q = covFilter.value;
-  const missing = covMissing.checked;
-  const sort = covSort.value;
-  if (type && type !== "all") {
-    params.set("type", type);
-  }
-  if (q) {
-    params.set("q", q);
-  }
-  if (missing) {
-    params.set("missing", "1");
-  }
-  if (sort && sort !== "title") {
-    params.set("sort", sort);
-  }
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
+// Read the four filter controls. route-path.ts owns the query-string codec, so
+// this half never sees a URL and that half never sees a control.
+function readLibraryFilters(): LibraryFilters {
+  return {
+    type: covTypeFilter.value,
+    q: covFilter.value,
+    missing: covMissing.checked,
+    sort: covSort.value,
+  };
 }
 
-// Restore library filter state from URL query params.
-function restoreLibraryFilters(): void {
-  const params = new URLSearchParams(location.search);
-  covTypeFilter.value = params.get("type") ?? "all";
-  covFilter.value = params.get("q") ?? "";
-  covMissing.checked = params.get("missing") === "1";
-  covSort.value = params.get("sort") ?? "title";
+// Write the four filter controls.
+function applyLibraryFilters(f: LibraryFilters): void {
+  covTypeFilter.value = f.type;
+  covFilter.value = f.q;
+  covMissing.checked = f.missing;
+  covSort.value = f.sort;
 }
 
 // Push a new URL and apply the route. Use replace=true for initial load
@@ -87,8 +76,7 @@ export function navigate(path: string, replace?: boolean): void {
 // Update library filter query params in the URL without a full
 // navigation. Called when filter controls change.
 export function updateLibraryFilters(): void {
-  const qs = buildLibraryQuery();
-  const newUrl = `/${qs}`;
+  const newUrl = buildPath({ kind: "library", filters: readLibraryFilters() });
   if (newUrl !== location.pathname + location.search) {
     history.replaceState(null, "", newUrl);
   }
@@ -96,38 +84,30 @@ export function updateLibraryFilters(): void {
 
 // --- Route handlers ---
 
-interface Route {
-  pattern: RegExp;
-  handler: (m: RegExpMatchArray) => Promise<void> | void;
-}
-
 async function withSeries(
-  m: RegExpMatchArray,
+  id: number,
   action: (s: CoverageItem) => void | Promise<void>,
 ): Promise<void> {
   prepareDetailView();
-  const tvdbId = Number(m[1]);
-  const s = await findCoverageItem("series", "tvdb_id", tvdbId);
+  const s = await findCoverageItem("series", "tvdb_id", id);
   if (s) {
     await action(s);
   }
 }
 
 async function withMovie(
-  m: RegExpMatchArray,
+  id: number,
   action: (mv: CoverageItem) => void | Promise<void>,
 ): Promise<void> {
   prepareDetailView();
-  const tmdbId = Number(m[1]);
-  const mv = await findCoverageItem("movie", "tmdb_id", tmdbId);
+  const mv = await findCoverageItem("movie", "tmdb_id", id);
   if (mv) {
     await action(mv);
   }
 }
 
-async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
-  const lang = m[2] ?? null;
-  await withSeries(m, (s) => {
+async function handleSeriesSearch(id: number, lang: string): Promise<void> {
+  await withSeries(id, (s) => {
     emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       openSearchPopup("episode", s, null, null, lang);
@@ -135,37 +115,34 @@ async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
   });
 }
 
-async function handleSeriesSync(m: RegExpMatchArray): Promise<void> {
-  await withSeries(m, (s) => {
+async function handleSeriesSync(id: number): Promise<void> {
+  await withSeries(id, (s) => {
     emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
         btn.click();
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex group guaranteed
-        navigate(`/series/${m[1]!}`, true);
+        navigate(buildPath({ kind: "series", id }), true);
       }
     }, ROUTE_TRANSITION_MS);
   });
 }
 
-function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
-  const tvdbId = Number(m[1]);
-  return withSeries(m, (s) => {
-    openFileManager("episode", `tvdb-${tvdbId}-`, s.title, `/series/${tvdbId}`, s.id);
+function handleSeriesFiles(id: number): Promise<void> {
+  return withSeries(id, (s) => {
+    openFileManager("episode", `tvdb-${id}-`, s.title, buildPath({ kind: "series", id }), s.id);
   });
 }
 
-async function handleSeriesDetail(m: RegExpMatchArray): Promise<void> {
-  await withSeries(m, (s) => {
+async function handleSeriesDetail(id: number): Promise<void> {
+  await withSeries(id, (s) => {
     emit(BusEvent.OpenSeries, { item: s, skipPush: true });
   });
 }
 
-async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
-  const lang = m[2] ?? null;
-  await withMovie(m, (mv) => {
+async function handleMovieSearch(id: number, lang: string): Promise<void> {
+  await withMovie(id, (mv) => {
     emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       openSearchPopup("movie", mv, null, null, lang);
@@ -173,49 +150,34 @@ async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
   });
 }
 
-async function handleMovieSync(m: RegExpMatchArray): Promise<void> {
-  await withMovie(m, (mv) => {
+async function handleMovieSync(id: number): Promise<void> {
+  await withMovie(id, (mv) => {
     emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
         btn.click();
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex group guaranteed
-        navigate(`/movie/${m[1]!}`, true);
+        navigate(buildPath({ kind: "movie", id }), true);
       }
     }, ROUTE_TRANSITION_MS);
   });
 }
 
-async function handleMovieFiles(m: RegExpMatchArray): Promise<void> {
-  const tmdbId = Number(m[1]);
-  await withMovie(m, (mv) => {
-    openFileManager("movie", `tmdb-${tmdbId}`, mv.title, `/movie/${tmdbId}`, mv.id);
+async function handleMovieFiles(id: number): Promise<void> {
+  await withMovie(id, (mv) => {
+    openFileManager("movie", `tmdb-${id}`, mv.title, buildPath({ kind: "movie", id }), mv.id);
   });
 }
 
-async function handleMovieDetail(m: RegExpMatchArray): Promise<void> {
-  await withMovie(m, (mv) => {
+async function handleMovieDetail(id: number): Promise<void> {
+  await withMovie(id, (mv) => {
     emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
   });
 }
 
-// More specific patterns must precede less specific ones (e.g.
-// /series/{id}/search/{lang} before /series/{id}).
-const routes: Route[] = [
-  { pattern: /^\/series\/(\d+)\/search\/([a-z]{2,3})$/, handler: handleSeriesSearch },
-  { pattern: /^\/series\/(\d+)\/sync$/, handler: handleSeriesSync },
-  { pattern: /^\/series\/(\d+)\/files$/, handler: handleSeriesFiles },
-  { pattern: /^\/series\/(\d+)$/, handler: handleSeriesDetail },
-  { pattern: /^\/movie\/(\d+)\/search\/([a-z]{2,3})$/, handler: handleMovieSearch },
-  { pattern: /^\/movie\/(\d+)\/sync$/, handler: handleMovieSync },
-  { pattern: /^\/movie\/(\d+)\/files$/, handler: handleMovieFiles },
-  { pattern: /^\/movie\/(\d+)$/, handler: handleMovieDetail },
-];
-
-// Read location.pathname and render the matching view.
-// This is called on initial load, pushState navigation, and popstate.
+// Read location and render the matching view. Called on initial load, pushState
+// navigation, and popstate.
 export async function applyRoute(): Promise<void> {
   // THE LEAVE PATH (B2 + C2): the view on screen is being left or re-applied,
   // so any in-flight page-leg work belongs to a departed view — abort its
@@ -223,36 +185,54 @@ export async function applyRoute(): Promise<void> {
   // renders (abortPageLeg owns both; a released detail view also drops the
   // heal's detail-scoped dirty entries, coverage-heal.ts).
   abortPageLeg();
-  const path = location.pathname;
-
-  // Simple path matches (no regex needed).
-  if (path === "/settings") {
-    showPage("library");
-    setDocTitle("Settings");
-    openConfig(true);
+  // Answered before the parse because parseRoute folds /movies onto the library
+  // with DEFAULT filters, which drops the type=movies this alias means.
+  if (location.pathname === "/movies") {
+    navigate(
+      buildPath({
+        kind: "library",
+        filters: { type: "movies", q: "", missing: false, sort: "title" },
+      }),
+      true,
+    );
     return;
   }
-  if (path === "/history") {
-    showPage("history");
-    return;
-  }
-  if (path === "/movies") {
-    navigate("/?type=movies", true);
-    return;
-  }
+  await applyParsedRoute(parseRoute(location.pathname, location.search));
+}
 
-  // Regex-based route table.
-  for (const route of routes) {
-    const m = path.match(route.pattern);
-    if (m) {
-      await route.handler(m);
-      return;
-    }
+// Every arm returns a value, so noImplicitReturns fails a Route kind added
+// without an effect here rather than letting it fall through silently.
+function applyParsedRoute(route: Route): Promise<void> {
+  switch (route.kind) {
+    case "settings":
+      showPage("library");
+      setDocTitle("Settings");
+      openConfig(true);
+      return Promise.resolve();
+    case "history":
+      showPage("history");
+      return Promise.resolve();
+    case "series":
+      return handleSeriesDetail(route.id);
+    case "series-sync":
+      return handleSeriesSync(route.id);
+    case "series-files":
+      return handleSeriesFiles(route.id);
+    case "series-search":
+      return handleSeriesSearch(route.id, route.lang);
+    case "movie":
+      return handleMovieDetail(route.id);
+    case "movie-sync":
+      return handleMovieSync(route.id);
+    case "movie-files":
+      return handleMovieFiles(route.id);
+    case "movie-search":
+      return handleMovieSearch(route.id, route.lang);
+    case "library":
+      applyLibraryFilters(route.filters);
+      showPage("library");
+      return Promise.resolve();
   }
-
-  // Default: / (library)
-  restoreLibraryFilters();
-  showPage("library");
 }
 
 // Show a page without pushing history (used by applyRoute).
