@@ -140,104 +140,25 @@ This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebindi
 
 ## Alerting
 
-subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate these
-with Prometheus or the Mimir ruler; delivery is through your Alertmanager.
+subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate the
+rules in [`alerts/promql.yaml`](alerts/promql.yaml) with Prometheus or the Mimir
+ruler; firing alerts deliver through your Alertmanager. They cover:
 
-```yaml
-groups:
-  - name: subflux
-    rules:
-      # The floor under every other rule here: all of them read a subflux metric,
-      # so all of them go quiet together when subflux stops being scraped.
-      #
-      # Two arms, because neither covers the other. `up == 0` catches a target
-      # that is configured and failing, and keeps its labels. `absent(up{...})`
-      # catches a target that stopped EXISTING — a dropped scrape target, a
-      # removed scrape config, a deleted Kubernetes pod or ServiceMonitor —
-      # where `up` has no series and `up == 0` cannot match. Use an EXACT job
-      # matcher: a regex absent() form asks whether ANY matching target is up,
-      # so one healthy replica masks every failed one, and its synthetic result
-      # carries no job label to route on.
-      - alert: SubfluxTargetDown
-        expr: up{job="subflux"} == 0
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux is not being scraped successfully"
-          description: >
-            No successful scrape of subflux for 15m, so every rule in this group
-            is blind. Either the scrape is failing (container down, wrong port,
-            network) or the target is gone from service discovery entirely. Set
-            the job matcher to whatever your scrape config calls subflux.
-      - alert: SubfluxTargetAbsent
-        expr: absent(up{job="subflux"})
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux has no scrape target at all"
-          description: >
-            There is no up{job="subflux"} series, so subflux is not merely failing
-            to scrape but is no longer a configured target: a dropped scrape
-            target, a removed scrape config, or a deleted Kubernetes pod or
-            ServiceMonitor. Every other rule in this group is blind.
-      # The deadman for the scan loop. subflux can be up, scraped and answering
-      # HTTP while its scheduled scan has been wedged for days, and nothing else
-      # here notices.
-      #
-      # The uptime guard is load-bearing, not decoration. A range selector does
-      # NOT require the series to have existed for the whole range: after a
-      # restart, increase(subflux_scans_total[26h]) reads 0 as soon as there are
-      # two samples, so without the guard this fires about `for:` after every
-      # restart rather than 26h after the last scan. The guard says the process
-      # has actually been up long enough for the window to mean anything.
-      # subflux_configured keeps it quiet in unconfigured mode, where there is
-      # no engine and no scan to miss.
-      - alert: SubfluxScanStalled
-        expr: >
-          subflux_configured == 1
-          and increase(subflux_scans_total[26h]) == 0
-          and (time() - process_start_time_seconds) > 93600
-        for: 2h
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux has not completed a scan in over a day"
-          description: >
-            subflux is configured, has been up for more than 26h, and no
-            scheduled full scan has completed in that window (scan_interval
-            defaults to 24h). The scheduler may be stalled, a scan may be stuck
-            mid-run, or the arrs may be unreachable. Check the subflux logs and
-            /api/activity. A scan that legitimately runs longer than the window
-            will also trip this; widen the range and the uptime guard together
-            if that is your normal.
-      - alert: SubfluxHTTP5xx
-        expr: sum(increase(subflux_http_requests_total{status=~"5.."}[10m])) > 5
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux is returning HTTP 5xx"
-          description: >
-            subflux returned more than 5 server errors in 10m. Check upstream
-            connectivity, provider config, and the subflux logs.
-      - alert: SubfluxBackupStale
-        expr: >
-          subflux_backup_last_success_timestamp > 0
-          and (time() - subflux_backup_last_success_timestamp) > 172800
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux backup is stale"
-          description: >
-            No successful subflux backup recorded in over 48h. Check the backup
-            task and the /config volume.
-```
+| Alert | Fires when | Severity |
+| --- | --- | --- |
+| `SubfluxTargetDown` | no successful scrape for 15m, so every other rule here is blind | warning |
+| `SubfluxTargetAbsent` | there is no `up` series at all, so subflux is not a configured target any more | warning |
+| `SubfluxScanStalled` | no scheduled scan has completed in 26h while the process has been up that long | warning |
+| `SubfluxHTTP5xx` | more than 5 server errors in 10m | warning |
+| `SubfluxBackupStale` | no successful backup recorded in over 48h | warning |
 
-Thresholds are starting points; add your scrape `job` label to the selectors if
-you run more than one instance, and route by whatever labels your Alertmanager
+The two target rules pin `job="subflux"` because they read the synthetic `up`
+series, where a bare `up == 0` would fire on every unrelated target in your
+Prometheus; set that matcher to whatever your scrape config calls subflux. The
+rules reading subflux's own metrics carry no job matcher, so add one if you run
+more than one instance. Thresholds and the `severity` labels are starting points,
+and `SubfluxScanStalled`'s window tracks `scan_interval` (24h by default), so
+move both together if you change it. Route by whatever labels your Alertmanager
 uses.
 
 ## Healthcheck
@@ -261,6 +182,18 @@ Distroless `gcr.io/distroless/static-debian13:nonroot` (UID 65532, no shell). Pr
 - The media volume must be writable. Subflux saves subtitle files next to the media, so mounting `/media` read-only silently prevents downloads from being saved.
 - Cloudflare-protected providers (subf2m, AvistaZ, CinemaZ) are not implemented.
 - Long-running anime with colliding aired/absolute numbering has a rare false-positive window: results matched by a stable ID skip title validation, so an aired SxxEyy that collides with another episode's absolute number can slip through.
+
+## Dependencies
+
+Every pin below is tracked automatically and bumped by pull request; the base image is pinned by digest, and the two media libraries are built from source in the image because no distribution ships them in the shape subflux needs.
+
+| Dependency | Source |
+| --- | --- |
+| Runtime base image | `gcr.io/distroless/static-debian13:nonroot`, pinned by digest |
+| FFmpeg and ffprobe | built from source at a pinned release tag, statically linked, network support not compiled in |
+| x264 | built from source at a pinned commit, since upstream publishes no release tags |
+| Go modules | `go.mod` and `go.sum` |
+| Frontend packages | the `@cplieger/*` set, exact-pinned in `internal/server/static-src/package.json` |
 
 ## Credits
 
