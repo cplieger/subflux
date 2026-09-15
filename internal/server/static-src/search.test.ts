@@ -456,14 +456,19 @@ describe("closeSearchPopup", () => {
     expect(location.pathname).toBe("/series/81189");
   });
 
-  it("falls back to the root when the search URL has no parent", async () => {
+  it("leaves a search-shaped URL the route space does not contain alone", async () => {
     history.replaceState(null, "", "/series/81189/search/en");
     await openEpisodePopup();
     history.replaceState(null, "", "/search/en");
+    const replace = vi.spyOn(history, "replaceState");
 
     closeSearchPopup();
 
-    expect(location.pathname).toBe("/");
+    // /search/en names no media item, so it is not a search route: it reads as
+    // the library either way, and inventing a parent for it navigates
+    // somewhere nobody asked for. Same rule as the two cases below.
+    expect(location.pathname).toBe("/search/en");
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("leaves a non-search URL alone", async () => {

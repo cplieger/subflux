@@ -11,6 +11,7 @@ import { initStatusPopover, initStatusReconcile } from "./status.js";
 import { initScanButtons } from "./detail-scan.js";
 import { filterCoverage } from "./coverage.js";
 import { closeSearchPopup } from "./search.js";
+import { buildPath, mediaParent, parseRoute } from "./route-path.js";
 import { consumeSyncClosing } from "./sync.js";
 import { navigate, navigateToHistory, applyRoute, updateLibraryFilters } from "./router.js";
 import { reloadHistory, reArmHistoryLatch } from "./history.js";
@@ -274,10 +275,16 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 // Close search dialog on backdrop click.
 onBackdropClose(searchDlg, closeSearchPopup);
 
-// Search dialog native Escape.
+// Search dialog native Escape. The dialog closes itself, so this only corrects
+// the URL — through the same derivation closeSearchPopup uses, or Escape and
+// Close would answer one path two ways.
 searchDlg.addEventListener("cancel", () => {
-  if (location.pathname.includes("/search/")) {
-    const parent = location.pathname.replace(/\/search\/[a-z]{2,3}$/, "");
-    history.replaceState(null, "", parent || "/");
+  const route = parseRoute(location.pathname);
+  if (route.kind !== "series-search" && route.kind !== "movie-search") {
+    return;
+  }
+  const parent = mediaParent(route);
+  if (parent !== null) {
+    history.replaceState(null, "", buildPath(parent));
   }
 });

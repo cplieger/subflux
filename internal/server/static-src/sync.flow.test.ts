@@ -157,12 +157,9 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  // A real sync-capable route, not the runner's "/". The dialog derives its
-  // history entry as `${pathname}/sync`, so at "/" that would be "//sync",
-  // which a browser reads as protocol-relative and refuses. Production cannot
-  // reach that (router.ts:209-216 hosts the dialog only under /series/{id} and
-  // /movie/{id}, with or without /files), so this is the harness matching
-  // reality rather than a bug being papered over.
+  // A real sync-capable route, not the runner's "/": the dialog derives its
+  // history entry from the route on screen, so at "/" it pushes nothing and the
+  // close path's pop would have no subject.
   history.replaceState(null, "", "/series/42");
   dispatchAudio.mockReset();
   dispatchOffset.mockReset();
