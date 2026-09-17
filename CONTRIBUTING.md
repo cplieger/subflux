@@ -381,8 +381,7 @@ parses them for release notes (`cliff.toml`), so the type drives the version
 bump: `feat:`, `fix:`, and `sec:` are user-facing and release, while
 `chore:`/`ci:`/`docs:`/`refactor:`/`test:` do not. Write the subject as the
 changelog line a user would read. The project is pre-1.0, so versions stay
-within `0.x`; there is no automatic `1.0` (see [ROADMAP.md](ROADMAP.md) for
-what 1.0 requires).
+within `0.x`; there is no automatic `1.0`.
 
 ## Conduct and security
 
