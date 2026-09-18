@@ -18,9 +18,9 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "25.9.6",
     "@typescript/native": "npm:typescript@7.0.2",
-    "@vitest/browser": "5.0.0",
-    "@vitest/browser-playwright": "5.0.0",
-    "@vitest/coverage-v8": "5.0.0",
+    "@vitest/browser": "5.0.1",
+    "@vitest/browser-playwright": "5.0.1",
+    "@vitest/coverage-v8": "5.0.1",
     "eslint": "10.10.0",
     "fast-check": "4.10.0",
     "html-validate": "11.15.0",
@@ -31,7 +31,7 @@
     "stylelint-config-standard": "40.0.0",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.0"
+    "vitest": "5.0.1"
   },
   "dependencies": {
     "@cplieger/actions": "3.1.5",
