@@ -8,6 +8,7 @@ cmd/
 !cmd/bundle/
 internal/server/static-src/node_modules/
 *.md
+!THIRD_PARTY_NOTICES.md
 compose.yaml
 *_test.go
 **/*_test.go

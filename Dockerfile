@@ -33,7 +33,10 @@ RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
       "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${FFMPEG_VERSION}.tar.gz" \
     && tar xz -C /tmp -f /tmp/ffmpeg.tar.gz \
     && mv /tmp/FFmpeg-n${FFMPEG_VERSION} /tmp/ffmpeg \
-    && rm /tmp/ffmpeg.tar.gz
+    && rm /tmp/ffmpeg.tar.gz \
+    && mkdir -p /out/usr/share/licenses/ffmpeg /out/usr/share/licenses/x264 \
+    && cp /tmp/ffmpeg/COPYING.* /tmp/ffmpeg/LICENSE.md /out/usr/share/licenses/ffmpeg/ \
+    && cp /tmp/x264-stable/COPYING /out/usr/share/licenses/x264/
 
 # ---------------------------------------------------------------------------
 # Embedded SBOM fragment. The final image is distroless with no package DB,
@@ -292,11 +295,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -trimpath -ldflags="-s -w" -o /subflux . \
     && mkdir -p /config-skel
 
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
+COPY scripts/collect-licenses.sh scripts/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    sh scripts/collect-licenses.sh --name subflux .
+
 # --- Final image ---
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
+COPY --from=sources /out/usr/share/licenses /usr/share/licenses
 # CycloneDX SBOM fragment for the source-built ffmpeg + statically linked
 # libx264 (generated in the sources stage from the same version ARGs the
 # fetches use). Placed where the release pipeline's Syft sbom-cataloger
@@ -304,6 +313,7 @@ COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprob
 # Go module inventory.
 COPY --from=sources /tmp/subflux-ffmpeg.cdx.json /usr/share/sbom/subflux-ffmpeg.cdx.json
 COPY --from=builder --chmod=755 /subflux /subflux
+COPY --from=builder /out/usr/share/licenses /usr/share/licenses
 # Ship an empty, nonroot-owned /config so the image starts standalone (e.g. the
 # CI image smoke test) with no mount; subflux writes its default config + DB
 # there on first run. In production /config is a bind mount. 65532 is the
