@@ -1,7 +1,7 @@
 // wizard-languages.test.ts — the first-boot wizard's languages step.
 //
 // This step decides what subflux downloads for the rest of the install, and
-// its state lives in wizard.ts's shared `langDefault` / `langRules` arrays
+// its state lives in wizard-store.ts's shared `langDefault` / `langRules` arrays
 // rather than in the DOM: render paints from the arrays, collect reads the
 // selects back into them, and the add/remove buttons collect BEFORE mutating.
 // That ordering is the whole correctness story — a remove that splices before
@@ -9,10 +9,10 @@
 // fine on screen until the wizard finishes and writes the wrong config.
 //
 // The step is driven directly (buildLanguagesStep().render/collect/validate),
-// which is how wizard.ts drives it, with wizard's module state reset between
-// tests through its own _resetForTest — Browser Mode cannot re-evaluate the
-// module and a cache-busted specifier is closed here, because wizard.ts sits
-// in an import cycle with the step modules.
+// which is how wizard.ts drives it, with the wizard's module state reset
+// between tests through its own _resetForTest (which also resets the store) —
+// Browser Mode cannot re-evaluate a module, so `vi.resetModules()` hands back
+// the cached instance.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as wizard from "./wizard.js";
 import { buildLanguagesStep } from "./wizard-languages.js";

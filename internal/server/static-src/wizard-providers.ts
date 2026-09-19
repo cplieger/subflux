@@ -5,16 +5,14 @@ import { el } from "./dom.js";
 import { createDisclosure, type DisclosureController } from "@cplieger/ui-primitives/disclosure";
 import type { ProviderSchema, SchemaField } from "./api-types.js";
 import {
-  type WizardStep,
   bootSections,
   schemaByKey,
   secretSaved,
   wizardValues,
   providerEnabled,
-  wizField,
-  wizToggle,
-} from "./wizard.js";
-import { providerEnabledInSections } from "./wizard-state.js";
+} from "./wizard-store.js";
+import { wizField, wizToggle } from "./wizard-fields.js";
+import { type WizardStep, providerEnabledInSections } from "./wizard-state.js";
 import { SECRET_SAVED_PLACEHOLDER } from "./wizard-steps.js";
 
 /** provSecretPath is the dotted presence path of one provider setting. */

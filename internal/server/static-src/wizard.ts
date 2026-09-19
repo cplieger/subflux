@@ -3,7 +3,11 @@
 // config_valid, prefills every step, collapses steps the config already
 // answers, walks the rest, and finishes with a GET-overlay-PUT of the FULL
 // section map followed by the passkey offer and one navigation into the
-// app. Decision logic lives in wizard-state.ts; this module owns DOM and flow.
+// app. This module owns DOM and flow; the three modules under it own what the
+// step modules also need, so nothing has to import the parent back:
+// wizard-state.ts the decision logic and the step vocabulary, wizard-store.ts
+// the boot snapshot plus the shared model bindings, wizard-fields.ts the field
+// builders.
 
 import { patch } from "@cplieger/reactive";
 import {
@@ -15,18 +19,15 @@ import {
   PATH_WEBAUTHN_REGISTER_FINISH,
 } from "./wire/client.gen.js";
 import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
-import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
-import { el, option, withHelp } from "./dom.js";
-import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT, SETUP_PATH } from "./constants.js";
-import type { SchemaSection } from "./api-types.js";
+import { el } from "./dom.js";
+import { YAML_TIMEOUT_MS, SETUP_PATH } from "./constants.js";
 import type { StructuredConfig } from "./wire/types.gen.js";
 import {
   type Sections,
   type StepID,
-  type WizardBoot,
   type WizardDraft,
-  type WizardModel,
+  type WizardStep,
   buildDraftJSON,
   buildSaveSections,
   fastPathAvailable,
@@ -36,6 +37,15 @@ import {
   prefillModel,
   satisfiedSteps,
 } from "./wizard-state.js";
+import {
+  adoptModel,
+  bootSnapshot,
+  currentModel,
+  fullSchemaSnapshot,
+  resetWizardStore,
+  setBoot,
+  setSchema,
+} from "./wizard-store.js";
 import { bufferToBase64url, creationOptionsFromJSON } from "./webauthn-utils.js";
 import { buildProvidersStep } from "./wizard-providers.js";
 import { buildLanguagesStep } from "./wizard-languages.js";
@@ -46,16 +56,6 @@ import {
   buildScoringStep,
   buildPostProcessStep,
 } from "./wizard-steps.js";
-
-export interface WizardStep {
-  /** Matrix step id, or "review" for the closing summary screen. */
-  stepId: StepID | "review";
-  title: string;
-  render: (container: HTMLElement) => void;
-  collect: () => void;
-  validate: () => string;
-  validateAsync?: (signal: AbortSignal) => Promise<string>;
-}
 
 /** WizardEntry carries what the login page knows at handoff: the validity
  *  signal (prefill source is the structured GET) and — memory-only, never
@@ -68,8 +68,6 @@ export interface WizardEntry {
 
 // --- Module state ---
 
-let fullSchema: SchemaSection[] = [];
-let boot: WizardBoot = { sections: {}, secretsPresent: new Set(), configValid: false };
 let bootFingerprint = "";
 let allSteps: WizardStep[] = [];
 let activeSteps: WizardStep[] = [];
@@ -77,76 +75,38 @@ let wizardIndex = 0;
 let touched = new Set<StepID>();
 let setupPassword = "";
 
-// Step-module-facing model bindings (live ES module bindings; reassigned at
-// boot from the prefilled model).
-export let wizardValues: Record<string, Record<string, string>> = {};
-export let providerEnabled: Record<string, boolean> = {};
-export let langRules: { audio: string; code: string; variant: string }[] = [];
-export let langDefault: { code: string; variant: string }[] = [];
-export let mediaRoots: string[] = [];
-
-/** Returns every module-scope binding to its initial value.
+/** Returns every module-scope binding to its initial value, this module's and
+ *  wizard-store.ts's.
  *
- *  This module cannot be re-evaluated to get a fresh graph: Browser Mode
- *  keys its module map by URL, so `vi.resetModules()` hands back the
- *  cached instance, and a `?boot=N` specifier is closed here because
- *  wizard-steps.ts and wizard-providers.ts import the shared bindings back
- *  from "./wizard.js" — a busted specifier would mint a duplicate instance
- *  whose sibling step modules keep reading the original's, which stays empty.
+ *  The wizard cannot be re-evaluated to get a fresh graph: Browser Mode keys its
+ *  module map by URL, so `vi.resetModules()` hands back the cached instance. A
+ *  `?boot=N` specifier is closed for a second reason — it mints a DUPLICATE
+ *  module instance, and the step modules would keep reading the original's
+ *  state, which stays empty. (Until the state moved to wizard-store.ts that
+ *  duplicate was also a cycle: each step module imported the shared bindings
+ *  back from "./wizard.js".)
  *
- *  Every module-scope `let` in this file must be listed here. `navWired`
- *  left true makes `wireWizardNav()` no-op on a freshly mounted page.
- *  `stepFadeTimer` left running renders a pending step into the next
- *  test's page. */
+ *  Every module-scope `let` in this file must be listed here, and
+ *  `resetWizardStore` owns the store's own list — the invariant spans two files
+ *  now, and a missed binding is cross-test pollution rather than a compile
+ *  error. `navWired` left true makes `wireWizardNav()` no-op on a freshly
+ *  mounted page. `stepFadeTimer` left running renders a pending step into the
+ *  next test's page. */
 export function _resetForTest(): void {
   abortValidation(); // aborts and nulls validationAbort
   clearTimeout(stepFadeTimer ?? undefined);
   stepFadeTimer = null;
-  fullSchema = [];
-  boot = { sections: {}, secretsPresent: new Set(), configValid: false };
+  resetWizardStore();
   bootFingerprint = "";
   allSteps = [];
   activeSteps = [];
   wizardIndex = 0;
   touched = new Set();
   setupPassword = "";
-  wizardValues = {};
-  providerEnabled = {};
-  langRules = [];
-  langDefault = [];
-  mediaRoots = [];
   navWired = false;
 }
 
-/** Reports whether the config file already holds a value for a schema
- *  secret (dotted path): the steps render a saved placeholder and count
- *  the credential as present. */
-export function secretSaved(path: string): boolean {
-  return boot.secretsPresent.has(path);
-}
-
-/** Read-only by convention: steps consult it for config-blessed state. */
-export function bootSections(): Sections {
-  return boot.sections;
-}
-
-export function schemaByKey(key: string): SchemaSection | undefined {
-  return fullSchema.find((s: SchemaSection) => s.key === key);
-}
-
 const DRAFT_KEY = "subflux-setup-draft";
-
-function adoptModel(m: WizardModel): void {
-  wizardValues = m.wizardValues;
-  providerEnabled = m.providerEnabled;
-  langRules = m.langRules;
-  langDefault = m.langDefault;
-  mediaRoots = m.mediaRoots;
-}
-
-function currentModel(): WizardModel {
-  return { wizardValues, providerEnabled, langRules, langDefault, mediaRoots };
-}
 
 /** Persists the wizard's progress. The stored model is schema-sanitized:
  *  secret fields never reach localStorage. Newly typed secrets are
@@ -157,7 +117,7 @@ function saveDraft(): void {
     localStorage.setItem(
       DRAFT_KEY,
       buildDraftJSON(
-        fullSchema,
+        fullSchemaSnapshot(),
         bootFingerprint,
         activeSteps[wizardIndex]?.stepId ?? "",
         [...touched],
@@ -175,80 +135,6 @@ function clearDraft(): void {
   } catch {
     /* ignore */
   }
-}
-
-// --- Shared field builders (consumed by the step modules) ---
-//
-// A field's schema `help` text goes through dom.ts's withHelp, the one
-// carrier for both this wizard and the settings dialog.
-
-export function wizField(
-  id: string,
-  label: string,
-  type: string,
-  value: string,
-  placeholder: string,
-  tip: string | undefined,
-): HTMLElement {
-  const lbl = withHelp(el("label", { for: id }, label), tip);
-  const inp = el("input", {
-    type: type === "number" ? "number" : "text",
-    id,
-    placeholder,
-    value,
-    autocomplete: "off",
-    "data-1p-ignore": "",
-    "data-lpignore": "true",
-    "data-bwignore": "",
-    "data-form-type": "other",
-    className: type === "secret" ? "wiz-masked" : "",
-  });
-  return el("div", { className: "wiz-field" }, lbl, inp);
-}
-
-export function wizToggle(
-  id: string,
-  label: string,
-  checked: boolean,
-  tip: string | undefined,
-): HTMLElement {
-  // `for` gives the checkbox its accessible name: the .wiz-toggle wrapper
-  // holds only the slider span, so without it the control announces
-  // unlabelled.
-  const lbl = withHelp(el("label", { for: id }, label), tip);
-  const cb = el("input", { type: "checkbox", id }) as HTMLInputElement;
-  cb.checked = checked;
-  const toggle = el("label", { className: "wiz-toggle" }, cb, el("span"));
-  return el("div", { className: "wiz-field" }, lbl, toggle);
-}
-
-export function langSelect(id: string, value: string, placeholder: string): HTMLElement {
-  // The placeholder doubles as the accessible name: these rows caption
-  // their selects with a layout element, not a label.
-  const sel = el("select", {
-    id,
-    className: "wiz-lang-select",
-    "aria-label": placeholder,
-  }) as HTMLSelectElement;
-  sel.appendChild(option("", placeholder));
-  for (const [code, name] of LANGUAGES) {
-    sel.appendChild(option(code, name + " (" + code + ")"));
-  }
-  sel.value = value;
-  return sel;
-}
-
-export function variantSelect(id: string, value: string): HTMLElement {
-  const sel = el("select", {
-    id,
-    className: "wiz-lang-variant",
-    "aria-label": "Subtitle variant",
-  }) as HTMLSelectElement;
-  for (const v of SUBTITLE_VARIANTS) {
-    sel.appendChild(option(v.value, v.label));
-  }
-  sel.value = value || DEFAULT_VARIANT;
-  return sel;
 }
 
 // --- Flow ---
@@ -271,11 +157,11 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
     renderWizardInitError(entry);
     return;
   }
-  fullSchema = schema;
+  setSchema(schema);
 
   const sections: Sections = { ...structured.sections };
   const present = new Set<string>(structured.secrets_present ?? []);
-  boot = { sections, secretsPresent: present, configValid: entry.configValid };
+  setBoot({ sections, secretsPresent: present, configValid: entry.configValid });
   bootFingerprint = fingerprintBoot(sections, [...present]);
 
   // Fresh prefill from the server snapshot; a fingerprint-valid draft
@@ -308,7 +194,7 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
 
   // Active walk: steps not auto-collapsed, plus any step the draft
   // already touched, then the review screen. A fresh visit walks everything.
-  const satisfied = satisfiedSteps(boot);
+  const satisfied = satisfiedSteps(bootSnapshot());
   const walk = allSteps.filter((s) => {
     const id = s.stepId as StepID;
     return !satisfied.has(id) || touched.has(id);
@@ -321,7 +207,7 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
     if (idx >= 0) {
       wizardIndex = idx;
     }
-  } else if (fastPathAvailable(boot)) {
+  } else if (fastPathAvailable(bootSnapshot())) {
     // Everything mandatory is satisfied — open on the finish summary.
     wizardIndex = activeSteps.length - 1;
   }
@@ -584,9 +470,9 @@ function buildReviewStep(): WizardStep {
     stepId: "review",
     title: "Review & Finish",
     render(container: HTMLElement): void {
-      const satisfied = satisfiedSteps(boot);
+      const satisfied = satisfiedSteps(bootSnapshot());
       const intro =
-        fastPathAvailable(boot) && touched.size === 0
+        fastPathAvailable(bootSnapshot()) && touched.size === 0
           ? "Everything looks configured. Review any step below, or finish now."
           : "Review your setup, then finish to activate it.";
       container.appendChild(el("p", { className: "wiz-review-intro" }, intro));
@@ -669,7 +555,7 @@ async function finishWizardInner(): Promise<void> {
   // The wizard holds the full boot snapshot and overlays only touched
   // sections; untouched sections survive by round-trip. Completion is
   // idempotent: retries and a duplicate PUT re-run activation harmlessly.
-  const sections = buildSaveSections(boot.sections, currentModel(), touched);
+  const sections = buildSaveSections(bootSnapshot().sections, currentModel(), touched);
   const o = await saveWizardConfigAction.dispatch(sections).outcome;
   if (o.status === "error") {
     showError("wizardError", "Save failed: " + o.error.message);

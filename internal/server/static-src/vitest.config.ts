@@ -132,6 +132,9 @@ export default defineConfig({
             provider: playwright({
               launchOptions: {
                 channel: "chromium",
+                // Chromium delivers animation frames at ~60Hz, so each frame a test awaits
+                // costs it ~16.7ms; this removes the cap.
+                args: ["--disable-frame-rate-limit"],
               },
             }),
             instances: [{ browser: "chromium" }],

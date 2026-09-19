@@ -108,12 +108,15 @@ function hiddenOf(id: string): boolean {
 //   - `vi.resetModules()` does not re-evaluate a module in Browser Mode (the
 //     module map is URL-keyed), so it hands back the cached instance;
 //   - `./wizard.ts?boot=N` -- the fix the other files in this package use --
-//     mints a DUPLICATE instance, and wizard.ts is in a circular import with
-//     wizard-steps.ts and wizard-providers.ts, which import `schemaByKey`,
-//     `wizardValues`, `secretSaved` and `mediaRoots` back from "./wizard.js".
-//     The copy sets `fullSchema` on itself while the single shared step
-//     modules keep reading the original's, which stays empty. Measured: the
-//     busted arr step renders its <h3> and no fields at all.
+//     mints a DUPLICATE instance, which used to strand the step modules: they
+//     imported `schemaByKey`, `wizardValues`, `secretSaved` and `mediaRoots`
+//     back from "./wizard.js", so the copy set `fullSchema` on itself while the
+//     single shared step modules kept reading the original's, which stayed
+//     empty (measured: the busted arr step rendered its <h3> and no fields at
+//     all). That specific failure is gone -- the shared state moved to
+//     wizard-store.ts, which a duplicate wizard.ts imports under the same
+//     specifier and therefore shares -- but nothing here depends on the
+//     duplicate working, and one `_resetForTest` call resets both modules.
 // The explicit reset is the fleet's pattern for exactly this (see
 // `_resetForTest` in @cplieger/ui-primitives, `resetActionFramework` in
 // @cplieger/actions). `navWired` is the binding that made the leak visible:

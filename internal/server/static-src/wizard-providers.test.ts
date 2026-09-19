@@ -7,7 +7,7 @@
 // to let a fresh install past the step it just prefilled — a dead end with no
 // way forward but disabling a provider that works.
 //
-// The step reads wizard.ts's schema and boot snapshot, so these tests boot the
+// The step reads wizard-store.ts's schema and boot snapshot, so these tests boot the
 // wizard for real (both fetches doubled) and then drive the step object
 // directly, which is what wizard.ts does with it.
 import { describe, it, expect, beforeEach, vi } from "vitest";

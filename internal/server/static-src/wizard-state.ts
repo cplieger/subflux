@@ -58,6 +58,20 @@ export const STEP_IDS = [
 /** StepID identifies one wizard step. */
 export type StepID = (typeof STEP_IDS)[number];
 
+/** WizardStep is one walkable screen: a step of the matrix, or the closing
+ *  summary. Declared here beside `StepID` rather than in wizard.ts, because
+ *  every step module implements it while wizard.ts only renders it — the step
+ *  vocabulary belongs with the step decisions. */
+export interface WizardStep {
+  /** Matrix step id, or "review" for the closing summary screen. */
+  stepId: StepID | "review";
+  title: string;
+  render: (container: HTMLElement) => void;
+  collect: () => void;
+  validate: () => string;
+  validateAsync?: (signal: AbortSignal) => Promise<string>;
+}
+
 /** MANDATORY_STEPS are the steps whose satisfaction gates the
  *  "everything looks configured — finish" fast path. The remaining steps
  *  are tunable defaults a user may accept untouched. */
