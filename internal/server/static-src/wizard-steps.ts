@@ -9,15 +9,9 @@ import { el, withHelp } from "./dom.js";
 import { connTestControl } from "./conn-test.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
-import {
-  type WizardStep,
-  schemaByKey,
-  secretSaved,
-  wizardValues,
-  mediaRoots,
-  wizField,
-  wizToggle,
-} from "./wizard.js";
+import { schemaByKey, secretSaved, wizardValues, mediaRoots } from "./wizard-store.js";
+import { wizField, wizToggle } from "./wizard-fields.js";
+import type { WizardStep } from "./wizard-state.js";
 
 /** SECRET_SAVED_PLACEHOLDER marks a secret the config file already holds:
  *  leaving the field blank keeps the stored value (server-side merge). */

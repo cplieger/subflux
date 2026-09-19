@@ -1,7 +1,7 @@
 // wizard-steps.test.ts — the five schema-driven wizard steps (arr, media
 // roots, search, scoring, post-processing).
 //
-// Every one of them is a render/collect/validate triple over wizard.ts's
+// Every one of them is a render/collect/validate triple over wizard-store.ts's
 // shared model, and the risks are the same shape in each: a prefill that
 // renders a REDACTED secret back into a field would save the redaction over a
 // working credential; a collect that replaces instead of merging drops the
@@ -9,7 +9,7 @@
 // asks for the wrong thing dead-ends a first boot. Those three are what these
 // tests aim at.
 //
-// The steps read wizard.ts's schema and boot snapshot, so the wizard is booted
+// The steps read wizard-store.ts's schema and boot snapshot, so the wizard is booted
 // for real with both fetches doubled, and each step object is then driven
 // directly — which is exactly how wizard.ts uses it. The wizard's OWN rendered
 // step is cleared after boot, because collect() resolves ids with
@@ -17,6 +17,7 @@
 // instead of the one under test.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as wizard from "./wizard.js";
+import * as store from "./wizard-store.js";
 import {
   buildArrStep,
   buildMediaRootsStep,
@@ -26,7 +27,7 @@ import {
   SECRET_SAVED_PLACEHOLDER,
 } from "./wizard-steps.js";
 import type { SchemaSection } from "./api-types.js";
-import type { WizardStep } from "./wizard.js";
+import type { WizardStep } from "./wizard-state.js";
 import type { PathValidationResponse } from "./wire/types.gen.js";
 
 const wire = vi.hoisted(() => ({
@@ -533,7 +534,7 @@ describe("search step", () => {
     rerender(step);
 
     expect(input("wiz-search-scan_interval").value).toBe("12h");
-    expect(wizard.wizardValues["search"]?.["provider_timeout"]).toBe("45s");
+    expect(store.wizardValues["search"]?.["provider_timeout"]).toBe("45s");
   });
 
   it("records the adaptive toggle and fields", async () => {
@@ -545,7 +546,7 @@ describe("search step", () => {
 
     step.collect();
 
-    expect(wizard.wizardValues["adaptive"]).toStrictEqual({
+    expect(store.wizardValues["adaptive"]).toStrictEqual({
       enabled: "false",
       max_attempts: "9",
     });
@@ -662,7 +663,7 @@ describe("post-processing step", () => {
 
     step.collect();
 
-    expect(wizard.wizardValues["post_processing"]).toStrictEqual({
+    expect(store.wizardValues["post_processing"]).toStrictEqual({
       sync_subtitles: "true",
       audio_sync_fallback: "false",
       encoding: "utf-8",

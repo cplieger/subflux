@@ -3,7 +3,9 @@
 import { $ } from "./dom-core.js";
 import { el, withHelp } from "./dom.js";
 import { DEFAULT_VARIANT } from "./constants.js";
-import { type WizardStep, langRules, langDefault, langSelect, variantSelect } from "./wizard.js";
+import type { WizardStep } from "./wizard-state.js";
+import { langRules, langDefault } from "./wizard-store.js";
+import { langSelect, variantSelect } from "./wizard-fields.js";
 
 export function buildLanguagesStep(): WizardStep {
   return {

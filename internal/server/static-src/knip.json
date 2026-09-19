@@ -4,9 +4,8 @@
   "ignore": ["wire/*.gen.ts"],
   "project": ["**/*.ts", "!**/*.d.ts", "!node_modules/**"],
   "ignoreDependencies": ["html-validate", "stylelint", "stylelint-config-standard"],
-  "ignoreBinaries": [],
-  "ignoreMembers": [],
   "treatConfigHintsAsErrors": true,
+  "rules": { "cycles": "error" },
   "includeEntryExports": true,
   "typescript": {
     "config": ["tsconfig.json", "tsconfig.worker.json"]
