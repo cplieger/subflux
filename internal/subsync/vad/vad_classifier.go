@@ -1,6 +1,6 @@
 package vad
 
-// GMM classifier functions ported from vad_core.c (WebRTC).
+// GMM classifier functions ported from WebRTC's vad_gmm.c (GaussianProbability) and vad_core.c (GmmProbability).
 
 // maxSpeechMean is the upper bound for the speech-mean update (from vad_core.c).
 const maxSpeechMean int16 = 12800

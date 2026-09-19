@@ -1,6 +1,6 @@
 package vad
 
-// Minimum value tracker ported from vad_core.c (WebRTC).
+// Minimum value tracker ported from WebRTC's vad_sp.c (WebRtcVad_FindMinimum).
 
 // ageMinValues increments the age of every tracked minimum and evicts any value
 // older than 100 frames, shifting the tail down and refilling the vacated top

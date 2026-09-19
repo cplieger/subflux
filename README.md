@@ -206,4 +206,8 @@ This project was built with AI-assisted tooling using [Claude](https://claude.co
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE). The image carries the license text of every bundled component under `/usr/share/licenses/`.
+
+The image bundles two upstream programs built from source, both GPL-2.0-or-later: [FFmpeg](https://ffmpeg.org/) (the `FFMPEG_VERSION` pin in the Dockerfile, fetched as the `n<version>` tag archive of <https://github.com/FFmpeg/FFmpeg>) and [x264](https://www.videolan.org/developers/x264.html) (the `X264_COMMIT` pin, cloned from <https://code.videolan.org/videolan/x264.git>). The build applies no patches; this repository's Dockerfile, together with those two pinned sources, is the complete build recipe, which is how the GPL source offer for the shipped binaries is met.
+
+Two upstream projects are ported into `internal/subsync` rather than bundled: the alignment algorithms of [alass](https://github.com/kaegi/alass) (GPL-3.0-or-later, which section 13 of the GPLv3 lets an AGPL-3.0 program contain) and the voice activity detector of [WebRTC](https://webrtc.googlesource.com/src/) (BSD-3-Clause). Both license texts, with the files that carry the ported code, are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
