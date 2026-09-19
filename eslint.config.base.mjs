@@ -26,9 +26,11 @@ export default [
       "**/*.gen.ts",
       "**/*.gen.js",
       "**/wire/*.gen.ts",
-      // Test fixtures that aren't real code
+      // Test fixtures that aren't real code, including fixture trees that are
+      // dead or unreachable by construction (a dead-code analyzer's inputs)
       "**/test-stubs/**",
       "**/__mocks__/**",
+      "**/fixtures/**",
     ],
   },
   // 2. Strictest official preset combination (typed linting required).
