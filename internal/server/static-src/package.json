@@ -39,7 +39,7 @@
     "@cplieger/keyenc": "1.0.8",
     "@cplieger/reactive": "2.1.1",
     "@cplieger/sse": "1.0.0",
-    "@cplieger/ui-primitives": "3.1.0"
+    "@cplieger/ui-primitives": "3.1.1"
   },
   "overrides": {
     "qs": "^6.15.2",
