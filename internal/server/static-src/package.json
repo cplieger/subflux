@@ -24,7 +24,7 @@
     "eslint": "10.10.0",
     "fast-check": "4.10.1",
     "html-validate": "11.16.0",
-    "knip": "6.36.0",
+    "knip": "6.37.0",
     "playwright": "1.63.0",
     "prettier": "3.9.8",
     "stylelint": "17.15.0",
