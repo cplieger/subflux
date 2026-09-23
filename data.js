@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1790125870692,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/subflux",
   "entries": {
     "Benchmark": [
       {
@@ -13685,10 +13685,10 @@ window.BENCHMARK_DATA = {
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "f9577db6c2f2096d9cc325c89450a48686d66346",
-          "message": "chore(deps): update cplieger/ci digest to aa0a018 (#649)",
-          "timestamp": "2026-09-20T08:02:03Z",
-          "url": "https://github.com/cplieger/ci/commit/f9577db6c2f2096d9cc325c89450a48686d66346"
+          "id": "b6301c9a0d70735561743d18ee44b7da3542dfae",
+          "message": "chore(devdeps): update dependency fast-check to v4.10.2 (#1012)",
+          "timestamp": "2026-09-22T20:14:32Z",
+          "url": "https://github.com/cplieger/subflux/commit/b6301c9a0d70735561743d18ee44b7da3542dfae"
         },
         "date": 1790125870346,
         "tool": "customSmallerIsBetter",
