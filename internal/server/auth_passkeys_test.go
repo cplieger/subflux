@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 

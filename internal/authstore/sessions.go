@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 )
 
 // This file holds the SessionPersister half of AuthStore.
