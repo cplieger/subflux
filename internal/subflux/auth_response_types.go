@@ -3,7 +3,7 @@ package subflux
 import (
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 )
 
 // SetupStatus is the JSON response for GET /api/auth/setup.

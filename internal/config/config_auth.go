@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 

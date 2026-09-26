@@ -3,7 +3,7 @@ package authhandlers
 import (
 	"context"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 )
 
 // The request-scoped authentication values, and the only place they are put

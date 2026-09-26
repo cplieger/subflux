@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
