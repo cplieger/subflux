@@ -21,7 +21,7 @@ package wirespec
 import (
 	"net/http"
 
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"

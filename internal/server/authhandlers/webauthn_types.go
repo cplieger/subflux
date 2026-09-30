@@ -3,8 +3,8 @@ package authhandlers
 import (
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 )
 
 // WebAuthnLoginBeginResponse wraps WebAuthn assertion options with a session token.

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/authstore/authstoretest"
 	"github.com/cplieger/subflux/internal/boltstore"

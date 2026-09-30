@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 )
 
 // liveCeremony returns a real in-flight WebAuthn ceremony. Only the library can

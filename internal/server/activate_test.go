@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/config"
