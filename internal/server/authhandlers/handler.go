@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/auth/v6/ratelimit"
 	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v3"
 )
@@ -235,7 +236,7 @@ func (h *Handler) relyingParty() *authwebauthn.RelyingParty {
 func (h *Handler) requireWebAuthn(w http.ResponseWriter, r *http.Request) (*authwebauthn.RelyingParty, bool) {
 	rp := h.relyingParty()
 	if rp == nil {
-		slog.Warn("webauthn: ceremony requested but no relying party is configured", "path", r.URL.Path, "ip", ClientIP(r))
+		slog.Warn("webauthn: ceremony requested but no relying party is configured", "path", logsafe.Field(r.URL.Path), "ip", ClientIP(r))
 		httpapi.BadRequestC(w, r, subflux.CodeWebAuthnUnconfigured, "passkeys are not configured on this instance")
 		return nil, false
 	}

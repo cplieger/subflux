@@ -62,8 +62,8 @@ function messages(host: HTMLElement): string[] {
 
 /** settle lets the click's awaited chain run to completion under fake timers,
  *  which also flush the microtasks between them. */
-function settle(): Promise<void> {
-  return vi.advanceTimersByTimeAsync(0);
+async function settle(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 /** state names what the control is showing, so a case asserts one thing rather
