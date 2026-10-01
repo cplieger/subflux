@@ -232,6 +232,14 @@ function downloadButton(): HTMLButtonElement {
   return req<HTMLButtonElement>(".result-dl button");
 }
 
+/** Change the language through the select the reader actually sees. */
+async function pickLanguage(value: string): Promise<void> {
+  const sel = req<HTMLSelectElement>("#popup-lang-sel");
+  sel.value = value;
+  sel.dispatchEvent(new Event("change"));
+  await settle();
+}
+
 beforeEach(() => {
   _resetSearchForTest();
   req<HTMLDialogElement>("#searchResultPopup").replaceChildren();
@@ -272,11 +280,30 @@ describe("openSearchPopup: the dialog and its URL", () => {
     expect(location.pathname).toBe("/movie/1396/search/en");
   });
 
-  it("leaves the id segment empty when the series has no tvdb id", async () => {
+  it("leaves the URL alone when the series has no tvdb id", async () => {
     openSearchPopup("episode", { id: 42, title: "Breaking Bad" }, 1, episode(), "en");
     await settle();
 
-    expect(location.pathname).toBe("/series//search/en");
+    // A series with no tvdb id addresses no search route, and a synthesised
+    // `/series//search/en` is a path the route space cannot read back.
+    expect(location.pathname).toBe("/");
+  });
+
+  it("leaves the URL alone when the movie has no tmdb id", async () => {
+    openSearchPopup("movie", { id: 42, title: "Breaking Bad" }, null, null, "en");
+    await settle();
+
+    expect(location.pathname).toBe("/");
+  });
+
+  it("still opens and searches for a series with no tvdb id", async () => {
+    // The refusal is about the URL only: the popup takes the media row it was
+    // handed, so the search itself is unaffected.
+    openSearchPopup("episode", { id: 42, title: "Breaking Bad" }, 1, episode(), "en");
+    await settle();
+
+    expect(req<HTMLDialogElement>("#searchResultPopup").open).toBe(true);
+    expect(lastQuery()).toMatchObject({ type: "episode", season: 1, episode: 1 });
   });
 
   it("titles the dialog with the show and its episode number", async () => {
@@ -408,6 +435,85 @@ describe("openSearchPopup: the dialog and its URL", () => {
     await settle();
 
     expect(location.pathname).toBe("/series/81189/search/fr");
+  });
+});
+
+// Nothing clears #searchResultPopup between two opens, so whatever the first
+// open installed is what the second one finds. Every case here opens for TWO
+// DIFFERENT media, which is the only way a header handler still holding the
+// first open's item can be told from a correct one.
+describe("reopening the search popup for another item", () => {
+  async function openBreakingBad(): Promise<void> {
+    openSearchPopup("episode", media(), 1, episode(), "en");
+    await settle();
+  }
+
+  async function openGameOfThrones(): Promise<void> {
+    openSearchPopup(
+      "episode",
+      { id: 77, tvdb_id: 121361, title: "Game of Thrones", year: 2011 },
+      3,
+      { episode: 7 },
+      "en",
+    );
+    await settle();
+  }
+
+  it("searches the item on screen when the language is changed", async () => {
+    await openBreakingBad();
+    await openGameOfThrones();
+
+    await pickLanguage("fr");
+
+    expect(lastQuery()).toMatchObject({ tvdb: "121361", season: 3, episode: 7, lang: "fr" });
+  });
+
+  it("rewrites the URL to the item on screen when the language is changed", async () => {
+    await openBreakingBad();
+    await openGameOfThrones();
+
+    await pickLanguage("fr");
+
+    expect(location.pathname).toBe("/series/121361/search/fr");
+  });
+
+  it("downloads for the item on screen after that language change", async () => {
+    wire.searchResult = { ok: true, status: 200, data: { results: [result()] } };
+    await openBreakingBad();
+    await openGameOfThrones();
+    await pickLanguage("fr");
+    // What the reader is looking at while the download is dispatched.
+    expect(req(".dlg-title").textContent).toContain("Game of Thrones");
+
+    downloadButton().click();
+    await settle();
+
+    expect(actions.dispatched.at(-1)).toMatchObject({ media_id: 77, season: 3, episode: 7 });
+  });
+});
+
+// The rows are the only handler-bearing children of the results pane, and each
+// row's onclick closes over its own button — so a render that reused a previous
+// render's row would dispatch the old result and spin a button nobody clicked.
+describe("re-rendering the results list", () => {
+  it("binds a download button to the result of the render that drew it", async () => {
+    wire.searchResult = { ok: true, status: 200, data: { results: [result()] } };
+    await openEpisodePopup();
+
+    wire.searchResult = {
+      ok: true,
+      status: 200,
+      data: { results: [result({ subtitle_id: "sub-2", release_name: "R2", score: 55 })] },
+    };
+    await pickLanguage("fr");
+
+    const btn = downloadButton();
+    btn.click();
+    await settle();
+
+    expect(actions.dispatched.at(-1)).toMatchObject({ subtitle_id: "sub-2", language: "fr" });
+    expect(btn.disabled).toBe(true);
+    expect(btn.querySelector(".spinner")).not.toBeNull();
   });
 });
 
@@ -1074,6 +1180,22 @@ describe("downloadFromPopup", () => {
     const btn = await clickDownload();
 
     expect(btn.disabled).toBe(false);
+  });
+
+  it("drops the failed status when that retry is dispatched", async () => {
+    actions.outcomes = [
+      { status: "error", error: { code: "download_failed", message: "timeout" } },
+      { status: "success", value: { activity_id: "act-1", status: "accepted" } },
+    ];
+    const btn = await clickDownload();
+
+    btn.click();
+    await settle();
+
+    // css/_shared-feedback.css paints button[data-status="err"] on --err-dim, so
+    // a status outliving its outcome renders the running download as failed.
+    expect(btn.dataset["status"]).toBeUndefined();
+    expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
   it("falls back to a generic tip when a cancelled dispatch carries no error", async () => {

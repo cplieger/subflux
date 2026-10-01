@@ -103,9 +103,14 @@ type anidbEpisode struct {
 // anidbError captures AniDB's error XML envelope. AniDB signals errors
 // with HTTP 200 + <error>Banned</error> (or similar); without this check
 // the response silently unmarshals into anidbAnime with zero episodes.
+//
+// Code is the optional `code` attribute. The episode path ignores it — every
+// error there is a reason to back off — while the credential check branches on
+// it to tell a refused client key from a ban.
 type anidbError struct {
 	XMLName xml.Name `xml:"error"`
 	Message string   `xml:",chardata"`
+	Code    string   `xml:"code,attr"`
 }
 
 // cacheEpisodes retrieves all episodes for a series from the AniDB HTTP API

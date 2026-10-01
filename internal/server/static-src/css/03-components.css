@@ -2,131 +2,6 @@
    2. Shared components
    ================================================================ */
 
-/* --- Icons --- */
-.icon {
-  display: inline-block;
-  width: var(--icon);
-  height: var(--icon);
-  background: currentcolor;
-  mask: center / contain no-repeat;
-  vertical-align: -0.125em;
-  flex-shrink: 0;
-}
-
-.icon-warning {
-  mask-image: url("icons/warning.svg");
-}
-
-.icon-moon {
-  mask-image: url("icons/moon.svg");
-}
-
-.icon-sun {
-  mask-image: url("icons/sun.svg");
-}
-
-.icon-arrow-left {
-  mask-image: url("icons/chevron.svg");
-  rotate: 90deg;
-}
-
-.icon-external {
-  mask-image: url("icons/external.svg");
-}
-
-.icon-excluded {
-  mask-image: url("icons/excluded.svg");
-}
-
-.icon-history {
-  mask-image: url("icons/history.svg");
-}
-
-.icon-check {
-  mask-image: url("icons/check.svg");
-}
-
-.icon-close {
-  mask-image: url("icons/close.svg");
-}
-
-.icon-dot {
-  mask-image: url("icons/dot.svg");
-}
-
-.icon-eye {
-  mask-image: url("icons/eye.svg");
-}
-
-.icon-eye-off {
-  mask-image: url("icons/eye-off.svg");
-}
-
-.icon-settings {
-  mask-image: url("icons/settings.svg");
-}
-
-.icon-sync {
-  mask-image: url("icons/sync.svg");
-}
-
-.icon-search {
-  mask-image: url("icons/search.svg");
-}
-
-.icon-download {
-  mask-image: url("icons/download.svg");
-}
-
-.icon-hourglass {
-  mask-image: url("icons/hourglass.svg");
-}
-
-.icon-play {
-  mask-image: url("icons/play.svg");
-}
-
-.icon-pause {
-  mask-image: url("icons/pause.svg");
-}
-
-.icon-stop {
-  mask-image: url("icons/stop.svg");
-}
-
-.icon-file {
-  mask-image: url("icons/file.svg");
-}
-
-.icon-trash {
-  mask-image: url("icons/trash.svg");
-}
-
-.icon-user {
-  mask-image: url("icons/user.svg");
-}
-
-.icon-chevron-up {
-  mask-image: url("icons/chevron-bold.svg");
-  rotate: 180deg;
-}
-
-.icon-chevron-down {
-  mask-image: url("icons/chevron-bold.svg");
-}
-
-.icon-shield {
-  mask-image: url("icons/shield.svg");
-}
-
-.icon-logout {
-  mask-image: url("icons/logout.svg");
-}
-
-.icon-monitor {
-  mask-image: url("icons/monitor.svg");
-}
-
 /* --- Badge (data-status drives color) --- */
 .badge {
   padding: var(--sp-2) var(--sp-5);
@@ -204,24 +79,6 @@ td[data-col="actions"] button {
   padding: var(--sp-2) var(--sp-4);
   flex: 1;
   text-align: center;
-}
-
-/* --- Spinner --- */
-.spinner {
-  display: inline-block;
-  width: var(--icon);
-  height: var(--icon);
-  border: 2px solid color-mix(in oklch, currentcolor 30%, transparent);
-  border-block-start-color: currentcolor;
-  border-radius: 50%;
-  vertical-align: middle;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    rotate: 360deg;
-  }
 }
 
 /* --- Skeleton ---
@@ -363,6 +220,13 @@ td[data-col="actions"] button {
   flex-direction: column;
   align-items: center;
   gap: var(--sp-4);
+
+  /* An author `display` outranks the UA `[hidden] { display: none }` rule
+     whatever the specificity, so every `.empty` the JS toggles needs this
+     arm or the message paints in every state. */
+  &[hidden] {
+    display: none;
+  }
 }
 
 .empty[data-status="err"] {

@@ -45,8 +45,11 @@ vi.mock("./wire/client.gen.js", () => ({
       wire.pathResults.length > 0 ? (wire.pathResults.shift() ?? null) : { valid: true },
     );
   },
-  webauthnRegisterBegin: () => Promise.resolve(null),
+  webauthnRegisterBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnLoginBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnAvailabilityRaw: () => Promise.resolve({ ok: false, status: 400 }),
   webauthnSignalData: () => Promise.resolve(null),
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
   // Reached only by a section's Test-connection button, which these
   // tests do not click; shaped like a real answer so a future one can.
   testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
@@ -66,6 +69,7 @@ function schemaFixture(): SchemaSection[] {
       key: "sonarr",
       title: "Sonarr",
       type: "object",
+      conn_test: true,
       fields: [
         { key: "url", label: "URL", type: "text", help: "Internal hostname or IP:port" },
         { key: "api_key", label: "API Key", type: "secret" },
@@ -316,7 +320,7 @@ describe("media roots step", () => {
     buildMediaRootsStep().render(host);
 
     expect(input("wiz-media-root-0").value).toBe("");
-    expect(host.querySelectorAll(".wiz-lang-remove")).toHaveLength(0);
+    expect(host.querySelectorAll(".wiz-row-remove")).toHaveLength(0);
   });
 
   it("prefills the configured roots", async () => {
@@ -343,10 +347,24 @@ describe("media roots step", () => {
     const host = await boot({ sections: { media_roots: ["/a", "/b", "/c"] } });
     buildMediaRootsStep().render(host);
 
-    host.querySelectorAll<HTMLButtonElement>(".wiz-lang-remove")[1]?.click();
+    host.querySelectorAll<HTMLButtonElement>(".wiz-row-remove")[1]?.click();
 
     expect(input("wiz-media-root-0").value).toBe("/a");
     expect(input("wiz-media-root-1").value).toBe("/c");
+  });
+
+  // The remove control is the shared close mask, not a "×" text node whose
+  // ink sits wherever the resolved font's math axis puts it; the mask has no
+  // baseline, so the aria-label is what gives the button a name.
+  it("removes through a named close-mask button", async () => {
+    const host = await boot({ sections: { media_roots: ["/a", "/b"] } });
+    buildMediaRootsStep().render(host);
+
+    const btn = host.querySelectorAll<HTMLButtonElement>(".wiz-row-remove")[0];
+
+    expect(btn?.querySelector(".icon.icon-close")).not.toBeNull();
+    expect(btn?.textContent).toBe("");
+    expect(btn?.getAttribute("aria-label")).toBe("Remove media root");
   });
 
   it("requires at least one path", async () => {
@@ -669,5 +687,32 @@ describe("post-processing step", () => {
       encoding: "utf-8",
     });
     expect(step.validate()).toBe("");
+  });
+});
+
+describe("arr step: the credential-check control", () => {
+  it("places the control in the group header of a section that declares one", async () => {
+    const host = await boot({ sections: { sonarr: { url: "http://sonarr:8989" } } });
+
+    buildArrStep().render(host);
+
+    const groups = host.querySelectorAll(".wiz-arr-group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]!.querySelector(".wiz-arr-header .conn-test")).not.toBeNull();
+    // radarr declares no test in this fixture, so it renders none.
+    expect(groups[1]!.querySelector(".conn-test")).toBeNull();
+  });
+
+  it("watches the group's own fields, so editing one retires the verdict", async () => {
+    const host = await boot({ sections: { sonarr: { url: "http://sonarr:8989" } } });
+
+    buildArrStep().render(host);
+
+    const btn = host.querySelector<HTMLButtonElement>(".conn-test");
+    expect(btn).not.toBeNull();
+    btn!.dataset["status"] = "ok";
+    input("wiz-sonarr-api_key").dispatchEvent(new Event("input"));
+
+    expect(btn!.dataset["status"]).toBeUndefined();
   });
 });

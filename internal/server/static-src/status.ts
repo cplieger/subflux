@@ -220,10 +220,15 @@ function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
     statusLabel.textContent = "Offline";
   }
   if (popupVisible) {
-    patch(
-      $.statusPopup,
-      el("div", { className: "pop-item muted" }, "Server unreachable \u2014 retrying\u2026"),
-    );
+    // The notice has to be one of `reconcile`'s own keyed rows: reconcile is the
+    // popup's only sweeper and it removes only children it keyed, so an unkeyed
+    // write here outlives every later paint. The clear covers the skeleton rows,
+    // unkeyed for the same reason.
+    $.statusPopup.replaceChildren();
+    reconcile($.statusPopup, ["offline"], {
+      key: (k) => k,
+      mount: () => el("div", { className: "pop-item muted" }, "Server unreachable, retrying\u2026"),
+    });
   }
 }
 

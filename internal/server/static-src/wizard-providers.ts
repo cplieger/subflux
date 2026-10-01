@@ -14,6 +14,8 @@ import {
 import { wizField, wizToggle } from "./wizard-fields.js";
 import { type WizardStep, providerEnabledInSections } from "./wizard-state.js";
 import { SECRET_SAVED_PLACEHOLDER } from "./wizard-steps.js";
+import { mountConnTest } from "./conn-test.js";
+import { WIZARD_BANNER_ID } from "./constants.js";
 
 /** provSecretPath is the dotted presence path of one provider setting. */
 function provSecretPath(provName: string, fieldKey: string): string {
@@ -151,7 +153,24 @@ function renderProviderCard(container: HTMLElement, prov: ProviderSchema): void 
     card.appendChild(body);
     bodyCtl = createDisclosure(null, body, { open: enabled });
   }
+  appendWizProvConnTest(card, header, prov);
   container.appendChild(card);
+}
+
+// appendWizProvConnTest adds the credential-check control to a provider card
+// that declares one, so a bad key is discovered here rather than at the Finish
+// save several steps later.
+function appendWizProvConnTest(card: HTMLElement, header: HTMLElement, prov: ProviderSchema): void {
+  if (!prov.conn_test) {
+    return;
+  }
+  const inputs: Record<string, HTMLInputElement | null> = {};
+  for (const f of prov.settings ?? []) {
+    inputs[f.key] = card.querySelector<HTMLInputElement>(
+      `#${CSS.escape("wiz-prov-" + prov.name + "-" + f.key)}`,
+    );
+  }
+  mountConnTest(header, prov.name, { inputs, bannerId: WIZARD_BANNER_ID });
 }
 
 function collectProviders(): void {

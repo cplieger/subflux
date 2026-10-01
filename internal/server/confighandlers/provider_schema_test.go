@@ -95,3 +95,30 @@ func TestBuildProviderSchemas_excludes_mock_provider(t *testing.T) {
 		t.Errorf("BuildProviderSchemas len = %d, want 1 (mock excluded)", len(schemas))
 	}
 }
+
+// TestBuildProviderSchemas_reports_the_credential_check pins the flag the client
+// renders a test control from. It is registry data rather than a name comparison
+// inside a renderer for the same reason SchemaSection.ConnTest is: which sections
+// get which controls is the schema's job, and the endpoint reads the same fact to
+// decide which kinds it will probe.
+func TestBuildProviderSchemas_reports_the_credential_check(t *testing.T) {
+	t.Parallel()
+	reg := provider.NewRegistry()
+	registerStub(reg, "gestdown")
+	registerStub(reg, "opensubtitles")
+	reg.RegisterCredentialCheck("gestdown", false)
+	reg.RegisterCredentialCheck("opensubtitles", true)
+
+	schemas := BuildProviderSchemas(reg)
+
+	if len(schemas) != 2 {
+		// Establishes the values the checks below read.
+		t.Fatalf("BuildProviderSchemas() = %d schemas, want 2", len(schemas))
+	}
+	if schemas[0].ConnTest {
+		t.Errorf("gestdown.ConnTest = true, want false (it carries no credentials)")
+	}
+	if !schemas[1].ConnTest {
+		t.Errorf("opensubtitles.ConnTest = false, want true")
+	}
+}

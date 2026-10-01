@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	"github.com/cplieger/auth/v5/ratelimit"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/auth/v6/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -46,7 +46,7 @@ func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 // HandleWebAuthnSignalData handles GET /api/auth/webauthn/signal-data — returns
 // the WebAuthn signal data needed by the browser for credential management.
 func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Request) {
-	rp, ok := h.requireWebAuthn(w)
+	rp, ok := h.requireWebAuthn(w, r)
 	if !ok {
 		return
 	}
@@ -76,7 +76,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 // initiates passkey registration. Requires password verification before issuing
 // the creation challenge to prevent unauthorized credential provisioning.
 func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Request) {
-	rp, ok := h.requireWebAuthn(w)
+	rp, ok := h.requireWebAuthn(w, r)
 	if !ok {
 		return
 	}
@@ -127,10 +127,14 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	creation, ceremony, err := authwebauthn.BeginRegistration(rp, webauthnUser)
+	origin, err := requestOrigin(r)
 	if err != nil {
-		slog.Error("webauthn register: begin", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
+		refuseOrigin(w, r, err)
+		return
+	}
+	creation, ceremony, err := authwebauthn.BeginRegistration(rp, webauthnUser, origin)
+	if err != nil {
+		refuseOrigin(w, r, err)
 		return
 	}
 
@@ -158,7 +162,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 // HandleWebAuthnRegisterFinish handles POST /api/auth/webauthn/register/finish —
 // completes passkey registration, stores the new credential, and emits an audit record.
 func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Request) {
-	rp, ok := h.requireWebAuthn(w)
+	rp, ok := h.requireWebAuthn(w, r)
 	if !ok {
 		return
 	}

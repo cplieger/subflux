@@ -162,9 +162,9 @@ describe("dom: element builders", () => {
   });
 
   it("keeps an option's value and its label apart", () => {
-    const o = option("fr", "fr \u2014 French");
+    const o = option("fr", "fr \u00B7 French");
     expect(o.value).toBe("fr");
-    expect(o.textContent).toBe("fr \u2014 French");
+    expect(o.textContent).toBe("fr \u00B7 French");
   });
 
   it("turns markup-looking input into literal text, never into elements", () => {

@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeasonSyncAccepted, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeasonSyncAccepted, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, SyncSeasonRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeasonSyncAccepted, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnAvailability, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeasonSyncAccepted, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, SyncSeasonRequest, UserInfo, WebAuthnAvailability, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -42,6 +42,7 @@ export const PATH_OIDC_CALLBACK = "/api/auth/oidc/callback";
 export const PATH_OIDC_LINK = "/api/auth/oidc/link";
 export const PATH_WEBAUTHN_LOGIN_BEGIN = "/api/auth/webauthn/login/begin";
 export const PATH_WEBAUTHN_LOGIN_FINISH = "/api/auth/webauthn/login/finish";
+export const PATH_WEBAUTHN_AVAILABILITY = "/api/auth/webauthn/availability";
 export const PATH_EVENTS = "/api/events";
 export const PATH_EVENTS_SYNC = "/api/events/sync";
 export const PATH_EVENTS_ALIVE = "/api/events/alive";
@@ -174,6 +175,15 @@ export function webauthnLoginBegin(query?: Record<string, QueryValue>, opts?: Cl
 
 export function webauthnLoginBeginRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<WebAuthnLoginBeginResponse>> {
   return clientRequestRaw("POST", "/api/auth/webauthn/login/begin" + qs(query), undefined, decodeWebAuthnLoginBeginResponse, opts?.signal);
+}
+
+/** Whether a passkey ceremony could be conducted from ?origin= (advisory; Begin is authoritative). */
+export function webauthnAvailability(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<WebAuthnAvailability | null> {
+  return clientRequest("GET", "/api/auth/webauthn/availability" + qs(query), undefined, decodeWebAuthnAvailability, opts?.signal);
+}
+
+export function webauthnAvailabilityRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<WebAuthnAvailability>> {
+  return clientRequestRaw("GET", "/api/auth/webauthn/availability" + qs(query), undefined, decodeWebAuthnAvailability, opts?.signal);
 }
 
 export function me(opts?: ClientOpts): Promise<MeResponse | null> {

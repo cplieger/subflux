@@ -130,6 +130,10 @@ async function loadFiles(): Promise<void> {
 
   // Shared anti-flicker timing (150ms show-delay, 300ms min-visible),
   // settled by refreshFileData (also runs skeleton-less on data:invalidate).
+  // The slot holds one controller, so taking it settles the previous holder:
+  // an unsettled show timer fires after this open has mounted and paints a
+  // skeleton over the table, disposing the live binding with it.
+  filesSkeleton?.cancel();
   filesSkeleton = skeletonTiming(
     () => {
       const skel = document.createDocumentFragment();
@@ -303,7 +307,11 @@ function ensureMounted(): void {
   const tbody = el("tbody");
   const tbl = el("table", { className: "files-table" }, thead, tbody);
   const emptyEl = emptyDiv("No external subtitles.");
-  patch(out, el("div", { className: "files-list" }, emptyEl, tbl));
+  // The installed tree must BE the tree the effect below closes over. A
+  // reusing reconciler (`patch`) would copy these nodes onto whatever the
+  // container already holds and discard them, leaving the effect writing
+  // `hidden` to an element that was never inserted.
+  out.replaceChildren(el("div", { className: "files-list" }, emptyEl, tbl));
 
   // Structure tier: reconcile rows keyed by path on add/remove/reorder.
   scope.add(
@@ -332,8 +340,13 @@ function ensureMounted(): void {
   );
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (headerEl) {
-    headerEl.querySelector('[data-nav="bulk-delete"]')?.remove();
     headerEl.appendChild(bulkBtn);
+    // The button lives outside the patched subtree, so this view's scope is the
+    // only thing that can take it away: left behind, it dispatches a bulk
+    // delete for the item the reader navigated away from.
+    scope.add(() => {
+      bulkBtn.remove();
+    });
   }
 
   // Empty-state, table, and bulk-button visibility/count track the

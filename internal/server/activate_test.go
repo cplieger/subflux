@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/config"
@@ -592,6 +592,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	// (1) A fresh ceremony begins under the NEW RP ID.
 	beginReq := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/auth/webauthn/login/begin", http.NoBody)
+	beginReq.Header.Set("Origin", "https://rp-b.example.com")
 	beginRec := httptest.NewRecorder()
 	s.authH.HandleWebAuthnLoginBegin(beginRec, beginReq)
 	if beginRec.Code != http.StatusOK {

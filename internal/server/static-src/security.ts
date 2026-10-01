@@ -2,10 +2,11 @@
 
 import * as bus from "./bus.js";
 import * as notify from "./notify.js";
-import { el, icon, dialog, dialogHead, confirm } from "./dom.js";
+import { el, icon, dialog, dialogHead, confirm, errDiv } from "./dom.js";
 import { createDialog } from "@cplieger/ui-primitives/dialog";
 import { ask, type AskInput } from "@cplieger/ui-primitives/ask";
-import { reconcile, patch } from "@cplieger/reactive";
+import { reconcile } from "@cplieger/reactive";
+import { FOCUS_KEY, trackFocus, captureReaderState } from "./focus-restore.js";
 import {
   changePasswordRaw,
   deletePasskeyRaw,
@@ -17,16 +18,16 @@ import {
   renamePasskey as renamePasskeyRequest,
   revokeAPIKey,
   updateProfileRaw,
-  webauthnRegisterBegin,
   PATH_OIDC_REDIRECT,
-  PATH_WEBAUTHN_REGISTER_FINISH,
 } from "./wire/client.gen.js";
 import type { APIKeyInfo, PasskeyInfo } from "./wire/types.gen.js";
+import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import {
-  bufferToBase64url,
-  creationOptionsFromJSON,
-  sendWebAuthnSignals,
-} from "./webauthn-utils.js";
+  probeAvailability,
+  registerPasskey,
+  unavailableSentence,
+  type Availability,
+} from "./webauthn-ceremony.js";
 import type { MeResponse } from "./api-types.js";
 
 /** Wrap an async click handler with disabled + aria-busy lifecycle. The
@@ -85,6 +86,7 @@ async function openSecurity(): Promise<void> {
 
   const body = el("div", { className: "dlg-body" });
   body.appendChild(el("p", { className: "muted" }, "Loading\u2026"));
+  trackFocus(body);
 
   dlg.replaceChildren(header, body);
   ctrl.open();
@@ -93,32 +95,46 @@ async function openSecurity(): Promise<void> {
 }
 
 async function renderSections(body: HTMLElement): Promise<void> {
-  const [user, passkeys, oidcAvailable] = await Promise.all([me(), listPasskeys(), detectOIDC()]);
+  const [user, passkeys, oidcProbe, availability] = await Promise.all([
+    me(),
+    listPasskeys(),
+    detectOIDC(),
+    probeAvailability(),
+  ]);
+
+  if (!user) {
+    body.replaceChildren(errDiv("Could not load your account. Close the dialog and try again."));
+    return;
+  }
 
   const frag = document.createDocumentFragment();
 
   // Identity first: the display name is not a credential, so an SSO-governed
   // account gets it too.
-  if (user) {
-    frag.appendChild(buildProfileSection(user));
-  }
+  frag.appendChild(buildProfileSection(user));
   // Local-credential management is only for accounts that have a password.
   // SSO-governed (password-less) accounts are managed at the identity provider.
-  if (user?.has_password) {
+  if (user.has_password) {
     frag.appendChild(buildPasswordSection());
-    frag.appendChild(buildPasskeysSection(passkeys));
+    frag.appendChild(buildPasskeysSection(passkeys, availability));
   }
   // API keys are admin-only (bearer credentials carrying the owner's role).
-  if (user?.role === "admin") {
+  if (user.role === "admin") {
     const apikeys = await listAPIKeys();
     frag.appendChild(buildAPIKeysSection(apikeys));
   }
-  const oidcSection = buildOIDCSection(user, oidcAvailable);
+  const oidcSection = buildOIDCSection(user, oidcProbe);
   if (oidcSection) {
     frag.appendChild(oidcSection);
   }
 
-  patch(body, frag);
+  // The installed tree must BE the tree these handlers closed over: a reusing
+  // reconciler (`patch`) copies a fresh node's handler properties into the
+  // element already in the document, leaving every handler holding nodes that
+  // were never inserted.
+  const restore = captureReaderState(body);
+  body.replaceChildren(frag);
+  restore();
 }
 
 // --- Display name ---
@@ -142,6 +158,7 @@ function buildProfileSection(user: MeResponse): HTMLElement {
     "button",
     {
       type: "button",
+      [FOCUS_KEY]: "profile-save",
       onclick: busyClick(async () => {
         const r = await updateProfileRaw({ display_name: nameInput.value });
         if (!r.ok) {
@@ -204,6 +221,7 @@ function buildPasswordSection(): HTMLElement {
     "button",
     {
       type: "button",
+      [FOCUS_KEY]: "password-submit",
       onclick: busyClick(async () => {
         const cur = currentPw.value;
         const nw = newPw.value;
@@ -248,27 +266,39 @@ function buildPasswordSection(): HTMLElement {
 
 // --- Passkeys ---
 
-function buildPasskeysSection(passkeys: PasskeyInfo[] | null): HTMLElement {
+// Fails CLOSED on every unavailable reason, probe_failed included: the cost of
+// optimism here is a password typed for a ceremony that cannot run.
+function buildPasskeysSection(
+  passkeys: PasskeyInfo[] | null,
+  availability: Availability,
+): HTMLElement {
   const sec = el("div", { className: "sec-section" });
   sec.appendChild(el("h3", null, "Passkeys"));
 
-  const items = passkeys ?? [];
-
-  const list = el("div", { className: "sec-list" });
-  reconcile(list, items, {
-    key: (pk) => String(pk.id),
-    mount: (pk) => passkeyRow(pk),
-  });
-  if (items.length === 0) {
+  if (passkeys === null) {
+    sec.appendChild(errDiv("Could not load passkeys."));
+  } else if (passkeys.length === 0) {
     sec.appendChild(el("p", { className: "muted" }, "No passkeys registered."));
   } else {
+    const list = el("div", { className: "sec-list" });
+    reconcile(list, passkeys, {
+      key: (pk) => String(pk.id),
+      mount: (pk) => passkeyRow(pk),
+    });
     sec.appendChild(list);
   }
 
+  if (!availability.available) {
+    sec.appendChild(
+      el("p", { className: "muted sec-pk-unavailable" }, unavailableSentence(availability)),
+    );
+  }
   const addBtn = el(
     "button",
     {
       type: "button",
+      disabled: !availability.available,
+      [FOCUS_KEY]: "pk-add",
       onclick: busyClick(async () => {
         const password = await promptTrimmed("Enter your password to add a passkey:", {
           type: "password",
@@ -277,7 +307,7 @@ function buildPasskeysSection(passkeys: PasskeyInfo[] | null): HTMLElement {
         if (password === null) {
           return;
         }
-        await registerPasskey(password);
+        await addPasskey(password);
       }),
     },
     "Add passkey",
@@ -285,6 +315,31 @@ function buildPasskeysSection(passkeys: PasskeyInfo[] | null): HTMLElement {
   sec.appendChild(el("div", { className: "sec-actions" }, addBtn));
 
   return sec;
+}
+
+async function addPasskey(password: string): Promise<void> {
+  const outcome = await registerPasskey(password);
+  switch (outcome.kind) {
+    case "registered":
+      notify.success("Passkey registered");
+      await renderSections(secDlgBody());
+      return;
+    case "cancelled":
+      return;
+    case "duplicate":
+      notify.error(
+        "This device already has a passkey for subflux. Use the one you have, or add a passkey from another device.",
+      );
+      return;
+    case "timeout":
+      notify.error(
+        "Passkey registration timed out. It may have completed — reload and check your passkey list before trying again.",
+      );
+      return;
+    case "not-discoverable":
+    case "failed":
+      notify.error(outcome.message);
+  }
 }
 
 function passkeyRow(pk: PasskeyInfo): HTMLElement {
@@ -296,8 +351,9 @@ function passkeyRow(pk: PasskeyInfo): HTMLElement {
     {
       type: "button",
       className: "sec-pk-name sec-pk-rename",
+      [FOCUS_KEY]: `pk-rename-${pk.id}`,
       "aria-label": `Rename passkey ${pk.name || "Passkey"}`,
-      onclick: () => renamePasskey(pk, nameEl),
+      onclick: () => renamePasskey(pk),
     },
     pk.name || "Passkey",
   );
@@ -307,6 +363,7 @@ function passkeyRow(pk: PasskeyInfo): HTMLElement {
     {
       type: "button",
       className: "close-btn ghost",
+      [FOCUS_KEY]: `pk-delete-${pk.id}`,
       "aria-label": "Delete passkey",
       onclick: busyClick(async () => {
         if (
@@ -340,7 +397,7 @@ function passkeyRow(pk: PasskeyInfo): HTMLElement {
   );
 }
 
-async function renamePasskey(pk: PasskeyInfo, nameEl: HTMLElement): Promise<void> {
+async function renamePasskey(pk: PasskeyInfo): Promise<void> {
   const newName = await promptTrimmed("Rename passkey:", {
     initialValue: pk.name,
     maxLength: 64,
@@ -350,77 +407,9 @@ async function renamePasskey(pk: PasskeyInfo, nameEl: HTMLElement): Promise<void
   }
   const ok = await renamePasskeyRequest(pk.id, { name: newName });
   if (ok) {
-    nameEl.textContent = newName;
-    pk.name = newName;
+    await renderSections(secDlgBody());
   } else {
     notify.error("Failed to rename passkey");
-  }
-}
-
-async function registerPasskey(password: string): Promise<void> {
-  try {
-    const begin = await webauthnRegisterBegin({ password });
-    if (!begin?.publicKey) {
-      notify.error("Failed to start passkey registration");
-      return;
-    }
-
-    const sessionToken = begin.session_token;
-    // The wire envelope nests the options under a second publicKey key
-    // (go-webauthn's CredentialCreation shape).
-    const publicKey = creationOptionsFromJSON(begin.publicKey.publicKey);
-
-    const credential = await navigator.credentials.create({ publicKey });
-    if (!credential) {
-      notify.error("Passkey creation cancelled");
-      return;
-    }
-
-    const attestation = credential as PublicKeyCredential;
-    const response = attestation.response as AuthenticatorAttestationResponse;
-
-    // Check credProps extension: warn if the credential is not discoverable.
-    const extensions = attestation.getClientExtensionResults() as { credProps?: { rk?: boolean } };
-    if (extensions.credProps?.rk === false) {
-      notify.error(
-        "Your authenticator created a non-discoverable credential. Passwordless login may not work with this passkey.",
-      );
-    }
-
-    // Custom header required (X-WebAuthn-Session); can't go through the
-    // generated client (its transport carries no per-call headers), so this
-    // stays a documented raw-fetch flow sourcing only the path constant.
-    const finishRes = await fetch(PATH_WEBAUTHN_REGISTER_FINISH, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-WebAuthn-Session": sessionToken,
-      },
-      body: JSON.stringify({
-        id: attestation.id,
-        rawId: bufferToBase64url(attestation.rawId),
-        type: attestation.type,
-        response: {
-          attestationObject: bufferToBase64url(response.attestationObject),
-          clientDataJSON: bufferToBase64url(response.clientDataJSON),
-        },
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (finishRes.ok) {
-      notify.success("Passkey registered");
-      void sendWebAuthnSignals();
-      await renderSections(secDlgBody());
-    } else {
-      const data = (await finishRes.json().catch(() => ({}))) as { error?: string };
-      notify.error(data.error ?? "Failed to register passkey");
-    }
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === "AbortError") {
-      return;
-    }
-    notify.error("Passkey registration failed");
   }
 }
 
@@ -430,16 +419,16 @@ function buildAPIKeysSection(apikeys: APIKeyInfo[] | null): HTMLElement {
   const sec = el("div", { className: "sec-section" });
   sec.appendChild(el("h3", null, "API Keys"));
 
-  const keys = apikeys ?? [];
-
-  const list = el("div", { className: "sec-list" });
-  reconcile(list, keys, {
-    key: (k) => String(k.id),
-    mount: (k) => apiKeyRow(k),
-  });
-  if (keys.length === 0) {
+  if (apikeys === null) {
+    sec.appendChild(errDiv("Could not load API keys."));
+  } else if (apikeys.length === 0) {
     sec.appendChild(el("p", { className: "muted" }, "No API keys."));
   } else {
+    const list = el("div", { className: "sec-list" });
+    reconcile(list, apikeys, {
+      key: (k) => String(k.id),
+      mount: (k) => apiKeyRow(k),
+    });
     sec.appendChild(list);
   }
 
@@ -447,6 +436,7 @@ function buildAPIKeysSection(apikeys: APIKeyInfo[] | null): HTMLElement {
     "button",
     {
       type: "button",
+      [FOCUS_KEY]: "apikey-generate",
       onclick: busyClick(async () => {
         const label = await promptTrimmed("Label for the new API key:", {
           maxLength: 64,
@@ -478,6 +468,7 @@ function apiKeyRow(key: APIKeyInfo): HTMLElement {
     {
       type: "button",
       className: "close-btn ghost",
+      [FOCUS_KEY]: `apikey-revoke-${key.id}`,
       "aria-label": "Revoke API key",
       onclick: busyClick(async () => {
         if (
@@ -576,24 +567,30 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
 
 // --- Single Sign-On (OIDC) ---
 
-/** Probe whether an OIDC provider is configured (mirrors the login page). */
-async function detectOIDC(): Promise<boolean> {
+type OIDCProbe = "available" | "absent" | "failed";
+
+/** Probe whether an OIDC provider is configured (mirrors the login page). A
+ *  probe that could not be answered reports `failed`, never `absent`. */
+async function detectOIDC(): Promise<OIDCProbe> {
   try {
     const res = await fetch(PATH_OIDC_REDIRECT, {
       method: "HEAD",
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
-    return res.status === 200 || res.type === "opaqueredirect" || res.status === 302;
+    return res.status === 200 || res.type === "opaqueredirect" || res.status === 302
+      ? "available"
+      : "absent";
   } catch {
-    return false;
+    return "failed";
   }
 }
 
-/** Build the SSO section. Returns null when OIDC is neither linked nor available. */
-function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElement | null {
-  const linked = me?.oidc_linked ?? false;
-  if (!linked && !available) {
+/** Build the SSO section. Returns null only when the probe answered that no
+ *  provider is configured and the account is not linked to one. */
+function buildOIDCSection(user: MeResponse, probe: OIDCProbe): HTMLElement | null {
+  const linked = user.oidc_linked;
+  if (!linked && probe === "absent") {
     return null;
   }
 
@@ -612,12 +609,19 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
     ),
   );
 
+  // A linked account renders from `oidc_linked` and disconnects without the
+  // probe, so only an unlinked one is left with an unanswered question.
+  if (!linked && probe === "failed") {
+    sec.appendChild(errDiv("Could not check single sign-on availability."));
+  }
+
   if (linked) {
     const unlinkBtn = el(
       "button",
       {
         type: "button",
         className: "ghost",
+        [FOCUS_KEY]: "oidc-disconnect",
         onclick: busyClick(async () => {
           if (
             !(await confirm(
@@ -640,11 +644,12 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
       "Disconnect",
     );
     sec.appendChild(el("div", { className: "sec-actions" }, unlinkBtn));
-  } else if (me?.can_link_oidc) {
+  } else if (user.can_link_oidc) {
     const connectBtn = el(
       "button",
       {
         type: "button",
+        [FOCUS_KEY]: "oidc-connect",
         onclick: () => {
           window.location.href = PATH_OIDC_REDIRECT;
         },

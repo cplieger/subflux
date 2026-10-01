@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	"github.com/cplieger/auth/v5/ratelimit"
+	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/auth/v6/ratelimit"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -120,10 +120,22 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/auth/setup ---
 
-// HandleSetupStatus handles GET /api/auth/setup — returns whether initial setup is required.
+// HandleSetupStatus handles GET /api/auth/setup — returns whether initial setup
+// is required, and whether a passkey login could succeed here.
 func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	dbCtx, dbCancel := dbCtx(r.Context())
 	count, err := h.Store.UserCount(dbCtx)
+	var passkeyLogin bool
+	if rp := h.relyingParty(); rp != nil {
+		usable, pkErr := h.Store.AnyPasskeyForDiscoverableLogin(dbCtx, rp.ID())
+		if pkErr != nil {
+			// Advisory: an offered button whose Begin answers with a real
+			// message beats a login page that renders no form at all.
+			slog.Error("setup: passkey login probe", "error", pkErr)
+			usable = true
+		}
+		passkeyLogin = usable
+	}
 	dbCancel()
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
@@ -132,8 +144,9 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpapi.WriteJSON(w, subflux.SetupStatus{
-		SetupRequired: count == 0,
-		ConfigValid:   h.Configured(),
+		SetupRequired:         count == 0,
+		ConfigValid:           h.Configured(),
+		PasskeyLoginAvailable: passkeyLogin,
 	})
 }
 

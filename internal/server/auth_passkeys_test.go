@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -8,9 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/webhttp/v3"
 )
 
 // liveCeremony returns a real in-flight WebAuthn ceremony. Only the library can
@@ -21,12 +24,15 @@ func liveCeremony(t *testing.T) authwebauthn.Ceremony {
 	rp, err := authwebauthn.New(authwebauthn.RPConfig{
 		ID:          "example.com",
 		DisplayName: "Test RP",
-		Origins:     []string{"https://example.com"},
 	})
 	if err != nil {
 		t.Fatalf("webauthn.New: %v", err)
 	}
-	_, ceremony, err := authwebauthn.BeginLogin(rp)
+	origin, err := authwebauthn.ParseOrigin("https://example.com")
+	if err != nil {
+		t.Fatalf("ParseOrigin: %v", err)
+	}
+	_, ceremony, err := authwebauthn.BeginLogin(rp, origin)
 	if err != nil {
 		t.Fatalf("BeginLogin: %v", err)
 	}
@@ -387,5 +393,91 @@ func TestConsumeWebAuthnSession_missing(t *testing.T) {
 	cs := authhandlers.NewCeremonyStore()
 	if _, found := cs.ConsumeWebAuthnSession("nonexistent-token"); found {
 		t.Error("ConsumeWebAuthnSession(unknown token) found = true, want false")
+	}
+}
+
+func loginBegin(t *testing.T, s *Server, origin string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequestWithContext(webhttp.WithRequestID(t.Context(), "req-42"),
+		http.MethodPost, "/api/auth/webauthn/login/begin", http.NoBody)
+	if origin != "" {
+		req.Header.Set("Origin", origin)
+	}
+	rec := httptest.NewRecorder()
+	s.authH.HandleWebAuthnLoginBegin(rec, req)
+	return rec
+}
+
+func TestWebAuthnLoginBegin_originDecidesBeforeAnyChallenge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		origin   string
+		wantCode int
+		wantErr  string
+	}{
+		{name: "covered_subdomain_proceeds", origin: "https://subflux.example.com", wantCode: http.StatusOK},
+		{
+			name: "localhost_is_refused_as_not_covered", origin: "http://localhost:8374", wantCode: http.StatusBadRequest,
+			wantErr: `this page's origin "http://localhost:8374" is not covered by the configured relying-party ID "example.com"; set auth.webauthn_rp_id to "localhost" under Settings → Authentication`,
+		},
+		{
+			name: "dot_guard", origin: "https://evilexample.com", wantCode: http.StatusBadRequest,
+			wantErr: `this page's origin "https://evilexample.com" is not covered by the configured relying-party ID "example.com"; set auth.webauthn_rp_id to "evilexample.com" under Settings → Authentication`,
+		},
+		{
+			name: "no_origin_header", origin: "", wantCode: http.StatusBadRequest,
+			wantErr: "this request carries no Origin header, so no passkey ceremony can be bound to it",
+		},
+		{
+			name: "trailing_dot_names_the_dotless_host", origin: "https://subflux.example.com.", wantCode: http.StatusBadRequest,
+			wantErr: `this page's address ends in a dot; reach subflux at "https://subflux.example.com"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, _ := testAuthServer(t)
+			rp := testRelyingParty(t)
+			s.authH.WebAuthnResolver = func() *authwebauthn.RelyingParty { return rp }
+
+			rec := loginBegin(t, s, tt.origin)
+			if rec.Code != tt.wantCode {
+				t.Fatalf("login begin from %q status = %d, want %d; body %s", tt.origin, rec.Code, tt.wantCode, rec.Body.String())
+			}
+			if tt.wantCode == http.StatusOK {
+				return
+			}
+			var resp map[string]string
+			decodeJSON(t, rec, &resp)
+			if resp["code"] != "webauthn_unsupported_origin" {
+				t.Errorf("code = %q, want webauthn_unsupported_origin", resp["code"])
+			}
+			if resp["error"] != tt.wantErr {
+				t.Errorf("error = %q, want %q", resp["error"], tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRequireWebAuthn_unconfiguredEnvelopeCarriesTheRequestIDAndLogs(t *testing.T) {
+	logs := capture.Default(t)
+	s, _ := testAuthServer(t)
+
+	rec := loginBegin(t, s, "https://subflux.example.com")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("login begin with no relying party status = %d, want 400; body %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]string
+	decodeJSON(t, rec, &resp)
+	if resp["code"] != "webauthn_unconfigured" {
+		t.Errorf("code = %q, want webauthn_unconfigured", resp["code"])
+	}
+	if resp["request_id"] != "req-42" {
+		t.Errorf("request_id = %q, want %q: the envelope dropped the correlation id", resp["request_id"], "req-42")
+	}
+	if logs.CountLevel(slog.LevelWarn, "webauthn: ceremony requested but no relying party is configured") != 1 {
+		t.Errorf("Warn records = %d, want 1; messages: %q",
+			logs.CountLevel(slog.LevelWarn, "webauthn: ceremony requested but no relying party is configured"), logs.Messages())
 	}
 }

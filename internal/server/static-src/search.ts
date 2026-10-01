@@ -16,6 +16,7 @@ import { observeActivities } from "./status.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS } from "./constants.js";
 import { buildPath, mediaParent, parseRoute } from "./route-path.js";
+import type { Route } from "./route-path.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
 
 const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
@@ -149,7 +150,7 @@ function resetDownloadButton(activityId: string): void {
   delete btn.dataset["activityId"];
   btn.disabled = false;
   patch(btn, icon("download"));
-  btn.setAttribute("data-tip", "Server restarted \u2014 outcome unknown, retry");
+  btn.setAttribute("data-tip", "Server restarted. Outcome unknown, retry");
 }
 
 function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
@@ -197,6 +198,19 @@ const searchDlg: HTMLDialogElement = dialog("searchResultPopup");
 // (vs. direct URL navigation where none was pushed).
 let searchPushedHistory = false;
 
+/** The search route a media row addresses, or null when the row carries no id:
+ *  the route space holds no search path without one, so there is nothing to
+ *  push and the popup opens on whatever URL the reader is already on. */
+function searchRouteFor(mediaType: MediaType, media: CoverageMedia, lang: string): Route | null {
+  const id = mediaType === "episode" ? media.tvdb_id : media.tmdb_id;
+  if (id === undefined) {
+    return null;
+  }
+  return mediaType === "episode"
+    ? { kind: "series-search", id, lang }
+    : { kind: "movie-search", id, lang };
+}
+
 export function openSearchPopup(
   mediaType: MediaType,
   media: CoverageMedia,
@@ -208,14 +222,14 @@ export function openSearchPopup(
   const langs: string[] = cfg?.languages ?? ["en"];
   const defaultLang: string = lang ?? langs[0] ?? "en";
 
-  const idPart: string =
-    mediaType === "episode" ? `/series/${media.tvdb_id ?? ""}` : `/movie/${media.tmdb_id ?? ""}`;
-  const searchPath = `${idPart}/search/${defaultLang}`;
-  if (location.pathname !== searchPath) {
-    history.pushState(null, "", searchPath);
-    searchPushedHistory = true;
-  } else {
-    searchPushedHistory = false;
+  const route = searchRouteFor(mediaType, media, defaultLang);
+  searchPushedHistory = false;
+  if (route !== null) {
+    const searchPath = buildPath(route);
+    if (location.pathname !== searchPath) {
+      history.pushState(null, "", searchPath);
+      searchPushedHistory = true;
+    }
   }
 
   let title: string = media.title;
@@ -233,7 +247,10 @@ export function openSearchPopup(
   }
   langSel.value = defaultLang;
   langSel.addEventListener("change", () => {
-    history.replaceState(null, "", `${idPart}/search/${langSel.value}`);
+    const picked = searchRouteFor(mediaType, media, langSel.value);
+    if (picked !== null) {
+      history.replaceState(null, "", buildPath(picked));
+    }
     void runPopupSearch(mediaType, media, season, episode, langSel.value);
   });
 
@@ -263,7 +280,10 @@ export function openSearchPopup(
     className: "dlg-body",
   });
 
-  patch(searchDlg, header, resultsDiv);
+  // The installed tree must BE the tree the header's handlers closed over:
+  // `patch` reuses the children already in the document and discards these, so
+  // the live <select> would keep the first open's `change` listener forever.
+  searchDlg.replaceChildren(header, resultsDiv);
   if (searchDlg.open) {
     searchDlg.close();
   }
@@ -277,9 +297,9 @@ export function openSearchPopup(
 
 export function closeSearchPopup(): void {
   closeDialog(searchDlg);
-  // The pop is owed by the PUSH, not by the parse: openSearchPopup pushes
-  // `/series//search/en` for a media row carrying no id, which the route space
-  // cannot hold, so a parse-first order would leave that entry on the stack.
+  // The pop is owed by the PUSH, not by the parse: a pushed open and a direct
+  // navigation present the same URL, so reading the location first would rewrite
+  // the pushed entry instead of popping it and leave it on the stack.
   if (searchPushedHistory) {
     searchPushedHistory = false;
     history.back();
@@ -512,6 +532,9 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
   }
 
   (btn as HTMLButtonElement).disabled = true;
+  // The status names the last OUTCOME, and the retry this re-arms has none yet:
+  // left behind, it paints the running download red.
+  delete btn.dataset["status"];
   patch(btn, icon("hourglass"));
 
   const o = await downloadAction.dispatch({

@@ -131,6 +131,22 @@ allowed_hosts:
 
 This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebinding attack makes a malicious page's hostname resolve to subflux's address, so the browser's same-origin request carries the attacker's name in both `Origin` and `Host`; they agree, so the CSRF check admits it. Only an exact-match `Host` check breaks that chain. Requests from localhost (the container healthcheck) always pass regardless of the list. Leave `allowed_hosts` empty (the default) to accept any `Host`, matching prior behavior.
 
+### Passkeys and domain scope
+
+A passkey is scoped to a registrable domain, not to a host and not to a path. subflux derives that domain from the address you first save your settings from, so `subflux.example.com` yields `example.com`, and the browser then offers the credential on every host under `example.com`. A password manager cannot narrow that: the scope is a property of the credential itself. If other applications share the domain, know that before enabling passkeys.
+
+A subpath deployment (`example.com/subflux`) gets domain-wide scope for the same reason: a relying-party ID has no path component, so there is no way to scope a passkey to a path.
+
+An IP-address deployment can never use passkeys. An IP literal is not a legal relying-party ID, so subflux does not derive one and the passkey controls stay disabled with the reason shown. The same holds for a single-label hostname (`nas`) and for a host that is itself a public suffix (`duckdns.org`); a host under one (`mybox.duckdns.org`) works, scoped to exactly that host.
+
+TLS is a hard prerequisite, with one exception: `localhost` over plain HTTP, which the WebAuthn specification treats as a trustworthy origin.
+
+`auth.webauthn_rp_id` holds the domain, and normally you never set it. subflux fills it in on the first settings save, derived from the address you saved from, and shows it under Settings → Authentication, where you can narrow it to a single host if you prefer. Changing it after passkeys exist strands them, and the settings dialog asks before it lets you. Clearing the field neither turns passkeys off nor loses the value: a save that carries no value keeps the one already stored, and the dialog asks nothing about it.
+
+One save is refused: a change to the field when the address you are saving from is not covered by the new value, because a passkey could never be tested from where you sit. Save the change from a browser at a host inside the domain you want. A save that leaves the value alone is never refused, whatever address you are on.
+
+The sign-in page shows its passkey button only when this server can complete a passkey login: a relying-party ID is configured and at least one stored passkey can answer one. On a new install, or after changing the relying-party ID, sign in with your password and add a passkey from the Security dialog; the button comes back with it.
+
 ## Alerting
 
 subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate the

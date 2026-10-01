@@ -38,6 +38,16 @@ export const EMBEDDED_PROVIDER = "embedded" as const;
 // which must serve login.html here for either auth state.
 export const SETUP_PATH = "/setup";
 
+// The id of each surface's red top banner, which is where a failed credential
+// check reports. Both are declared in their page's HTML and shown through
+// dom-core's showError/hideError.
+//
+// CONFIG_BANNER_ID names a slot config.ts renders hidden at the top of the
+// settings form; WIZARD_BANNER_ID is the wizard's existing .auth-error slot,
+// which wizard.ts also addresses by literal for its own validation messages.
+export const CONFIG_BANNER_ID = "cfgBanner";
+export const WIZARD_BANNER_ID = "wizardError";
+
 // Subtitle variant options — single source of truth for config, wizard, and badge logic.
 export const SUBTITLE_VARIANTS = [
   { value: DEFAULT_VARIANT, label: "standard" },

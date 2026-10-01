@@ -19,7 +19,9 @@ const wire = vi.hoisted(() => ({
   configSchema: vi.fn(),
   configStructured: vi.fn(),
   validateConfigPath: vi.fn(),
-  webauthnRegisterBegin: vi.fn(),
+  webauthnRegisterBeginRaw: vi.fn(),
+  webauthnLoginBeginRaw: vi.fn(),
+  webauthnAvailabilityRaw: vi.fn(),
   webauthnSignalData: vi.fn(),
 }));
 
@@ -27,13 +29,16 @@ vi.mock("./wire/client.gen.js", () => ({
   configSchema: wire.configSchema,
   configStructured: wire.configStructured,
   validateConfigPath: wire.validateConfigPath,
-  webauthnRegisterBegin: wire.webauthnRegisterBegin,
+  webauthnRegisterBeginRaw: wire.webauthnRegisterBeginRaw,
+  webauthnLoginBeginRaw: wire.webauthnLoginBeginRaw,
+  webauthnAvailabilityRaw: wire.webauthnAvailabilityRaw,
   webauthnSignalData: wire.webauthnSignalData,
   // Reached only by a section's Test-connection button, which these
   // tests do not click; shaped like a real answer so a future one can.
   testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
   PATH_SAVE_CONFIG_STRUCTURED: "/api/config/structured",
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
 }));
 
 // Plain-function factory (immune to mockReset). wizard.ts is imported ONCE

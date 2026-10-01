@@ -31,6 +31,15 @@ func ClearCaches(providers []Provider) {
 	}
 }
 
+// CredentialChecker is implemented by a provider whose settings carry
+// credentials it can validate without performing a search.
+//
+// A rejected credential is *subflux.AuthError; every other failure means the
+// check did not complete, and the operator's remedy differs between the two.
+type CredentialChecker interface {
+	CheckCredentials(ctx context.Context) error
+}
+
 // ShowSubtitleCounter is the optional show-level count a provider may support:
 // how many subtitles exist for a show+language without naming an episode. ONE
 // method, and it is declared here rather than beside Provider because it is not

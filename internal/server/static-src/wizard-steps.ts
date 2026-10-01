@@ -5,8 +5,9 @@
 
 import { validateConfigPath } from "./wire/client.gen.js";
 import { $ } from "./dom-core.js";
-import { el, withHelp } from "./dom.js";
-import { connTestControl } from "./conn-test.js";
+import { el, withHelp, icon } from "./dom.js";
+import { mountConnTest } from "./conn-test.js";
+import { WIZARD_BANNER_ID } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import { schemaByKey, secretSaved, wizardValues, mediaRoots } from "./wizard-store.js";
@@ -15,7 +16,7 @@ import type { WizardStep } from "./wizard-state.js";
 
 /** SECRET_SAVED_PLACEHOLDER marks a secret the config file already holds:
  *  leaving the field blank keeps the stored value (server-side merge). */
-export const SECRET_SAVED_PLACEHOLDER = "\u2022\u2022\u2022\u2022 saved \u2014 leave blank to keep";
+export const SECRET_SAVED_PLACEHOLDER = "\u2022\u2022\u2022\u2022 saved, leave blank to keep";
 
 // --- Step 1: Sonarr + Radarr ---
 
@@ -92,14 +93,19 @@ function renderArrGroup(
       ),
     );
   }
-  // The test is OPTIONAL: Next validates presence only and does not wait on the
+  // The check is OPTIONAL: Next validates presence only and does not wait on the
   // network, so an operator who knows the values are right walks straight
   // through. It exists because the alternative to using it is discovering a bad
-  // URL at the Finish save, six steps later.
+  // URL at the Finish save, six steps later. A failure reports in the wizard's
+  // own error banner, the way every other wizard failure does.
   if (section.conn_test) {
-    const find = (fieldKey: string): HTMLInputElement | null =>
-      group.querySelector<HTMLInputElement>(`#${CSS.escape("wiz-" + key + "-" + fieldKey)}`);
-    group.appendChild(connTestControl(key, { url: find("url"), apiKey: find("api_key") }));
+    const inputs: Record<string, HTMLInputElement | null> = {};
+    for (const field of section.fields ?? []) {
+      inputs[field.key] = group.querySelector<HTMLInputElement>(
+        `#${CSS.escape("wiz-" + key + "-" + field.key)}`,
+      );
+    }
+    mountConnTest(header, key, { inputs, bannerId: WIZARD_BANNER_ID });
   }
   container.appendChild(group);
 }
@@ -148,7 +154,7 @@ export function buildMediaRootsStep(): WizardStep {
           "button",
           {
             type: "button",
-            className: "wiz-lang-add",
+            className: "wiz-row-add",
             onclick: () => {
               collectMediaRoots();
               mediaRoots.push("");
@@ -202,7 +208,7 @@ export function buildMediaRootsStep(): WizardStep {
 function renderMediaRoots(container: HTMLElement): void {
   container.replaceChildren();
   for (let i = 0; i < mediaRoots.length; i++) {
-    const row = el("div", { className: "wiz-lang-row" });
+    const row = el("div", { className: "wiz-row" });
     row.appendChild(
       el("input", {
         type: "text",
@@ -223,14 +229,15 @@ function renderMediaRoots(container: HTMLElement): void {
         "button",
         {
           type: "button",
-          className: "wiz-lang-remove",
+          className: "wiz-row-remove",
+          "aria-label": "Remove media root",
           onclick: () => {
             collectMediaRoots();
             mediaRoots.splice(idx, 1);
             renderMediaRoots(container);
           },
         },
-        "\u00d7",
+        icon("close"),
       );
       row.appendChild(rm);
     }

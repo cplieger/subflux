@@ -10,14 +10,7 @@
 // builders.
 
 import { patch } from "@cplieger/reactive";
-import {
-  configSchema,
-  configStructured,
-  webauthnRegisterBegin,
-  webauthnSignalData,
-  PATH_SAVE_CONFIG_STRUCTURED,
-  PATH_WEBAUTHN_REGISTER_FINISH,
-} from "./wire/client.gen.js";
+import { configSchema, configStructured, PATH_SAVE_CONFIG_STRUCTURED } from "./wire/client.gen.js";
 import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { $, showPage, showError, hideError } from "./dom-core.js";
 import { el } from "./dom.js";
@@ -46,7 +39,13 @@ import {
   setBoot,
   setSchema,
 } from "./wizard-store.js";
-import { bufferToBase64url, creationOptionsFromJSON } from "./webauthn-utils.js";
+import {
+  probeAvailability,
+  registerPasskey,
+  unavailable,
+  unavailableSentence,
+} from "./webauthn-ceremony.js";
+import { navigateToApp } from "./nav-app.js";
 import { buildProvidersStep } from "./wizard-providers.js";
 import { buildLanguagesStep } from "./wizard-languages.js";
 import {
@@ -91,7 +90,8 @@ let setupPassword = "";
  *  now, and a missed binding is cross-test pollution rather than a compile
  *  error. `navWired` left true makes `wireWizardNav()` no-op on a freshly
  *  mounted page. `stepFadeTimer` left running renders a pending step into the
- *  next test's page. */
+ *  next test's page. `terminalMode` left true makes every later
+ *  `updateWizardNav()` a no-op, so the next test's nav never appears. */
 export function _resetForTest(): void {
   abortValidation(); // aborts and nulls validationAbort
   clearTimeout(stepFadeTimer ?? undefined);
@@ -104,6 +104,7 @@ export function _resetForTest(): void {
   touched = new Set();
   setupPassword = "";
   navWired = false;
+  terminalMode = false;
 }
 
 const DRAFT_KEY = "subflux-setup-draft";
@@ -219,16 +220,11 @@ export async function startConfigWizard(entry: WizardEntry): Promise<void> {
 
 /** Renders the retryable init-failure state: the wizard page with no
  *  step content, navigation, or Finish, plus a Retry button. No draft is
- *  read or written — nothing may overlay a boot that never happened. */
+ *  read or written — nothing may overlay a boot that never happened.
+ *  Retry re-runs the boot, so this is not the flow's terminal state. */
 function renderWizardInitError(entry: WizardEntry): void {
   showPage("configWizardPage");
-  for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
-    const b = $(id);
-    if (b) {
-      b.hidden = true;
-    }
-  }
-  $("wizardProgress")?.replaceChildren();
+  hideWizardChrome();
   showError("wizardError", "Loading the current configuration failed. Nothing has been changed.");
   const container = $("wizardSection");
   if (!container) {
@@ -332,6 +328,9 @@ function renderWizardProgress(): void {
 }
 
 function updateWizardNav(): void {
+  if (terminalMode) {
+    return;
+  }
   const isFirst = wizardIndex === 0;
   const isLast = wizardIndex === activeSteps.length - 1;
   const back = $("wizardBack");
@@ -349,6 +348,25 @@ function updateWizardNav(): void {
   }
 }
 
+/** Clears the nav chrome so a takeover screen owns #wizardSection alone. */
+function hideWizardChrome(): void {
+  for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
+    const b = $(id);
+    if (b) {
+      b.hidden = true;
+    }
+  }
+  $("wizardProgress")?.replaceChildren();
+}
+
+/** Enters the flow's terminal state: the step index still points at the step
+ *  the takeover screen replaced, so updateWizardNav must stop deriving nav
+ *  state from it rather than the chrome being re-hidden after each caller. */
+function enterTerminalMode(): void {
+  terminalMode = true;
+  hideWizardChrome();
+}
+
 /** Records a real step visit/edit for the draft overlay and the save-time
  *  section overlay (the review screen is never "touched"). */
 function markTouched(step: WizardStep): void {
@@ -357,12 +375,13 @@ function markTouched(step: WizardStep): void {
   }
 }
 
-// All three are module-scope state: keep them listed in `_resetForTest` above.
+// All four are module-scope state: keep them listed in `_resetForTest` above.
 let navWired = false;
 let validationAbort: AbortController | null = null;
 // Held so a second advance cancels the first, and so `_resetForTest` can
 // cancel one that would otherwise fire into a torn-down page.
 let stepFadeTimer: ReturnType<typeof setTimeout> | null = null;
+let terminalMode = false;
 
 function abortValidation(): void {
   if (validationAbort) {
@@ -585,55 +604,34 @@ const saveWizardConfigAction = apiAction<Sections>({
 
 // --- Passkey offer (after activation; skip carries the reason) ---
 
-/** The flow's single navigation (the wizard lives on login.html). */
-function navigateToApp(): void {
-  window.location.href = "/";
-}
-
 async function showPasskeyOffer(): Promise<void> {
   const container = $("wizardSection");
   if (!container) {
     navigateToApp();
     return;
   }
-  // The offer replaces the wizard chrome: no back/next/finish, no dots.
-  for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
-    const b = $(id);
-    if (b) {
-      b.hidden = true;
-    }
-  }
-  $("wizardProgress")?.replaceChildren();
+  enterTerminalMode();
   hideError("wizardError");
 
   container.replaceChildren();
   container.appendChild(el("h3", { className: "wizard-section-title" }, "Add a passkey?"));
 
-  // Availability probe: signal-data 400s while WebAuthn is unconfigured.
-  const signal = await webauthnSignalData();
-  // Runtime feature detection; Boolean() widens away the always-defined DOM typing.
-  const browserSupport = Boolean(window.PublicKeyCredential);
-
-  const continueBtn = el(
-    "button",
-    { type: "button", id: "wizardOfferContinue", onclick: navigateToApp },
-    "Continue to Subflux",
-  );
-
-  if (!signal || !browserSupport || !setupPassword) {
-    let reason: string;
-    if (!signal) {
-      reason =
-        "Passkeys are unavailable: no WebAuthn Relying Party ID is configured. " +
-        "You can set one later under Settings \u2192 Authentication, then add a passkey from the Security dialog.";
-    } else if (!browserSupport) {
-      reason = "This browser does not support passkeys. You can add one later from another device.";
-    } else {
-      reason =
-        "Passkey enrollment needs your password to confirm. You can add one any time from the Security dialog.";
-    }
-    container.appendChild(el("p", { className: "wiz-offer-reason" }, reason));
-    container.appendChild(el("div", { className: "wiz-offer-actions" }, continueBtn));
+  // Fails CLOSED on every unavailable reason, probe_failed included. The
+  // password check comes first so no request is spent when the offer would
+  // decline anyway.
+  const availability =
+    setupPassword === "" ? unavailable("no_password") : await probeAvailability();
+  if (!availability.available) {
+    container.appendChild(
+      el("p", { className: "wiz-offer-reason" }, unavailableSentence(availability)),
+    );
+    container.appendChild(
+      el(
+        "div",
+        { className: "wiz-offer-actions" },
+        el("button", { type: "button", onclick: navigateToApp }, "Finish"),
+      ),
+    );
     return;
   }
 
@@ -676,50 +674,27 @@ async function showPasskeyOffer(): Promise<void> {
 /** Runs the full registration ceremony with the remembered password.
  *  A failure leaves the offer on screen with the error inline. */
 async function registerOfferPasskey(): Promise<boolean> {
-  try {
-    const begin = await webauthnRegisterBegin({ password: setupPassword });
-    if (!begin?.publicKey) {
-      showError("wizardError", "Failed to start passkey registration.");
+  const outcome = await registerPasskey(setupPassword);
+  switch (outcome.kind) {
+    case "registered":
+      return true;
+    case "cancelled":
       return false;
-    }
-    const publicKey = creationOptionsFromJSON(begin.publicKey.publicKey);
-    const credential = await navigator.credentials.create({ publicKey });
-    if (!credential) {
-      showError("wizardError", "Passkey creation was cancelled.");
+    case "duplicate":
+      showError(
+        "wizardError",
+        "This device already has a passkey for subflux. Use the one you have, or add a passkey from another device.",
+      );
       return false;
-    }
-    const attestation = credential as PublicKeyCredential;
-    const response = attestation.response as AuthenticatorAttestationResponse;
-    // Custom header required (X-WebAuthn-Session): a documented raw-fetch
-    // flow sourcing only the path constant (same as the Security dialog).
-    const finishRes = await fetch(PATH_WEBAUTHN_REGISTER_FINISH, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-WebAuthn-Session": begin.session_token,
-      },
-      body: JSON.stringify({
-        id: attestation.id,
-        rawId: bufferToBase64url(attestation.rawId),
-        type: attestation.type,
-        response: {
-          attestationObject: bufferToBase64url(response.attestationObject),
-          clientDataJSON: bufferToBase64url(response.clientDataJSON),
-        },
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!finishRes.ok) {
-      const data = (await finishRes.json().catch(() => ({}))) as { error?: string };
-      showError("wizardError", data.error ?? "Failed to register the passkey.");
+    case "timeout":
+      showError(
+        "wizardError",
+        "Passkey registration timed out. It may have completed \u2014 reload and check your passkey list before trying again.",
+      );
       return false;
-    }
-    return true;
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === "AbortError") {
+    case "not-discoverable":
+    case "failed":
+      showError("wizardError", outcome.message);
       return false;
-    }
-    showError("wizardError", "Passkey registration failed.");
-    return false;
   }
 }

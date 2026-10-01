@@ -45,7 +45,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -121,7 +121,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Credential-establishing flows. Every endpoint here either creates
 	// a session (login, setup, OIDC callback, WebAuthn login finish) or
 	// prepares one (OIDC redirect, WebAuthn login begin). The client is
-	// by definition unauthenticated when calling these.
+	// by definition unauthenticated when calling these. The availability
+	// probe establishes nothing: it is the pre-session read the login page
+	// needs to decide what to offer.
 	public.Add("GET /api/auth/setup", s.authH.HandleSetupStatus)
 	public.Add("POST /api/auth/setup", s.authH.HandleSetupCreate)
 	public.Add("POST /api/auth/login", s.authH.HandleLogin)
@@ -131,6 +133,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	public.Add("POST /api/auth/oidc/link", s.authH.HandleOIDCLink)
 	public.Add("POST /api/auth/webauthn/login/begin", s.authH.HandleWebAuthnLoginBegin)
 	public.Add("POST /api/auth/webauthn/login/finish", s.authH.HandleWebAuthnLoginFinish)
+	public.Add("GET /api/auth/webauthn/availability", s.authH.HandleWebAuthnAvailability)
 
 	// --- user: requires a session or valid API key ---
 

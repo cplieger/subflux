@@ -1,7 +1,7 @@
 // wizard-languages.ts — Extracted wizard languages step.
 
 import { $ } from "./dom-core.js";
-import { el, withHelp } from "./dom.js";
+import { el, withHelp, icon } from "./dom.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import type { WizardStep } from "./wizard-state.js";
 import { langRules, langDefault } from "./wizard-store.js";
@@ -32,7 +32,7 @@ export function buildLanguagesStep(): WizardStep {
           "button",
           {
             type: "button",
-            className: "wiz-lang-add",
+            className: "wiz-row-add",
             onclick: () => {
               collectLangDefaults();
               langDefault.push({ code: "", variant: DEFAULT_VARIANT });
@@ -65,7 +65,7 @@ export function buildLanguagesStep(): WizardStep {
           "button",
           {
             type: "button",
-            className: "wiz-lang-add",
+            className: "wiz-row-add",
             onclick: () => {
               collectLangRules();
               langRules.push({ audio: "", code: "", variant: DEFAULT_VARIANT });
@@ -102,7 +102,7 @@ function renderLangDefaults(container: HTMLElement): void {
     if (!entry) {
       continue;
     }
-    const row = el("div", { className: "wiz-lang-row" });
+    const row = el("div", { className: "wiz-row" });
     row.appendChild(langSelect("wiz-lang-def-code-" + String(i), entry.code, "Subtitle language"));
     row.appendChild(variantSelect("wiz-lang-def-variant-" + String(i), entry.variant));
     if (langDefault.length > 1) {
@@ -112,14 +112,15 @@ function renderLangDefaults(container: HTMLElement): void {
           "button",
           {
             type: "button",
-            className: "wiz-lang-remove",
+            className: "wiz-row-remove",
+            "aria-label": "Remove default",
             onclick: () => {
               collectLangDefaults();
               langDefault.splice(idx, 1);
               renderLangDefaults(container);
             },
           },
-          "\u00d7",
+          icon("close"),
         ),
       );
     }
@@ -134,7 +135,7 @@ function renderLangRules(container: HTMLElement): void {
     if (!entry) {
       continue;
     }
-    const row = el("div", { className: "wiz-lang-row" });
+    const row = el("div", { className: "wiz-row" });
     row.appendChild(langSelect("wiz-lang-rule-audio-" + String(i), entry.audio, "Audio language"));
     row.appendChild(el("span", { className: "wiz-lang-arrow" }, "\u2192"));
     row.appendChild(langSelect("wiz-lang-rule-code-" + String(i), entry.code, "Subtitle language"));
@@ -145,14 +146,15 @@ function renderLangRules(container: HTMLElement): void {
         "button",
         {
           type: "button",
-          className: "wiz-lang-remove",
+          className: "wiz-row-remove",
+          "aria-label": "Remove rule",
           onclick: () => {
             collectLangRules();
             langRules.splice(idx, 1);
             renderLangRules(container);
           },
         },
-        "\u00d7",
+        icon("close"),
       ),
     );
     container.appendChild(row);

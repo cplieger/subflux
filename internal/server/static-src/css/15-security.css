@@ -84,7 +84,7 @@
   }
 
   & code {
-    font-family: ui-monospace, monospace;
+    font-family: ui-monospace, Consolas, monospace;
     font-size: var(--text-xs);
   }
 }
@@ -133,7 +133,7 @@
   margin-block-start: var(--sp-3);
 
   & code {
-    font-family: ui-monospace, monospace;
+    font-family: ui-monospace, Consolas, monospace;
     font-size: var(--text-xs);
     word-break: break-all;
     flex: 1;

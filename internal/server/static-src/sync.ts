@@ -17,6 +17,7 @@ import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction, seasonSyncAction } from "./sync-actions.js";
 import { attachSyncJob, watchSyncJob } from "./sync-jobs.js";
 import { refKey, subtitleRef, type FileRefArgs } from "./file-ref.js";
+import { FOCUS_KEY, trackFocus, captureReaderState } from "./focus-restore.js";
 import type { Job, JobOutcome, SyncDoneEvent } from "./wire/types.gen.js";
 import {
   previewStart,
@@ -606,6 +607,9 @@ async function reattachSyncJob(resultDiv: HTMLElement, lost: boolean): Promise<v
   }
 }
 
+/** The cap refusal's one visible sentence, shared by the audio and season paths. */
+const CAP_REFUSAL_TEXT = "Sync queue is full. Wait for a running sync to finish, then try again.";
+
 /** The typed capacity refusal: the admission lease is full (HTTP 429), read
  *  through the dispatch handle's outcome (ActionErrorLike.status). */
 function isCapacityRefusal(err: unknown): boolean {
@@ -641,8 +645,7 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
         // framework toast off).
         resultDiv.hidden = false;
         resultDiv.className = "sync-audio-result";
-        resultDiv.textContent =
-          "Sync queue is full \u2014 wait for a running sync to finish, then try again.";
+        resultDiv.textContent = CAP_REFUSAL_TEXT;
       } else {
         notify.error("Audio sync failed");
       }
@@ -664,28 +667,6 @@ function resetSync(): void {
 }
 
 async function toggleVideoPreview(container: HTMLElement): Promise<void> {
-  if (syncState.status === "preview") {
-    if (syncState.ffmpegAbort) {
-      syncState.ffmpegAbort.abort();
-    }
-    syncState = { ...syncState, status: "idle" };
-    const playOverlay = el(
-      "button",
-      {
-        type: "button",
-        className: "sync-play",
-        "aria-label": "Play video preview",
-        onclick: () => {
-          playOverlay.remove();
-          void toggleVideoPreview(container);
-        },
-      },
-      previewPlayIcon(),
-    );
-    patch(container, playOverlay);
-    return;
-  }
-
   patch(
     container,
     el(
@@ -1146,6 +1127,12 @@ function seasonItemStatus(job: Job): string {
   return job.outcome === "cancelled" ? "stopped" : "failed";
 }
 
+/** One item row's full line. Both the initial paint and the per-event repaint
+ *  render through here, so a row cannot change shape mid-batch. */
+function seasonItemLine(job: Job): string {
+  return `${seasonItemLabel(job)}: ${seasonItemStatus(job)}`;
+}
+
 /** Fold the registry rows into the aggregate line the dialog shows. */
 function seasonAggregate(items: Job[]): string {
   let done = 0;
@@ -1175,6 +1162,45 @@ function seasonAggregate(items: Job[]): string {
   }`;
 }
 
+let seasonFocusTracked = false;
+
+/** Arm the focus tracker on the reused confirm dialog, once per document.
+ *
+ *  `document.activeElement` cannot name the pressed control here: Stop disables
+ *  itself, which blurs it, and the re-render is several awaits later. The latch
+ *  is the other half — `#seasonSyncConfirm` outlives every open, so a second
+ *  `trackFocus` call would leak a listener per confirm click. */
+function trackSeasonFocus(dlg: HTMLDialogElement): void {
+  if (seasonFocusTracked) {
+    return;
+  }
+  seasonFocusTracked = true;
+  trackFocus(dlg);
+}
+
+/** Install a season-dialog view, carrying the reader's focus and the item
+ *  list's scroll offset across the swap.
+ *
+ *  The installed tree must BE the tree the handlers closed over. `patch` reuses
+ *  a node it did not insert as a TEMPLATE: it copies the fresh node's `on*`
+ *  properties onto the element already in the document and discards the
+ *  template, so the Stop handler, every row in `rows` and the aggregate would
+ *  belong to a subtree nothing ever inserted. */
+function installSeasonView(
+  dlg: HTMLDialogElement,
+  header: HTMLElement,
+  body: HTMLElement,
+  footer: HTMLElement,
+): void {
+  // `.season-sync-items` carries no CSS of its own, so `.dlg-body` is the
+  // scroller, and this install replaces it.
+  const restore = captureReaderState(dlg, {
+    scrollEl: () => dlg.querySelector<HTMLElement>(".dlg-body"),
+  });
+  dlg.replaceChildren(header, body, footer);
+  restore();
+}
+
 /** Render (or re-render) the batch view from one registry read, then watch
  *  each live item's own sync:done. */
 async function renderSeasonBatch(
@@ -1191,7 +1217,7 @@ async function renderSeasonBatch(
 
   const header = dialogHead(`Sync ${label}`, closeFn);
   const body = el("div", { className: "dlg-body" });
-  const aggregate = el("div", { id: "season-sync-status" });
+  const aggregate = el("div");
   body.appendChild(aggregate);
 
   const stopBtn = el(
@@ -1199,6 +1225,7 @@ async function renderSeasonBatch(
     {
       type: "button",
       className: "ghost",
+      [FOCUS_KEY]: "season-batch-stop",
       onclick: () => {
         (stopBtn as HTMLButtonElement).disabled = true;
         // The batch is the cancellation unit: one stop request settles
@@ -1208,7 +1235,11 @@ async function renderSeasonBatch(
     },
     "Stop",
   );
-  const closeBtn = el("button", { type: "button", className: "ghost", onclick: closeFn }, "Close");
+  const closeBtn = el(
+    "button",
+    { type: "button", className: "ghost", [FOCUS_KEY]: "season-batch-close", onclick: closeFn },
+    "Close",
+  );
   const footer = el("div", { className: "dlg-foot" }, stopBtn, closeBtn);
 
   if (!jobs || jobs.length === 0) {
@@ -1217,7 +1248,7 @@ async function renderSeasonBatch(
       jobs === null
         ? "Could not load the batch state. Close and reopen to retry."
         : "This batch is gone (a server restart drops it). Start a new sync.";
-    patch(dlg, header, body, el("div", { className: "dlg-foot" }, closeBtn));
+    installSeasonView(dlg, header, body, el("div", { className: "dlg-foot" }, closeBtn));
     return;
   }
 
@@ -1225,13 +1256,13 @@ async function renderSeasonBatch(
   const rows = new Map<number, HTMLElement>();
   const list = el("div", { className: "season-sync-items" });
   for (const j of items) {
-    const rowEl = el("div", null, `${seasonItemLabel(j)} \u2014 ${seasonItemStatus(j)}`);
+    const rowEl = el("div", null, seasonItemLine(j));
     rows.set(j.job_id, rowEl);
     list.appendChild(rowEl);
   }
   body.appendChild(list);
   aggregate.textContent = seasonAggregate(items);
-  patch(dlg, header, body, footer);
+  installSeasonView(dlg, header, body, footer);
 
   const allDone = (): boolean => items.every((j) => j.state === "done");
   const settle = (): void => {
@@ -1274,7 +1305,7 @@ async function renderSeasonBatch(
       j.confidence = ev.confidence;
       const rowEl = rows.get(ev.job_id);
       if (rowEl) {
-        rowEl.textContent = `${seasonItemLabel(j)} \u2014 ${seasonItemStatus(j)}`;
+        rowEl.textContent = seasonItemLine(j);
       }
       settle();
       if (ev.outcome === "cancelled") {
@@ -1322,6 +1353,8 @@ export function confirmSeasonSync(
 ): void {
   const dlg = dialog("seasonSyncConfirm");
   const label = `${seriesTitle} S${pad(seasonNum)}`;
+
+  trackSeasonFocus(dlg);
 
   const ctrl = createDialog(dlg, {});
   dlg.addEventListener(
@@ -1384,7 +1417,7 @@ export function confirmSeasonSync(
     el("button", { type: "button", className: "ghost", onclick: closeFn }, "Cancel"),
   );
 
-  patch(dlg, header, body, footer);
+  dlg.replaceChildren(header, body, footer);
   ctrl.open();
 
   // A batch dispatched before a reload is still the server's; show its
@@ -1417,8 +1450,7 @@ async function startSeasonSync(
     if (isCapacityRefusal(outcome.error)) {
       // The typed cap refusal renders inline — the only visible surface.
       status.hidden = false;
-      status.textContent =
-        "Sync queue is full \u2014 wait for a running sync to finish, then try again.";
+      status.textContent = CAP_REFUSAL_TEXT;
     } else {
       notify.error("Season sync failed");
     }

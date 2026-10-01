@@ -5,6 +5,7 @@ import { el, option, icon, withHelp } from "./dom.js";
 import { langSelect } from "./utils.js";
 import { SUBTITLE_VARIANTS, DEFAULT_VARIANT } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
+import { join } from "@cplieger/keyenc";
 // Language config shapes come from the generated wire types (registered in
 // internal/wirespec); the former hand-mirrored interfaces are gone.
 import type { AudioRule, LanguageRules, SubtitleTarget } from "./wire/types.gen.js";
@@ -22,6 +23,49 @@ function cfgFieldEl(label: string, element: HTMLElement, tip: string | undefined
     element,
   );
 }
+
+// --- Advanced-gear reader state ---
+
+/** Which list a subtitle target belongs to: one value decides both the controls
+ *  it renders and the identity its gear is keyed by, so the two cannot disagree
+ *  about whether a target is a default. */
+type TargetScope = { readonly kind: "default" } | { readonly kind: "rule"; readonly audio: string };
+
+const DEFAULTS_SCOPE: TargetScope = { kind: "default" };
+
+const GEAR_KEY = "data-gear-key";
+
+/** A gear's identity: the list it sits in plus the (code, variant) pair the
+ *  config addresses the target by. Never a row index — adding a row above one
+ *  would hand the new row the gear the reader opened below it. */
+function gearKey(scope: TargetScope, sub: SubtitleTarget): string {
+  if (scope.kind === "default") {
+    return join("default", sub.code);
+  }
+  return join("rule", scope.audio, sub.code, sub.variant ?? DEFAULT_VARIANT);
+}
+
+/** Whether a gear is open is reader state no config carries, so the tree this
+ *  render replaces is its only record — and it is still in the document while
+ *  renderConfigForm builds its fragment. An ABSENT key means the reader has
+ *  expressed nothing and `hasAdvanced` still decides; a present one carries the
+ *  choice in both directions. */
+function renderedGearStates(): Map<string, boolean> {
+  const states = new Map<string, boolean>();
+  for (const wrapper of document.querySelectorAll<HTMLElement>(`.lang-sub[${GEAR_KEY}]`)) {
+    const key = wrapper.getAttribute(GEAR_KEY);
+    const gear = wrapper.querySelector("button[aria-expanded]");
+    if (key !== null && gear !== null) {
+      states.set(key, gear.getAttribute("aria-expanded") === "true");
+    }
+  }
+  return states;
+}
+
+/** What an ADD button hands a row the reader just created. Every add seeds a
+ *  fixed target, so its key can collide with one already open — and the reader
+ *  expressed nothing about a row that did not exist a moment ago. */
+const NO_GEARS: ReadonlyMap<string, boolean> = new Map();
 
 // --- Exported functions ---
 
@@ -48,6 +92,7 @@ export function buildLanguagesSection(): HTMLElement {
   const lr: LanguageRules = cfgVal?.language_rules ?? {};
   const rules: AudioRule[] = lr.rules ?? [];
   const defaults: SubtitleTarget[] = lr.default ?? [{ code: "en" }];
+  const gears = renderedGearStates();
 
   // --- Defaults ---
   sec.appendChild(el("div", { className: "cfg-title" }, "Language Defaults"));
@@ -56,7 +101,7 @@ export function buildLanguagesSection(): HTMLElement {
     className: "lang-subs",
   });
   for (const d of defaults) {
-    defaultsContainer.appendChild(buildSubTarget(d, true));
+    defaultsContainer.appendChild(buildSubTarget(d, DEFAULTS_SCOPE, gears));
   }
   sec.appendChild(defaultsContainer);
   sec.appendChild(
@@ -65,7 +110,8 @@ export function buildLanguagesSection(): HTMLElement {
       {
         type: "button",
         className: "ghost",
-        onclick: () => defaultsContainer.appendChild(buildSubTarget({ code: "en" }, true)),
+        onclick: () =>
+          defaultsContainer.appendChild(buildSubTarget({ code: "en" }, DEFAULTS_SCOPE, NO_GEARS)),
       },
       "+ Add subtitle",
     ),
@@ -83,7 +129,7 @@ export function buildLanguagesSection(): HTMLElement {
   );
   const rulesContainer = el("div", { id: "lang-rules" });
   for (const rule of rules) {
-    rulesContainer.appendChild(buildRuleBlock(rule));
+    rulesContainer.appendChild(buildRuleBlock(rule, gears));
   }
   sec.appendChild(rulesContainer);
   sec.appendChild(
@@ -94,10 +140,13 @@ export function buildLanguagesSection(): HTMLElement {
         className: "ghost",
         onclick: () =>
           rulesContainer.appendChild(
-            buildRuleBlock({
-              audio: "en",
-              subtitles: [{ code: "fr" }],
-            }),
+            buildRuleBlock(
+              {
+                audio: "en",
+                subtitles: [{ code: "fr" }],
+              },
+              NO_GEARS,
+            ),
           ),
       },
       "+ Add rule",
@@ -107,12 +156,18 @@ export function buildLanguagesSection(): HTMLElement {
   return sec;
 }
 
-function buildSubTarget(sub: SubtitleTarget, isDefault: boolean): HTMLElement {
+function buildSubTarget(
+  sub: SubtitleTarget,
+  scope: TargetScope,
+  gears: ReadonlyMap<string, boolean>,
+): HTMLElement {
+  const isDefault = scope.kind === "default";
   // Block wrapper: the flex controls row and the collapsible advanced region are
   // siblings inside it (not the region nested in the flex row), so the region
   // collapses to zero height with no flex row-gap residual. This wrapper is the
   // serialize anchor — a direct child of .lang-subs / the defaults container.
-  const wrapper = el("div", { className: "lang-sub" });
+  const key = gearKey(scope, sub);
+  const wrapper = el("div", { className: "lang-sub", [GEAR_KEY]: key });
 
   const row = el("div", { className: "lang-row" });
   row.appendChild(langSelect(null, sub.code, "Subtitle language"));
@@ -197,13 +252,14 @@ function buildSubTarget(sub: SubtitleTarget, isDefault: boolean): HTMLElement {
 
   // WAI-ARIA disclosure: aria-expanded on the gear, aria-controls/aria-hidden/
   // inert on the region, and an animated height 0 <-> auto.
-  createDisclosure(toggleBtn, adv, { open: hasAdvanced });
+  createDisclosure(toggleBtn, adv, { open: gears.get(key) ?? hasAdvanced });
 
   return wrapper;
 }
 
-function buildRuleBlock(rule: AudioRule): HTMLElement {
+function buildRuleBlock(rule: AudioRule, gears: ReadonlyMap<string, boolean>): HTMLElement {
   const block = el("div", { className: "lang-rule" });
+  const scope: TargetScope = { kind: "rule", audio: rule.audio };
 
   block.appendChild(el("span", { className: "lang-label" }, "Audio:"));
   const header = el("div", { className: "lang-row" });
@@ -227,7 +283,7 @@ function buildRuleBlock(rule: AudioRule): HTMLElement {
   block.appendChild(el("span", { className: "lang-label" }, "Subtitles:"));
   const subsContainer = el("div", { className: "lang-subs" });
   for (const sub of rule.subtitles) {
-    subsContainer.appendChild(buildSubTarget(sub, false));
+    subsContainer.appendChild(buildSubTarget(sub, scope, gears));
   }
   block.appendChild(subsContainer);
   block.appendChild(
@@ -236,7 +292,7 @@ function buildRuleBlock(rule: AudioRule): HTMLElement {
       {
         type: "button",
         className: "ghost",
-        onclick: () => subsContainer.appendChild(buildSubTarget({ code: "en" }, false)),
+        onclick: () => subsContainer.appendChild(buildSubTarget({ code: "en" }, scope, NO_GEARS)),
       },
       "+ Add subtitle",
     ),

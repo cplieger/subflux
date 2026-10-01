@@ -84,7 +84,7 @@ func TestWirespec_matches_registerRoutes(t *testing.T) {
 // TestWirespec_query_flags pins each endpoint's Query flag against a full
 // snapshot, split by why it is set: the FIVE ?recovery=1-honoring endpoints
 // (the two coverage collections, episodes-by-series, and the two per-item
-// summaries — A3's transport precondition) and the eleven shipped endpoints
+// summaries — A3's transport precondition) and the thirteen shipped endpoints
 // that carry it for unrelated query strings. Every other endpoint is
 // flag-free — a new Query: true is a deliberate wire-contract change that
 // updates this snapshot. The HONORING pin itself is handler-level (the
@@ -100,18 +100,19 @@ func TestWirespec_query_flags(t *testing.T) {
 		"coverageMovieSummary":  true,
 	}
 	unrelatedQuery := map[string]bool{
-		"webauthnLoginBegin": true,
-		"dismissAlert":       true,
-		"dismissActivity":    true,
-		"manualSearch":       true,
-		"searchResolve":      true,
-		"searchTargets":      true,
-		"listState":          true,
-		"stateIDs":           true,
-		"backoffPrefix":      true,
-		"listFiles":          true,
-		"previewStart":       true,
-		"syncJobs":           true,
+		"webauthnLoginBegin":   true,
+		"webauthnAvailability": true,
+		"dismissAlert":         true,
+		"dismissActivity":      true,
+		"manualSearch":         true,
+		"searchResolve":        true,
+		"searchTargets":        true,
+		"listState":            true,
+		"stateIDs":             true,
+		"backoffPrefix":        true,
+		"listFiles":            true,
+		"previewStart":         true,
+		"syncJobs":             true,
 	}
 	seen := 0
 	for _, e := range wirespec.Endpoints() {

@@ -241,6 +241,11 @@ type ProviderSchema struct {
 	Name     string        `json:"name"`
 	Label    string        `json:"label"`
 	Settings []SchemaField `json:"settings,omitempty"`
+	// ConnTest marks a provider whose implementation can validate its
+	// credentials without searching, so the settings dialog and the setup
+	// wizard render a test control on its card. The provider-section twin of
+	// SchemaSection.ConnTest, keyed by Name the way that one is keyed by Key.
+	ConnTest bool `json:"conn_test,omitempty"`
 }
 
 // --- Language rules (JSON-serializable for settings UI) ---

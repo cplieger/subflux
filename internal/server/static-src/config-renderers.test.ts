@@ -589,3 +589,61 @@ describe("renderRawSection", () => {
     expect(host.querySelector("textarea")?.value).toContain("<img src=x onerror=alert(1)>");
   });
 });
+
+describe("renderFieldsSection: the credential-check control", () => {
+  const arr: SchemaSection = {
+    key: "sonarr",
+    title: "Sonarr",
+    type: "fields",
+    enable_key: "enabled",
+    conn_test: true,
+    fields: [
+      field({ key: "enabled", type: "bool" }),
+      field({ key: "url", type: "text" }),
+      field({ key: "api_key", type: "secret", secret: true }),
+    ],
+  };
+
+  it("places the control in the section header, inline with the title", () => {
+    const sec = renderFieldsSection(arr, null);
+
+    const btn = sec.querySelector(".cfg-title .conn-test");
+    expect(btn).not.toBeNull();
+    // Not in the collapsible body: a section switched off still answers
+    // whether its credentials are right, which is the same question.
+    expect(sec.querySelector(".cfg-body .conn-test")).toBeNull();
+  });
+
+  it("puts the control BEFORE the toggle, so the toggle keeps the trailing edge", () => {
+    const sec = renderFieldsSection(arr, null);
+
+    const head = sec.querySelector(".cfg-title")!;
+    const kids = [...head.children];
+    expect(kids.indexOf(head.querySelector(".conn-test")!)).toBeLessThan(
+      kids.indexOf(head.querySelector(".toggle")!),
+    );
+  });
+
+  it("omits the control for a section that declares none", () => {
+    const sec = renderFieldsSection({ ...arr, conn_test: false }, null);
+    expect(sec.querySelector(".conn-test")).toBeNull();
+  });
+
+  it("watches the section's own fields, so editing one retires the verdict", () => {
+    // The control resolves its inputs out of the section while it is still a
+    // detached subtree, so a renderer that moved the fields would leave it
+    // watching nothing and a stale green would survive every edit.
+    document.body.replaceChildren(renderFieldsSection(arr, null));
+    const btn = document.body.querySelector<HTMLButtonElement>(".conn-test");
+    const url = document.body.querySelector<HTMLInputElement>(
+      `#${CSS.escape(fieldId("sonarr", "url"))}`,
+    );
+    expect(btn).not.toBeNull();
+    expect(url).not.toBeNull();
+
+    btn!.dataset["status"] = "ok";
+    url!.dispatchEvent(new Event("input"));
+
+    expect(btn!.dataset["status"]).toBeUndefined();
+  });
+});

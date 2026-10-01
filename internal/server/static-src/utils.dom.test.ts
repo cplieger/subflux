@@ -119,9 +119,9 @@ describe("langSelect", () => {
     const sel = langSelect("lang-field");
 
     expect([...sel.options].slice(0, 3).map((o) => [o.value, o.textContent])).toEqual([
-      ["en", "en \u2014 English"],
-      ["fr", "fr \u2014 French"],
-      ["es", "es \u2014 Spanish"],
+      ["en", "en \u00B7 English"],
+      ["fr", "fr \u00B7 French"],
+      ["es", "es \u00B7 Spanish"],
     ]);
   });
 

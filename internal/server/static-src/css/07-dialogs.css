@@ -19,19 +19,20 @@
   }
 }
 
-/* Full-screen config on narrow viewports */
-@media (width < 640px) {
-  /* Mobile type scale for top-layer elements (Apple HIG aligned) */
+/* Touch-target sizing, keyed on the POINTER rather than the width: a tablet is
+ * 1024px wide and still touch-driven, so a width query left every control in
+ * this dialog at its 28px desktop size there. The wizard has always keyed its
+ * own controls this way (login-05-mobile-a11y.css). Layout and type below stay
+ * width-keyed, because those answer "how much room is there", not "how is it
+ * being pointed at". */
+@media (width < 640px), (pointer: coarse) {
+  /* A glyph scales with the target that holds it, or an icon-only control keeps
+   * a 14px mark inside a 44px button. */
   dialog,
   .uip-popover {
-    --text-xs: 0.8rem;
-    --text-sm: 0.9375rem;
-    --text-base: 1rem;
-    --text-lg: 1.25rem;
     --icon: 1.125rem;
   }
 
-  /* Scale up interactive elements in dialogs */
   dialog button {
     height: 2.75rem;
   }
@@ -72,17 +73,6 @@
     height: 2.75rem;
   }
 
-  dialog .tc-btn-stack {
-    border-inline-start: 1px solid var(--border);
-    min-width: 3rem;
-    place-self: stretch stretch;
-  }
-
-  dialog .sync-timecode {
-    width: 100%;
-    grid-template-columns: 3fr 1fr;
-  }
-
   dialog .toggle {
     height: 2.75rem;
   }
@@ -114,12 +104,35 @@
     min-width: 2.75rem;
   }
 
-  dialog .dlg-head h2 {
-    font-size: var(--text-lg);
-  }
-
   dialog .badge {
     height: 2.75rem;
+  }
+}
+
+/* Full-screen config on narrow viewports */
+@media (width < 640px) {
+  /* Mobile type scale for top-layer elements (Apple HIG aligned) */
+  dialog,
+  .uip-popover {
+    --text-xs: 0.8rem;
+    --text-sm: 0.9375rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+  }
+
+  dialog .tc-btn-stack {
+    border-inline-start: 1px solid var(--border);
+    min-width: 3rem;
+    place-self: stretch stretch;
+  }
+
+  dialog .sync-timecode {
+    width: 100%;
+    grid-template-columns: 3fr 1fr;
+  }
+
+  dialog .dlg-head h2 {
+    font-size: var(--text-lg);
   }
 
   .dlg-config {

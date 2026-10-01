@@ -6,6 +6,7 @@ import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { el, dialog, confirm, $ } from "./dom.js";
+import { FOCUS_KEY, trackFocus, captureReaderState } from "./focus-restore.js";
 import { createDialog, type DialogController } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
 import {
@@ -19,7 +20,7 @@ import type { StructuredConfig } from "./wire/types.gen.js";
 import { apiAction, bindLoadingState, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
-import { YAML_TIMEOUT_MS } from "./constants.js";
+import { YAML_TIMEOUT_MS, CONFIG_BANNER_ID } from "./constants.js";
 import { setCfgSections, cfgSectionEntries, cfgValue } from "./config-values.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
@@ -150,7 +151,8 @@ export async function saveConfig(): Promise<void> {
  *  their RP ID, so changing it locks out passkey-only sign-ins until users
  *  re-register. Returns false when the user backs out. Setting an RP ID
  *  for the first time needs no warning — there are no credentials to
- *  strand. */
+ *  strand. Clearing it is not a change either: a save carrying no value
+ *  keeps the stored one, so there is nothing to warn about. */
 async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boolean> {
   const oldRPID = cfgValue("auth", "webauthn_rp_id").trim();
   if (oldRPID === "") {
@@ -162,7 +164,7 @@ async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boo
       ? (auth as Record<string, unknown>)["webauthn_rp_id"]
       : undefined;
   const newRPID = typeof raw === "string" ? raw.trim() : "";
-  if (newRPID === oldRPID) {
+  if (newRPID === "" || newRPID === oldRPID) {
     return true;
   }
   return confirm(
@@ -303,6 +305,15 @@ function renderConfigForm(): void {
   const frag = document.createDocumentFragment();
   const rendered = new Set<string>();
 
+  // The form's one error slot, rendered hidden and reused. Every error on this
+  // surface reports at the top of the form, so the credential-check controls
+  // scattered through the sections have somewhere to put a failure without
+  // inventing a second visual language; .cfg-banner is already err-tinted with
+  // an err border, which is what the notices below borrow it for.
+  frag.appendChild(
+    el("div", { id: CONFIG_BANNER_ID, className: "cfg-banner", role: "alert", hidden: true }),
+  );
+
   // Show setup banner only for first-time setup (no config file).
   if (isFirstSetup) {
     const bannerText = el(
@@ -347,15 +358,83 @@ function renderConfigForm(): void {
 
   for (const [name, value] of cfgSectionEntries()) {
     if (!rendered.has(name)) {
-      frag.appendChild(renderRawSection(name, value));
+      frag.appendChild(rawSection(name, value));
     }
   }
-  patch(body, frag);
+  // Must not be `patch`: patch REUSES the nodes already in this parent and copies
+  // the fresh tree's on* handlers onto them, so every Add, Remove and reveal
+  // handler would run against nodes that were never inserted — silently, since
+  // the click still fires and the write lands on a detached subtree.
+  trackReaderFocus(body);
+  keyFocusables(frag);
+  const restoreReader = captureReaderState(body, { scrollEl: body });
+  body.replaceChildren(frag);
+  restoreReader();
 
   // Mark required fields only for first-time setup.
   if (isFirstSetup) {
     markRequiredFields(configSchema, body);
   }
+}
+
+const RAW_SECTION_NOTICE =
+  "Subflux does not recognise this section, so the settings form cannot edit it \u2014 " +
+  "a save from this dialog keeps it exactly as it is on disk. " +
+  "Edit it in the config file.";
+
+/** buildSectionsFromForm round-trips the STORED value for this section, so a save
+ *  keeps it; nothing here parses what a reader would type, so the control is
+ *  read-only rather than an edit the save would accept and then discard. */
+function rawSection(name: string, value: unknown): HTMLElement {
+  const sec = renderRawSection(name, value);
+  const ta = sec.querySelector("textarea");
+  if (ta === null) {
+    return sec;
+  }
+  ta.readOnly = true;
+  sec.insertBefore(el("p", { className: "muted" }, RAW_SECTION_NOTICE), ta);
+  return sec;
+}
+
+let readerFocusTracked = false;
+
+/** The form can re-render while `confirm`'s dialog is still closing, so the
+ *  control the reader left is tracked rather than read at swap time. */
+function trackReaderFocus(body: HTMLElement): void {
+  if (readerFocusTracked) {
+    return;
+  }
+  trackFocus(body);
+  readerFocusTracked = true;
+}
+
+/** Key every field focus-restore must find again after the swap. Both trees go
+ *  through this one function or the restore lands nowhere: an id where the schema
+ *  gives one, else the nearest id-bearing ancestor plus the child-index path,
+ *  because a bare position does not survive the setup banner coming or going. */
+function keyFocusables(root: ParentNode): void {
+  for (const ctl of root.querySelectorAll<HTMLElement>("input, select, textarea")) {
+    const key = focusKey(ctl);
+    if (key !== null) {
+      ctl.setAttribute(FOCUS_KEY, key);
+    }
+  }
+}
+
+function focusKey(ctl: HTMLElement): string | null {
+  if (ctl.id !== "") {
+    return ctl.id;
+  }
+  const path: number[] = [];
+  let node: Element = ctl;
+  for (let parent = node.parentElement; parent !== null; parent = node.parentElement) {
+    path.push([...parent.children].indexOf(node));
+    if (parent.id !== "") {
+      return `${parent.id}/${path.reverse().join("/")}`;
+    }
+    node = parent;
+  }
+  return null;
 }
 
 // Shared validation display for required fields.
@@ -466,6 +545,7 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
 // the builder is a pure function of (schema, DOM) and directly testable.
 export function buildSectionsFromForm(schemaSections: SchemaSection[]): Record<string, unknown> {
   const sections: Record<string, unknown> = {};
+  const known = new Set(schemaSections.map((s) => s.key));
   for (const schema of schemaSections) {
     if (schema.type === "providers") {
       sections[schema.key] = genProviders(schema);
@@ -487,6 +567,17 @@ export function buildSectionsFromForm(schemaSections: SchemaSection[]): Record<s
       sections[schema.key] = genScoring(schema);
     } else {
       sections[schema.key] = genFields(schema);
+    }
+  }
+  // A section the schema does not describe is round-tripped from the server's own
+  // value: assembleSections builds config.yaml from the submitted sections alone,
+  // so omitting one DELETES it, and the loader's strict unknown-key check means
+  // every section in that file is one the config struct accepts. Keyed on the
+  // schema (renderConfigForm's own `rendered` set), not on what the loop assigned
+  // — that would also resurrect a deliberately omitted empty `poll_interval`.
+  for (const [name, value] of cfgSectionEntries()) {
+    if (!known.has(name)) {
+      sections[name] = value;
     }
   }
   return sections;

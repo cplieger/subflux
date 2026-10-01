@@ -1,9 +1,11 @@
 package confighandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -29,6 +31,57 @@ func testArrSchema() []subflux.SchemaSection {
 		}
 	}
 	return []subflux.SchemaSection{arr("sonarr"), arr("radarr")}
+}
+
+// testRegistry stands in for the provider registry: one provider that offers a
+// credential check, recording the settings the check was handed so the tests can
+// assert what the endpoint resolved before probing.
+type testRegistry struct {
+	got    *map[string]any
+	calls  *int
+	err    error
+	name   subflux.ProviderID
+	fields []subflux.ProviderSchemaField
+}
+
+func (r testRegistry) ProviderNames() []subflux.ProviderID { return []subflux.ProviderID{r.name} }
+
+func (r testRegistry) Schema(name subflux.ProviderID) (string, []subflux.ProviderSchemaField) {
+	if name != r.name {
+		return "", nil
+	}
+	return string(r.name), r.fields
+}
+
+func (r testRegistry) CredentialCheck(name subflux.ProviderID) bool { return name == r.name }
+
+func (r testRegistry) CheckCredentials(_ context.Context, name subflux.ProviderID, settings map[string]any) error {
+	if r.calls != nil {
+		*r.calls++
+	}
+	if r.got != nil {
+		*r.got = settings
+	}
+	if name != r.name {
+		return errors.New("wrong provider")
+	}
+	return r.err
+}
+
+// opensubsRegistry is the provider fixture every provider-arm case shares: two
+// secrets and one plain field, the shape a real provider card renders.
+func opensubsRegistry(got *map[string]any, calls *int, err error) testRegistry {
+	return testRegistry{
+		name:  "opensubtitles",
+		got:   got,
+		calls: calls,
+		err:   err,
+		fields: []subflux.ProviderSchemaField{
+			{Key: "username"},
+			{Key: "password", Secret: true},
+			{Key: "api_key", Secret: true},
+		},
+	}
 }
 
 // TestHandleTestConnection pins the whole probe: which instance is built and with
@@ -62,7 +115,7 @@ func TestHandleTestConnection(t *testing.T) {
 	}{
 		{
 			name:       "reachable sonarr answers valid",
-			body:       `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`,
+			body:       `{"kind":"sonarr","settings":{"url":"http://sonarr:8989","api_key":"k1"}}`,
 			wantStatus: http.StatusOK,
 			wantValid:  true,
 			wantSonarr: []string{"http://sonarr:8989|k1"},
@@ -70,7 +123,7 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "reachable radarr builds the radarr client",
-			body:       `{"kind":"radarr","url":"http://radarr:7878","api_key":"k2"}`,
+			body:       `{"kind":"radarr","settings":{"url":"http://radarr:7878","api_key":"k2"}}`,
 			wantStatus: http.StatusOK,
 			wantValid:  true,
 			wantRadarr: []string{"http://radarr:7878|k2"},
@@ -78,7 +131,7 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "unreachable arr is a 200 verdict carrying the reason",
-			body:       `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`,
+			body:       `{"kind":"sonarr","settings":{"url":"http://sonarr:8989","api_key":"k1"}}`,
 			pingErr:    &arrapi.StatusError{Code: http.StatusUnauthorized},
 			wantStatus: http.StatusOK,
 			wantErrIs:  "the API key was rejected",
@@ -87,7 +140,7 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "malformed URL is a verdict, not a bad request",
-			body:       `{"kind":"sonarr","url":"sonarr:8989","api_key":"k1"}`,
+			body:       `{"kind":"sonarr","settings":{"url":"sonarr:8989","api_key":"k1"}}`,
 			newErr:     errors.New("baseURL must be an absolute http(s) URL"),
 			wantStatus: http.StatusOK,
 			wantErrIs:  "absolute http(s) URL",
@@ -96,7 +149,7 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "omitted key falls back to the one on disk",
-			body:       `{"kind":"radarr","url":"http://radarr:7878","api_key":""}`,
+			body:       `{"kind":"radarr","settings":{"url":"http://radarr:7878","api_key":""}}`,
 			existing:   onDisk,
 			wantStatus: http.StatusOK,
 			wantValid:  true,
@@ -105,7 +158,7 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "unchanged credentials still ping",
-			body:       `{"kind":"sonarr","url":"http://live:8989","api_key":"k-live"}`,
+			body:       `{"kind":"sonarr","settings":{"url":"http://live:8989","api_key":"k-live"}}`,
 			existing:   onDisk,
 			wantStatus: http.StatusOK,
 			wantValid:  true,
@@ -114,21 +167,21 @@ func TestHandleTestConnection(t *testing.T) {
 		},
 		{
 			name:       "empty URL never builds a client",
-			body:       `{"kind":"sonarr","url":"  ","api_key":"k1"}`,
+			body:       `{"kind":"sonarr","settings":{"url":"  ","api_key":"k1"}}`,
 			wantStatus: http.StatusOK,
 			wantErrIs:  "URL is required",
 			wantPings:  0,
 		},
 		{
 			name:       "omitted key with nothing on disk never builds a client",
-			body:       `{"kind":"sonarr","url":"http://sonarr:8989","api_key":""}`,
+			body:       `{"kind":"sonarr","settings":{"url":"http://sonarr:8989","api_key":""}}`,
 			wantStatus: http.StatusOK,
 			wantErrIs:  "API key is required",
 			wantPings:  0,
 		},
 		{
 			name:       "unknown kind is the one bad request",
-			body:       `{"kind":"lidarr","url":"http://lidarr:8686","api_key":"k1"}`,
+			body:       `{"kind":"lidarr","settings":{"url":"http://lidarr:8686","api_key":"k1"}}`,
 			wantStatus: http.StatusBadRequest,
 			wantPings:  0,
 		},
@@ -157,6 +210,7 @@ func TestHandleTestConnection(t *testing.T) {
 				SchemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection {
 					return testArrSchema()
 				},
+				Registry:   opensubsRegistry(nil, nil, nil),
 				NewSonarr:  record(&gotSonarr),
 				NewRadarr:  record(&gotRadarr),
 				ConfigPath: func() string { return configPath },
@@ -218,39 +272,47 @@ func TestHandleTestConnection_rejects_non_post(t *testing.T) {
 	}
 }
 
-// TestStoredArrAPIKey covers the fallback's read failures, each of which must
-// answer "" so the handler reports the missing key as the operator-facing
-// answer it is rather than a 500 about the server's own file.
-func TestStoredArrAPIKey(t *testing.T) {
+// TestStoredSecret covers the fallback's read failures, each of which must
+// answer "" so the handler reports the missing value as the operator-facing
+// answer it is rather than a 500 about the server's own file. The nested path
+// case is the provider arm's: a provider secret sits four keys deep, so a
+// resolver that only ever walked two would answer "" for every provider and
+// silently fail the test on exactly the configs that work.
+func TestStoredSecret(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
 		existing string // "" writes no file at all
-		kind     string
+		path     secretPath
 		want     string
 	}{
 		{
-			name: "reads the section's key", kind: "sonarr", want: "k1",
+			name: "reads the section's key", path: secretPath{"sonarr", "api_key"}, want: "k1",
 			existing: "sonarr:\n  api_key: \"k1\"\n",
 		},
-		{name: "missing file", kind: "sonarr", want: ""},
-		{name: "unparseable file", kind: "sonarr", want: "", existing: "\tnot: yaml\n"},
-		{name: "scalar document", kind: "sonarr", want: "", existing: "just-a-string\n"},
+		{name: "missing file", path: secretPath{"sonarr", "api_key"}, want: ""},
+		{name: "unparseable file", path: secretPath{"sonarr", "api_key"}, want: "", existing: "\tnot: yaml\n"},
+		{name: "scalar document", path: secretPath{"sonarr", "api_key"}, want: "", existing: "just-a-string\n"},
 		{
-			name: "section absent", kind: "radarr", want: "",
+			name: "section absent", path: secretPath{"radarr", "api_key"}, want: "",
 			existing: "sonarr:\n  api_key: \"k1\"\n",
 		},
 		{
-			name: "key absent", kind: "sonarr", want: "",
+			name: "key absent", path: secretPath{"sonarr", "api_key"}, want: "",
 			existing: "sonarr:\n  url: \"http://sonarr:8989\"\n",
 		},
 		{
-			name: "key is a mapping, not a scalar", kind: "sonarr", want: "",
+			name: "key is a mapping, not a scalar", path: secretPath{"sonarr", "api_key"}, want: "",
 			existing: "sonarr:\n  api_key:\n    nested: no\n",
 		},
 		{
-			name: "surrounding whitespace is trimmed", kind: "sonarr", want: "k1",
+			name: "surrounding whitespace is trimmed", path: secretPath{"sonarr", "api_key"}, want: "k1",
 			existing: "sonarr:\n  api_key: \"  k1  \"\n",
+		},
+		{
+			name: "reads a provider secret four keys deep",
+			path: secretPath{"providers", "opensubtitles", "settings", "api_key"}, want: "k-prov",
+			existing: "providers:\n  opensubtitles:\n    settings:\n      api_key: \"k-prov\"\n",
 		},
 	}
 	for _, tt := range tests {
@@ -263,8 +325,8 @@ func TestStoredArrAPIKey(t *testing.T) {
 				}
 			}
 			h := New(&Deps{ConfigPath: func() string { return configPath }})
-			if got := h.storedArrAPIKey(t.Context(), tt.kind); got != tt.want {
-				t.Errorf("storedArrAPIKey(%q) = %q, want %q", tt.kind, got, tt.want)
+			if got := h.storedSecret(t.Context(), tt.path); got != tt.want {
+				t.Errorf("storedSecret(%v) = %q, want %q", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -294,7 +356,7 @@ func TestDescribeArrFailure(t *testing.T) {
 		{
 			name: "404 names the base path",
 			err:  &arrapi.StatusError{Code: http.StatusNotFound},
-			want: "HTTP 404: no arr API at this URL — check for a missing or extra base path",
+			want: "HTTP 404: no arr API at this URL; check for a missing or extra base path",
 		},
 		{
 			name: "any other status is reported without a claim about the cause",
@@ -331,13 +393,14 @@ func TestHandleTestConnection_sanitizes_the_upstream_error(t *testing.T) {
 	t.Parallel()
 	hostile := "HTTP 500: " + strings.Repeat("a", 4096) + "\nSecond-Line: injected"
 	h := New(&Deps{
+		Registry: opensubsRegistry(nil, nil, nil),
 		NewSonarr: func(string, string) (ArrPinger, error) {
 			return recordingPinger{pings: new(int), err: errors.New(hostile)}, nil
 		},
 		ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
 	})
 
-	rec := doArrTest(t, h, `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`)
+	rec := doArrTest(t, h, `{"kind":"sonarr","settings":{"url":"http://sonarr:8989","api_key":"k1"}}`)
 	var got ConnTestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("HandleTestConnection() response %s: %v", rec.Body.String(), err)
@@ -383,12 +446,13 @@ func TestHandleTestConnection_closes_the_client_it_builds(t *testing.T) {
 				SchemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection {
 					return testArrSchema()
 				},
+				Registry:   opensubsRegistry(nil, nil, nil),
 				NewSonarr:  newPinger,
 				NewRadarr:  newPinger,
 				ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
 			})
 
-			doArrTest(t, h, `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`)
+			doArrTest(t, h, `{"kind":"sonarr","settings":{"url":"http://sonarr:8989","api_key":"k1"}}`)
 
 			if built != 1 || pings != 1 {
 				// Establishes what the close count below is measured against.
@@ -397,6 +461,168 @@ func TestHandleTestConnection_closes_the_client_it_builds(t *testing.T) {
 			}
 			if closes != 1 {
 				t.Errorf("HandleTestConnection() closed the client %d times, want 1", closes)
+			}
+		})
+	}
+}
+
+// TestHandleTestConnection_provider_arm pins the second arm of the endpoint: a
+// provider's own credential check, with every empty secret resolved from the
+// config file the way the arr arm resolves its key.
+//
+// The three verdicts are three different sentences on purpose. A refused
+// credential is a field to go fix and an unreachable service is not, and the
+// banner is the only place the operator learns which; a check that reported both
+// the same way would send them to the wrong remedy half the time.
+func TestHandleTestConnection_provider_arm(t *testing.T) {
+	t.Parallel()
+	const onDisk = "providers:\n  opensubtitles:\n    settings:\n" +
+		"      password: \"p-stored\"\n      api_key: \"k-stored\"\n"
+
+	tests := []struct {
+		checkErr     error
+		wantSettings map[string]any
+		name         string
+		body         string
+		existing     string
+		wantErrIs    string
+		wantStatus   int
+		wantChecks   int
+		wantValid    bool
+	}{
+		{
+			name:       "accepted credentials answer valid",
+			body:       `{"kind":"opensubtitles","settings":{"username":"u","password":"p","api_key":"k"}}`,
+			wantStatus: http.StatusOK, wantValid: true, wantChecks: 1,
+			wantSettings: map[string]any{"username": "u", "password": "p", "api_key": "k"},
+		},
+		{
+			name:       "refused credentials name the credentials",
+			body:       `{"kind":"opensubtitles","settings":{"username":"u","password":"p","api_key":"k"}}`,
+			checkErr:   &subflux.AuthError{Msg: "HTTP 401"},
+			wantStatus: http.StatusOK, wantErrIs: "the credentials were rejected: HTTP 401",
+			wantChecks: 1,
+		},
+		{
+			name:       "an unreachable service does not blame the credentials",
+			body:       `{"kind":"opensubtitles","settings":{"username":"u","password":"p","api_key":"k"}}`,
+			checkErr:   errors.New("dial tcp: connection refused"),
+			wantStatus: http.StatusOK, wantErrIs: "could not reach the service: dial tcp: connection refused",
+			wantChecks: 1,
+		},
+		{
+			name:       "empty secrets fall back to the ones on disk",
+			body:       `{"kind":"opensubtitles","settings":{"username":"u","password":"","api_key":""}}`,
+			existing:   onDisk,
+			wantStatus: http.StatusOK, wantValid: true, wantChecks: 1,
+			wantSettings: map[string]any{"username": "u", "password": "p-stored", "api_key": "k-stored"},
+		},
+		{
+			name:       "a typed secret is never replaced by the stored one",
+			body:       `{"kind":"opensubtitles","settings":{"username":"u","password":"p-typed","api_key":""}}`,
+			existing:   onDisk,
+			wantStatus: http.StatusOK, wantValid: true, wantChecks: 1,
+			wantSettings: map[string]any{"username": "u", "password": "p-typed", "api_key": "k-stored"},
+		},
+		{
+			name:       "a plain field is never resolved from disk",
+			body:       `{"kind":"opensubtitles","settings":{"username":"","password":"p","api_key":"k"}}`,
+			existing:   "providers:\n  opensubtitles:\n    settings:\n      username: \"u-stored\"\n",
+			wantStatus: http.StatusOK, wantValid: true, wantChecks: 1,
+			wantSettings: map[string]any{"username": "", "password": "p", "api_key": "k"},
+		},
+		{
+			name:       "a provider offering no check is the one bad request",
+			body:       `{"kind":"gestdown","settings":{}}`,
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			configPath := filepath.Join(t.TempDir(), "config.yaml")
+			if tt.existing != "" {
+				if err := os.WriteFile(configPath, []byte(tt.existing), 0o600); err != nil {
+					t.Fatalf("write existing config: %v", err)
+				}
+			}
+			var gotSettings map[string]any
+			checks := 0
+			h := New(&Deps{
+				Registry:   opensubsRegistry(&gotSettings, &checks, tt.checkErr),
+				ConfigPath: func() string { return configPath },
+			})
+
+			rec := doArrTest(t, h, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("HandleTestConnection(%s) status = %d, want %d; body %s",
+					tt.body, rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if checks != tt.wantChecks {
+				t.Errorf("HandleTestConnection(%s) ran %d checks, want %d", tt.body, checks, tt.wantChecks)
+			}
+			if tt.wantSettings != nil && !maps.Equal(gotSettings, tt.wantSettings) {
+				t.Errorf("HandleTestConnection(%s) checked settings %v, want %v",
+					tt.body, gotSettings, tt.wantSettings)
+			}
+			if tt.wantStatus != http.StatusOK {
+				return
+			}
+
+			var got ConnTestResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				// Establishes the value every check below reads.
+				t.Fatalf("HandleTestConnection(%s) response %s: %v", tt.body, rec.Body.String(), err)
+			}
+			if got.Valid != tt.wantValid {
+				t.Errorf("HandleTestConnection(%s) valid = %t, want %t (error %q)",
+					tt.body, got.Valid, tt.wantValid, got.Error)
+			}
+			if got.Error != tt.wantErrIs {
+				t.Errorf("HandleTestConnection(%s) error = %q, want %q", tt.body, got.Error, tt.wantErrIs)
+			}
+		})
+	}
+}
+
+// TestDescribeCredentialFailure pins which failures accuse the credentials. The
+// two sentences are the two remedies, and classification is on the published
+// error TYPE, so a failure this package cannot recognize degrades to the weaker
+// claim rather than telling the operator to go and retype a working key.
+func TestDescribeCredentialFailure(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		err  error
+		name string
+		want string
+	}{
+		{
+			name: "a refusal names the credentials",
+			err:  &subflux.AuthError{Msg: "SubDL refused the API key (HTTP 403)"},
+			want: "the credentials were rejected: SubDL refused the API key (HTTP 403)",
+		},
+		{
+			name: "a wrapped refusal is still recognized",
+			err:  fmt.Errorf("check: %w", &subflux.AuthError{Msg: "refused"}),
+			want: "the credentials were rejected: refused",
+		},
+		{
+			name: "a transport failure does not accuse the credentials",
+			err:  errors.New("dial tcp 10.0.0.5:443: connect: connection refused"),
+			want: "could not reach the service: dial tcp 10.0.0.5:443: connect: connection refused",
+		},
+		{
+			name: "a rate limit is not a credential verdict either",
+			err:  &subflux.RateLimitError{Msg: "rate limited (429)"},
+			want: "could not reach the service: rate limited (429)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := describeCredentialFailure(tt.err); got != tt.want {
+				t.Errorf("describeCredentialFailure(%v) = %q, want %q", tt.err, got, tt.want)
 			}
 		})
 	}

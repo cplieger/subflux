@@ -159,8 +159,13 @@
   flex: 1;
 }
 
-.wiz-field :is(input, select) {
-  flex: 1;
+/* The one field skin for every wizard control, shared by `.wiz-field` rows and
+ * the repeatable rows in section 13. It was written out four times (here, and
+ * once each for the two language selects and the media-root input) and the
+ * copies had drifted to two heights, putting 32px selects beside 28px buttons
+ * in the same row; 1.75rem is the desktop interactive height the design system
+ * pins. Only WIDTH is per-control, below and in section 13. */
+:is(.wiz-field, .wiz-row) :is(input, select) {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
@@ -170,9 +175,13 @@
   font: inherit;
 }
 
-.wiz-field :is(input, select):focus {
+:is(.wiz-field, .wiz-row) :is(input, select):focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.wiz-field :is(input, select) {
+  flex: 1;
 }
 
 .wiz-field .wiz-toggle {
@@ -180,10 +189,16 @@
   flex-shrink: 0;
 }
 
-/* Secret field masking (no type=password outside forms, avoids Chrome DOM warnings) */
+/* Secret field masking (no type=password outside forms, avoids Chrome DOM
+ * warnings). `-webkit-text-security` is all of it: Chrome 1, Safari 3,
+ * Firefox 114, so every engine at the support floor masks. The
+ * `font-family: text-security-disc, …` fallback both copies carried was the
+ * Firefox-era webfont trick and this app ships no `@font-face`, so it resolved
+ * to nothing and only swapped the control's face before the dots were drawn
+ * (to `sans-serif` here, to `Verdana` in the settings dialog, so the two
+ * surfaces' dots differed on a machine that has Verdana). */
 .wiz-masked {
   -webkit-text-security: disc;
-  font-family: text-security-disc, Verdana, sans-serif;
 }
 
 /* ================================================================
@@ -248,6 +263,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-5);
   background: var(--input-bg);
 }
@@ -267,8 +283,16 @@
 }
 
 /* ================================================================
-   13. Language & media root rows
+   13. Repeatable rows (language defaults, audio rules, media roots)
    ================================================================ */
+
+/* One row shape serves three steps, and they hold a different number of
+   controls: two for a language default, three for an audio rule, one for a
+   media root, each plus a remove button. So the row sizes its CONTROLS and
+   never declares a column count. A hardcoded `1fr 1fr auto` grid here put the
+   audio rule's fourth child on a second line at the row's left edge, measured
+   66px tall against 32px at 600px and 94px against 44px on a phone, and gave
+   its variant select the `auto` column instead of a share of the width. */
 
 .wiz-lang-section-title {
   font-size: var(--text-sm);
@@ -277,45 +301,27 @@
   margin-block-end: var(--sp-3);
 }
 
-.wiz-lang-row {
+.wiz-row {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   margin-block-end: var(--sp-3);
 }
 
+/* Widths only; the skin and the height are the shared rule in section 9. */
 .wiz-lang-select {
   width: 10rem;
   flex-shrink: 0;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2) var(--sp-4);
-  height: 2rem;
-  color: var(--text);
-  font: inherit;
-}
-
-.wiz-lang-select:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 
 .wiz-lang-variant {
   width: 6rem;
   flex-shrink: 0;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2) var(--sp-4);
-  height: 2rem;
-  color: var(--text);
-  font: inherit;
 }
 
-.wiz-lang-variant:focus {
-  outline: none;
-  border-color: var(--accent);
+.wiz-media-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .wiz-lang-arrow {
@@ -324,14 +330,16 @@
   flex-shrink: 0;
 }
 
-/* Remove button: fixed square, override .auth-card button width */
-.auth-card .wiz-lang-remove {
+/* Remove button: fixed square, override .auth-card button width. It holds an
+   .icon mask rather than a "×" text node, because a glyph's ink sits on its
+   font's math axis while flex centring centres the LINE BOX: the residual is
+   ((ascent - descent) / 2 - inkCentreAboveBaseline) em, a font metric no rule
+   here controls. The mask box has no baseline, so it centres exactly. */
+.auth-card .wiz-row-remove {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--muted);
   cursor: pointer;
-  font-size: var(--text-base);
-  line-height: 1;
   width: 1.75rem;
   height: 1.75rem;
   flex-shrink: 0;
@@ -339,51 +347,38 @@
   min-width: 0;
 }
 
-.auth-card .wiz-lang-remove:hover {
+.auth-card .wiz-row-remove:hover {
   background: var(--ghost-hover);
   color: var(--text);
 }
 
-/* Narrow phones / touch: the fixed-width flex row (10rem + arrow + 10rem +
-   6rem + remove) overflows the card. Re-grid it: selects share the row width,
-   the decorative arrow goes, and the remove button keeps its square. */
+/* Narrow phones / touch: the authored widths (10rem + 10rem + 6rem, plus the
+   button) overflow the card, so the controls share the row and the decorative
+   arrow goes. A row that still cannot fit them WRAPS rather than shrinking
+   them past legibility: proportional shrink took the audio rule's variant
+   select to 59px at 390px, where its own "Hearing impaired" option needs more
+   than the language codes beside it. The remove button keeps its square and
+   takes the right edge on any line it lands alone on. */
 @media (width < 640px), (pointer: coarse) {
-  .wiz-lang-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    align-items: center;
+  .wiz-row {
+    flex-wrap: wrap;
   }
 
-  .wiz-lang-row .wiz-lang-arrow {
+  .wiz-row .wiz-lang-arrow {
     display: none;
   }
 
-  .wiz-lang-select,
-  .wiz-lang-variant {
-    width: 100%;
+  .wiz-row :is(input, select) {
+    flex: 1 1 7rem;
     min-width: 0;
+  }
+
+  .wiz-row-remove {
+    margin-inline-start: auto;
   }
 }
 
-/* Media root input: fill available space */
-.wiz-media-input {
-  flex: 1;
-  min-width: 0;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2) var(--sp-4);
-  height: 1.75rem;
-  color: var(--text);
-  font: inherit;
-}
-
-.wiz-media-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.wiz-lang-add {
+.wiz-row-add {
   background: var(--ghost);
   color: var(--text-2);
   border: none;
@@ -395,7 +390,7 @@
   margin-block-start: var(--sp-3);
 }
 
-.wiz-lang-add:hover {
+.wiz-row-add:hover {
   background: var(--ghost-hover);
   color: var(--text);
 }

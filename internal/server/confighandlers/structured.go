@@ -14,8 +14,10 @@ import (
 	"strings"
 
 	"github.com/cplieger/atomicfile/v3"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/rpid"
 	"github.com/cplieger/subflux/internal/subflux"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -30,9 +32,8 @@ import (
 // JSON is a subset of YAML, so each section's raw JSON parses directly into
 // a yaml.Node tree; assembling the document in schema section order and
 // letting yaml.Marshal render it IS the canonical serializer — no duplicate
-// struct tree, no hand-rolled emitter. Like the previous UI save path, a
-// structured save regenerates the file from form values: unknown hand-added
-// keys and comments are not preserved (unchanged, documented behavior).
+// struct tree, no hand-rolled emitter. A structured save regenerates the file
+// from the payload's sections, so comments in the file are not preserved.
 
 // StructuredConfig is the wire shape both structured endpoints share.
 type StructuredConfig struct {
@@ -140,6 +141,11 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 	// canonicalYAML through persistence (see saveMu).
 	h.saveMu.Lock()
 	defer h.saveMu.Unlock()
+
+	if fillErr := h.fillWebAuthnRPID(r.Context(), sc.Sections, originHost(r)); fillErr != nil {
+		httpapi.InternalErrorC(w, r, fillErr, subflux.CodeInternalError, "stage", "rp-id baseline")
+		return
+	}
 
 	data, err := h.canonicalYAML(r.Context(), &sc)
 	if err != nil {
@@ -338,6 +344,10 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
 		return
 	}
+	if err := h.checkWebAuthnRPID(r, newCfg.WebAuthnRPID()); err != nil {
+		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "auth.webauthn_rp_id: "+err.Error())
+		return
+	}
 
 	live := h.state()
 	if pingErr := h.pingArrIfChanged(r.Context(), arrSonarr, newCfg.Sonarr(), live.Sonarr); pingErr != nil {
@@ -385,6 +395,157 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 
 	slog.Info("config saved and hot-reloaded")
 	httpapi.WriteJSON(w, subflux.StatusResponse{Status: "saved and applied"})
+}
+
+// --- the WebAuthn relying-party ID: fill and gate ---
+
+// rpIDPath addresses auth.webauthn_rp_id in the config document.
+var rpIDPath = secretPath{"auth", "webauthn_rp_id"}
+
+// fillWebAuthnRPID supplies auth.webauthn_rp_id when the submitted document
+// carries no value for it: the value already on disk when there is one, else
+// one derived from the saving browser's own host. It never overwrites a
+// submitted value, and it reads the stored value only when the payload needs
+// it, so a complete payload can still repair an unreadable file. A stored
+// value the server could not read is not "no value" — deriving over it would
+// widen or delete what is there — so that case is returned as the error
+// wrapping errBaselineUnavailable and nothing is filled.
+//
+// "No value" is an absent auth section, or an auth object whose key is absent
+// or the empty string — the three shapes the wizard's Finish, the settings
+// dialog and a hand-crafted PUT respectively produce, and which the config
+// loader reads identically. A non-object auth section is left for the
+// downstream parse to refuse.
+func (h *Handler) fillWebAuthnRPID(ctx context.Context, sections map[string]json.RawMessage, host string) error {
+	section, needsValue := authSectionWithoutRPID(sections)
+	if !needsValue {
+		return nil
+	}
+
+	value, err := h.storedScalar(ctx, rpIDPath)
+	if err != nil {
+		return err
+	}
+	if value == "" {
+		if host == "" {
+			return nil
+		}
+		derived, derr := rpid.Derive(host)
+		if derr != nil {
+			slog.Debug("webauthn rp id not derived", "host", host, "error", derr)
+			return nil
+		}
+		value = derived
+		slog.Info("webauthn rp id derived from the saving browser", "rp_id", value, "host", host)
+	} else {
+		slog.Debug("webauthn rp id preserved", "rp_id", value)
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("encode rp id: %w", err)
+	}
+	section["webauthn_rp_id"] = encoded
+	raw, err := json.Marshal(section)
+	if err != nil {
+		return fmt.Errorf("encode auth section: %w", err)
+	}
+	sections["auth"] = raw
+	return nil
+}
+
+// authSectionWithoutRPID decodes the submitted auth section and reports whether
+// it carries no relying-party ID: an absent section, an absent key or the empty
+// string. A non-object section or a submitted value answers false.
+func authSectionWithoutRPID(sections map[string]json.RawMessage) (map[string]json.RawMessage, bool) {
+	section := map[string]json.RawMessage{}
+	if raw, ok := sections["auth"]; ok {
+		if err := json.Unmarshal(raw, &section); err != nil {
+			return nil, false
+		}
+	}
+	raw, ok := section["webauthn_rp_id"]
+	if !ok {
+		return section, true
+	}
+	var current string
+	if err := json.Unmarshal(raw, &current); err != nil || current != "" {
+		return nil, false
+	}
+	return section, true
+}
+
+// originHost is the host the saving browser is at: the Origin header's host,
+// parsed by the same parser a ceremony's origin goes through. A missing
+// header and a header ParseOrigin refuses both answer "" — there is no browser
+// host to derive from or to test against, and guessing from r.Host would
+// answer a different question.
+func originHost(r *http.Request) string {
+	raw := r.Header.Get("Origin")
+	if raw == "" {
+		return ""
+	}
+	o, err := authwebauthn.ParseOrigin(raw)
+	if err != nil {
+		return ""
+	}
+	return o.Host()
+}
+
+// checkWebAuthnRPID is the save gate: legality on every save, and the
+// served-host check only when the value CHANGES the stored one, so an
+// unrelated save from a host outside the RP ID's subtree (the LAN address, a
+// tunnel) is never refused over a passkey field nobody touched. A stored
+// value that cannot be read counts as no stored value here — the strict
+// direction, whose failure mode is a refused save, never a wrong value.
+func (h *Handler) checkWebAuthnRPID(r *http.Request, id string) error {
+	if id == "" {
+		return nil
+	}
+	if err := rpid.Validate(id); err != nil {
+		return err
+	}
+	stored, _ := h.storedScalar(r.Context(), rpIDPath)
+	if id == stored {
+		return nil
+	}
+	host := originHost(r)
+	if host == "" {
+		return nil
+	}
+	return rpid.ValidateForHost(id, host)
+}
+
+// storedScalar reads one scalar out of the config file on disk, reporting
+// absence and failure separately: ("", nil) when the file does not exist or
+// the key is missing or not a scalar; an error wrapping errBaselineUnavailable
+// when the file cannot be read for any other reason, cannot be parsed, or is
+// not a mapping. The FILE rather than the live config, because it is what a
+// save merges from and it is readable in unconfigured mode.
+func (h *Handler) storedScalar(ctx context.Context, path secretPath) (string, error) {
+	data, err := atomicfile.ReadBounded(ctx, h.configPath(), maxBodySize)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", nil
+		}
+		return "", fmt.Errorf("%w: read existing config: %w", errBaselineUnavailable, err)
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return "", fmt.Errorf("%w: parse existing config: %w", errBaselineUnavailable, err)
+	}
+	doc := documentMapping(&root)
+	if doc == nil {
+		if emptyYAMLDocument(&root) {
+			return "", nil
+		}
+		return "", fmt.Errorf("%w: existing config is not a YAML mapping", errBaselineUnavailable)
+	}
+	node := resolvePath(doc, path)
+	if node == nil || node.Kind != yaml.ScalarNode {
+		return "", nil
+	}
+	return strings.TrimSpace(node.Value), nil
 }
 
 // --- schema-driven secret paths + yaml.Node plumbing ---

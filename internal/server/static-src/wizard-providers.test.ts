@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as wizard from "./wizard.js";
 import { buildProvidersStep } from "./wizard-providers.js";
+import { SECRET_SAVED_PLACEHOLDER } from "./wizard-steps.js";
 import type { SchemaSection } from "./api-types.js";
 
 const wire = vi.hoisted(() => ({
@@ -23,8 +24,11 @@ vi.mock("./wire/client.gen.js", () => ({
   configSchema: () => Promise.resolve(wire.schema),
   configStructured: () => Promise.resolve(wire.structured),
   validateConfigPath: () => Promise.resolve(null),
-  webauthnRegisterBegin: () => Promise.resolve(null),
+  webauthnRegisterBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnLoginBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnAvailabilityRaw: () => Promise.resolve({ ok: false, status: 400 }),
   webauthnSignalData: () => Promise.resolve(null),
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
   // Reached only by a section's Test-connection button, which these
   // tests do not click; shaped like a real answer so a future one can.
   testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
@@ -50,6 +54,7 @@ function schemaFixture(): SchemaSection[] {
         {
           name: "subdl",
           label: "SubDL",
+          conn_test: true,
           settings: [
             { key: "api_key", label: "API Key", type: "text", secret: true },
             { key: "prefer_hi", label: "Prefer HI", type: "bool", default: "true" },
@@ -113,8 +118,6 @@ function textInput(id: string): HTMLInputElement {
   }
   return found;
 }
-
-const SAVED_PLACEHOLDER = "\u2022\u2022\u2022\u2022 saved \u2014 leave blank to keep";
 
 beforeEach(() => {
   wizard._resetForTest();
@@ -181,7 +184,7 @@ describe("providers step: rendering", () => {
     });
 
     expect(textInput("wiz-prov-subdl-api_key").value).toBe("");
-    expect(textInput("wiz-prov-subdl-api_key").placeholder).toBe(SAVED_PLACEHOLDER);
+    expect(textInput("wiz-prov-subdl-api_key").placeholder).toBe(SECRET_SAVED_PLACEHOLDER);
   });
 
   it("takes a bool setting's default when the config has no value", async () => {
@@ -333,5 +336,43 @@ describe("providers step: validate", () => {
     await wizard.startConfigWizard({ configValid: false });
 
     expect(buildProvidersStep().validate()).toBe("");
+  });
+});
+
+describe("providers step: the credential-check control", () => {
+  it("places the control in the card head of a provider that declares one", async () => {
+    const host = await boot({});
+
+    const cards = host.querySelectorAll(".wiz-prov-card");
+    expect(cards).toHaveLength(3);
+    expect(cards[0]!.querySelector(".wiz-prov-header .conn-test")).not.toBeNull();
+    // A provider with no credentials, and one that declares no test, render
+    // none: the server would refuse the request either way.
+    expect(cards[1]!.querySelector(".conn-test")).toBeNull();
+    expect(cards[2]!.querySelector(".conn-test")).toBeNull();
+  });
+
+  it("puts the control BEFORE the toggle, so every card's toggle lines up", async () => {
+    const host = await boot({});
+
+    const head = host.querySelector(".wiz-prov-header")!;
+    const kids = [...head.children];
+    expect(kids.indexOf(head.querySelector(".conn-test")!)).toBeLessThan(
+      kids.indexOf(head.querySelector(".wiz-toggle")!),
+    );
+  });
+
+  it("watches the provider's own settings, so editing one retires the verdict", async () => {
+    const host = await boot({});
+
+    const btn = host.querySelector<HTMLButtonElement>(".conn-test");
+    const key = host.querySelector<HTMLInputElement>("#wiz-prov-subdl-api_key");
+    expect(btn).not.toBeNull();
+    expect(key).not.toBeNull();
+
+    btn!.dataset["status"] = "ok";
+    key!.dispatchEvent(new Event("input"));
+
+    expect(btn!.dataset["status"]).toBeUndefined();
   });
 });

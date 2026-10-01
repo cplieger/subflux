@@ -71,6 +71,20 @@ function compact(nodes: (HTMLElement | null)[]): HTMLElement[] {
   return nodes.filter((n): n is HTMLElement => n !== null);
 }
 
+/** A cell this module's own `mount` built into a list row. `bindList` hands
+ *  `update` only the node its `mount` returned for that key, and each row kind
+ *  has its own key space, so the lookup cannot miss; it throws rather than
+ *  no-ops so a rebuilt row is loud (`dom.ts`'s `$` registry, same reason).
+ *  `reactive-contract.test.ts` pins the library half, so a bump that added a
+ *  structural `update` goes red there instead of throwing per row here. */
+function rowCell(node: HTMLElement, selector: string): HTMLElement {
+  const cell = node.querySelector<HTMLElement>(selector);
+  if (cell === null) {
+    throw new Error(`Missing row cell: ${selector}`);
+  }
+  return cell;
+}
+
 /**
  * Index key for one (language, variant) pair. ONE helper for every producer
  * and consumer: the subtitle index is built from stored files' lang/variant
@@ -525,14 +539,10 @@ function buildEpisodeRow(row: DetailEpRow): HTMLElement {
 
 /** Repaint just the dynamic parts of an episode row. */
 function paintEpisodeRow(node: HTMLElement, row: DetailEpRow): void {
-  const covCell = node.querySelector("td.ep-coverage");
-  if (covCell) {
-    covCell.replaceChildren(...episodeCoverageChildren(row));
-  }
-  const actionGroup = node.querySelector('[data-col="actions"] .action-group');
-  if (actionGroup) {
-    actionGroup.replaceChildren(...compact(episodeActionChildren(row)));
-  }
+  rowCell(node, "td.ep-coverage").replaceChildren(...episodeCoverageChildren(row));
+  rowCell(node, '[data-col="actions"] .action-group').replaceChildren(
+    ...compact(episodeActionChildren(row)),
+  );
   node.dataset["sig"] = row.sig;
 }
 
@@ -610,10 +620,9 @@ function buildSeasonHeadRow(row: DetailHeadRow, scope: Scope): HTMLElement {
 
 /** Repaint a season-head row's action buttons. */
 function paintSeasonHead(node: HTMLElement, row: DetailHeadRow, scope: Scope): void {
-  const actionGroup = node.querySelector('[data-col="actions"] .action-group');
-  if (actionGroup) {
-    actionGroup.replaceChildren(...compact(seasonHeadActionChildren(row, scope)));
-  }
+  rowCell(node, '[data-col="actions"] .action-group').replaceChildren(
+    ...compact(seasonHeadActionChildren(row, scope)),
+  );
   node.dataset["sig"] = row.sig;
 }
 
@@ -858,11 +867,6 @@ export function renderSeriesDetail(
     seriesColl = null;
   });
 
-  // Detach previous content BEFORE patching the fresh shell: patch reuses
-  // position-matched elements, so patching over a live table would keep the
-  // old tbody on screen instead of this binding's.
-  patch(out, document.createDocumentFragment());
-
   // The desktop tree leaves the table formatting context, so roles are
   // explicit. Accessible name is #lib-heading, populated before this commits.
   const frag = document.createDocumentFragment();
@@ -878,7 +882,10 @@ export function renderSeriesDetail(
       tbody,
     ),
   );
-  patch(out, frag);
+  // The installed tree must BE the tree this pass built: a reusing reconciler
+  // (`patch`) would host the fresh table inside a live one, leaving the bound
+  // tbody and the registered scan buttons detached.
+  out.replaceChildren(frag);
 }
 
 // --- Movie detail drilldown ---
@@ -948,10 +955,7 @@ function buildMovieRow(row: MovieRow): HTMLElement {
 
 /** Repaint just the coverage cell of a movie row (Search button is stable). */
 function paintMovieRow(node: HTMLElement, row: MovieRow): void {
-  const covCell = node.querySelector("td.ep-coverage");
-  if (covCell) {
-    covCell.replaceChildren(...movieCoverageChildren(row.entries));
-  }
+  rowCell(node, "td.ep-coverage").replaceChildren(...movieCoverageChildren(row.entries));
   node.dataset["sig"] = row.sig;
 }
 
@@ -1183,11 +1187,6 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     movieColl = null;
   });
 
-  // Detach previous content before patching the fresh shell: patch keys
-  // tables by data-movie-id, so a same-movie mount over a live table would
-  // keep the old tbody instead of this binding's.
-  patch(out, document.createDocumentFragment());
-
   const frag = document.createDocumentFragment();
   frag.appendChild(
     el(
@@ -1201,7 +1200,10 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
       tbody,
     ),
   );
-  patch(out, frag);
+  // The installed tree must BE the tree this pass built: `patch` keys tables by
+  // data-movie-id, so a same-movie mount over a live one would host the fresh
+  // table inside it and leave the bound tbody detached.
+  out.replaceChildren(frag);
 }
 
 // --- Bus handlers: coverage.js emits these ---

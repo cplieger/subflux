@@ -440,7 +440,9 @@ function ensureMounted(): void {
     ),
   );
   const tbl = el("table", { className: "library" }, thead, tbody);
-  const emptyEl = emptyState("No media found. Data will appear after the first scheduled scan.");
+  const emptyEl = emptyState(
+    "No media found. Titles appear once Sonarr or Radarr has imported files.",
+  );
   const noMatchEl = emptyState("No matching items.");
   // Same pagination affordance as the history table (.more-btn is the one
   // sanctioned full-width pagination style; the old "cov-show-more" class had
@@ -456,7 +458,12 @@ function ensureMounted(): void {
     },
     "Show more\u2026",
   );
-  patch(out, el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
+  // replaceChildren, not patch: the installed tree must BE the tree the
+  // visibility effect below closed over. A reusing reconciler copies a fresh
+  // node's attributes into whatever the container already holds — a skeleton
+  // row, a departing view's empty state — and discards the fresh node, so the
+  // effect's `hidden` writes would land on a detached subtree.
+  out.replaceChildren(el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
 
   // Content + structure tiers: per-row repaint on entity change, structural
   // reconcile on visibleIds change. Each row builds in a CHILD scope of this

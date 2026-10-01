@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -542,5 +542,81 @@ func TestPasskey_storedRowWithoutTheOctetReadsBackBackupEligible(t *testing.T) {
 	want := flagUserPresent | flagUserVerified | flagBackupEligible | flagBackupState
 	if got.RawFlags != want {
 		t.Errorf("RawFlags after decoding a row with no octet = %#08b, want %#08b (rebuilt from the booleans)", got.RawFlags, want)
+	}
+}
+
+func TestAnyPasskeyForDiscoverableLogin(t *testing.T) {
+	boolp := func(b bool) *bool { return &b }
+	tests := []struct {
+		name  string
+		creds []auth.PasskeyCredential
+		want  bool
+	}{
+		{name: "empty_store", want: false},
+		{
+			name: "one_discoverable",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: "example.com", Discoverable: boolp(true)},
+			},
+			want: true,
+		},
+		{
+			name: "one_unreported_discoverability",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: "example.com"},
+			},
+			want: true,
+		},
+		{
+			name: "all_explicitly_non_discoverable",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: "example.com", Discoverable: boolp(false)},
+				{CredentialID: []byte("c2"), RPID: "example.com", Discoverable: boolp(false)},
+			},
+			want: false,
+		},
+		{
+			name: "non_discoverable_then_discoverable",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: "example.com", Discoverable: boolp(false)},
+				{CredentialID: []byte("c2"), RPID: "example.com", Discoverable: boolp(true)},
+			},
+			want: true,
+		},
+		{
+			name: "all_recorded_against_another_rp",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: "other.example", Discoverable: boolp(true)},
+				{CredentialID: []byte("c2"), RPID: "other.example"},
+			},
+			want: false,
+		},
+		{
+			name: "unrecorded_rp_id",
+			creds: []auth.PasskeyCredential{
+				{CredentialID: []byte("c1"), RPID: ""},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newPasskeyStore(t)
+			for i := range tt.creds {
+				c := tt.creds[i]
+				c.UserID = 1
+				c.PublicKey = []byte("pub")
+				if err := s.CreatePasskey(t.Context(), &c); err != nil {
+					t.Fatalf("CreatePasskey(%q): %v", c.CredentialID, err)
+				}
+			}
+			got, err := s.AnyPasskeyForDiscoverableLogin(t.Context(), "example.com")
+			if err != nil {
+				t.Fatalf("AnyPasskeyForDiscoverableLogin(example.com) error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("AnyPasskeyForDiscoverableLogin(example.com) over %s = %v, want %v", tt.name, got, tt.want)
+			}
+		})
 	}
 }

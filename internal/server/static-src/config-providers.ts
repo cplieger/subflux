@@ -4,7 +4,9 @@ import { el } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { providerTimeouts } from "./wire/client.gen.js";
 import { cfgProviderBlock, scalarString } from "./config-values.js";
-import type { SchemaField, SchemaSection } from "./api-types.js";
+import { mountConnTest } from "./conn-test.js";
+import { CONFIG_BANNER_ID } from "./constants.js";
+import type { ProviderSchema, SchemaField, SchemaSection } from "./api-types.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
 
 // --- Inline interfaces for provider API shapes ---
@@ -33,6 +35,11 @@ export function providerFieldValue(
   }
   return scalarString(raw);
 }
+
+/** Teardown marker for the health fetch, which outlives the render pass that
+ *  started it: the next pass aborts the previous one, whose section is detached
+ *  by then and whose badges would land nowhere. */
+let healthPass: AbortController | null = null;
 
 export function renderProvidersSection(schema: SchemaSection): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
@@ -90,13 +97,19 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
         }
       });
     }
+    appendProviderConnTest(card, prov);
     sec.appendChild(card);
   }
 
   // Async: fetch provider health and show status badges.
-  providerTimeouts()
+  healthPass?.abort();
+  const pass = new AbortController();
+  healthPass = pass;
+  providerTimeouts({ signal: pass.signal })
     .then((data) => {
-      if (!data?.providers) {
+      // An abort that arrives after the response is already in hand still has
+      // to stop the write.
+      if (pass.signal.aborted || !data?.providers) {
         return;
       }
       for (const [name, status] of Object.entries(data.providers)) {
@@ -120,7 +133,11 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
           },
           status.timed_out ? (status.last_error ?? "timed out") : "healthy",
         );
-        head.insertBefore(badge, head.lastElementChild);
+        // Anchored on the toggle rather than on lastElementChild: the head's
+        // last element is whatever was appended most recently, so a positional
+        // insert silently changes where the badge lands the moment the head
+        // grows another control.
+        head.insertBefore(badge, head.querySelector(".toggle"));
       }
     })
     .catch(() => {
@@ -128,6 +145,28 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
     });
 
   return sec;
+}
+
+// appendProviderConnTest adds the credential-check control to a provider card
+// that declares one, in the card head beside the toggle — the same placement the
+// arr sections use for theirs.
+//
+// Every rendered setting is sent, not just the secrets: the server reads what it
+// needs by name, and the values it does not need cost one small JSON field each.
+function appendProviderConnTest(card: HTMLElement, prov: ProviderSchema): void {
+  if (!prov.conn_test) {
+    return;
+  }
+  const inputs: Record<string, HTMLInputElement | null> = {};
+  for (const sf of prov.settings ?? []) {
+    inputs[sf.key] = card.querySelector<HTMLInputElement>(
+      `#${CSS.escape(`cfg-prov-${prov.name}-s-${sf.key}`)}`,
+    );
+  }
+  const head = card.querySelector(".provider-head");
+  if (head) {
+    mountConnTest(head, prov.name, { inputs, bannerId: CONFIG_BANNER_ID });
+  }
 }
 
 // settingScalar mirrors the YAML scalar inference the old text emitter got

@@ -3,13 +3,47 @@ package subflux
 import (
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 )
 
 // SetupStatus is the JSON response for GET /api/auth/setup.
 type SetupStatus struct {
 	SetupRequired bool `json:"setup_required"`
 	ConfigValid   bool `json:"config_valid"`
+	// PasskeyLoginAvailable reports whether a passkey login could succeed on
+	// this server: a relying party is configured AND at least one stored
+	// credential could answer a discoverable login. It says nothing about the
+	// calling page's origin, which a GET cannot know; that half is the
+	// availability probe's, which takes the origin explicitly.
+	PasskeyLoginAvailable bool `json:"passkey_login_available"`
+}
+
+// WebAuthnUnavailableReason names why a passkey ceremony cannot be conducted.
+type WebAuthnUnavailableReason string
+
+// The wire reasons, one per condition, so the client's sentence per reason is
+// total: a parse-stage refusal of the probed origin is address_unusable, an IP
+// host is unconfigurable, and only host_not_covered is origin_not_accepted.
+const (
+	WebAuthnUnavailableUnconfigured    WebAuthnUnavailableReason = "unconfigured"
+	WebAuthnUnavailableUnconfigurable  WebAuthnUnavailableReason = "unconfigurable"
+	WebAuthnUnavailableInitFailed      WebAuthnUnavailableReason = "init_failed"
+	WebAuthnUnavailableInsecureScheme  WebAuthnUnavailableReason = "insecure_scheme"
+	WebAuthnUnavailableAddressUnusable WebAuthnUnavailableReason = "address_unusable"
+	WebAuthnUnavailableOrigin          WebAuthnUnavailableReason = "origin_not_accepted"
+	WebAuthnUnavailableNotAllowlisted  WebAuthnUnavailableReason = "origin_not_allowlisted"
+)
+
+// WebAuthnAvailability is the JSON response for
+// GET /api/auth/webauthn/availability. Reason names the condition and the
+// client owns the sentence; RPID and SuggestedRPID are what make a refusal
+// actionable, and neither is a secret (the RP ID rides every assertion
+// challenge, the suggestion derives from the caller's own origin).
+type WebAuthnAvailability struct {
+	Reason        WebAuthnUnavailableReason `json:"reason,omitempty"`
+	RPID          string                    `json:"rp_id,omitempty"`
+	SuggestedRPID string                    `json:"suggested_rp_id,omitempty"`
+	Available     bool                      `json:"available"`
 }
 
 // MeResponse is the JSON response for GET /api/auth/me.

@@ -8,7 +8,7 @@ export type AlertLevel = "error" | "warn" | "info";
 
 export type AlertOp = "raise" | "dismiss";
 
-export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
+export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "webauthn_unconfigured" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
 
 export type EventType = "coverage" | "notify" | "scan:start" | "scan:done" | "epoch" | "activity" | "alert" | "provider" | "sync:done";
 
@@ -33,6 +33,8 @@ export type ScoreTier = "excellent" | "good" | "acceptable" | "minimal" | "none"
 export type Source = "scheduled" | "manual";
 
 export type Variant = "standard" | "hi" | "forced";
+
+export type WebAuthnUnavailableReason = "unconfigured" | "unconfigurable" | "init_failed" | "insecure_scheme" | "address_unusable" | "origin_not_accepted" | "origin_not_allowlisted";
 
 /**
  * EventData is a sealed interface restricting Event.Data to known payload types.
@@ -164,11 +166,9 @@ export interface BulkDeleteRequest {
  */
 export interface ConnTestResponse {
   /**
- * Error is the failure, sanitized and capped for display. Where it is not
- * one of the named HTTP answers (describeArrFailure) it is the client's own
- * text, because an operator needs to tell "HTTP 401" from "connection
- * refused" and a vocabulary in front of those two would hide the
- * distinction that makes the test useful.
+ * Error is the failure, sanitized and capped for display. Unnamed answers
+ * keep the client's own text: an operator needs to tell "HTTP 401" from
+ * "connection refused", and a vocabulary in front of those would hide it.
  */
   error?: string;
   valid: boolean;
@@ -517,6 +517,13 @@ export interface ProviderSchema {
   name: string;
   label: string;
   settings?: SchemaField[];
+  /**
+ * ConnTest marks a provider whose implementation can validate its
+ * credentials without searching, so the settings dialog and the setup
+ * wizard render a test control on its card. The provider-section twin of
+ * SchemaSection.ConnTest, keyed by Name the way that one is keyed by Key.
+ */
+  conn_test?: boolean;
 }
 
 /** ProviderStatus is the state of a single provider's timeout. */
@@ -760,6 +767,14 @@ export interface SeriesItem {
 export interface SetupStatus {
   setup_required: boolean;
   config_valid: boolean;
+  /**
+ * PasskeyLoginAvailable reports whether a passkey login could succeed on
+ * this server: a relying party is configured AND at least one stored
+ * credential could answer a discoverable login. It says nothing about the
+ * calling page's origin, which a GET cannot know; that half is the
+ * availability probe's, which takes the origin explicitly.
+ */
+  passkey_login_available: boolean;
 }
 
 /**
@@ -962,6 +977,20 @@ export interface UserInfo {
   role: Role;
   id: number;
   enabled: boolean;
+}
+
+/**
+ * WebAuthnAvailability is the JSON response for
+ * GET /api/auth/webauthn/availability. Reason names the condition and the
+ * client owns the sentence; RPID and SuggestedRPID are what make a refusal
+ * actionable, and neither is a secret (the RP ID rides every assertion
+ * challenge, the suggestion derives from the caller's own origin).
+ */
+export interface WebAuthnAvailability {
+  reason?: WebAuthnUnavailableReason;
+  rp_id?: string;
+  suggested_rp_id?: string;
+  available: boolean;
 }
 
 /**

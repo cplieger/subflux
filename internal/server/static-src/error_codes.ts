@@ -31,8 +31,10 @@ export const ErrorCode = {
   // webauthn
   WebAuthnSessionInvalid: "webauthn_session_invalid",
   WebAuthnRegisterFailed: "webauthn_register_failed",
+  WebAuthnNotDiscoverable: "webauthn_not_discoverable",
   WebAuthnAssertionFailed: "webauthn_assertion_failed",
   WebAuthnUnsupportedOrigin: "webauthn_unsupported_origin",
+  WebAuthnUnconfigured: "webauthn_unconfigured",
 
   // oidc
   OIDCStateInvalid: "oidc_state_invalid",

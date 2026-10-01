@@ -274,6 +274,28 @@ async function load(
   await loadCoverage();
 }
 
+/** Real time, not fake: the skeleton controller's 150ms show-delay and 300ms
+ *  min-visible window bracket an AWAITED fetch, so a fake clock would have to
+ *  drive the fetch too. */
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Answer the deferred series fetch, so the load settles and the skeleton
+ *  controller can commit the content paint. */
+function settleDeferredSeries(rows: Record<string, unknown>[]): void {
+  const resolve = clientState.pending[0];
+  if (resolve === undefined) {
+    throw new Error("the deferred series fetch was never issued");
+  }
+  resolve(rows);
+}
+
+/** The no-media empty state INSIDE the installed list — the node the
+ *  visibility effect's write has to be able to reach. */
+const LIVE_EMPTY = "#coverageContent .cov-list > .empty";
+
 describe("coverage: fetchAndMergeCoverage", () => {
   it("merges series and movies under one _type discriminant", async () => {
     clientState.series = [series(1, "Show")];
@@ -832,6 +854,53 @@ describe("coverage: empty states", () => {
     const empties = Array.from(document.querySelectorAll<HTMLElement>(".cov-list .empty"));
     expect(empties.map((e) => e.hidden)).toEqual([true, true]);
     expect(reqEl<HTMLElement>("table.library").hidden).toBe(false);
+  });
+
+  // The three cases below differ ONLY in whether the skeleton painted before
+  // the list was installed. The first is the control: without it a selector
+  // that stopped matching would look exactly like the defect.
+  it("hides the no-media state on a load fast enough to skip the skeleton", async () => {
+    await load([series(1, "Alpha")]);
+
+    expect(rowTitles()).toEqual(["Alpha"]);
+    const empty = reqEl<HTMLElement>(LIVE_EMPTY);
+    expect(empty.textContent).toContain("No media found");
+    expect(empty.hidden).toBe(true);
+  });
+
+  it("hides the no-media state on a load that painted the skeleton first", async () => {
+    clientState.defer = true;
+    const done = loadCoverage();
+    await sleep(220);
+    expect(document.querySelectorAll("#coverageContent .skeleton-row").length).toBe(8);
+
+    settleDeferredSeries([series(1, "Alpha")]);
+    await done;
+    await sleep(400);
+
+    expect(rowTitles()).toEqual(["Alpha"]);
+    const empty = reqEl<HTMLElement>(LIVE_EMPTY);
+    expect(empty.textContent).toContain("No media found");
+    expect(empty.hidden).toBe(true);
+  });
+
+  it("installs the empty state the effect holds, not a node the skeleton left behind", async () => {
+    clientState.defer = true;
+    const done = loadCoverage();
+    await sleep(220);
+    const skeletonInner = reqEl<HTMLElement>("#coverageContent .skeleton-row > .skeleton");
+
+    settleDeferredSeries([series(1, "Alpha")]);
+    await done;
+    await sleep(400);
+
+    // A reusing install seats the list on the skeleton row and the empty state
+    // on its inner div, copying the class across and leaving the node the
+    // visibility effect closed over detached — same node, right class, and a
+    // `hidden` write that lands nowhere.
+    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
+    expect(installed).not.toBe(skeletonInner);
+    expect(installed.hidden).toBe(true);
   });
 });
 

@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 )
 
 const (

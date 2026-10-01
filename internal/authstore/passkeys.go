@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -448,6 +448,48 @@ func (s *Store) DeletePasskey(_ context.Context, ref auth.PasskeyRef) error {
 		slog.Info("passkey deleted", "passkey_id", ref.ID, "user_id", ref.UserID)
 	}
 	return nil
+}
+
+// AnyPasskeyForDiscoverableLogin reports whether any stored credential could
+// answer a discoverable login for rpID: one cursor over auth_passkeys,
+// returning at the first usable row. A usable row is the normal case (the
+// library refuses a non-discoverable credential at registration), so the
+// expected cost is one decode; only a store whose every row is explicitly
+// unusable walks the bucket.
+//
+// A nil Discoverable counts as usable — every credential stored before the
+// client forwarded credProps carries nil, and reading it as false would hide
+// the login button from every user who already has a working passkey. An
+// empty stored RPID takes the same unknown-is-usable rule; a different one is
+// a stranded credential that cannot answer.
+func (s *Store) AnyPasskeyForDiscoverableLogin(_ context.Context, rpID string) (bool, error) {
+	var usable bool
+	err := s.view(func(tx *bbolt.Tx) error {
+		pb, ok := authBucket(tx, bucketAuthPasskeys)
+		if !ok {
+			return nil
+		}
+		c := pb.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var rec pkRec
+			if err := decodeAuthRecord(bucketAuthPasskeys, k, v, &rec); err != nil {
+				return err
+			}
+			if rec.canAnswerDiscoverableLogin(rpID) {
+				usable = true
+				return nil
+			}
+		}
+		return nil
+	})
+	return usable, err
+}
+
+func (r *pkRec) canAnswerDiscoverableLogin(rpID string) bool {
+	if r.RPID != "" && r.RPID != rpID {
+		return false
+	}
+	return r.Discoverable == nil || *r.Discoverable
 }
 
 // PasskeyCountForUser returns the number of passkeys registered for a user

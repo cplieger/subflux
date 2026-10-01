@@ -372,6 +372,32 @@ const AUTH_SCHEMA: SchemaSection[] = [
   },
 ];
 
+// One section per handler family the form's install statement owns: a list row
+// (add + remove), a secret field (reveal), and the language builder (add).
+const HANDLERS_SCHEMA: SchemaSection[] = [
+  {
+    key: "media_roots",
+    title: "Media Roots",
+    type: "list",
+    fields: [{ key: "path", label: "Path", type: "text", placeholder: "/media" }],
+  },
+  {
+    key: "sonarr",
+    title: "Sonarr",
+    type: "fields",
+    fields: [
+      { key: "url", label: "URL", type: "text" },
+      { key: "api_key", label: "API Key", type: "secret", secret: true },
+    ],
+  },
+  { key: "language_rules", title: "Languages", type: "languages" },
+];
+
+const HANDLERS_SECTIONS: Record<string, unknown> = {
+  media_roots: ["/media/tv"],
+  sonarr: { url: "http://sonarr:8989", api_key: "****" },
+};
+
 /** The rendered input for one schema field. */
 function fieldInput(h: Harness, section: string, field: string): HTMLInputElement {
   const inp = h.body.querySelector<HTMLInputElement>(`#cfg-${section}-${field}`);
@@ -379,6 +405,32 @@ function fieldInput(h: Harness, section: string, field: string): HTMLInputElemen
     throw new Error(`missing rendered input #cfg-${section}-${field}`);
   }
   return inp;
+}
+
+function pick<T extends Element>(root: ParentNode, sel: string): T {
+  const found = root.querySelector<T>(sel);
+  if (!found) {
+    throw new Error(`missing ${sel}`);
+  }
+  return found;
+}
+
+/** The form's button carrying this exact label. */
+function labelled(root: ParentNode, text: string): HTMLButtonElement {
+  const found = [...root.querySelectorAll("button")].find((b) => b.textContent === text);
+  if (!found) {
+    throw new Error(`missing button ${text}`);
+  }
+  return found;
+}
+
+/** The sections payload `config.save` was dispatched with — what a save writes. */
+function savedSections(): Record<string, unknown> {
+  const call = actions.calls.find((c) => c.name === "config.save");
+  if (!call) {
+    throw new Error("config.save was never dispatched");
+  }
+  return call.args as Record<string, unknown>;
 }
 
 // --- Dismissal policy ------------------------------------------------------
@@ -748,9 +800,31 @@ describe("config: WebAuthn RP ID change guard", () => {
     expect(asked.calls).toHaveLength(0);
   });
 
-  it("asks when the form carries no auth section at all", async () => {
-    // The schema renders no auth section, so the payload has no auth key —
-    // dropping a stored RP ID is still a change that strands passkeys.
+  it("asks nothing when the rendered RP ID field is cleared, because the save keeps the stored value", async () => {
+    // An emptied field is submitted as an absent key, which the server fills
+    // from the stored value, so no passkey is stranded and a warning would
+    // describe a consequence the save cannot produce. The payload assertion is
+    // what stops this passing for the opposite reason.
+    const h = await boot({
+      schema: AUTH_SCHEMA,
+      sections: { auth: { webauthn_rp_id: "example.com" } },
+    });
+    await openDrawer(h);
+    fieldInput(h, "auth", "webauthn_rp_id").value = "";
+    asked.answer = false;
+
+    await h.config.saveConfig();
+    await flush();
+
+    expect(asked.calls).toHaveLength(0);
+    expect(savedSections()["auth"]).not.toHaveProperty("webauthn_rp_id");
+  });
+
+  it("asks nothing when the schema renders no auth section, because the save keeps it", async () => {
+    // A section the schema does not describe is round-tripped verbatim, so the
+    // stored RP ID reaches the file unchanged and no passkey is stranded. The
+    // payload assertion is what stops this passing for the opposite reason —
+    // a dropped section with the guard also broken.
     const h = await boot({
       schema: SEARCH_SCHEMA,
       sections: { auth: { webauthn_rp_id: "example.com" } },
@@ -759,9 +833,10 @@ describe("config: WebAuthn RP ID change guard", () => {
     asked.answer = false;
 
     await h.config.saveConfig();
+    await flush();
 
-    expect(asked.calls).toHaveLength(1);
-    expect(actions.names()).toHaveLength(0);
+    expect(asked.calls).toHaveLength(0);
+    expect(savedSections()["auth"]).toStrictEqual({ webauthn_rp_id: "example.com" });
   });
 });
 
@@ -813,7 +888,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner")).not.toBeNull();
+    expect(h.body.querySelector(".cfg-banner:not([hidden])")).not.toBeNull();
     expect(h.body.textContent).toContain("Configure at least one of Sonarr or Radarr");
     expect(fieldInput(h, "sonarr", "url").classList.contains("cfg-required")).toBe(true);
   });
@@ -827,7 +902,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner")).not.toBeNull();
+    expect(h.body.querySelector(".cfg-banner:not([hidden])")).not.toBeNull();
     expect(h.body.textContent).toContain("Configuration has errors");
   });
 
@@ -838,7 +913,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner")).toBeNull();
+    expect(h.body.querySelector(".cfg-banner:not([hidden])")).toBeNull();
     expect(fieldInput(h, "sonarr", "url").value).toBe("");
     expect(fieldInput(h, "sonarr", "url").classList.contains("cfg-required")).toBe(false);
   });
@@ -850,7 +925,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner")).toBeNull();
+    expect(h.body.querySelector(".cfg-banner:not([hidden])")).toBeNull();
   });
 
   it("routes each section type to its own renderer", async () => {
@@ -890,6 +965,192 @@ describe("config: rendering the config form", () => {
 
     expect(h.body.querySelector("#section-mystery")).not.toBeNull();
     expect(h.body.querySelector("#section-search")).toBeNull();
+  });
+
+  it("refuses an edit to an unknown section instead of accepting one nothing saves", async () => {
+    const h = await boot({ sections: { mystery: { a: 1 } }, schema: SEARCH_SCHEMA });
+
+    await openDrawer(h);
+
+    // The save round-trips the STORED value, so nothing typed here reaches the
+    // file. Read-only is the only honest state for the control.
+    expect(pick<HTMLTextAreaElement>(h.body, "#section-mystery").readOnly).toBe(true);
+  });
+
+  it("says at the unknown section why it cannot be edited here", async () => {
+    const h = await boot({ sections: { mystery: { a: 1 } }, schema: SEARCH_SCHEMA });
+
+    await openDrawer(h);
+
+    const notice = pick<HTMLTextAreaElement>(h.body, "#section-mystery").previousElementSibling;
+    expect(notice?.textContent).toContain("config file");
+  });
+
+  // assembleSections builds config.yaml from the submitted sections ALONE, so a
+  // section the payload omits is one the save deletes from disk — and the loader
+  // runs strict unknown-key checks, so a section present in that file is one the
+  // config struct accepts. Both directions below are the contract: the section
+  // survives, and nothing typed into its control reaches the file.
+
+  it("keeps a section the schema does not know in what a save writes", async () => {
+    const mystery = { retries: 3, nested: { codecs: ["srt", "ass"], deep: { on: true } } };
+    const h = await boot({ sections: { mystery }, schema: SEARCH_SCHEMA });
+    await openDrawer(h);
+
+    await h.config.saveConfig();
+
+    // Key order too, not just shape: the server renders the payload straight
+    // into the YAML document.
+    expect(JSON.stringify(savedSections()["mystery"])).toBe(JSON.stringify(mystery));
+    expect(savedSections()["mystery"]).toStrictEqual(mystery);
+  });
+
+  it("sends the server's own value for it rather than anything typed into it", async () => {
+    const h = await boot({ sections: { mystery: { retries: 3 } }, schema: SEARCH_SCHEMA });
+    await openDrawer(h);
+    // The control is read-only, so this is what a devtools or scripted edit
+    // does. Nothing here parses that text, so it may not reach the file.
+    pick<HTMLTextAreaElement>(h.body, "#section-mystery").value = '{"retries": 9999}';
+
+    await h.config.saveConfig();
+
+    expect(savedSections()["mystery"]).toStrictEqual({ retries: 3 });
+  });
+});
+
+// --- Handlers and reader state across a re-render --------------------------
+
+// #configBody is a static element in index.html that nothing replaces, and the
+// form re-renders into it on every open, on every successful save and on every
+// reset — so a second pass over a live tree is the normal case here, not an edge
+// one. The CONTROL block below asserts the same three observables after ONE
+// render: without it a broken selector reads exactly like the defect.
+
+describe("config: form handlers after a re-render", () => {
+  it("adds a language default", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+    await openDrawer(h);
+
+    const defaults = pick<HTMLElement>(h.body, "#lang-defaults");
+    expect(defaults.children).toHaveLength(1);
+    labelled(h.body, "+ Add subtitle").click();
+
+    expect(defaults.children).toHaveLength(2);
+  });
+
+  it("removes a list row", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+    await openDrawer(h);
+
+    const list = pick<HTMLElement>(h.body, "#media_roots-list");
+    expect(list.children).toHaveLength(1);
+    pick<HTMLButtonElement>(list, 'button[aria-label="Remove item"]').click();
+
+    expect(list.children).toHaveLength(0);
+  });
+
+  it("unmasks the secret field the reveal button sits beside", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+    await openDrawer(h);
+
+    const inp = fieldInput(h, "sonarr", "api_key");
+    expect(inp.classList.contains("cfg-masked")).toBe(true);
+    pick<HTMLButtonElement>(h.body, "button.cfg-reveal").click();
+
+    expect(inp.classList.contains("cfg-masked")).toBe(false);
+  });
+
+  it("returns focus to the field the reader left", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+    fieldInput(h, "sonarr", "url").focus();
+
+    await openDrawer(h);
+
+    // A different element, same field: the restore is keyed, not held.
+    expect(document.activeElement).toBe(fieldInput(h, "sonarr", "url"));
+  });
+
+  it("puts the form back at the reader's scroll offset", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    // #configBody is .dlg-body in the app, the dialog's scroller; the harness
+    // loads no stylesheet, so the box that makes it one comes from here.
+    h.body.style.height = "100px";
+    h.body.style.overflow = "auto";
+    await openDrawer(h);
+    // Focus a control at the TOP of a form scrolled well past it: restoring
+    // focus scrolls the container to reveal it, so the offset has to be put
+    // back after that, not before.
+    pick<HTMLInputElement>(h.body, "#media_roots-list input").focus();
+    h.body.scrollTop = 100;
+    expect(h.body.scrollTop).toBe(100);
+
+    await openDrawer(h);
+
+    expect(h.body.scrollTop).toBe(100);
+  });
+
+  it("leaves a usable form behind when a save succeeds while still unconfigured", async () => {
+    const h = await boot({
+      unconfigured: true,
+      sections: HANDLERS_SECTIONS,
+      schema: HANDLERS_SCHEMA,
+    });
+    await openDrawer(h);
+    // The save applied, and the reload's parsed-config read answered nothing —
+    // so the stale `configured: false` is what closeConfig reads, it refuses,
+    // and the reader is left on the form the reload just rebuilt.
+    wire.parsed = null;
+
+    await h.config.saveConfig();
+    await flush();
+
+    // The refusal is the precondition: without it the form under test is not
+    // the one the reader is looking at.
+    expect(toasts.error).toContain(UNCONFIGURED_TOAST);
+    const defaults = pick<HTMLElement>(h.body, "#lang-defaults");
+    expect(defaults.children).toHaveLength(1);
+    labelled(h.body, "+ Add subtitle").click();
+
+    expect(defaults.children).toHaveLength(2);
+  });
+});
+
+describe("config: form handlers after one render (control)", () => {
+  it("adds a language default", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+
+    const defaults = pick<HTMLElement>(h.body, "#lang-defaults");
+    expect(defaults.children).toHaveLength(1);
+    labelled(h.body, "+ Add subtitle").click();
+
+    expect(defaults.children).toHaveLength(2);
+  });
+
+  it("removes a list row", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+
+    const list = pick<HTMLElement>(h.body, "#media_roots-list");
+    expect(list.children).toHaveLength(1);
+    pick<HTMLButtonElement>(list, 'button[aria-label="Remove item"]').click();
+
+    expect(list.children).toHaveLength(0);
+  });
+
+  it("unmasks the secret field the reveal button sits beside", async () => {
+    const h = await boot({ sections: HANDLERS_SECTIONS, schema: HANDLERS_SCHEMA });
+    await openDrawer(h);
+
+    const inp = fieldInput(h, "sonarr", "api_key");
+    expect(inp.classList.contains("cfg-masked")).toBe(true);
+    pick<HTMLButtonElement>(h.body, "button.cfg-reveal").click();
+
+    expect(inp.classList.contains("cfg-masked")).toBe(false);
   });
 });
 
