@@ -47,3 +47,6 @@ reports/
 # internal/server/static-src/stryker.config.json), where the vitest runner drops
 # one setup file per worker into the package dir and never removes them.
 internal/server/static-src/stryker-setup-*.js
+
+# Agent workflow scratch
+.agents/
