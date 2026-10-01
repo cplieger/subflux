@@ -208,10 +208,15 @@ method (*Pattern).String
 # archive/zip_test.go's two chain assertions are what it serves. Its counterpart
 # guard is NOT here but in the code: ExtractAndValidate marks these permanent, or
 # the reachable chain would make a corrupt archive look retryable.
+# rpid.Error.Unwrap carries auth/webauthn's ErrIllegalRPID on the illegal_domain
+# arm, so a caller can branch on the library's sentinel without parsing the
+# message; rpid_test.go's TestDerive_illegalDomainWrapsTheLibrarySentinel pins
+# that errors.Is reaches it.
 method (*RateLimitError).Error
 method (*RegistryError).Error
 method (*RegistryError).Unwrap
 method (*memberReadError).Unwrap
+method (*Error).Unwrap
 method (*ValidationError).Error
 method (*FieldDependencyError).Error
 
