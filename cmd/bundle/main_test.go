@@ -169,6 +169,56 @@ func TestBundleWorker_servesTheSameURLFromARelativeOutdir(t *testing.T) {
 	}
 }
 
+// The setup wizard is a chunk only /setup fetches, and that rests on the real
+// option set splitting a dynamically imported module out of the entry rather
+// than inlining it.
+func TestBundleOptions_splitADynamicImportIntoItsOwnChunk(t *testing.T) {
+	const marker = "LAZY_CHUNK_MARKER"
+	src := t.TempDir()
+	out := t.TempDir()
+	entry := filepath.Join(src, "entry.ts")
+	entryBody := "export async function go(): Promise<void> {\n" +
+		"  const m = await import(\"./lazy.js\");\n  m.run();\n}\nvoid go();\n"
+	if err := os.WriteFile(entry, []byte(entryBody), 0o600); err != nil {
+		t.Fatalf("Setup: writing the fixture entrypoint: %v", err)
+	}
+	lazyBody := "export function run(): void {\n  console.log(" + strconv.Quote(marker) + ");\n}\n"
+	if err := os.WriteFile(filepath.Join(src, "lazy.ts"), []byte(lazyBody), 0o600); err != nil {
+		t.Fatalf("Setup: writing the lazily imported fixture module: %v", err)
+	}
+
+	result := api.Build(bundleOptions([]string{entry}, out, ""))
+	if len(result.Errors) > 0 {
+		msgs := api.FormatMessages(result.Errors, api.FormatMessagesOptions{Kind: api.ErrorMessage, Color: false})
+		t.Fatalf("Setup: api.Build(bundleOptions(%q, %q)) failed: %s", entry, out, strings.Join(msgs, "\n"))
+	}
+	bundle, err := os.ReadFile(filepath.Join(out, "entry.js"))
+	if err != nil {
+		t.Fatalf("Setup: api.Build(bundleOptions(...)) wrote no entry.js: %v", err)
+	}
+
+	if strings.Contains(string(bundle), marker) {
+		t.Errorf("entry.js carries %s; the lazily imported module was inlined instead of split out", marker)
+	}
+	names := chunkNames(t, out)
+	carriers := 0
+	for _, name := range names {
+		chunk, err := os.ReadFile(filepath.Join(out, "chunks", name))
+		if err != nil {
+			t.Fatalf("Setup: reading chunks/%s: %v", name, err)
+		}
+		if strings.Contains(string(chunk), marker) {
+			carriers++
+		}
+	}
+	if carriers != 1 {
+		t.Errorf("chunks carrying %s = %d, want exactly 1; chunks/ = %q", marker, carriers, names)
+	}
+	if !strings.Contains(string(bundle), "import(") || !strings.Contains(string(bundle), "./chunks/") {
+		t.Errorf("entry.js fetches no chunk at runtime, want an import() naming ./chunks/; got %q", string(bundle))
+	}
+}
+
 // writeWorkerFixture writes a minimal worker source whose body carries
 // `marker`, so two fixtures differ by content and hash differently.
 func writeWorkerFixture(t *testing.T, src, marker string) {
