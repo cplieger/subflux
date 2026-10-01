@@ -13,8 +13,8 @@ import { registerCleanup } from "@cplieger/actions";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
 import { storePasswordCredential } from "./password-credential.js";
-import { startConfigWizard } from "./wizard.js";
-import { postLoginDestination } from "./wizard-state.js";
+import type { WizardEntry } from "./wizard.js";
+import { postLoginDestination } from "./post-login.js";
 import { SETUP_PATH } from "./constants.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import {
@@ -53,6 +53,23 @@ registerCleanup(() => {
     conditionalRetryTimer = null;
   }
 });
+
+// --- The setup wizard's chunk ---
+
+const WIZARD_LOAD_FAILED = "The setup wizard could not be loaded. Reload the page to continue.";
+
+/** loadWizard fetches the setup wizard's chunk. It is a separate chunk because only
+ *  /setup ever needs it and every sign-in would otherwise download it; null on a
+ *  failed fetch, the same shape the generated client answers with. */
+async function loadWizard(): Promise<{
+  startConfigWizard: (entry: WizardEntry) => Promise<void>;
+} | null> {
+  try {
+    return await import("./wizard.js");
+  } catch {
+    return null;
+  }
+}
 
 // --- Initialization ---
 
@@ -94,7 +111,13 @@ async function init(): Promise<void> {
     const who = await me();
     if (who) {
       if (postLoginDestination(who.role, false) === "wizard") {
-        await startConfigWizard({ configValid: false });
+        const wiz = await loadWizard();
+        if (!wiz) {
+          showPage("loginPage");
+          showError("loginError", WIZARD_LOAD_FAILED);
+          return;
+        }
+        await wiz.startConfigWizard({ configValid: false });
       } else {
         showPage("setupNoticePage");
       }
@@ -300,7 +323,12 @@ function wireLoginForm(resumeSetup: boolean): void {
         // "an admin needs to finish setup" notice instead of a wizard of 403s.
         const dest = postLoginDestination(res.data?.user.role ?? "", false);
         if (dest === "wizard") {
-          await startConfigWizard({ configValid: false, password });
+          const wiz = await loadWizard();
+          if (!wiz) {
+            showError("loginError", WIZARD_LOAD_FAILED);
+            return;
+          }
+          await wiz.startConfigWizard({ configValid: false, password });
         } else {
           showPage("setupNoticePage");
         }
@@ -386,7 +414,12 @@ function wireSetupForm(configValid: boolean): void {
     // Not awaited: the wizard must not wait behind a save prompt, and the
     // call never rejects (see password-credential.ts).
     void storePasswordCredential(username, password);
-    await startConfigWizard({ configValid, password });
+    const wiz = await loadWizard();
+    if (!wiz) {
+      showError("setupError", WIZARD_LOAD_FAILED);
+      return;
+    }
+    await wiz.startConfigWizard({ configValid, password });
   });
 }
 

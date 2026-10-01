@@ -1,8 +1,8 @@
 // wizard-state.test.ts — Pins the first-boot wizard's decision logic:
 // prefill from structured configs (with presence flags), the
 // satisfied/collapse gating incl. the fresh-volume example-config FULL-walk
-// fixture, stale-draft invalidation, the preserve-untouched-sections
-// round-trip proof, and the non-admin entry routing.
+// fixture, stale-draft invalidation, and the preserve-untouched-sections
+// round-trip proof.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -15,7 +15,6 @@ import {
   fingerprintBoot,
   overlayDraft,
   parseDraft,
-  postLoginDestination,
   prefillModel,
   providerEnabledInSections,
   satisfiedSteps,
@@ -547,21 +546,5 @@ describe("providerEnabledInSections", () => {
     expect(providerEnabledInSections(sections, "animetosho")).toBe(true);
     expect(providerEnabledInSections(sections, "opensubtitles")).toBe(false);
     expect(providerEnabledInSections(sections, "nonexistent")).toBe(false);
-  });
-});
-
-// --- Non-admin entry (R3.8) ---
-
-describe("postLoginDestination", () => {
-  it("routes an admin into the wizard while the config is invalid", () => {
-    expect(postLoginDestination("admin", false)).toBe("wizard");
-  });
-  it("routes a non-admin to the finish-setup notice, never a wizard of 403s", () => {
-    expect(postLoginDestination("user", false)).toBe("admin_needed_notice");
-    expect(postLoginDestination("", false)).toBe("admin_needed_notice");
-  });
-  it("routes everyone to the app when the config is valid", () => {
-    expect(postLoginDestination("admin", true)).toBe("app");
-    expect(postLoginDestination("user", true)).toBe("app");
   });
 });
