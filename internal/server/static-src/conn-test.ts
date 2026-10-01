@@ -2,7 +2,6 @@
 // carry it is schema-declared, and the probe runs server-side; see `subflux.md`.
 
 import { el, icon } from "./dom.js";
-import { showError, hideError, bannerText } from "./dom-core.js";
 import { testConnectionRaw } from "./wire/client.gen.js";
 import type { ApiResult } from "./api-client.js";
 import type { ConnTestResponse } from "./wire/types.gen.js";
@@ -13,14 +12,23 @@ const SUCCESS_LINGER_MS = 3000;
 
 const LABEL = "Test credentials";
 
+/** ConnTestBanner is the surface's red top banner, as the three operations the
+ *  control performs on it. text() is what lets a success clear only the message
+ *  THIS control posted: the banner is shared with the surface's other errors. */
+export interface ConnTestBanner {
+  show(msg: string): void;
+  hide(): void;
+  text(): string;
+}
+
 /** The control's host: the inputs whose values it sends and whose edits retire a
- *  verdict, and the id of the surface's red top banner.
+ *  verdict, and the writer over the surface's red top banner.
  *
  *  Elements rather than ids, because every host builds the control while its
  *  section is still detached. A null element sends "" for its key. */
 export interface ConnTestHost {
   inputs: Record<string, HTMLInputElement | null>;
-  bannerId: string;
+  banner: ConnTestBanner;
 }
 
 /** Build the credential-check control for one section or provider. `kind` is the
@@ -57,8 +65,8 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
   };
 
   const clearBanner = (): void => {
-    if (posted !== "" && bannerText(host.bannerId) === posted) {
-      hideError(host.bannerId);
+    if (posted !== "" && host.banner.text() === posted) {
+      host.banner.hide();
     }
     posted = "";
   };
@@ -77,7 +85,7 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
     btn.dataset["status"] = "err";
     btn.replaceChildren(icon("close"));
     posted = msg;
-    showError(host.bannerId, msg);
+    host.banner.show(msg);
   };
 
   // A green verdict beside a key edited since the test is a lie the operator

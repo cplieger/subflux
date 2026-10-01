@@ -9,6 +9,7 @@
 // APPENDED is covered by the four hosts' own suites.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { connTestControl } from "./conn-test.js";
+import { configBanner, configBannerHost } from "./config-banner.js";
 import type { ApiResult } from "./api-client.js";
 import type { ConnTestResponse } from "./wire/types.gen.js";
 
@@ -35,27 +36,28 @@ vi.mock("./wire/client.gen.js", () => ({
   },
 }));
 
-const BANNER_ID = "testBanner";
-
 interface Mounted {
   btn: HTMLButtonElement;
   banner: HTMLElement;
   inputs: Record<string, HTMLInputElement>;
 }
 
-/** mount renders one control over freshly created inputs and a hidden banner,
- *  the shape both real hosts provide. */
+/** mount renders one control over freshly created inputs and the settings
+ *  form's REAL banner, so the writer under test is the shipped one. */
 function mount(kind = "sonarr", keys: string[] = ["url", "api_key"]): Mounted {
   const inputs: Record<string, HTMLInputElement> = {};
   for (const key of keys) {
     inputs[key] = document.createElement("input");
   }
-  const banner = document.createElement("div");
-  banner.id = BANNER_ID;
-  banner.hidden = true;
-  const btn = connTestControl(kind, { inputs, bannerId: BANNER_ID });
-  document.body.replaceChildren(banner, ...Object.values(inputs), btn);
-  return { btn, banner, inputs };
+  const btn = connTestControl(kind, { inputs, banner: configBanner });
+  document.body.replaceChildren(configBannerHost, ...Object.values(inputs), btn);
+  return { btn, banner: configBannerHost, inputs };
+}
+
+/** messages names what the banner is showing: the host is permanent, so the
+ *  observable is which `.cfg-banner` messages it holds, in order. */
+function messages(host: HTMLElement): string[] {
+  return [...host.querySelectorAll(".cfg-banner")].map((m) => m.textContent ?? "");
 }
 
 /** settle lets the click's awaited chain run to completion under fake timers,
@@ -94,7 +96,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   // Browser Mode isolates per FILE, not per test, and nothing clears the body
-  // for us: a leftover banner would answer for the next case's control.
+  // for us. The banner host is module-held, so its message outlives the body.
+  configBanner.hide();
   document.body.replaceChildren();
 });
 
@@ -200,7 +203,7 @@ describe("conn-test: a success fades and a failure does not", () => {
     await vi.advanceTimersByTimeAsync(60_000);
 
     expect(state(m.btn)).toBe("err");
-    expect(m.banner.hidden).toBe(false);
+    expect(messages(m.banner)).toEqual(["HTTP 401"]);
   });
 
   it("does not fade a success that an edit has already retired", async () => {
@@ -255,8 +258,7 @@ describe("conn-test: the banner carries the reason", () => {
     m.btn.click();
     await settle();
 
-    expect(m.banner.hidden).toBe(false);
-    expect(m.banner.textContent).toBe("the credentials were rejected: HTTP 401");
+    expect(messages(m.banner)).toEqual(["the credentials were rejected: HTTP 401"]);
   });
 
   it("distinguishes a transport failure from a verdict about the service", async () => {
@@ -266,7 +268,7 @@ describe("conn-test: the banner carries the reason", () => {
     m.btn.click();
     await settle();
 
-    expect(m.banner.textContent).toBe("unauthorized");
+    expect(messages(m.banner)).toEqual(["unauthorized"]);
   });
 
   it("falls back to its own wording when a failure carries no message", async () => {
@@ -275,15 +277,15 @@ describe("conn-test: the banner carries the reason", () => {
     m.btn.click();
     await settle();
 
-    expect(m.banner.textContent).toBe("The credentials were not accepted");
+    expect(messages(m.banner)).toEqual(["The credentials were not accepted"]);
   });
 
-  it("leaves the banner alone on a success that had nothing to clear", async () => {
+  it("leaves the banner empty on a success that had nothing to clear", async () => {
     const m = mount();
     m.btn.click();
     await settle();
 
-    expect(m.banner.hidden).toBe(true);
+    expect(messages(m.banner)).toEqual([]);
   });
 
   it("clears its own message when a later press succeeds", async () => {
@@ -291,14 +293,14 @@ describe("conn-test: the banner carries the reason", () => {
     const m = mount();
     m.btn.click();
     await settle();
-    expect(m.banner.hidden).toBe(false);
+    expect(messages(m.banner)).toEqual(["HTTP 401"]);
 
     m.inputs["api_key"]!.dispatchEvent(new Event("input"));
     m.btn.click();
     await settle();
 
     expect(state(m.btn)).toBe("ok");
-    expect(m.banner.hidden).toBe(true);
+    expect(messages(m.banner)).toEqual([]);
   });
 
   it("does not clear a message somebody else wrote over its own", async () => {
@@ -309,13 +311,12 @@ describe("conn-test: the banner carries the reason", () => {
     m.btn.click();
     await settle();
 
-    m.banner.textContent = "Save failed: something else";
+    configBanner.show("Save failed: something else");
     m.btn.click();
     await settle();
 
     expect(state(m.btn)).toBe("ok");
-    expect(m.banner.hidden).toBe(false);
-    expect(m.banner.textContent).toBe("Save failed: something else");
+    expect(messages(m.banner)).toEqual(["Save failed: something else"]);
   });
 });
 
@@ -331,7 +332,7 @@ describe("conn-test: a verdict does not outlive its values", () => {
 
     expect(state(m.btn)).toBe("idle");
     expect(m.btn.dataset["status"]).toBeUndefined();
-    expect(m.banner.hidden).toBe(true);
+    expect(messages(m.banner)).toEqual([]);
   });
 
   it("drops an abandoned answer instead of painting it over the current state", async () => {
@@ -385,7 +386,7 @@ describe("conn-test: a verdict does not outlive its values", () => {
 
     expect(wire.calls).toHaveLength(2);
     expect(state(m.btn)).toBe("ok");
-    expect(m.banner.hidden).toBe(true);
+    expect(messages(m.banner)).toEqual([]);
   });
 });
 
@@ -395,19 +396,16 @@ describe("conn-test: missing fields", () => {
     // not throw, and the server owns the "URL is required" wording so the hosts
     // cannot disagree about it.
     wire.answers = [{ ok: true, status: 200, data: { valid: false, error: "URL is required" } }];
-    const banner = document.createElement("div");
-    banner.id = BANNER_ID;
-    banner.hidden = true;
     const btn = connTestControl("sonarr", {
       inputs: { url: null, api_key: null },
-      bannerId: BANNER_ID,
+      banner: configBanner,
     });
-    document.body.replaceChildren(banner, btn);
+    document.body.replaceChildren(configBannerHost, btn);
 
     btn.click();
     await settle();
 
     expect(wire.calls).toEqual([{ kind: "sonarr", settings: { url: "", api_key: "" } }]);
-    expect(banner.textContent).toBe("URL is required");
+    expect(messages(configBannerHost)).toEqual(["URL is required"]);
   });
 });

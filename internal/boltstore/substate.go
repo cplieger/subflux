@@ -681,8 +681,9 @@ func matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (ent
 	return stateEntryFrom(&sr), true, nil
 }
 
-// State returns subtitle-state rows matching the query, most-recently-
-// imported first. It mirrors the old SQLite State:
+// State returns a page of subtitle-state rows matching the query, most-recently-
+// imported first, plus the number of rows the store holds with NO filter applied.
+// It mirrors the old SQLite State:
 //
 //   - Filters by media_type, language (both carried in the ix_state_quad key)
 //     and provider (carried in the primary row); zero-value fields mean no
@@ -706,7 +707,11 @@ func matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (ent
 // of table size. A row whose primary cannot be decoded is skipped with a
 // warning (subtitle_state is a derived bucket the next scan rebuilds; this is
 // not a lock-bearing read).
-func (d *DB) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+//
+// UnfilteredTotal is the maintained counter, read inside the SAME View as the
+// page walk: read in a second transaction it could count a dataset the page
+// does not describe.
+func (d *DB) State(_ context.Context, q *subflux.StateQuery) (subflux.StatePage, error) {
 	slog.Debug("State",
 		"media_type", q.MediaType, "lang", q.Language,
 		"provider", q.Provider, "search", q.Search,
@@ -718,7 +723,7 @@ func (d *DB) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEnt
 	}
 	offset := max(q.Offset, 0)
 
-	var out []subflux.StateEntry
+	var page subflux.StatePage
 	err := d.db.View(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
@@ -728,15 +733,18 @@ func (d *DB) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEnt
 		if imp == nil {
 			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
-		var err error
-		out, err = collectStatePage(imp, sb, q, limit, offset)
-		return err
+		entries, err := collectStatePage(imp, sb, q, limit, offset)
+		if err != nil {
+			return err
+		}
+		page = subflux.StatePage{Entries: entries, UnfilteredTotal: int(readDownloadCount(tx))}
+		return nil
 	})
 	if err != nil {
-		return nil, err
+		return subflux.StatePage{}, err
 	}
-	slog.Debug("State result", "count", len(out))
-	return out, nil
+	slog.Debug("State result", "count", len(page.Entries), "unfiltered_total", page.UnfilteredTotal)
+	return page, nil
 }
 
 // collectStatePage performs a REVERSE walk of ix_state_imported (which sorts

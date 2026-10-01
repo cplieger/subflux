@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as bus from "./bus.js";
 import * as store from "./store.js";
-import { initUserMenu } from "./user-menu.js";
+import { initUserMenu, _userMenuPanelForTest } from "./user-menu.js";
 import type { MeResponse } from "./api-types.js";
 
 const wire = vi.hoisted(() => ({
@@ -79,20 +79,19 @@ vi.mock("./events.js", () => ({
   disconnectForLogout: vi.fn(),
 }));
 
-/** The header markup app.ts ships: the trigger, the menu panel, and the two
- *  standalone controls the menu replaces. */
+/** The header markup app.ts ships: the trigger alone. The menu panel is
+ *  user-menu.ts's own node and never in the document, so the fixture empties it
+ *  instead of re-authoring it. */
 function mountHeader(): void {
   document.body.innerHTML = `
     <header>
-      <button type="button" id="configBtn">cfg</button>
-      <button type="button" id="themeBtn">thm</button>
       <button type="button" id="userBtn">user</button>
-      <div id="userMenuPopup" role="menu"></div>
     </header>`;
+  _userMenuPanelForTest().replaceChildren();
 }
 
 function items(): HTMLButtonElement[] {
-  return [...document.querySelectorAll<HTMLButtonElement>("#userMenuPopup .um-item")];
+  return [..._userMenuPanelForTest().querySelectorAll<HTMLButtonElement>(".um-item")];
 }
 
 function labels(): string[] {
@@ -154,13 +153,6 @@ describe("initUserMenu", () => {
     expect(items()).toHaveLength(0);
   });
 
-  it("removes the standalone config and theme buttons it replaces", async () => {
-    await boot();
-
-    expect(document.getElementById("configBtn")).toBeNull();
-    expect(document.getElementById("themeBtn")).toBeNull();
-  });
-
   it("wires the popover as a menu and rebuilds its content on open", async () => {
     await boot();
 
@@ -190,7 +182,7 @@ describe("user menu content", () => {
   it("lists the username, Security, Settings, the theme and Logout for an admin", async () => {
     await boot();
 
-    expect(document.querySelector("#userMenuPopup .um-name")?.textContent).toBe("cplieger");
+    expect(_userMenuPanelForTest().querySelector(".um-name")?.textContent).toBe("cplieger");
     expect(labels()).toStrictEqual(["Security", "Settings", "Light mode", "Logout"]);
   });
 
@@ -206,7 +198,7 @@ describe("user menu content", () => {
     await boot();
 
     // role="none" keeps a non-focusable div out of the role="menu" item set.
-    expect(document.querySelector("#userMenuPopup .um-user")?.getAttribute("role")).toBe("none");
+    expect(_userMenuPanelForTest().querySelector(".um-user")?.getAttribute("role")).toBe("none");
   });
 
   it("gives every actionable row role=menuitem", async () => {
@@ -307,7 +299,9 @@ describe("theme item", () => {
     itemNamed("Dark mode").click();
 
     expect(themeState.cycles).toBe(1);
-    expect(document.querySelector(".um-theme-label")?.textContent).toBe("System theme");
-    expect(document.querySelector(".um-theme-icon .icon-monitor")).not.toBeNull();
+    expect(_userMenuPanelForTest().querySelector(".um-theme-label")?.textContent).toBe(
+      "System theme",
+    );
+    expect(_userMenuPanelForTest().querySelector(".um-theme-icon .icon-monitor")).not.toBeNull();
   });
 });

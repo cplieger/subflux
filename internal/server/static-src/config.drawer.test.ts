@@ -888,7 +888,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner:not([hidden])")).not.toBeNull();
+    expect(h.body.querySelector(".cfg-banner")).not.toBeNull();
     expect(h.body.textContent).toContain("Configure at least one of Sonarr or Radarr");
     expect(fieldInput(h, "sonarr", "url").classList.contains("cfg-required")).toBe(true);
   });
@@ -902,7 +902,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner:not([hidden])")).not.toBeNull();
+    expect(h.body.querySelector(".cfg-banner")).not.toBeNull();
     expect(h.body.textContent).toContain("Configuration has errors");
   });
 
@@ -913,7 +913,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner:not([hidden])")).toBeNull();
+    expect(h.body.querySelector(".cfg-banner")).toBeNull();
     expect(fieldInput(h, "sonarr", "url").value).toBe("");
     expect(fieldInput(h, "sonarr", "url").classList.contains("cfg-required")).toBe(false);
   });
@@ -925,7 +925,7 @@ describe("config: rendering the config form", () => {
 
     await openDrawer(h);
 
-    expect(h.body.querySelector(".cfg-banner:not([hidden])")).toBeNull();
+    expect(h.body.querySelector(".cfg-banner")).toBeNull();
   });
 
   it("routes each section type to its own renderer", async () => {

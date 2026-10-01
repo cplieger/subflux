@@ -139,6 +139,26 @@ func TestPublicStore_indexEqualsRescan(t *testing.T) {
 		}); err != nil {
 			rt.Fatalf("verify View: %v", err)
 		}
+
+		// The page's UnfilteredTotal must equal the number of rows an UNCAPPED
+		// read serves. Stated with the bound it needs, because the unbounded
+		// form is false: State caps at q.Limit or defaultQueryLimit, so the
+		// comparison read has to ask for at least as many rows as exist. The
+		// model draws at most 60 ops and each adds at most one state row, so
+		// this limit sits above every reachable row count.
+		const uncappedLimit = 512
+		page, err := db.State(ctx, &subflux.StateQuery{})
+		if err != nil {
+			rt.Fatalf("State(page): %v", err)
+		}
+		uncapped, err := db.State(ctx, &subflux.StateQuery{Limit: uncappedLimit})
+		if err != nil {
+			rt.Fatalf("State(limit=%d): %v", uncappedLimit, err)
+		}
+		if page.UnfilteredTotal != len(uncapped.Entries) {
+			rt.Fatalf("UnfilteredTotal = %d, want %d (= the rows an uncapped read serves)",
+				page.UnfilteredTotal, len(uncapped.Entries))
+		}
 	})
 }
 

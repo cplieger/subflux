@@ -73,9 +73,9 @@ func (*NopStore) CurrentScore(context.Context, subflux.MediaType, string, string
 	return 0, time.Time{}, false, nil
 }
 
-// State returns download state entries matching the query.
-func (*NopStore) State(context.Context, *subflux.StateQuery) ([]subflux.StateEntry, error) {
-	return nil, nil
+// State returns an empty page of download state entries.
+func (*NopStore) State(context.Context, *subflux.StateQuery) (subflux.StatePage, error) {
+	return subflux.StatePage{Entries: []subflux.StateEntry{}}, nil
 }
 
 // HistoryMediaIDs returns distinct media IDs with download history for the given type and language.

@@ -14,14 +14,12 @@
 //
 // The router reads location.pathname directly, so the tests drive the real
 // History API (Chromium gives real pushState/replaceState) and restore the
-// runner's own URL afterwards. It also resolves the four filter controls at
-// IMPORT time, so the fixture is built once at module scope, before the
-// import, and reset between tests rather than rebuilt — replacing it would
-// leave the module holding detached elements.
+// runner's own URL afterwards.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as bus from "./bus.js";
 import * as store from "./store.js";
 import { kindsMatching } from "./route-path.js";
+import { historyPanel, libraryPanel } from "./panels.js";
 import type { CoverageItem } from "./api-types.js";
 
 const coverage = vi.hoisted(() => ({
@@ -44,6 +42,7 @@ vi.mock("./coverage.js", () => ({
   configurePanel: (v: boolean) => {
     coverage.panelCalls.push(v);
   },
+  showLibraryControls: () => undefined,
 }));
 // The row store is a separate leaf now: the renderer's entry points above and
 // the row reads/writes below are different modules.
@@ -123,24 +122,10 @@ vi.mock("@cplieger/ui-primitives/view-transition", () => ({
   },
 }));
 
-/** The subset of index.html the router touches. Built before the import
- *  because router.ts resolves the filter controls at module scope. */
+/** The shell index.html still authors; showPage attaches a panel into <main>. */
 document.body.innerHTML = `
   <button type="button" id="historyBtn">History</button>
-  <div id="coveragePanel">
-    <div class="card-head"><h2 id="lib-heading">Library</h2></div>
-    <div class="controls">
-      <select id="cov-type-filter"><option value="all"></option><option value="movies"></option></select>
-      <input id="cov-filter" type="search" />
-      <input id="cov-missing" type="checkbox" />
-      <select id="cov-sort"><option value="title"></option><option value="missing"></option></select>
-    </div>
-    <div id="coverageContent"></div>
-  </div>
-  <div id="historyPanel" hidden>
-    <div class="card-head"><h2 id="hist-heading">History</h2></div>
-    <input id="h-filter" type="search" />
-  </div>`;
+  <main id="main"></main>`;
 
 const router = await import("./router.js");
 
@@ -196,12 +181,14 @@ function filters(): {
   missing: HTMLInputElement;
   sort: HTMLSelectElement;
 } {
-  return {
-    type: el<HTMLSelectElement>("cov-type-filter"),
-    q: el<HTMLInputElement>("cov-filter"),
-    missing: el<HTMLInputElement>("cov-missing"),
-    sort: el<HTMLSelectElement>("cov-sort"),
-  };
+  const p = libraryPanel();
+  return { type: p.typeFilter, q: p.filter, missing: p.missingOnly, sort: p.sort };
+}
+
+/** The panels attached to `<main>`, by their `data-page`: presence IS the
+ *  visibility mechanism, so the page on screen is the panel in the DOM. */
+function pagesInMain(): (string | null)[] {
+  return [...el("main").children].map((e) => e.getAttribute("data-page"));
 }
 
 /** Run the ROUTE_TRANSITION_MS-deferred half of the search/sync handlers. */
@@ -228,12 +215,14 @@ beforeEach(() => {
   f.q.value = "";
   f.missing.checked = false;
   f.sort.value = "title";
-  el("lib-heading").textContent = "Library";
-  el("coverageContent").replaceChildren();
-  el<HTMLInputElement>("h-filter").value = "";
-  document.querySelectorAll("#historyPanel .detail-nav").forEach((e) => {
-    e.remove();
-  });
+  libraryPanel().heading.textContent = "Library";
+  libraryPanel().content.replaceChildren();
+  historyPanel().filter.value = "";
+  historyPanel()
+    .head.querySelectorAll(".detail-nav")
+    .forEach((e) => {
+      e.remove();
+    });
   at(HOME);
 });
 
@@ -254,11 +243,11 @@ describe("library filter query string", () => {
     f.type.value = "movies";
     f.q.value = "expanse";
     f.missing.checked = true;
-    f.sort.value = "missing";
+    f.sort.value = "newest";
 
     router.updateLibraryFilters();
 
-    expect(location.search).toBe("?type=movies&q=expanse&missing=1&sort=missing");
+    expect(location.search).toBe("?type=movies&q=expanse&missing=1&sort=newest");
   });
 
   it("round-trips the filters through the URL", async () => {
@@ -266,7 +255,7 @@ describe("library filter query string", () => {
     f.type.value = "movies";
     f.q.value = "the expanse";
     f.missing.checked = true;
-    f.sort.value = "missing";
+    f.sort.value = "newest";
     router.updateLibraryFilters();
 
     // A fresh load of that URL — the shared-link case.
@@ -279,7 +268,7 @@ describe("library filter query string", () => {
     expect(f.type.value).toBe("movies");
     expect(f.q.value).toBe("the expanse");
     expect(f.missing.checked).toBe(true);
-    expect(f.sort.value).toBe("missing");
+    expect(f.sort.value).toBe("newest");
   });
 
   it("restores defaults for a bare URL rather than leaving stale values", async () => {
@@ -313,7 +302,7 @@ describe("navigate", () => {
     // real and lands on a path it is already on — the push is asserted below.
     router.navigate("/history", true);
 
-    expect(el("historyPanel").hidden).toBe(false);
+    expect(pagesInMain()).toStrictEqual(["history"]);
   });
 
   it("pushes by default and replaces only when asked", () => {
@@ -429,7 +418,7 @@ describe("route table", () => {
     const btn = document.createElement("button");
     btn.dataset["nav"] = "sync";
     btn.addEventListener("click", () => clicks.push("sync"));
-    el("coverageContent").appendChild(btn);
+    libraryPanel().content.appendChild(btn);
     at("/series/42/sync");
 
     await router.applyRoute();
@@ -492,7 +481,7 @@ describe("route table", () => {
     off();
 
     expect(opened).toStrictEqual([]);
-    const empty = document.querySelector<HTMLElement>("#coverageContent .empty");
+    const empty = libraryPanel().content.querySelector<HTMLElement>(".empty");
     expect(empty?.textContent).toContain("Not found");
     expect(empty?.querySelector("button")?.textContent).toBe("Back to library");
     expect(wire.calls).toStrictEqual([{ kind: "series", id: 999 }]);
@@ -555,7 +544,7 @@ describe("route table", () => {
 
     await expect(router.applyRoute()).resolves.toBeUndefined();
 
-    const err = document.querySelector<HTMLElement>('#coverageContent .empty[data-status="err"]');
+    const err = libraryPanel().content.querySelector<HTMLElement>('.empty[data-status="err"]');
     expect(err?.textContent).toBe("boom");
     expect(coverage.loadCalls).toBe(0);
     expect(coverage.healedRows).toStrictEqual([]);
@@ -585,7 +574,7 @@ describe("route table", () => {
     await router.applyRoute();
 
     expect(store.get("currentPage")).toBe("library");
-    expect(el("coveragePanel").hidden).toBe(false);
+    expect(pagesInMain()).toStrictEqual(["coverage"]);
   });
 });
 
@@ -633,24 +622,21 @@ describe("page switching", () => {
     await router.applyRoute();
     off();
 
-    expect(el("historyPanel").hidden).toBe(false);
-    expect(el("coveragePanel").hidden).toBe(true);
+    expect(pagesInMain()).toStrictEqual(["history"]);
     expect(el("historyBtn").classList.contains("active")).toBe(true);
     expect(loads).toStrictEqual(["load"]);
     expect(document.title).toBe("Subflux \u00B7 History");
   });
 
-  it("pre-hides the library chrome on a detail route so it cannot flash", async () => {
+  it("empties the library heading on a detail route so it cannot flash", async () => {
     at("/series/42");
 
     await router.applyRoute();
 
-    // The detail loader paints later; leaving the controls and heading up
-    // shows the library for a frame first.
-    expect(document.querySelector<HTMLElement>("#coveragePanel .controls")?.style.display).toBe(
-      "none",
-    );
-    expect(el("lib-heading").textContent).toBe("");
+    // The detail loader paints later; leaving the heading up shows the library
+    // for a frame first. The controls half is asserted over the real writer in
+    // coverage.wiring.test.ts.
+    expect(libraryPanel().heading.textContent).toBe("");
     // skipRender: the detail route replaces the content itself.
     expect(coverage.renderCalls).toBe(0);
   });
@@ -694,7 +680,7 @@ describe("history panel back button", () => {
 
     await router.applyRoute();
 
-    const back = document.querySelector("#historyPanel .detail-nav .btn-text");
+    const back = historyPanel().head.querySelector(".detail-nav .btn-text");
     expect(back?.textContent).toBe(" Library");
   });
 
@@ -703,13 +689,13 @@ describe("history panel back button", () => {
     const opening = spyOnHistory();
     router.navigateToHistory("Show");
     expect(opening.push).toHaveBeenCalledWith(null, "", "/history");
-    expect(el<HTMLInputElement>("h-filter").value).toBe("Show");
+    expect(historyPanel().filter.value).toBe("Show");
     opening.restore();
 
     // Render the history page the navigation asked for.
     at("/history");
     await router.applyRoute();
-    const back = document.querySelector<HTMLElement>("#historyPanel .detail-nav");
+    const back = historyPanel().head.querySelector<HTMLElement>(".detail-nav");
     expect(back?.querySelector(".btn-text")?.textContent).toBe(" Back");
 
     const returning = spyOnHistory();
@@ -719,12 +705,12 @@ describe("history panel back button", () => {
   });
 
   it("clears the media filter when opened with no filter", () => {
-    el<HTMLInputElement>("h-filter").value = "stale";
+    historyPanel().filter.value = "stale";
     const h = spyOnHistory();
 
     router.navigateToHistory();
 
-    expect(el<HTMLInputElement>("h-filter").value).toBe("");
+    expect(historyPanel().filter.value).toBe("");
     expect(h.push).toHaveBeenCalledWith(null, "", "/history");
     h.restore();
   });
@@ -735,7 +721,7 @@ describe("history panel back button", () => {
 
     await router.applyRoute();
 
-    expect(document.querySelectorAll("#historyPanel .detail-nav")).toHaveLength(1);
+    expect(historyPanel().head.querySelectorAll(".detail-nav")).toHaveLength(1);
   });
 });
 
@@ -757,7 +743,7 @@ describe("bus navigation", () => {
     bus.emit(bus.BusEvent.NavHistory, "Film");
 
     expect(h.push).toHaveBeenCalledWith(null, "", "/history");
-    expect(el<HTMLInputElement>("h-filter").value).toBe("Film");
+    expect(historyPanel().filter.value).toBe("Film");
     h.restore();
   });
 });

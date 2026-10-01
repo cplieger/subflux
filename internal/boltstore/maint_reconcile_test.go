@@ -50,13 +50,13 @@ func rmfile(t *testing.T, path string) {
 func assertDownloadsConsistent(t *testing.T, db *DB) {
 	t.Helper()
 	downloads, _, _ := mustStats(t, db)
-	entries, err := db.State(t.Context(), &subflux.StateQuery{})
+	page, err := db.State(t.Context(), &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if downloads != len(entries) {
+	if downloads != len(page.Entries) {
 		t.Errorf("downloads counter = %d, but State returned %d rows (counter drift)",
-			downloads, len(entries))
+			downloads, len(page.Entries))
 	}
 }
 

@@ -152,13 +152,13 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Irreplaceable fixture: the manual row, its lock, the offset, the user.
-	entries, err := db.State(ctx, &subflux.StateQuery{})
+	page, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
 	manuals := 0
 	var maxID int64
-	for _, e := range entries {
+	for _, e := range page.Entries {
 		if e.Manual {
 			manuals++
 		}
@@ -182,8 +182,8 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	assertStateIndexesMatchPrimary(t, db)
 
 	downloads, _, err := db.Stats(ctx)
-	if err != nil || downloads != len(entries) {
-		t.Errorf("Stats downloads = (%d, %v), want %d (counter equals rows)", downloads, err, len(entries))
+	if err != nil || downloads != len(page.Entries) {
+		t.Errorf("Stats downloads = (%d, %v), want %d (counter equals rows)", downloads, err, len(page.Entries))
 	}
 
 	// Sequence: a fresh insert must allocate past every surviving id.
@@ -199,7 +199,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if err != nil {
 		t.Fatalf("State after insert: %v", err)
 	}
-	for _, e := range after {
+	for _, e := range after.Entries {
 		if e.MediaID == "tt8" && e.ID <= maxID {
 			t.Errorf("fresh id %d collides with surviving max id %d (sequence lost)", e.ID, maxID)
 		}

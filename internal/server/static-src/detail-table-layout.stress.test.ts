@@ -53,7 +53,7 @@ vi.mock("./store.js", () => ({
 
 import { renderSeriesDetail } from "./detail.js";
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
-import { contentView } from "./view-scope.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 
 // The real stylesheets, once per file (MANIFEST slice order).
 const style = document.createElement("style");
@@ -97,15 +97,9 @@ function makeSeasons(): SeasonGroup[] {
 }
 
 function mountPanel(): HTMLElement {
-  document.body.innerHTML =
-    '<section class="card" id="coveragePanel">' +
-    '<div class="card-head"><h2 id="lib-heading">Reference Longrunner</h2></div>' +
-    '<div id="coverageContent"></div></section>';
-  contentView.clear();
-  const panel = document.getElementById("coveragePanel");
-  if (!panel) {
-    throw new Error("panel missing");
-  }
+  _resetPanelsForTest();
+  const panel = libraryPanel().root;
+  document.body.replaceChildren(panel);
   return panel;
 }
 

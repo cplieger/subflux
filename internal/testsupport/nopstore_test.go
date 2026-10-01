@@ -69,14 +69,20 @@ func TestNopStoreContract(t *testing.T) {
 		}
 	})
 
-	t.Run("GetState_returns_nil_no_error", func(t *testing.T) {
+	t.Run("State_returns_an_empty_non_nil_page", func(t *testing.T) {
 		t.Parallel()
 		got, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie, Language: "eng", Limit: 50})
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
-		if got != nil {
-			t.Errorf("State = %v, want nil", got)
+		if got.Entries == nil {
+			t.Errorf("State().Entries = nil, want an empty non-nil slice (a nil marshals as JSON null)")
+		}
+		if len(got.Entries) != 0 {
+			t.Errorf("State().Entries = %v, want empty", got.Entries)
+		}
+		if got.UnfilteredTotal != 0 {
+			t.Errorf("State().UnfilteredTotal = %d, want 0", got.UnfilteredTotal)
 		}
 	})
 

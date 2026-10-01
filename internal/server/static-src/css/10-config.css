@@ -124,13 +124,6 @@
   flex-wrap: wrap;
 }
 
-/* The `display: flex` above beats the UA sheet's `[hidden] { display: none }`,
- * so the reusable error slot rendered as an empty red box until this existed.
- * `.auth-error` in login-03-forms.css carries the same guard. */
-.cfg-banner[hidden] {
-  display: none;
-}
-
 .cfg-textarea {
   width: 100%;
   font-family: ui-monospace, Consolas, monospace;

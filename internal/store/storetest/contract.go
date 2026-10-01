@@ -95,7 +95,7 @@ type Store interface {
 	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
 	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
 	CurrentScore(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (score int, mediaImported time.Time, found bool, err error)
-	State(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
+	State(ctx context.Context, q *subflux.StateQuery) (subflux.StatePage, error)
 
 	// Manual locks and ordinals.
 	IsManuallyLocked(ctx context.Context, key subflux.ManualLockKey) (bool, error)
@@ -192,6 +192,11 @@ func Suite(t *testing.T, newStore func(t *testing.T) Store) {
 	t.Run("GetState_filter_search_limit_offset", func(t *testing.T) {
 		t.Parallel()
 		testGetStateQuery(t, newStore(t))
+	})
+
+	t.Run("State_unfiltered_total_counts_every_row", func(t *testing.T) {
+		t.Parallel()
+		testStateUnfilteredTotal(t, newStore(t))
 	})
 
 	t.Run("DeleteStateByPaths_orphan_cleanup", func(t *testing.T) {
@@ -377,12 +382,12 @@ func testAutoUpsertPreservesImported(t *testing.T, s Store) {
 	}
 
 	// The upgrade is in place: still exactly one row for the triple.
-	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	page, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("State = %d rows after auto upgrade, want 1 (updated in place)", len(entries))
+	if len(page.Entries) != 1 {
+		t.Fatalf("State = %d rows after auto upgrade, want 1 (updated in place)", len(page.Entries))
 	}
 }
 
@@ -455,8 +460,8 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 	if err != nil {
 		t.Fatalf("State (before clear): %v", err)
 	}
-	if len(before) != 1 {
-		t.Fatalf("State before clear = %d rows, want 1", len(before))
+	if len(before.Entries) != 1 {
+		t.Fatalf("State before clear = %d rows, want 1", len(before.Entries))
 	}
 
 	if cerr := s.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: subflux.VariantStandard}); cerr != nil {
@@ -476,9 +481,9 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 	if err != nil {
 		t.Fatalf("State (after clear): %v", err)
 	}
-	if len(after) != 1 {
-		t.Errorf("State after clear = %d rows, want 1 (rows preserved, not deleted)", len(after))
-	} else if after[0].Manual {
+	if len(after.Entries) != 1 {
+		t.Errorf("State after clear = %d rows, want 1 (rows preserved, not deleted)", len(after.Entries))
+	} else if after.Entries[0].Manual {
 		t.Errorf("row after clear Manual = true, want false (flipped to auto)")
 	}
 
@@ -581,16 +586,16 @@ func assertVariantRowIndependence(t *testing.T, s Store, mid string) {
 	}
 
 	// Two distinct rows: the forced save must not overwrite the standard row.
-	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	page, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("State = %d rows after standard+forced saves, want 2 (independent quads)", len(entries))
+	if len(page.Entries) != 2 {
+		t.Fatalf("State = %d rows after standard+forced saves, want 2 (independent quads)", len(page.Entries))
 	}
 	variants := map[subflux.Variant]bool{}
-	for i := range entries {
-		variants[entries[i].Variant] = true
+	for i := range page.Entries {
+		variants[page.Entries[i].Variant] = true
 	}
 	if !variants[subflux.VariantStandard] || !variants[subflux.VariantForced] {
 		t.Fatalf("State variants = %v, want standard and forced exposed", variants)
@@ -843,14 +848,14 @@ func testGetStateQuery(t *testing.T, s Store) {
 	saveAuto(t, s, subflux.MediaTypeEpisode, "ttq4", langEng, subflux.ProviderID("subdl"), "Delta", 40)
 
 	assertCount := func(name string, q *subflux.StateQuery, want int) []subflux.StateEntry {
-		entries, err := s.State(ctx, q)
+		page, err := s.State(ctx, q)
 		if err != nil {
 			t.Fatalf("State(%s): %v", name, err)
 		}
-		if len(entries) != want {
-			t.Fatalf("State(%s) = %d rows, want %d", name, len(entries), want)
+		if len(page.Entries) != want {
+			t.Fatalf("State(%s) = %d rows, want %d", name, len(page.Entries), want)
 		}
-		return entries
+		return page.Entries
 	}
 
 	assertCount("all", &subflux.StateQuery{}, 4)
@@ -880,6 +885,53 @@ func testGetStateQuery(t *testing.T, s Store) {
 		if !seen[want] {
 			t.Fatalf("paginated pages missing media_id %q; union = %v", want, seen)
 		}
+	}
+}
+
+// testStateUnfilteredTotal asserts the page's UnfilteredTotal counts every row
+// the store holds whatever the query filtered on, which is what lets a client
+// tell "nothing matched this filter" from "nothing was ever downloaded". Every
+// read here passes no Limit, so the default cap sits far above the fixture and
+// cannot truncate the comparison.
+func testStateUnfilteredTotal(t *testing.T, s Store) {
+	t.Helper()
+	ctx := context.Background()
+
+	saveAuto(t, s, subflux.MediaTypeMovie, "ttu1", langEng, provOS, "Alpha", 10)
+	saveAuto(t, s, subflux.MediaTypeMovie, "ttu2", langEng, provOS, "Beta", 20)
+	saveAuto(t, s, subflux.MediaTypeEpisode, "ttu3", langFra, subflux.ProviderID("subdl"), "Gamma", 30)
+
+	all, err := s.State(ctx, &subflux.StateQuery{})
+	if err != nil {
+		t.Fatalf("State(unfiltered): %v", err)
+	}
+	if len(all.Entries) != 3 || all.UnfilteredTotal != 3 {
+		t.Fatalf("State(unfiltered) = %d rows with total %d, want 3 and 3",
+			len(all.Entries), all.UnfilteredTotal)
+	}
+
+	filtered, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeEpisode})
+	if err != nil {
+		t.Fatalf("State(type=episode): %v", err)
+	}
+	if len(filtered.Entries) != 1 {
+		t.Fatalf("State(type=episode) = %d rows, want 1", len(filtered.Entries))
+	}
+	if filtered.UnfilteredTotal != 3 {
+		t.Errorf("State(type=episode).UnfilteredTotal = %d, want 3 (a filter must not narrow the total)",
+			filtered.UnfilteredTotal)
+	}
+
+	none, err := s.State(ctx, &subflux.StateQuery{Search: "no-such-title"})
+	if err != nil {
+		t.Fatalf("State(search=no-such-title): %v", err)
+	}
+	if len(none.Entries) != 0 {
+		t.Fatalf("State(search=no-such-title) = %d rows, want 0", len(none.Entries))
+	}
+	if none.UnfilteredTotal != 3 {
+		t.Errorf("State(search=no-such-title).UnfilteredTotal = %d, want 3 (an empty page still counts the store's rows)",
+			none.UnfilteredTotal)
 	}
 }
 
@@ -1182,12 +1234,12 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = false, want true (lock preserved)")
 	}
 
-	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	page, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(entries) != 1 || entries[0].ReleaseName != "Present" {
-		t.Fatalf("State = %+v, want one row 'Present'", entries)
+	if len(page.Entries) != 1 || page.Entries[0].ReleaseName != "Present" {
+		t.Fatalf("State = %+v, want one row 'Present'", page.Entries)
 	}
 }
 
@@ -1251,17 +1303,17 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = true, want false (manual row deleted)")
 	}
 
-	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	page, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("State = %d rows, want 1 (auto reset, manual deleted)", len(entries))
+	if len(page.Entries) != 1 {
+		t.Fatalf("State = %d rows, want 1 (auto reset, manual deleted)", len(page.Entries))
 	}
-	if entries[0].Manual {
+	if page.Entries[0].Manual {
 		t.Fatalf("surviving row Manual = true, want false")
 	}
-	if entries[0].Path != "" || entries[0].Score != 0 {
-		t.Fatalf("surviving row not reset: path=%q score=%d, want empty/0", entries[0].Path, entries[0].Score)
+	if page.Entries[0].Path != "" || page.Entries[0].Score != 0 {
+		t.Fatalf("surviving row not reset: path=%q score=%d, want empty/0", page.Entries[0].Path, page.Entries[0].Score)
 	}
 }

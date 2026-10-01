@@ -46,7 +46,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	if len(searchParam) > 200 {
 		searchParam = searchParam[:200]
 	}
-	entries, err := h.queryDB.State(ctx, &subflux.StateQuery{
+	page, err := h.queryDB.State(ctx, &subflux.StateQuery{
 		MediaType: subflux.MediaType(q.Get("type")),
 		Language:  q.Get("lang"),
 		Provider:  subflux.ProviderID(q.Get("provider")),
@@ -58,11 +58,11 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "state")
 		return
 	}
-	slog.Debug("handleState", "results", len(entries),
+	slog.Debug("handleState", "results", len(page.Entries),
 		"type", logsafe.Field(q.Get("type")), "lang", logsafe.Field(q.Get("lang")),
 		"provider", logsafe.Field(q.Get("provider")), "search", logsafe.Field(searchParam),
 		"limit", limit)
-	httpapi.WriteJSON(w, entries)
+	httpapi.WriteJSON(w, page)
 }
 
 // HandleBackoff handles GET /api/backoff.

@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeasonSyncAccepted, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnAvailability, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeasonSyncAccepted, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, SyncSeasonRequest, UserInfo, WebAuthnAvailability, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeJob, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeasonSyncAccepted, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStatePage, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAccepted, decodeUserInfo, decodeWebAuthnAvailability, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, Job, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeasonSyncAccepted, SeriesItem, SetupStatus, Signals, StatePage, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAccepted, SyncAudioRequest, SyncOffsetRequest, SyncSeasonRequest, UserInfo, WebAuthnAvailability, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -431,12 +431,12 @@ export function searchTargetsRaw(query?: Record<string, QueryValue>, opts?: Clie
   return clientRequestRaw("GET", "/api/search/targets" + qs(query), undefined, decodeSearchTargets, opts?.signal);
 }
 
-export function listState(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<StateEntry[] | null> {
-  return clientRequest("GET", "/api/state" + qs(query), undefined, (v) => decodeArray(v, decodeStateEntry, "$"), opts?.signal);
+export function listState(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<StatePage | null> {
+  return clientRequest("GET", "/api/state" + qs(query), undefined, decodeStatePage, opts?.signal);
 }
 
-export function listStateRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<StateEntry[]>> {
-  return clientRequestRaw("GET", "/api/state" + qs(query), undefined, (v) => decodeArray(v, decodeStateEntry, "$"), opts?.signal);
+export function listStateRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<StatePage>> {
+  return clientRequestRaw("GET", "/api/state" + qs(query), undefined, decodeStatePage, opts?.signal);
 }
 
 export function stateStats(opts?: ClientOpts): Promise<Stats | null> {

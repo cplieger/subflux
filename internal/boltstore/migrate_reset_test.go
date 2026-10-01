@@ -265,15 +265,15 @@ func assertAuthBucketsIdentical(t *testing.T, db *DB, before map[string]map[stri
 func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	entries, err := db.State(ctx, &subflux.StateQuery{})
+	page, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(entries) != len(fx.manualRows) {
-		t.Fatalf("state rows after reset = %d, want %d (manual only)", len(entries), len(fx.manualRows))
+	if len(page.Entries) != len(fx.manualRows) {
+		t.Fatalf("state rows after reset = %d, want %d (manual only)", len(page.Entries), len(fx.manualRows))
 	}
-	byPath := make(map[string]subflux.StateEntry, len(entries))
-	for _, e := range entries {
+	byPath := make(map[string]subflux.StateEntry, len(page.Entries))
+	for _, e := range page.Entries {
 		if !e.Manual {
 			t.Errorf("non-manual row %q survived the reset", e.Path)
 		}
@@ -472,11 +472,11 @@ func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after raw-preserving reset = (%v, %v), want locked", locked, err)
 	}
-	entries, err := mdb.State(ctx, &subflux.StateQuery{})
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("State = (%d entries, %v), want the one manual survivor", len(entries), err)
+	page, err := mdb.State(ctx, &subflux.StateQuery{})
+	if err != nil || len(page.Entries) != 1 {
+		t.Fatalf("State = (%d entries, %v), want the one manual survivor", len(page.Entries), err)
 	}
-	if e := entries[0]; e.ID != 1 || !e.Manual || e.Path != "/m/tt1.en.1.srt" || e.Score != 88 {
+	if e := page.Entries[0]; e.ID != 1 || !e.Manual || e.Path != "/m/tt1.en.1.srt" || e.Score != 88 {
 		t.Errorf("survivor decoded as %+v, want id 1, manual, path /m/tt1.en.1.srt, score 88", e)
 	}
 }

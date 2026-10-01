@@ -227,7 +227,7 @@ export function openSyncDialog(
     // Drop the old watch and re-attach for the newly selected file.
     stopWatchingSyncJob();
     if (audioResultEl) {
-      audioResultEl.hidden = true;
+      audioResultEl.replaceChildren();
       void reattachSyncJob(audioResultEl, false);
     }
   });
@@ -272,7 +272,7 @@ export function openSyncDialog(
   );
 
   // Audio sync button and result.
-  const audioResultDiv = el("div", { className: "sync-audio-result", hidden: true });
+  const audioResultDiv = el("div", { className: "sync-audio-result" });
   audioResultEl = audioResultDiv;
   const audioBtn = el(
     "button",
@@ -331,9 +331,15 @@ export function openSyncDialog(
   );
   footer.appendChild(resetBtn);
 
-  // Single source of truth for Reset-button visibility.
+  // Single source of truth for whether Reset is offered. It is the footer's
+  // last child, so appending restores its place; re-seating an attached node
+  // drops hover and focus (web.md), and this effect runs on every offset edit.
   stopOffsetEffect = effect(() => {
-    resetBtn.hidden = offset.value === 0;
+    if (offset.value === 0) {
+      resetBtn.remove();
+    } else if (resetBtn.parentNode === null) {
+      footer.appendChild(resetBtn);
+    }
   });
 
   dlg.replaceChildren(header, body, footer);
@@ -521,22 +527,20 @@ function failedOutcomeText(outcome: Exclude<JobOutcome, "result">, error?: strin
 /** Render one job's terminal outcome into the inline result panel — the
  *  dialog's ONE surface for analysis results and refusals alike. */
 function renderSyncOutcome(view: SyncOutcomeView, resultDiv: HTMLElement): void {
-  resultDiv.hidden = false;
-  resultDiv.className = "sync-audio-result";
   if (view.outcome !== undefined && view.outcome !== "result") {
-    resultDiv.textContent = failedOutcomeText(view.outcome, view.error);
+    resultDiv.replaceChildren(failedOutcomeText(view.outcome, view.error));
     return;
   }
   if (view.error) {
     // A record with no outcome cannot arrive from this server; keep the
     // generic line rather than claiming a verdict nothing supplied.
-    resultDiv.textContent = `Audio sync did not complete: ${view.error}`;
+    resultDiv.replaceChildren(`Audio sync did not complete: ${view.error}`);
     return;
   }
   const confidence = ((view.confidence ?? 0) * 100).toFixed(0);
   if (view.applied) {
     const offsetMs = view.offset_ms ?? 0;
-    resultDiv.textContent = `${formatOffsetMs(offsetMs)} (${confidence}% confidence)`;
+    resultDiv.replaceChildren(`${formatOffsetMs(offsetMs)} (${confidence}% confidence)`);
     offset.value = offsetMs;
     updateTimecodeDisplay(offsetMs);
     if (syncState.status === "preview") {
@@ -544,7 +548,7 @@ function renderSyncOutcome(view: SyncOutcomeView, resultDiv: HTMLElement): void 
     }
     notify.success("Audio sync offset applied to preview");
   } else {
-    resultDiv.textContent = `Low confidence (${confidence}%). No changes.`;
+    resultDiv.replaceChildren(`Low confidence (${confidence}%). No changes.`);
   }
 }
 
@@ -552,9 +556,7 @@ function renderSyncOutcome(view: SyncOutcomeView, resultDiv: HTMLElement): void 
  *  sync:done event (matched on the 202's job_id) settles it. */
 function watchDialogSyncJob(jobId: number, resultDiv: HTMLElement, label: string): void {
   stopWatchingSyncJob();
-  resultDiv.hidden = false;
-  resultDiv.className = "sync-audio-result";
-  resultDiv.textContent = label;
+  resultDiv.replaceChildren(label);
   syncUnwatch = watchSyncJob(jobId, (ev: SyncDoneEvent | null) => {
     syncUnwatch = null;
     if (audioResultEl !== resultDiv) {
@@ -599,9 +601,7 @@ async function reattachSyncJob(resultDiv: HTMLElement, lost: boolean): Promise<v
       break;
     case "none":
       if (lost) {
-        resultDiv.hidden = false;
-        resultDiv.className = "sync-audio-result";
-        resultDiv.textContent = "Sync result was lost to a server restart. Run it again.";
+        resultDiv.replaceChildren("Sync result was lost to a server restart. Run it again.");
       }
       break;
   }
@@ -630,7 +630,7 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
   btn.disabled = true;
   const origNodes = Array.from(btn.childNodes, (n: ChildNode) => n.cloneNode(true));
   btn.textContent = "Requesting\u2026";
-  resultDiv.hidden = true;
+  resultDiv.replaceChildren();
   try {
     // Instant 202 hands over {activity_id, job_id}; the result arrives via
     // sync:done matched on job_id.
@@ -643,9 +643,7 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
         // The typed cap refusal renders through the dialog's inline
         // result path — the only visible surface (error: false keeps the
         // framework toast off).
-        resultDiv.hidden = false;
-        resultDiv.className = "sync-audio-result";
-        resultDiv.textContent = CAP_REFUSAL_TEXT;
+        resultDiv.replaceChildren(CAP_REFUSAL_TEXT);
       } else {
         notify.error("Audio sync failed");
       }
@@ -1269,7 +1267,7 @@ async function renderSeasonBatch(
     aggregate.textContent = seasonAggregate(items);
     if (allDone()) {
       stopSeasonWatches();
-      stopBtn.hidden = true;
+      stopBtn.remove();
     }
   };
   settle();
@@ -1388,7 +1386,7 @@ export function confirmSeasonSync(
         "are not guaranteed to be accurate for every file.",
     ),
   );
-  const status = el("div", { id: "season-sync-status", hidden: true });
+  const status = el("div", { id: "season-sync-status" });
   body.appendChild(status);
 
   const startBtn = el(
@@ -1449,8 +1447,7 @@ async function startSeasonSync(
     startBtn.disabled = false;
     if (isCapacityRefusal(outcome.error)) {
       // The typed cap refusal renders inline — the only visible surface.
-      status.hidden = false;
-      status.textContent = CAP_REFUSAL_TEXT;
+      status.replaceChildren(CAP_REFUSAL_TEXT);
     } else {
       notify.error("Season sync failed");
     }

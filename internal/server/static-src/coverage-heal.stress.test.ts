@@ -47,30 +47,16 @@ vi.mock("./status.js", () => ({
 import * as store from "./store.js";
 import { SUMMARY_COALESCE_MS } from "./constants.js";
 import { _resetHealForTest, healFromCoverageEvent } from "./coverage-heal.js";
-import { _resetCoverageForTest, filterCoverage, loadCoverage } from "./coverage.js";
+import {
+  _coverageDerivesForTest,
+  _resetCoverageForTest,
+  filterCoverage,
+  loadCoverage,
+} from "./coverage.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import { coverageRow } from "./coverage-store.js";
 import { refMovieWire, refSeriesWire } from "./reference-fixture.js";
 import type { CoverageEvent, MediaType, MovieItem, SeriesItem } from "./wire/types.gen.js";
-
-const FIXTURE = `
-<section class="card" id="coveragePanel">
-  <div class="card-head" hidden>
-    <h2 id="lib-heading">Library</h2>
-    <div class="controls">
-      <input type="checkbox" id="cov-missing">
-      <select id="cov-type-filter">
-        <option value="all">All</option>
-        <option value="series">Series</option>
-        <option value="movies">Movies</option>
-      </select>
-      <select id="cov-sort">
-        <option value="title">A-Z</option>
-      </select>
-      <input id="cov-filter" type="search">
-    </div>
-  </div>
-  <div id="coverageContent"></div>
-</section>`;
 
 function ev(mediaId: string, mediaType: MediaType = "episode"): CoverageEvent {
   return {
@@ -114,7 +100,8 @@ describe("coverage-heal stress: 200-event burst at the reference library", () =>
     wire.summaryCalls = [];
     _resetHealForTest();
     _resetCoverageForTest();
-    document.body.innerHTML = FIXTURE;
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     store.set("currentPage", "library");
     store.set("detailCtx", null);
     filterCoverage();
@@ -159,10 +146,8 @@ describe("coverage-heal stress: 200-event burst at the reference library", () =>
       wire.summaries.set("movie:500050", { ok: true, status: 200, data: healedMovieB });
       wire.summaries.set("series:100001", { ok: true, status: 200, data: healedSeries });
 
-      // applyFilters reads #cov-filter exactly once per run: counting that
-      // lookup counts derives of the filtered+sorted 4,860-row view.
-      const byId = vi.spyOn(document, "getElementById");
-      const derives = (): number => byId.mock.calls.filter(([id]) => id === "cov-filter").length;
+      const derivesBase = _coverageDerivesForTest();
+      const derives = (): number => _coverageDerivesForTest() - derivesBase;
 
       // THE BURST: 200 synchronous events round-robin across k=3 roots,
       // outside any transaction.

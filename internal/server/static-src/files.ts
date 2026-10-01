@@ -10,7 +10,8 @@
 
 import * as notify from "./notify.js";
 import * as store from "./store.js";
-import { $, el, icon, emptyDiv, errDiv, confirm } from "./dom.js";
+import { el, icon, emptyDiv, errDiv, confirm } from "./dom.js";
+import { libraryPanel } from "./panels.js";
 import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
 import { listFiles, PATH_BULK_DELETE_FILES, PATH_DELETE_FILE } from "./wire/client.gen.js";
 import type { DeleteFileRequest, FileEntry } from "./wire/types.gen.js";
@@ -21,7 +22,15 @@ import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
 import { subtitleRef } from "./file-ref.js";
 import type { MediaType } from "./api-types.js";
-import { computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import {
+  computed,
+  effect,
+  createCollection,
+  bindList,
+  patch,
+  reconcile,
+  type ReconcileSpec,
+} from "@cplieger/reactive";
 import { contentView } from "./view-scope.js";
 import { join } from "@cplieger/keyenc";
 
@@ -114,7 +123,7 @@ export function openFileManager(
 }
 
 async function loadFiles(): Promise<void> {
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
 
   emit(BusEvent.PanelConfigure, {
     visible: false,
@@ -156,7 +165,7 @@ async function loadFiles(): Promise<void> {
 let filesSkeleton: SkeletonTimingController | null = null;
 
 async function refreshFileData(): Promise<void> {
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   const settle = (render: () => void): void => {
     if (filesSkeleton !== null) {
       const s = filesSkeleton;
@@ -281,8 +290,10 @@ function buildFileRow(f: FileEntry): HTMLElement {
 
 const VIEW_FILES = "files";
 
+type FileSlot = "empty" | "table";
+
 function ensureMounted(): void {
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   // Ownership check: a live table this view bound is still the container's
   // content, which a DOM probe cannot distinguish from another view's patch.
   if (contentView.scopeFor(VIEW_FILES) !== null) {
@@ -307,11 +318,12 @@ function ensureMounted(): void {
   const tbody = el("tbody");
   const tbl = el("table", { className: "files-table" }, thead, tbody);
   const emptyEl = emptyDiv("No external subtitles.");
-  // The installed tree must BE the tree the effect below closes over. A
-  // reusing reconciler (`patch`) would copy these nodes onto whatever the
-  // container already holds and discard them, leaving the effect writing
-  // `hidden` to an element that was never inserted.
-  out.replaceChildren(el("div", { className: "files-list" }, emptyEl, tbl));
+  // replaceChildren, not patch: a reusing reconciler copies these nodes onto
+  // whatever the container already holds — the skeleton it painted — and
+  // discards them, so the list the effect below reconciles into would never be
+  // inserted. EMPTY: every child of it is reconcile's.
+  const list = el("div", { className: "files-list" });
+  out.replaceChildren(list);
 
   // Structure tier: reconcile rows keyed by path on add/remove/reorder.
   scope.add(
@@ -322,7 +334,6 @@ function ensureMounted(): void {
     ),
   );
 
-  // Panel-header "Delete all" button; count + visibility track reactively.
   const bulkText = el("span", { className: "btn-text" });
   const bulkBtn = el(
     "button",
@@ -338,25 +349,33 @@ function ensureMounted(): void {
     icon("trash"),
     bulkText,
   );
-  const headerEl = document.querySelector("#coveragePanel .card-head");
-  if (headerEl) {
-    headerEl.appendChild(bulkBtn);
-    // The button lives outside the patched subtree, so this view's scope is the
-    // only thing that can take it away: left behind, it dispatches a bulk
-    // delete for the item the reader navigated away from.
-    scope.add(() => {
-      bulkBtn.remove();
-    });
-  }
+  // The button lives outside the list, so this view's scope is the only thing
+  // that can take it away: left behind, it dispatches a bulk delete for the
+  // item the reader navigated away from.
+  scope.add(() => {
+    bulkBtn.remove();
+  });
 
-  // Empty-state, table, and bulk-button visibility/count track the
-  // collection's id list.
+  const slots: ReconcileSpec<FileSlot> = {
+    key: (s) => s,
+    // Both are per-MOUNT singletons, so the row binding outlives the table's
+    // absence: reconcile detaches it while the list is empty and re-inserts THIS
+    // node, with its bindings and its rows, when a file arrives.
+    mount: (s) => (s === "empty" ? emptyEl : tbl),
+  };
+
   scope.add(
     effect(() => {
       const n = files.ids.value.length;
-      emptyEl.hidden = n > 0;
-      tbl.hidden = n === 0;
-      bulkBtn.hidden = n === 0;
+      reconcile(list, n === 0 ? ["empty"] : ["table"], slots);
+      const head = libraryPanel().head;
+      if (n === 0) {
+        bulkBtn.remove();
+      } else if (bulkBtn.parentNode !== head) {
+        // Already-in-place check: appending an attached node re-seats it, which
+        // drops `:hover` and restarts its animations on every row change.
+        head.appendChild(bulkBtn);
+      }
       bulkText.textContent = ` Delete all (${n})`;
     }),
   );

@@ -234,7 +234,7 @@ func (s *suite) sectionSync() {
 	s.log("=== Sync & Preview ===")
 
 	state := s.apiGet("/api/state?limit=1")
-	firstPath := fieldRawOrEmpty(state, ".[0].path")
+	firstPath := fieldRawOrEmpty(state, ".entries[0].path")
 
 	if firstPath != "" {
 		s.apiGet("/api/preview/start?subtitle=" + curlEncode(firstPath))

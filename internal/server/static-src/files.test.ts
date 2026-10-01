@@ -71,7 +71,7 @@ import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
 import * as store from "./store.js";
-import { contentView } from "./view-scope.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 
 // Mirrors the wire FileEntry fields files.ts consumes (only the fields the
 // row builder and the collection key read matter here). No paths on the
@@ -135,8 +135,12 @@ function headerLabels(): string[] {
   );
 }
 
+function bulkButton(): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>('[data-nav="bulk-delete"]');
+}
+
 function reqBulkButton(): HTMLButtonElement {
-  const btn = document.querySelector<HTMLButtonElement>('[data-nav="bulk-delete"]');
+  const btn = bulkButton();
   if (!btn) {
     throw new Error("bulk-delete button not mounted");
   }
@@ -153,11 +157,8 @@ describe("files: renderFiles", () => {
     confirmState.answer = true;
     confirmState.messages = [];
     history.replaceState(null, "", "/");
-    // ensureMounted() renders into #coverageContent; the bulk-delete button is
-    // appended to #coveragePanel .card-head, both of which must exist.
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("two external files for the same media_id+language render as two rows", async () => {
@@ -253,21 +254,16 @@ describe("files: renderFiles", () => {
     expect(join("tmdb-5", "fr", "standard", "0")).toBe("tmdb-5:fr:standard:0");
   });
 
-  it("renders the empty state and hides the table when there are no external files", async () => {
+  it("renders the empty state and no table when there are no external files", async () => {
     mockListFiles.mockResolvedValueOnce([]);
 
     openFileManager("movie", "tmdb-13", "Movie", "/");
     await tick();
 
-    const emptyEl = document.querySelector<HTMLElement>(".files-list .empty");
-    if (!emptyEl) {
-      throw new Error("empty state missing");
-    }
-    expect(emptyEl.hidden).toBe(false);
-    expect(emptyEl.textContent).toBe("No external subtitles.");
-    const tbl = document.querySelector<HTMLElement>("table.files-table");
-    expect(tbl?.hidden).toBe(true);
-    expect(reqBulkButton().hidden).toBe(true);
+    const empty = document.querySelector<HTMLElement>(".files-list .empty");
+    expect(empty?.textContent).toBe("No external subtitles.");
+    expect(document.querySelector("table.files-table")).toBeNull();
+    expect(bulkButton()).toBeNull();
   });
 
   it("shows the table with a counted bulk-delete button once files exist", async () => {
@@ -276,12 +272,11 @@ describe("files: renderFiles", () => {
     openFileManager("movie", "tmdb-15", "Movie", "/");
     await tick();
 
-    const emptyEl = document.querySelector<HTMLElement>(".files-list .empty");
-    expect(emptyEl?.hidden).toBe(true);
-    expect(document.querySelector<HTMLElement>("table.files-table")?.hidden).toBe(false);
-    const bulk = reqBulkButton();
-    expect(bulk.hidden).toBe(false);
-    expect(bulk.querySelector(".btn-text")?.textContent).toBe(" Delete all (2)");
+    expect(document.querySelector(".files-list .empty")).toBeNull();
+    expect(document.querySelector("table.files-table")).not.toBeNull();
+    const bulk = bulkButton();
+    expect(bulk).not.toBeNull();
+    expect(bulk?.querySelector(".btn-text")?.textContent).toBe(" Delete all (2)");
   });
 
   it("series files carry an episode column, sorted by season then episode", async () => {

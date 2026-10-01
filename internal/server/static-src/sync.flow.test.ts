@@ -556,28 +556,37 @@ describe("consumeSyncClosing", () => {
 });
 
 describe("the offset controls", () => {
-  const resetBtn = (): HTMLButtonElement => button(/^Reset$/);
+  /** The footer's Reset button, or null: Reset is in the footer while there is
+   *  an offset to reset and out of it otherwise. */
+  const resetBtn = (): HTMLButtonElement | null => {
+    const footer = dlg().querySelector(".dlg-foot");
+    return (
+      Array.from(footer?.querySelectorAll("button") ?? []).find((b) =>
+        /^Reset$/.test(b.textContent ?? ""),
+      ) ?? null
+    );
+  };
 
-  it("hides Reset while the offset is zero", () => {
+  it("does not render Reset while the offset is zero", () => {
     // Nothing to reset TO, so the control would be a no-op invitation.
     open([entry({ offset_ms: 0 })]);
-    expect(resetBtn().hidden).toBe(true);
+    expect(resetBtn()).toBeNull();
   });
 
-  it("shows Reset when the dialog opens on a non-zero offset", () => {
-    // The visibility effect runs synchronously on creation, so it must seed
-    // from the incoming value rather than waiting for a change.
+  it("renders Reset when the dialog opens on a non-zero offset", () => {
+    // The effect runs synchronously on creation, so it must seed from the
+    // incoming value rather than waiting for a change.
     open([entry({ offset_ms: -1200 })]);
-    expect(resetBtn().hidden).toBe(false);
+    expect(resetBtn()).not.toBeNull();
   });
 
-  it("zeroes the offset and hides itself when Reset is clicked", async () => {
+  it("zeroes the offset and removes itself when Reset is clicked", async () => {
     dispatchOffset.mockResolvedValue({});
     open([entry({ offset_ms: 3000 })]);
 
-    resetBtn().click();
+    resetBtn()?.click();
     await vi.waitFor(() => {
-      expect(resetBtn().hidden).toBe(true);
+      expect(resetBtn()).toBeNull();
     });
 
     // The saved value is the observable that matters: Reset must have moved the

@@ -152,7 +152,7 @@ function buildProfileSection(user: MeResponse): HTMLElement {
     value: user.display_name,
   }) as HTMLInputElement;
 
-  const feedback = el("div", { className: "sec-feedback", hidden: true });
+  const feedback = el("div");
 
   const submitBtn = el(
     "button",
@@ -215,7 +215,7 @@ function buildPasswordSection(): HTMLElement {
     passwordrules: "minlength: 8; maxlength: 128;",
   }) as HTMLInputElement;
 
-  const feedback = el("div", { className: "sec-feedback", hidden: true });
+  const feedback = el("div");
 
   const submitBtn = el(
     "button",
@@ -687,13 +687,22 @@ async function promptTrimmed(message: string, input?: AskInput): Promise<string 
   return val === "" ? null : val;
 }
 
-function showFeedback(feedbackEl: HTMLElement, msg: string, isError: boolean): void {
-  // Announce the outcome: inline feedback in this dialog is otherwise
-  // invisible to screen readers (set the role before the text so the
-  // insertion is what gets announced).
-  feedbackEl.setAttribute("role", isError ? "alert" : "status");
-  feedbackEl.setAttribute("aria-live", isError ? "assertive" : "polite");
-  feedbackEl.textContent = msg;
-  feedbackEl.hidden = false;
-  feedbackEl.className = isError ? "sec-feedback sec-feedback-err" : "sec-feedback sec-feedback-ok";
+function showFeedback(host: HTMLElement, msg: string, isError: boolean): void {
+  // The host stays classless and the MESSAGE carries `.sec-feedback`: that class
+  // sets padding and margin-block (15-security.css), so a permanently present
+  // host wearing it would render dead vertical space on every open.
+  //
+  // Announce the outcome: inline feedback in this dialog is otherwise invisible
+  // to screen readers. role/aria-live vary per call, so they cannot be static,
+  // and they go on the host before the swap, so the live region is established
+  // before the mutation that is announced.
+  host.setAttribute("role", isError ? "alert" : "status");
+  host.setAttribute("aria-live", isError ? "assertive" : "polite");
+  host.replaceChildren(
+    el(
+      "div",
+      { className: isError ? "sec-feedback sec-feedback-err" : "sec-feedback sec-feedback-ok" },
+      msg,
+    ),
+  );
 }

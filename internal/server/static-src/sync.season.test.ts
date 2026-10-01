@@ -90,6 +90,14 @@ function dlg(): HTMLDialogElement {
   return document.getElementById("seasonSyncConfirm") as HTMLDialogElement;
 }
 
+/** The button matching `name`, or null — used where the assertion is whether
+ *  the dialog offers the control at all. */
+function optionalButton(name: RegExp): HTMLButtonElement | null {
+  return (
+    Array.from(dlg().querySelectorAll("button")).find((b) => name.test(b.textContent ?? "")) ?? null
+  );
+}
+
 function button(name: RegExp): HTMLButtonElement {
   const found = Array.from(dlg().querySelectorAll("button")).find((b) =>
     name.test(b.textContent ?? ""),
@@ -566,7 +574,7 @@ describe("a second write of the reused dialog installs what it built", () => {
     expect(button(/^Stop$/)).not.toBe(startNode);
   });
 
-  it("hides Stop once every item has settled", async () => {
+  it("drops Stop from the footer once every item has settled", async () => {
     dispatchSeason.mockReturnValue({
       outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
     });
@@ -587,7 +595,7 @@ describe("a second write of the reused dialog installs what it built", () => {
       expect(dlg().textContent).toContain("Done: 1 synced");
     });
 
-    expect(button(/^Stop$/).hidden).toBe(true);
+    expect(optionalButton(/^Stop$/)).toBeNull();
   });
 
   it("settles a row and the aggregate from a sync:done that arrives after a re-render", async () => {

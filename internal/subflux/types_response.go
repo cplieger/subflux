@@ -63,6 +63,15 @@ type Stats struct {
 	Partial             bool   `json:"partial"`
 }
 
+// StatePage is the GET /api/state response: one page of history rows plus the number
+// of rows the store holds with NO filter applied. The second field is what lets a
+// client tell "nothing matched this filter" from "nothing was ever downloaded"; the
+// rows alone cannot, because the query filters server-side.
+type StatePage struct {
+	Entries         []StateEntry `json:"entries"`
+	UnfilteredTotal int          `json:"unfiltered_total"`
+}
+
 // ScorePreview is the JSON response for POST /api/score/preview.
 type ScorePreview struct {
 	Tier        ScoreTier `json:"tier"`

@@ -233,7 +233,7 @@ function statsOf(partial: Partial<Stats>): Stats {
 
 const HARNESS_HTML =
   '<button id="statusBtn"><span class="nav-label"></span></button>' +
-  '<span id="statusIcon"></span><div id="statusPopup"></div>';
+  '<span id="statusIcon"></span>';
 
 interface PollWire {
   activities?: ActivityEntry[];
@@ -281,6 +281,18 @@ interface Harness {
  *  modules are unaffected either way -- they resolve through the mock registry
  *  whatever query the importer carries. */
 let bootCount = 0;
+// status.ts builds and holds its own panel, and the library appends it only on a
+// real first show -- so it is detached here and every read goes through it rather
+// than through the document.
+let statusPanel: HTMLElement | null = null;
+
+function panel(): HTMLElement {
+  if (statusPanel === null) {
+    throw new Error("boot() not called");
+  }
+  return statusPanel;
+}
+
 async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
   vi.resetModules();
   actions.reset();
@@ -298,6 +310,7 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
     /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
   )) as typeof StatusModule;
   status.initStatusPopover();
+  statusPanel = status._statusPanelForTest();
 
   const run = actions.runs.get("status.poll");
   if (!run) {
@@ -321,11 +334,11 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
 }
 
 function skeletonRows(): NodeListOf<Element> {
-  return document.querySelectorAll("#statusPopup > div.skeleton-row");
+  return panel().querySelectorAll(":scope > div.skeleton-row");
 }
 
 function mutedRow(): Element | null {
-  return document.querySelector("#statusPopup .pop-item.muted");
+  return panel().querySelector(".pop-item.muted");
 }
 
 describe("status: popover wiring", () => {
@@ -376,21 +389,21 @@ describe("status: first-open skeleton", () => {
     // its key attribute — an unkeyed placeholder survives every later paint, so
     // the two bars would sit above the live rows for the lifetime of the page.
     expect(skeletonRows()).toHaveLength(0);
-    expect(document.querySelector('[data-act-id="a1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).not.toBeNull();
   });
 
   it("re-opening a panel that already holds rows never wipes them with a skeleton", async () => {
     const h = await boot();
     // Paint real content first (nothing armed, so this paints straight).
     await h.poll({ activities: [entry({ id: "a1", detail: "Scanning A" })] });
-    expect(document.querySelector('[data-act-id="a1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).not.toBeNull();
     vi.useFakeTimers();
 
     h.openPanel();
     vi.advanceTimersByTime(400);
 
     expect(skeletonRows()).toHaveLength(0);
-    expect(document.querySelector('[data-act-id="a1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).not.toBeNull();
   });
 });
 
@@ -411,11 +424,11 @@ describe("status: popup anti-flicker paint", () => {
     // Painting now would flash the skeleton away a millisecond after it
     // appeared — the flicker minVisibleMs exists to prevent.
     expect(skeletonRows()).toHaveLength(2);
-    expect(document.querySelector('[data-act-id="a1"]')).toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).toBeNull();
 
     vi.advanceTimersByTime(300);
 
-    expect(document.querySelector('[data-act-id="a1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).not.toBeNull();
   });
 
   it("a newer poll supersedes the queued paint, so the deferred commit shows the freshest rows", async () => {
@@ -433,8 +446,8 @@ describe("status: popup anti-flicker paint", () => {
     vi.advanceTimersByTime(300);
 
     // The commit renders the LATEST snapshot, not the one queued first.
-    expect(document.querySelector('[data-act-id="b1"]')).not.toBeNull();
-    expect(document.querySelector('[data-act-id="a1"]')).toBeNull();
+    expect(panel().querySelector('[data-act-id="b1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="a1"]')).toBeNull();
   });
 });
 
@@ -449,7 +462,7 @@ describe("status: live timers tick only while the popup is open", () => {
     vi.setSystemTime(new Date("2026-07-19T10:00:30Z"));
     await h.poll({ activities: [entry({ id: "lt1", started_at: "2026-07-19T10:00:00Z" })] });
     const timer = (): string =>
-      document.querySelector('#statusPopup [data-act-id="lt1"] .live-timer')?.textContent ?? "";
+      panel().querySelector('[data-act-id="lt1"] .live-timer')?.textContent ?? "";
     expect(timer()).toBe(" \u00B7 30s");
 
     // Panel never opened: the clock advances, the row stays frozen — a
@@ -487,9 +500,9 @@ describe("status: live timers tick only while the popup is open", () => {
     vi.setSystemTime(new Date("2026-07-19T10:02:09Z"));
     vi.advanceTimersByTime(1_000); // the tick fires at 10:02:10
 
-    expect(
-      document.querySelector('#statusPopup [data-act-id="in1"] .live-timer')?.textContent,
-    ).toBe(" \u00B7 2m 10s");
+    expect(panel().querySelector('[data-act-id="in1"] .live-timer')?.textContent).toBe(
+      " \u00B7 2m 10s",
+    );
     expect(stray.textContent).toBe(" \u00B7 30s");
   });
 });

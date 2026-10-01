@@ -21,6 +21,7 @@ import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
 import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
+import { historyPanel, libraryPanel } from "./panels.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { configParsed } from "./wire/client.gen.js";
 import { subscribeToActions } from "@cplieger/actions";
@@ -183,12 +184,6 @@ $.historyBtn.addEventListener("click", () => {
     navigateToHistory();
   }
 });
-const configBtn = document.getElementById("configBtn");
-if (configBtn) {
-  configBtn.addEventListener("click", () => {
-    openConfig();
-  });
-}
 $.configClose.addEventListener("click", closeConfig);
 
 // Config dialog dismissal (drag-safe backdrop + Escape, with the
@@ -202,26 +197,15 @@ const debouncedFilter = debounce(() => {
   updateLibraryFilters();
 }, 150);
 
-function wireFilter(id: string, event: string, handler: () => void): void {
-  const filterEl = document.getElementById(id);
-  if (filterEl) {
-    filterEl.addEventListener(event, handler);
-  }
-}
+const libraryFilterChanged = (): void => {
+  filterCoverage();
+  updateLibraryFilters();
+};
 
-wireFilter("cov-type-filter", "change", () => {
-  filterCoverage();
-  updateLibraryFilters();
-});
-wireFilter("cov-filter", "input", debouncedFilter);
-wireFilter("cov-missing", "change", () => {
-  filterCoverage();
-  updateLibraryFilters();
-});
-wireFilter("cov-sort", "change", () => {
-  filterCoverage();
-  updateLibraryFilters();
-});
+libraryPanel().typeFilter.addEventListener("change", libraryFilterChanged);
+libraryPanel().filter.addEventListener("input", debouncedFilter);
+libraryPanel().missingOnly.addEventListener("change", libraryFilterChanged);
+libraryPanel().sort.addEventListener("change", libraryFilterChanged);
 
 // History filters — text input debounced.
 const debouncedHistoryFilter = debounce(reloadHistory, 300);
@@ -231,10 +215,10 @@ const historyChange = (): void => {
     reloadHistory();
   }
 };
-wireFilter("h-type", "change", historyChange);
-wireFilter("h-lang", "change", historyChange);
-wireFilter("h-provider", "change", historyChange);
-wireFilter("h-filter", "input", debouncedHistoryFilter);
+historyPanel().type.addEventListener("change", historyChange);
+historyPanel().lang.addEventListener("change", historyChange);
+historyPanel().provider.addEventListener("change", historyChange);
+historyPanel().filter.addEventListener("input", debouncedHistoryFilter);
 
 const configForm = configDlg.querySelector("form");
 if (configForm) {
@@ -266,10 +250,7 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
     return;
   }
   e.preventDefault();
-  const searchInput = document.getElementById("cov-filter") ?? document.getElementById("h-filter");
-  if (searchInput) {
-    searchInput.focus();
-  }
+  (store.get("currentPage") === "history" ? historyPanel() : libraryPanel()).filter.focus();
 });
 
 // Close search dialog on backdrop click.

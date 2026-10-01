@@ -1,9 +1,10 @@
 // Client-side routing: URL-driven page navigation with view transitions.
 
 import * as store from "./store.js";
-import { $, el, errDiv, icon, input, select } from "./dom.js";
+import { $, el, errDiv, icon } from "./dom.js";
+import { historyPanel, libraryPanel } from "./panels.js";
 import { openConfig } from "./config.js";
-import { loadCoverage, configurePanel, renderCoverage } from "./coverage.js";
+import { loadCoverage, configurePanel, renderCoverage, showLibraryControls } from "./coverage.js";
 import { applyHealedRow, coverageItems, libraryLoaded } from "./coverage-store.js";
 import { coverageMovieSummaryRaw, coverageSeriesSummaryRaw } from "./wire/client.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
@@ -14,48 +15,43 @@ import { viewTransition, setDocTitle, emptyState } from "./utils.js";
 import { contentView } from "./view-scope.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
 import { buildPath, parseRoute } from "./route-path.js";
+import { reconcile, type ReconcileSpec } from "@cplieger/reactive";
 import type { LibraryFilters, Route } from "./route-path.js";
 import type { CoverageItem } from "./api-types.js";
 
 // --- Page navigation and client-side routing ---
 
-// Immediately prepare the card for a detail route: hide library
-// controls and heading so they don't flash before the detail loads.
+// Immediately prepare the card for a detail route: take the library
+// controls and heading out so they don't flash before the detail loads.
 function prepareDetailView(): void {
   showPage("library", true);
-  const ctrl = $.coveragePanel.querySelector<HTMLElement>(".controls");
-  if (ctrl) {
-    ctrl.style.display = "none";
-  }
-  $.libHeading.textContent = "";
+  showLibraryControls(false);
+  libraryPanel().heading.textContent = "";
   // No eager skeleton here: the detail/files loaders own their loading paint
   // via skeletonTiming (150ms show-delay + 300ms min-visible), so a cached
   // load swaps content in directly without a skeleton flash. The previous
   // view simply remains during the show-delay window.
 }
 
-const covTypeFilter = select("cov-type-filter");
-const covFilter = input("cov-filter");
-const covMissing = input("cov-missing");
-const covSort = select("cov-sort");
-
 // Read the four filter controls. route-path.ts owns the query-string codec, so
 // this half never sees a URL and that half never sees a control.
 function readLibraryFilters(): LibraryFilters {
+  const p = libraryPanel();
   return {
-    type: covTypeFilter.value,
-    q: covFilter.value,
-    missing: covMissing.checked,
-    sort: covSort.value,
+    type: p.typeFilter.value,
+    q: p.filter.value,
+    missing: p.missingOnly.checked,
+    sort: p.sort.value,
   };
 }
 
 // Write the four filter controls.
 function applyLibraryFilters(f: LibraryFilters): void {
-  covTypeFilter.value = f.type;
-  covFilter.value = f.q;
-  covMissing.checked = f.missing;
-  covSort.value = f.sort;
+  const p = libraryPanel();
+  p.typeFilter.value = f.type;
+  p.filter.value = f.q;
+  p.missingOnly.checked = f.missing;
+  p.sort.value = f.sort;
 }
 
 // Push a new URL and apply the route. Use replace=true for initial load
@@ -235,13 +231,21 @@ function applyParsedRoute(route: Route): Promise<void> {
   }
 }
 
+type PanelSlot = "library" | "history";
+
+const PANEL_SLOTS: ReconcileSpec<PanelSlot> = {
+  key: (s) => s,
+  mount: (s) => (s === "history" ? historyPanel() : libraryPanel()).root,
+};
+
 // Show a page without pushing history (used by applyRoute).
 // skipRender: true to toggle panels without re-rendering content
 // (used by detail routes that replace content themselves).
 function showPage(page: string, skipRender?: boolean): void {
   store.set("currentPage", page);
-  $.coveragePanel.hidden = page !== "library";
-  $.historyPanel.hidden = page !== "history";
+  // One keyed slot: the departing panel is detached with its filter values and
+  // the arriving one is the node it was before.
+  reconcile($.main, [page === "history" ? "history" : "library"], PANEL_SLOTS);
   $.historyBtn.classList.toggle("active", page === "history");
   // Detail routes overwrite this with the item title once resolved.
   setDocTitle(page === "history" ? "History" : undefined);
@@ -272,12 +276,8 @@ let historyBackPath: string | null = null;
 
 // Manage the history panel header: add/remove back button.
 function setHistoryHeader(): void {
-  const headerEl = document.querySelector("#historyPanel .card-head");
-  const heading = document.getElementById("hist-heading");
-  if (!headerEl || !heading) {
-    return;
-  }
-  headerEl.querySelectorAll(".detail-nav").forEach((e: Element) => {
+  const { head, heading } = historyPanel();
+  head.querySelectorAll(".detail-nav").forEach((e: Element) => {
     e.remove();
   });
 
@@ -298,7 +298,7 @@ function setHistoryHeader(): void {
     icon("arrow-left"),
     el("span", { className: "btn-text" }, backText),
   );
-  headerEl.insertBefore(backBtn, heading);
+  head.insertBefore(backBtn, heading);
 }
 
 // Resolve a detail route's media item: from the coverage cache when held,
@@ -341,19 +341,19 @@ async function findCoverageItem(
   // it is released rather than mounted (view-scope.ts).
   contentView.clear();
   if (status === 404) {
-    $.coverageContent.replaceChildren(
+    libraryPanel().content.replaceChildren(
       emptyState("Not found. This title is not in the library.", "Back to library", () => {
         navigate("/");
       }),
     );
   } else {
-    $.coverageContent.replaceChildren(errDiv(error ?? "failed to load item"));
+    libraryPanel().content.replaceChildren(errDiv(error ?? "failed to load item"));
   }
   return null;
 }
 
 export function navigateToHistory(mediaFilter?: string): void {
-  const filterEl = input("h-filter");
+  const filterEl = historyPanel().filter;
   if (mediaFilter) {
     filterEl.value = mediaFilter;
   } else {

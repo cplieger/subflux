@@ -180,16 +180,16 @@ func TestMigrate_copyStepIdentity(t *testing.T) {
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after copy: %v", err)
 	}
-	entries, err := db.State(ctx, &subflux.StateQuery{})
+	page, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("State after copy: %v", err)
 	}
 	wantRows := len(fx.manualRows) + len(fx.autoRows) + 1
-	if len(entries) != wantRows {
-		t.Errorf("state rows after copy + insert = %d, want %d", len(entries), wantRows)
+	if len(page.Entries) != wantRows {
+		t.Errorf("state rows after copy + insert = %d, want %d", len(page.Entries), wantRows)
 	}
 	preservedSeq := int64(wantSeqs[bucketSubtitleState])
-	for _, e := range entries {
+	for _, e := range page.Entries {
 		if e.MediaID == "tt9" && e.ID <= preservedSeq {
 			t.Errorf("fresh row id %d collides with the preserved sequence %d", e.ID, preservedSeq)
 		}

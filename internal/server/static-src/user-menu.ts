@@ -27,6 +27,17 @@ let menuPopover: MenuPopover | null = null;
 // per-open rebuild needs only refresh() + focusFirst().
 let menuNav: RovingFocusController | null = null;
 
+const panel = el("div", {
+  id: "userMenuPopup",
+  className: "pop-menu",
+  role: "menu",
+  "aria-label": "User menu",
+});
+
+export function _userMenuPanelForTest(): HTMLElement {
+  return panel;
+}
+
 export function initUserMenu(): void {
   void fetchMe();
   wireUserButton();
@@ -45,34 +56,23 @@ async function fetchMe(): Promise<void> {
 // locally via a node_modules overlay until released.
 function wireUserButton(): void {
   const btn = document.getElementById("userBtn");
-  const popup = document.getElementById("userMenuPopup");
-  if (!btn || !popup) {
+  if (!btn) {
     return;
   }
-
-  // Config and theme controls are now inside the user menu popover.
-  // Remove the standalone header buttons to avoid duplicate controls.
-  document.getElementById("configBtn")?.remove();
-  document.getElementById("themeBtn")?.remove();
 
   // Rebuild menu content each time the popover opens (onOpen) so the theme
   // label/icon reflect the live data-theme. Auto-mode (matchMedia) can flip
   // data-theme while the menu is closed, leaving a stale label. haspopup:
   // "menu" matches the panel's role="menu".
-  menuPopover = createMenuPopover(btn, popup, {
+  menuPopover = createMenuPopover(btn, panel, {
     haspopup: "menu",
     onOpen: buildMenuContent,
   });
-  menuNav = rovingFocus(popup, ".um-item");
+  menuNav = rovingFocus(panel, ".um-item");
   btn.addEventListener("click", () => menuPopover?.toggle());
 }
 
 function buildMenuContent(): void {
-  const popup = document.getElementById("userMenuPopup");
-  if (!popup) {
-    return;
-  }
-
   const items: HTMLElement[] = [];
 
   // Username display (non-interactive).
@@ -114,11 +114,11 @@ function buildMenuContent(): void {
       () => {
         theme.cycle();
         // Update the label after cycling.
-        const label = popup.querySelector(".um-theme-label");
+        const label = panel.querySelector(".um-theme-label");
         if (label) {
           label.textContent = resolveThemeLabel();
         }
-        const ic = popup.querySelector(".um-theme-icon");
+        const ic = panel.querySelector(".um-theme-icon");
         if (ic) {
           ic.textContent = "";
           ic.appendChild(icon(themeIcon()));
@@ -137,7 +137,7 @@ function buildMenuContent(): void {
     }),
   );
 
-  popup.replaceChildren(...items);
+  panel.replaceChildren(...items);
 
   // The panel announces itself as role="menu", so it must honor the menu
   // interaction contract — the roving-focus primitive owns it (wired once in

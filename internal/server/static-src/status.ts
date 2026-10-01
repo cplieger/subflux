@@ -80,6 +80,19 @@ const stoppingActivities = new Set<string>();
 
 let statusPopover: MenuPopover | null = null;
 
+let statusPanel: HTMLElement | null = null;
+
+function panel(): HTMLElement {
+  if (statusPanel === null) {
+    throw new Error("status panel missing: initStatusPopover() has not run");
+  }
+  return statusPanel;
+}
+
+export function _statusPanelForTest(): HTMLElement {
+  return panel();
+}
+
 // First-open anti-flicker controller: showDelay 0 (an empty popup at
 // min-height is worse than an instant skeleton) + 300ms min-visible.
 // deferredPaint holds the newest paint while a min-visible commit is
@@ -88,11 +101,13 @@ let popupSkeleton: SkeletonTimingController | null = null;
 let deferredPaint: (() => void) | null = null;
 
 export function initStatusPopover(): void {
-  statusPopover = createMenuPopover($.statusBtn, $.statusPopup, {
+  const host = el("div", { id: "statusPopup", role: "group", "aria-label": "Status" });
+  statusPanel = host;
+  statusPopover = createMenuPopover($.statusBtn, host, {
     // Panel role is "group", not "menu" — no dedicated aria-haspopup token
     // for that, so leave it at its default.
     onOpen: () => {
-      if (!$.statusPopup.children.length && popupSkeleton === null) {
+      if (!host.children.length && popupSkeleton === null) {
         popupSkeleton = skeletonTiming(
           () => {
             const skel = document.createDocumentFragment();
@@ -101,7 +116,7 @@ export function initStatusPopover(): void {
                 el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
               );
             }
-            patch($.statusPopup, skel);
+            patch(host, skel);
           },
           { showDelayMs: 0, minVisibleMs: 300 },
         );
@@ -224,8 +239,9 @@ function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
     // popup's only sweeper and it removes only children it keyed, so an unkeyed
     // write here outlives every later paint. The clear covers the skeleton rows,
     // unkeyed for the same reason.
-    $.statusPopup.replaceChildren();
-    reconcile($.statusPopup, ["offline"], {
+    const host = panel();
+    host.replaceChildren();
+    reconcile(host, ["offline"], {
       key: (k) => k,
       mount: () => el("div", { className: "pop-item muted" }, "Server unreachable, retrying\u2026"),
     });
@@ -722,7 +738,7 @@ function requestStopScan(id: string, btn: HTMLButtonElement | null): void {
   if (btn) {
     btn.disabled = true;
   }
-  const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
+  const item = panel().querySelector(`[data-act-id="${CSS.escape(id)}"]`);
   const timer = item?.querySelector(".live-timer");
   if (timer) {
     timer.textContent = " \u00B7 stopping\u2026";
@@ -888,7 +904,7 @@ function renderPopup(
 ): void {
   const paint = (): void => {
     const items = buildPopupItems(stats, providers, activities, alerts, ongoing, isActive);
-    reconcile($.statusPopup, items, {
+    reconcile(panel(), items, {
       key: (item) => item.key,
       mount: (item) => item.build(),
       // Without an update path, a keyed row mounted once never repaints, so
@@ -915,7 +931,7 @@ function renderPopup(
       // reconcile() removes only children carrying its key attribute, so
       // the unkeyed skeleton rows must be detached before the first
       // reconcile or they'd survive every later paint too.
-      $.statusPopup.replaceChildren();
+      panel().replaceChildren();
       deferredPaint?.();
       deferredPaint = null;
     });
@@ -942,7 +958,7 @@ function animateDismiss(item: Element): void {
 
 function dismissActivity(id: string): void {
   addBounded(dismissedActivities, id);
-  const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
+  const item = panel().querySelector(`[data-act-id="${CSS.escape(id)}"]`);
   if (item) {
     const btn = item.querySelector<HTMLButtonElement>(".close-btn");
     if (btn) {
@@ -1011,12 +1027,14 @@ function stopLiveTimers(): void {
 
 function updateLiveTimers(): void {
   const now = new Date();
-  $.statusPopup.querySelectorAll(".live-timer[data-started]").forEach((timer: Element) => {
-    timer.textContent = ` \u00B7 ${formatDuration(
-      new Date(timer.getAttribute("data-started") ?? ""),
-      now,
-    )}`;
-  });
+  panel()
+    .querySelectorAll(".live-timer[data-started]")
+    .forEach((timer: Element) => {
+      timer.textContent = ` \u00B7 ${formatDuration(
+        new Date(timer.getAttribute("data-started") ?? ""),
+        now,
+      )}`;
+    });
 }
 
 function formatDuration(start: Date, end: Date): string {

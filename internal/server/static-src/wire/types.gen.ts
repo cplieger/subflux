@@ -833,6 +833,17 @@ export interface StateEntry {
   manual: boolean;
 }
 
+/**
+ * StatePage is the GET /api/state response: one page of history rows plus the number
+ * of rows the store holds with NO filter applied. The second field is what lets a
+ * client tell "nothing matched this filter" from "nothing was ever downloaded"; the
+ * rows alone cannot, because the query filters server-side.
+ */
+export interface StatePage {
+  entries: StateEntry[];
+  unfiltered_total: number;
+}
+
 /** Stats is the JSON response for GET /api/stats. */
 export interface Stats {
   last_scan: string;

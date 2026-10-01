@@ -7,7 +7,6 @@ import {
   errDiv,
   dialogHead,
   onBackdropClose,
-  insertNavButton,
   $,
   confirm,
   closeDialog,
@@ -256,46 +255,12 @@ describe("dom: onBackdropClose()", () => {
 
 describe("dom: the $ registry", () => {
   it("returns the registered element when it is present", () => {
-    document.body.innerHTML = '<div id="statusPopup"></div>';
-    expect($.statusPopup).toBe(document.getElementById("statusPopup"));
+    document.body.innerHTML = '<main id="main"></main>';
+    expect($.main).toBe(document.getElementById("main"));
   });
 
   it("fails fast and names the element rather than handing back null", () => {
     document.body.innerHTML = "";
-    expect(() => $.statusPopup).toThrow("Missing element: #statusPopup");
-  });
-});
-
-describe("dom: insertNavButton()", () => {
-  beforeEach(() => {
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head">' +
-      '<h1>Library</h1><a data-nav="arr">Sonarr</a>' +
-      "</div></div>";
-  });
-
-  function headText(): (string | null)[] {
-    return [...document.querySelectorAll("#coveragePanel .card-head > *")].map(
-      (n) => n.textContent,
-    );
-  }
-
-  function navButton(): HTMLElement {
-    const b = document.createElement("button");
-    b.textContent = "History";
-    return b;
-  }
-
-  it("inserts the button ahead of the arr link", () => {
-    insertNavButton(navButton());
-    expect(headText()).toEqual(["Library", "History", "Sonarr"]);
-  });
-
-  it("appends the button when there is no arr link to sit before", () => {
-    document.querySelector('[data-nav="arr"]')?.remove();
-
-    insertNavButton(navButton());
-
-    expect(headText()).toEqual(["Library", "History"]);
+    expect(() => $.main).toThrow("Missing element: #main");
   });
 });
