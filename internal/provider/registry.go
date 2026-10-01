@@ -92,17 +92,19 @@ type FactoryFunc func(ctx context.Context, settings map[string]any) (Provider, e
 
 // Registry holds provider factories keyed by name.
 type Registry struct {
-	factories map[subflux.ProviderID]FactoryFunc
-	schemas   map[subflux.ProviderID][]subflux.ProviderSchemaField
-	labels    map[subflux.ProviderID]string
+	factories  map[subflux.ProviderID]FactoryFunc
+	schemas    map[subflux.ProviderID][]subflux.ProviderSchemaField
+	labels     map[subflux.ProviderID]string
+	credChecks map[subflux.ProviderID]bool
 }
 
 // NewRegistry creates an empty provider registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		factories: make(map[subflux.ProviderID]FactoryFunc),
-		schemas:   make(map[subflux.ProviderID][]subflux.ProviderSchemaField),
-		labels:    make(map[subflux.ProviderID]string),
+		factories:  make(map[subflux.ProviderID]FactoryFunc),
+		schemas:    make(map[subflux.ProviderID][]subflux.ProviderSchemaField),
+		labels:     make(map[subflux.ProviderID]string),
+		credChecks: make(map[subflux.ProviderID]bool),
 	}
 }
 
@@ -122,6 +124,51 @@ func (r *Registry) Register(name subflux.ProviderID, f FactoryFunc) {
 func (r *Registry) RegisterSchema(name subflux.ProviderID, label string, fields []subflux.ProviderSchemaField) {
 	r.labels[name] = label
 	r.schemas[name] = fields
+}
+
+// ErrNoCredentialCheck reports that a provider offers no credential check:
+// either the name is unregistered, or its implementation does not satisfy
+// CredentialChecker. Callers gate on CredentialCheck first, so reaching this is
+// a caller bug rather than an operator mistake.
+var ErrNoCredentialCheck = errors.New("provider: no credential check")
+
+// RegisterCredentialCheck records whether a provider's implementation can
+// validate its credentials without searching. Declared at the registration
+// table rather than derived here, because deriving it would mean building the
+// provider, which needs the credentials the schema is rendered to collect.
+func (r *Registry) RegisterCredentialCheck(name subflux.ProviderID, offered bool) {
+	r.credChecks[name] = offered
+}
+
+// CredentialCheck reports whether the named provider offers a credential check.
+// Schema data: the settings UI renders a test control for the providers it
+// answers true for, and the endpoint refuses a request naming any other.
+func (r *Registry) CredentialCheck(name subflux.ProviderID) bool {
+	return r.credChecks[name]
+}
+
+// CheckCredentials builds the named provider from settings and asks it whether
+// its credentials are accepted. A nil error means they are.
+//
+// Settings are normalized exactly as LoadAll normalizes them, so the check runs
+// against the values a save would activate rather than a second interpretation
+// of the same map. A factory failure is reported as *subflux.AuthError: every
+// factory here fails only on a missing required credential, so the remedy is the
+// operator's blank field rather than the network.
+func (r *Registry) CheckCredentials(ctx context.Context, name subflux.ProviderID, settings map[string]any) error {
+	f, ok := r.factories[name]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
+	}
+	p, err := f(ctx, NormalizeSettings(r.schemas[name], settings))
+	if err != nil {
+		return &subflux.AuthError{Msg: err.Error()}
+	}
+	checker, ok := p.(CredentialChecker)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
+	}
+	return checker.CheckCredentials(ctx)
 }
 
 // ProviderNames returns all registered provider names in sorted order.

@@ -1,7 +1,7 @@
 // providers.go is the single registration point for all subtitle providers.
-// Each provider's factory function and settings schema are registered here;
-// adding a new provider requires one Register + one RegisterSchema call.
-// No init(), no blank imports, no global state.
+// Each provider's factory function, settings schema and credential-check
+// capability are registered here; adding a new provider requires one entry in
+// providerEntries. No init(), no blank imports, no global state.
 package main
 
 import (
@@ -41,6 +41,7 @@ func newProviderRegistry() *provider.Registry {
 	for _, e := range providerEntries {
 		r.Register(e.name, e.factory)
 		r.RegisterSchema(e.name, e.label, e.fields)
+		r.RegisterCredentialCheck(e.name, e.credCheck)
 	}
 	return r
 }
@@ -51,12 +52,20 @@ type providerEntry struct {
 	label   string
 	factory provider.FactoryFunc
 	fields  []subflux.ProviderSchemaField
+	// credCheck declares that the provider's implementation satisfies
+	// provider.CredentialChecker, which is what makes the settings UI offer a
+	// connection test for it. Declared rather than derived because deriving it
+	// means building the provider, and that needs the credentials the settings
+	// form exists to collect; TestProviderCredentialChecks keeps the column
+	// honest by building each one and asserting the assertion holds.
+	credCheck bool
 }
 
 // providerEntries is the declarative list of all built-in providers.
 var providerEntries = []providerEntry{
 	{
 		name: subflux.ProviderNameHDBits, label: "HDBits", factory: hdbits.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
@@ -70,6 +79,7 @@ var providerEntries = []providerEntry{
 	},
 	{
 		name: subflux.ProviderNameOpenSubtitles, label: "OpenSubtitles", factory: opensubtitles.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
@@ -101,6 +111,7 @@ var providerEntries = []providerEntry{
 	},
 	{
 		name: subflux.ProviderNameBetaSeries, label: "BetaSeries", factory: betaseries.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: "token", Label: "Token", Type: fieldTypeSecret, Secret: true,
@@ -114,6 +125,7 @@ var providerEntries = []providerEntry{
 	},
 	{
 		name: subflux.ProviderNameSubSource, label: "SubSource", factory: subsource.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
@@ -123,6 +135,7 @@ var providerEntries = []providerEntry{
 	},
 	{
 		name: subflux.ProviderNameSubDL, label: "SubDL", factory: subdl.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
@@ -132,6 +145,7 @@ var providerEntries = []providerEntry{
 	},
 	{
 		name: subflux.ProviderNameAnimeTosho, label: "AnimeTosho", factory: animetosho.Factory,
+		credCheck: true,
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: "anidb_client_key", Label: "AniDB Client Key", Type: fieldTypeSecret,

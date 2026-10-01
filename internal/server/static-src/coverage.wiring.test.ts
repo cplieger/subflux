@@ -28,6 +28,18 @@ vi.mock("./wire/client.gen.js", () => ({
   coverageSeries: (): Promise<unknown> =>
     clientState.next.shift()?.() ?? Promise.resolve(clientState.series),
   coverageMovies: (): Promise<unknown> => Promise.resolve(clientState.movies),
+  // The router's item-grain deep-link resolution. Only its 404 arm arms an
+  // install here, so both summaries answer one.
+  coverageSeriesSummaryRaw: (): Promise<unknown> =>
+    Promise.resolve({ ok: false, status: 404, error: "not found" }),
+  coverageMovieSummaryRaw: (): Promise<unknown> =>
+    Promise.resolve({ ok: false, status: 404, error: "not found" }),
+  coverageSeriesDetail: (): Promise<unknown> => Promise.resolve([]),
+  mediaEpisodes: (): Promise<unknown> => Promise.resolve([]),
+  stateIDs: (): Promise<unknown> => Promise.resolve([]),
+  stateIDsRaw: (): Promise<unknown> => Promise.resolve({ ok: true, status: 200, data: [] }),
+  coverageMovieSubsRaw: (): Promise<unknown> =>
+    Promise.resolve({ ok: true, status: 200, data: [] }),
 }));
 
 vi.mock("@cplieger/actions", () => ({
@@ -46,7 +58,25 @@ vi.mock("./bus.js", () => ({
     OpenMovie: "open:movie",
     ScanSeries: "scan:series",
     ScanMovie: "scan:movie",
+    NavRoute: "nav:route",
+    NavHistory: "nav:history",
+    LoadHistory: "load:history",
   },
+}));
+
+// The two modules that ARM the install under test (detail.ts's season-less
+// series, router.ts's 404 deep link) are real; their own collaborators are
+// not, so this suite stays the coverage container's.
+vi.mock("./config.js", () => ({ openConfig: () => undefined }));
+vi.mock("./search.js", () => ({ openSearchPopup: () => undefined }));
+vi.mock("./sync.js", () => ({
+  openSyncDialog: () => undefined,
+  confirmSeasonSync: () => undefined,
+}));
+vi.mock("./files.js", () => ({ openFileManager: () => undefined }));
+vi.mock("./page-leg.js", () => ({
+  abortPageLeg: () => undefined,
+  refreshCurrentPage: () => Promise.resolve("applied"),
 }));
 
 // A faithful stand-in for detail-scan.ts: the real one keeps a REGISTRY of the
@@ -68,6 +98,9 @@ vi.mock("./detail-scan.js", () => ({
       btn.disabled = true;
     }
   },
+  triggerSeriesScan: () => Promise.resolve(),
+  triggerSeasonScan: () => Promise.resolve(),
+  triggerMovieScan: () => Promise.resolve(),
 }));
 
 /** A running-scans publish, as the store effect delivers it: every REGISTERED
@@ -96,7 +129,8 @@ vi.mock("./store.js", () => ({
 }));
 
 import { configurePanel, fetchAndMergeCoverage, filterCoverage, loadCoverage } from "./coverage.js";
-import type { CoverageItem, CoverageTarget } from "./api-types.js";
+import { renderSeriesDetail } from "./detail.js";
+import type { CoverageItem, CoverageTarget, SeriesItem } from "./api-types.js";
 import { contentView } from "./view-scope.js";
 import { seriesScopeKey } from "./scan-scope.js";
 
@@ -125,6 +159,20 @@ function series(
   };
 }
 
+/** The detail view's own series shape, for the season-less render. */
+function seriesDetailItem(tvdbId: number): SeriesItem {
+  return {
+    title: "Show",
+    year: 2020,
+    id: 100 + tvdbId,
+    tvdb_id: tvdbId,
+    audio_lang: "en",
+    rule: "en",
+    episodes: 0,
+    targets: [],
+  } as SeriesItem;
+}
+
 const FIXTURE = `
 <section class="card" id="coveragePanel">
   <div class="card-head" hidden>
@@ -137,7 +185,9 @@ const FIXTURE = `
     </div>
   </div>
   <div id="coverageContent"></div>
-</section>`;
+</section>
+<button type="button" id="historyBtn">History</button>
+<section class="card" id="historyPanel" hidden></section>`;
 
 // The module holds ONE collection plus the filter/page signals for the whole
 // file, and every path under test branches on whether that collection is EMPTY
@@ -418,5 +468,45 @@ describe("coverage: render disposal", () => {
 
     expect(live.hidden).toBe(true);
     expect(discarded.hidden).toBe(false);
+  });
+});
+
+/** The installed no-media panel. A reusing install leaves the container's OLD
+ *  node wearing this class, which is why the cases below assert identity too. */
+const LIVE_EMPTY = "#coverageContent .cov-list > .empty";
+
+// Two arrivals that leave a `div.empty` in the container rather than a skeleton
+// row: a reusing install seats the list on it and the empty state on its message
+// div. `reqEl` throws on a selector miss, which is what keeps a broken selector
+// distinguishable from the defect without a third control case.
+describe("coverage: install over a departing view's empty state", () => {
+  it("installs its own empty state over a season-less series' empty state", async () => {
+    renderSeriesDetail(seriesDetailItem(1), [], []);
+    const armedMessage = reqEl<HTMLElement>("#coverageContent .empty > div");
+    expect(armedMessage.textContent).toContain("No episodes with video files");
+
+    await load([series(1, "Show")]);
+
+    expect(rowTitles()).toEqual(["Show"]);
+    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
+    expect(installed).not.toBe(armedMessage);
+    expect(installed.hidden).toBe(true);
+  });
+
+  it("installs its own empty state over a 404 deep link's not-found panel", async () => {
+    const router = await import("./router.js");
+    const home = location.pathname + location.search;
+    history.replaceState(null, "", "/series/999");
+    await router.applyRoute();
+    history.replaceState(null, "", home);
+    const armedMessage = reqEl<HTMLElement>("#coverageContent .empty > div");
+    expect(armedMessage.textContent).toContain("Not found");
+
+    await load([series(1, "Show")]);
+
+    expect(rowTitles()).toEqual(["Show"]);
+    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
+    expect(installed).not.toBe(armedMessage);
+    expect(installed.hidden).toBe(true);
   });
 });

@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	authoidc "github.com/cplieger/auth/v5/oidc"
-	"github.com/cplieger/auth/v5/ratelimit"
-	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/auth/v6"
+	authoidc "github.com/cplieger/auth/v6/oidc"
+	"github.com/cplieger/auth/v6/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v3"
@@ -21,8 +21,9 @@ import (
 
 // AuthConfig is the authentication half of the configuration, and the only
 // part these handlers read: whether password login is on at all, whether a new
-// password must be checked against the breach corpus, and whether OIDC is
-// available as an alternative factor. 3 of the 37 values the config offers.
+// password must be checked against the breach corpus, whether OIDC is
+// available as an alternative factor, and the configured relying-party ID the
+// availability probe reports. 4 of the 37 values the config offers.
 //
 // Exported because the composition root names it: the Config resolver below is
 // how the handlers see a hot-reloaded config, and the root has to write that
@@ -31,6 +32,7 @@ type AuthConfig interface {
 	BasicAuthEnabled() bool
 	CheckBreachedPasswords() bool
 	OIDCEnabled() bool
+	WebAuthnRPID() string
 }
 
 // Handler holds all dependencies for the auth handler family.
@@ -217,16 +219,24 @@ func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *h
 	return PasswordHash(auth.HashPassword(check.Password)), "", nil
 }
 
-// requireWebAuthn resolves the current relying party from the live snapshot,
-// writing a 400 error and returning ok=false when WebAuthn is not configured
-// (no RP ID, cold-boot degrade, or no resolver wired in tests).
-func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*authwebauthn.RelyingParty, bool) {
-	var rp *authwebauthn.RelyingParty
-	if h.WebAuthnResolver != nil {
-		rp = h.WebAuthnResolver()
+// relyingParty resolves the current relying party from the live snapshot, nil
+// when WebAuthn is not configured (no RP ID, cold-boot degrade, or no resolver
+// wired in tests). It is the one authority on RP existence that requireWebAuthn,
+// the availability probe and the setup status all read.
+func (h *Handler) relyingParty() *authwebauthn.RelyingParty {
+	if h.WebAuthnResolver == nil {
+		return nil
 	}
+	return h.WebAuthnResolver()
+}
+
+// requireWebAuthn resolves the current relying party, writing a 400 error and
+// returning ok=false when WebAuthn is not configured.
+func (h *Handler) requireWebAuthn(w http.ResponseWriter, r *http.Request) (*authwebauthn.RelyingParty, bool) {
+	rp := h.relyingParty()
 	if rp == nil {
-		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "WebAuthn not configured")
+		slog.Warn("webauthn: ceremony requested but no relying party is configured", "path", r.URL.Path, "ip", ClientIP(r))
+		httpapi.BadRequestC(w, r, subflux.CodeWebAuthnUnconfigured, "passkeys are not configured on this instance")
 		return nil, false
 	}
 	return rp, true

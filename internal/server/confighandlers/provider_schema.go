@@ -1,20 +1,30 @@
 package confighandlers
 
 import (
+	"context"
 	"slices"
 
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// SchemaRegistry is the provider metadata the settings UI is built from: the
-// registered names, and each one's label and fields. 2 of the registry's 3
-// methods — instantiating providers (LoadAll) is the composition root's job and
-// no HTTP handler does it.
+// SchemaRegistry is what the config surface asks of the provider registry: the
+// registered names, each one's label and fields, and which of them can validate
+// their credentials. 4 of the registry's 8 methods — instantiating providers
+// (LoadAll) and the three registration calls are the composition root's job.
 type SchemaRegistry interface {
 	// ProviderNames returns all registered provider names in priority order.
 	ProviderNames() []subflux.ProviderID
 	// Schema returns the UI label and settings fields for a named provider.
 	Schema(name subflux.ProviderID) (label string, fields []subflux.ProviderSchemaField)
+	// CredentialCheck reports whether the provider offers a credential check.
+	// One owner for the fact: the schema renders a test control from it and
+	// HandleTestConnection refuses a request naming a provider it answers
+	// false for.
+	CredentialCheck(name subflux.ProviderID) bool
+	// CheckCredentials builds the named provider from settings and reports
+	// whether its credentials are accepted. A nil error means they are; a
+	// *subflux.AuthError means they were refused.
+	CheckCredentials(ctx context.Context, name subflux.ProviderID, settings map[string]any) error
 }
 
 // BuildProviderSchemas converts the registry's provider metadata into
@@ -36,8 +46,9 @@ func BuildProviderSchemas(reg SchemaRegistry, exclude ...string) []subflux.Provi
 			label = nameStr
 		}
 		ps := subflux.ProviderSchema{
-			Name:  nameStr,
-			Label: label,
+			Name:     nameStr,
+			Label:    label,
+			ConnTest: reg.CredentialCheck(name),
 		}
 		for _, f := range fields {
 			ps.Settings = append(ps.Settings, subflux.SchemaField{

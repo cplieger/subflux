@@ -25,8 +25,11 @@ vi.mock("./wire/client.gen.js", () => ({
   configSchema: () => Promise.resolve(null),
   configStructured: () => Promise.resolve(null),
   validateConfigPath: () => Promise.resolve(null),
-  webauthnRegisterBegin: () => Promise.resolve(null),
+  webauthnRegisterBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnLoginBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnAvailabilityRaw: () => Promise.resolve({ ok: false, status: 400 }),
   webauthnSignalData: () => Promise.resolve(null),
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
   // Reached only by a section's Test-connection button, which these
   // tests do not click; shaped like a real answer so a future one can.
   testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
@@ -69,7 +72,7 @@ function buttonWithText(host: HTMLElement, text: string): HTMLButtonElement {
 
 function removeButtons(containerId: string): HTMLButtonElement[] {
   const container = document.getElementById(containerId);
-  return [...(container?.querySelectorAll<HTMLButtonElement>(".wiz-lang-remove") ?? [])];
+  return [...(container?.querySelectorAll<HTMLButtonElement>(".wiz-row-remove") ?? [])];
 }
 
 beforeEach(() => {
@@ -169,6 +172,38 @@ describe("languages step: audio rules", () => {
     expect(sel("wiz-lang-rule-audio-0").value).toBe("en");
     expect(sel("wiz-lang-rule-code-0").value).toBe("fr");
     expect(document.getElementById("wiz-lang-rule-audio-1")).toBeNull();
+  });
+});
+
+describe("languages step: the remove control", () => {
+  // A "×" text node centres on its font's math axis while flex centring
+  // centres the LINE BOX, so the glyph's offset is a font metric the
+  // stylesheet cannot reach. The mask has no baseline, which is the whole
+  // reason these buttons hold an icon; measured 7px above / 7px below at
+  // 28px and 15/15 at the 44px touch size.
+  it("holds the shared close mask rather than a text glyph", () => {
+    const host = render();
+    buttonWithText(host, "+ Add default").click();
+    buttonWithText(host, "+ Add rule").click();
+
+    const buttons = [...removeButtons("wiz-lang-defaults"), ...removeButtons("wiz-lang-rules")];
+
+    expect(buttons).toHaveLength(3);
+    for (const btn of buttons) {
+      expect(btn.querySelector(".icon.icon-close")).not.toBeNull();
+      expect(btn.textContent).toBe("");
+    }
+  });
+
+  it("names what it removes, since the mask carries no accessible text", () => {
+    const host = render();
+    buttonWithText(host, "+ Add default").click();
+    buttonWithText(host, "+ Add rule").click();
+
+    expect(removeButtons("wiz-lang-defaults")[0]?.getAttribute("aria-label")).toBe(
+      "Remove default",
+    );
+    expect(removeButtons("wiz-lang-rules")[0]?.getAttribute("aria-label")).toBe("Remove rule");
   });
 });
 

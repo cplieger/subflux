@@ -132,7 +132,8 @@ func authSection() subflux.SchemaSection {
 				Key:         "webauthn_rp_id",
 				Label:       "WebAuthn RP ID",
 				Type:        fieldText,
-				Placeholder: "subflux.example.com",
+				Placeholder: "example.com",
+				Help:        "The registrable domain your passkeys are scoped to. Filled in automatically from the address you first save from; changing it strands existing passkeys. Clearing it keeps the stored value.",
 			},
 		},
 	}

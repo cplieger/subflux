@@ -151,6 +151,45 @@ func TestSecretKeysCoverProviderSchemas(t *testing.T) {
 	}
 }
 
+// TestProviderCredentialChecks is what keeps providerEntries' credCheck column
+// honest. The column is a declaration about the implementation, because deriving
+// it would mean building the provider and that needs the credentials the settings
+// form exists to collect — so this builds each one with placeholder credentials
+// and asserts the two agree. A dropped or renamed CheckCredentials method makes
+// the schema keep offering a control the endpoint then refuses, with nothing red
+// anywhere.
+func TestProviderCredentialChecks(t *testing.T) {
+	t.Parallel()
+
+	// Enough to satisfy every factory's required-credential guard; the values
+	// never leave the process because nothing calls the check.
+	placeholder := map[string]any{
+		"username": "u", "password": "p", "api_key": "k",
+		"passkey": "pk", "token": "t", "anidb_client_key": "c",
+	}
+
+	r := newProviderRegistry()
+	for _, entry := range providerEntries {
+		t.Run(string(entry.name), func(t *testing.T) {
+			t.Parallel()
+			p, err := entry.factory(t.Context(), placeholder)
+			if err != nil {
+				// Establishes the value the check below reads.
+				t.Fatalf("%s factory with placeholder credentials: %v", entry.name, err)
+			}
+			_, implements := p.(provider.CredentialChecker)
+			if implements != entry.credCheck {
+				t.Errorf("%s implements provider.CredentialChecker = %t, but providerEntries declares credCheck = %t",
+					entry.name, implements, entry.credCheck)
+			}
+			if got := r.CredentialCheck(entry.name); got != entry.credCheck {
+				t.Errorf("registry.CredentialCheck(%q) = %t, want the declared %t",
+					entry.name, got, entry.credCheck)
+			}
+		})
+	}
+}
+
 // TestProviderDefaults_declared_once_in_schema pins the P14 single-source
 // property at the REAL declaration: the registry's schema entry for
 // opensubtitles declares use_hash default true, and NormalizeSettings (the

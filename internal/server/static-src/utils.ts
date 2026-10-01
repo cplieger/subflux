@@ -160,7 +160,7 @@ export function langSelect(id: string | null, value?: string, label?: string): H
     "aria-label": label ?? null,
   }) as HTMLSelectElement;
   for (const [code, name] of LANGUAGES) {
-    sel.appendChild(option(code, `${code} \u2014 ${name}`));
+    sel.appendChild(option(code, `${code} \u00B7 ${name}`));
   }
   if (value) {
     sel.value = value;

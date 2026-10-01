@@ -62,6 +62,7 @@ const (
 	CodeWebAuthnNotDiscoverable   ErrorCode = "webauthn_not_discoverable"
 	CodeWebAuthnAssertionFailed   ErrorCode = "webauthn_assertion_failed"
 	CodeWebAuthnUnsupportedOrigin ErrorCode = "webauthn_unsupported_origin"
+	CodeWebAuthnUnconfigured      ErrorCode = "webauthn_unconfigured"
 )
 
 // OIDC codes.

@@ -3,12 +3,16 @@
    ================================================================ */
 
 @media (pointer: coarse) {
+  /* The app steps --icon to 1.125rem at its own mobile tier (02-base.css); the
+   * wizard had no such step, so an icon-only control kept a 14px glyph inside a
+   * 44px target. */
+  .auth-card {
+    --icon: 1.125rem;
+  }
+
   .auth-card button,
   .auth-card input:where(:not([type="checkbox"])),
-  .wiz-field :is(input, select),
-  .wiz-lang-select,
-  .wiz-lang-variant,
-  .wiz-media-input,
+  :is(.wiz-field, .wiz-row) :is(input, select),
   .wizard-nav button {
     height: 2.75rem;
   }
@@ -17,7 +21,7 @@
     padding: var(--sp-3) var(--sp-5);
   }
 
-  .auth-card .wiz-lang-remove {
+  .auth-card .wiz-row-remove {
     /* 44px touch-target floor (2.75rem), matching every other coarse-pointer
        control; 2.5rem (40px) sat below it. */
     width: 2.75rem;

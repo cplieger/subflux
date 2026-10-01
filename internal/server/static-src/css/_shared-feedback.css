@@ -11,11 +11,37 @@
  * The .conn-test rules are deliberately self-contained rather than composing an
  * existing button class: .ghost exists in 02-base.css but the login bundle only
  * ever declares it scoped to one wizard screen, so a shared control that leaned
- * on it would render unstyled on the page that needs it most. Two-class
- * selectors (.conn-test .conn-test-btn) keep the rules order-independent — this
- * file loads before both .auth-card :where(button) and 02-base.css's bare
- * button, and a single class would only tie with the former.
+ * on it would render unstyled on the page that needs it most. The doubled class
+ * (.conn-test.conn-test-btn) keeps the rules order-independent and above each
+ * host's own button rule — this file loads before both .auth-card button and
+ * 02-base.css's bare button, and those carry a class plus an element, so a
+ * single class here would lose to the former outright.
  */
+
+/* --- Spinner ---
+   The busy state of an inline action, so it lives with the rest of that
+   vocabulary rather than in the app-only layer. It moved here when the
+   credential-check control replaced its text label with an icon: a spinner
+   declared only in 03-components.css renders as an empty box in the wizard,
+   which is the bundle that has no other way to say "in flight".
+   It sizes off --icon and colours off currentcolor, so it drops into a button
+   wherever an icon was without either being restated. */
+.spinner {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  border: 2px solid color-mix(in oklch, currentcolor 30%, transparent);
+  border-block-start-color: currentcolor;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
 
 /* Button feedback states (data-status driven, consistent everywhere) */
 button[data-status="ok"] {
@@ -28,28 +54,35 @@ button[data-status="err"] {
   color: var(--err);
 }
 
-/* --- Connection test control (settings dialog + wizard; the sections that
-   carry it declare it via SchemaSection.ConnTest) --- */
+/* --- Credential-check control (settings dialog + wizard; the sections and
+   providers that carry it declare it in the schema) --- */
 
-.conn-test {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-3);
-  align-items: center;
-  margin-block-start: var(--sp-3);
-}
-
-/* A secondary action beside its fields, not a submit: both hosts stretch a bare
- * button to the form width, so width and flex are pinned here. */
-.conn-test .conn-test-btn {
+/* An icon button inline with its section's title, not a submit: both hosts
+ * stretch a bare button to the form width, so width, flex and padding are
+ * pinned here.
+ *
+ * HEIGHT is deliberately absent, and the doubled class is what lets that work.
+ * Each host owns the control-height vocabulary for its own surface, including
+ * its touch-target arm (.auth-card button under (pointer: coarse), dialog
+ * button under (width < 640px)) — and those selectors carry a class plus an
+ * element, which a single class here would lose to outright. Two classes
+ * outrank them while still leaving height to whichever one applies, and
+ * aspect-ratio squares whatever that height turns out to be: 44px beside 44px
+ * fields, 28px at rest, with neither number restated. Restating the rest height
+ * is the defect this replaced — it outranked both touch arms and left the
+ * control at 28px next to 44px fields. */
+.conn-test.conn-test-btn {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  height: 1.75rem;
-  padding: 0 var(--sp-5);
+  aspect-ratio: 1;
+  padding: 0;
+  /* Every host is a flex row whose title sits left; the auto margin is what
+   * puts the control at the trailing edge beside the toggle without each host
+   * having to place it. */
+  margin-inline-start: auto;
   background: var(--ghost);
   color: var(--text-2);
-  font-size: var(--text-sm);
 }
 
 /* Hover applies only while there is no verdict to hide. The status arms below
@@ -57,35 +90,19 @@ button[data-status="err"] {
  * two classes and two pseudo-classes, which outranks them — so hovering a
  * settled button repainted it ghost-grey and threw away the answer the operator
  * had just asked for. Excluding [data-status] states that as a rule rather than
- * fixing it with a specificity race. Any edit in either field clears the
+ * fixing it with a specificity race. Any edit in a watched field clears the
  * verdict, which restores the hover response along with it. */
-.conn-test .conn-test-btn:hover:not(:disabled, [data-status]) {
+.conn-test.conn-test-btn:hover:not(:disabled, [data-status]) {
   background: var(--ghost-hover);
   color: var(--text);
 }
 
-.conn-test .conn-test-btn[data-status="ok"] {
+.conn-test.conn-test-btn[data-status="ok"] {
   background: var(--ok-dim);
   color: var(--ok);
 }
 
-.conn-test .conn-test-btn[data-status="err"] {
+.conn-test.conn-test-btn[data-status="err"] {
   background: var(--err-dim);
-  color: var(--err);
-}
-
-.conn-test-status {
-  flex: 1 1 12rem;
-  min-width: 0;
-  font-size: var(--text-sm);
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.conn-test-status[data-status="ok"] {
-  color: var(--ok);
-}
-
-.conn-test-status[data-status="err"] {
   color: var(--err);
 }

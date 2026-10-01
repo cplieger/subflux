@@ -622,6 +622,104 @@ describe("status: unreachable server", () => {
     const row = document.querySelector("#statusPopup .pop-item.muted");
     expect(row?.textContent).toContain("Server unreachable");
   });
+
+  it("sweeps the unreachable-server row once the server answers again", async () => {
+    h.status.initStatusPopover();
+    await h.runPollWith({ activities: [entry({ id: "o1", detail: "scanning" })] });
+
+    await h.runPollWith({ alerts: { ok: false, status: 0 } });
+    expect(document.querySelector("#statusPopup .pop-item.muted")?.textContent).toContain(
+      "Server unreachable",
+    );
+
+    // The recovered paint reconciles, and reconcile removes only children it
+    // keyed — so an unkeyed notice would sit above the rows forever.
+    await h.runPollWith({ activities: [entry({ id: "o1", detail: "scanning again" })] });
+    expect(
+      [...document.querySelectorAll("#statusPopup > *")].map((n) => n.getAttribute("data-act-id")),
+    ).toEqual(["o1"]);
+  });
+});
+
+describe("status: popup controls after a repeat poll re-patched their row", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.status.initStatusPopover();
+    for (const name of ["activity.cancel", "activity.dismiss", "alerts.dismiss"]) {
+      dispatchers.get(name)?.mockClear();
+      dispatchers.get(name)?.mockResolvedValue(undefined);
+    }
+  });
+
+  function actRow(id: string): HTMLElement {
+    const row = document.querySelector<HTMLElement>(`#statusPopup [data-act-id="${id}"]`);
+    if (!row) {
+      throw new Error(`no activity row ${id}`);
+    }
+    return row;
+  }
+
+  it("keeps the stop button driving the live row", async () => {
+    const running = entry({ id: "s1", detail: "scanning 1/10", cancellable: true, kind: "series" });
+    await h.runPollWith({ activities: [running] });
+    const rowFirst = actRow("s1");
+    const btnFirst = rowFirst.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]');
+    expect(btnFirst).not.toBeNull();
+
+    await h.runPollWith({ activities: [entry({ ...running, detail: "scanning 4/10" })] });
+    const row = actRow("s1");
+    const btn = row.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]');
+    // The reuse this case exists for: reconcile kept the row and patch wrote
+    // the fresh build's handler onto the button already in the document.
+    expect(row).toBe(rowFirst);
+    expect(btn).toBe(btnFirst);
+
+    btn?.click();
+
+    expect(dispatchers.get("activity.cancel")).toHaveBeenCalledWith("s1");
+    expect(btn?.disabled).toBe(true);
+    expect(row.querySelector(".live-timer")?.textContent).toBe(" \u00B7 stopping\u2026");
+  });
+
+  it("keeps the dismiss button hiding the live row", async () => {
+    const done = entry({ id: "d1", done: true, detail: "found 2" });
+    await h.runPollWith({ activities: [done] });
+    const rowFirst = actRow("d1");
+
+    await h.runPollWith({ activities: [entry({ ...done, detail: "found 3" })] });
+    const row = actRow("d1");
+    expect(row).toBe(rowFirst);
+
+    const btn = row.querySelector<HTMLButtonElement>("button.close-btn");
+    expect(btn).not.toBeNull();
+    btn?.click();
+
+    expect(dispatchers.get("activity.dismiss")).toHaveBeenCalledWith("d1");
+    expect(btn?.disabled).toBe(true);
+    expect(row.classList.contains("pop-dismissing")).toBe(true);
+  });
+
+  it("keeps an alert's dismiss button hiding the live row", async () => {
+    const a = alertEntry({ id: 7, message: "provider down" });
+    await h.runPollWith({ alerts: { ok: true, status: 200, data: [a] } });
+    const first = document.querySelector("#statusPopup .pop-item");
+    expect(first?.textContent).toContain("provider down");
+
+    await h.runPollWith({
+      alerts: { ok: true, status: 200, data: [alertEntry({ ...a, level: "error" })] },
+    });
+    const row = document.querySelector("#statusPopup .pop-item");
+    expect(row).toBe(first);
+
+    const dismiss = row?.querySelector<HTMLButtonElement>("button.pop-dismiss");
+    expect(dismiss).not.toBeNull();
+    dismiss?.click();
+
+    expect(dispatchers.get("alerts.dismiss")).toHaveBeenCalledWith(7);
+    expect(row?.classList.contains("pop-dismissing")).toBe(true);
+  });
 });
 
 describe("status: status button severity", () => {

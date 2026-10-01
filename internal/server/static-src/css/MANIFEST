@@ -2,14 +2,16 @@
 # Files concatenated in declared order at Docker build time.
 #
 # _shared-tokens.css holds the design system (custom properties, @property
-# definitions, [data-theme] color-scheme selectors) and _shared-feedback.css
+# definitions, [data-theme] color-scheme selectors), _shared-feedback.css
 # the inline-action feedback vocabulary (button[data-status], the arr
-# connection test). Both are included by MANIFEST and login.MANIFEST so the
-# two pages stay visually consistent without manual sync. Naming convention:
+# connection test), and _shared-icons.css the .icon mask set. All three are
+# included by MANIFEST and login.MANIFEST so the two pages stay visually
+# consistent without manual sync. Naming convention:
 # MANIFEST -> style.css, <name>.MANIFEST -> <name>.css.
 00-header.css
 _shared-tokens.css
 _shared-feedback.css
+_shared-icons.css
 02-base.css
 03-components.css
 04-layout.css

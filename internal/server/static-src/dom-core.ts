@@ -70,3 +70,18 @@ export function showError(id: string, msg: string): void {
 export function hideError(id: string): void {
   hide($(id));
 }
+
+/** bannerText is what the named error slot is showing, or "" when it is hidden
+ *  or absent.
+ *
+ *  The credential-check control reads it so a success clears only the message
+ *  that control itself posted: the slot is shared with the surface's other
+ *  errors, and clearing one somebody else wrote would hide a failure nobody has
+ *  dealt with. */
+export function bannerText(id: string): string {
+  const el = $(id);
+  if (!el || el.hidden) {
+    return "";
+  }
+  return el.textContent;
+}

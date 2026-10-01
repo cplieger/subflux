@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
@@ -65,8 +65,10 @@ func (c *Config) CheckBreachedPasswords() bool {
 	return *c.Auth.CheckBreached
 }
 
-// WebAuthnRPID returns the configured WebAuthn Relying Party ID.
-// Returns empty string if not set (auto-detected from hostname at runtime).
+// WebAuthnRPID returns the configured WebAuthn relying-party ID. An empty
+// value means no relying party exists yet; the structured config save fills
+// it from the saving browser's host, and the origin a ceremony accepts is
+// decided by the library's policy over this ID, not derived from it here.
 func (c *Config) WebAuthnRPID() string { return c.Auth.WebAuthnRPID }
 
 // AuthDisabled returns whether authentication is completely bypassed.

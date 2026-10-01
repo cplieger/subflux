@@ -3,7 +3,7 @@ package authhandlers
 import (
 	"context"
 
-	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v6"
 )
 
 // AccountStore is the narrow interface consumed by the account handlers on
@@ -27,6 +27,12 @@ type AccountStore interface {
 	UserCount(ctx context.Context) (int, error)
 	PasskeysByUserID(ctx context.Context, userID int64) ([]auth.PasskeyCredential, error)
 	PasskeyCountForUser(ctx context.Context, userID int64) (int, error)
+	// AnyPasskeyForDiscoverableLogin reports whether any stored credential
+	// could answer a discoverable login for rpID. An unreported
+	// discoverability and an unrecorded RP ID both count as usable: nil is
+	// what every credential stored before the client forwarded credProps
+	// carries.
+	AnyPasskeyForDiscoverableLogin(ctx context.Context, rpID string) (bool, error)
 	DeletePasskey(ctx context.Context, ref auth.PasskeyRef) error
 	// UpdatePasskeyAfterLogin is the post-login credential-custody write the
 	// library's CompleteLogin performs through this store.

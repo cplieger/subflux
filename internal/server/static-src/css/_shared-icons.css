@@ -1,0 +1,142 @@
+/* Icon vocabulary, shared by style.css and login.css.
+ *
+ * One owner for the mask set, because both surfaces render the same glyphs:
+ * the settings dialog and the setup wizard build their remove controls from
+ * icon("close"), and a mask box centres geometrically where a text glyph
+ * centres on whatever face system-ui resolves to. The URLs are relative to
+ * the bundle, and both bundles sit in static/, so icons/*.svg resolves the
+ * same from either. Depends on --icon from _shared-tokens.css, which both
+ * manifests include above this file.
+ *
+ * A mask-image is fetched only when a rule matches, so the glyphs the login
+ * page never renders cost bytes and no requests.
+ */
+
+/* --- Icons --- */
+.icon {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  background: currentcolor;
+  mask: center / contain no-repeat;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+.icon-warning {
+  mask-image: url("icons/warning.svg");
+}
+
+.icon-moon {
+  mask-image: url("icons/moon.svg");
+}
+
+.icon-sun {
+  mask-image: url("icons/sun.svg");
+}
+
+.icon-arrow-left {
+  mask-image: url("icons/chevron.svg");
+  rotate: 90deg;
+}
+
+.icon-external {
+  mask-image: url("icons/external.svg");
+}
+
+.icon-excluded {
+  mask-image: url("icons/excluded.svg");
+}
+
+.icon-history {
+  mask-image: url("icons/history.svg");
+}
+
+.icon-check {
+  mask-image: url("icons/check.svg");
+}
+
+.icon-close {
+  mask-image: url("icons/close.svg");
+}
+
+.icon-flask {
+  mask-image: url("icons/flask.svg");
+}
+
+.icon-dot {
+  mask-image: url("icons/dot.svg");
+}
+
+.icon-eye {
+  mask-image: url("icons/eye.svg");
+}
+
+.icon-eye-off {
+  mask-image: url("icons/eye-off.svg");
+}
+
+.icon-settings {
+  mask-image: url("icons/settings.svg");
+}
+
+.icon-sync {
+  mask-image: url("icons/sync.svg");
+}
+
+.icon-search {
+  mask-image: url("icons/search.svg");
+}
+
+.icon-download {
+  mask-image: url("icons/download.svg");
+}
+
+.icon-hourglass {
+  mask-image: url("icons/hourglass.svg");
+}
+
+.icon-play {
+  mask-image: url("icons/play.svg");
+}
+
+.icon-pause {
+  mask-image: url("icons/pause.svg");
+}
+
+.icon-stop {
+  mask-image: url("icons/stop.svg");
+}
+
+.icon-file {
+  mask-image: url("icons/file.svg");
+}
+
+.icon-trash {
+  mask-image: url("icons/trash.svg");
+}
+
+.icon-user {
+  mask-image: url("icons/user.svg");
+}
+
+.icon-chevron-up {
+  mask-image: url("icons/chevron-bold.svg");
+  rotate: 180deg;
+}
+
+.icon-chevron-down {
+  mask-image: url("icons/chevron-bold.svg");
+}
+
+.icon-shield {
+  mask-image: url("icons/shield.svg");
+}
+
+.icon-logout {
+  mask-image: url("icons/logout.svg");
+}
+
+.icon-monitor {
+  mask-image: url("icons/monitor.svg");
+}

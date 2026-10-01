@@ -1,8 +1,11 @@
 package config
 
 import (
+	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/cplieger/slogx/capture"
 )
 
 // =============================================================================
@@ -191,5 +194,26 @@ auth:
 	}
 	if cfg.CheckBreachedPasswords() {
 		t.Error("CheckBreachedPasswords() = true, want false")
+	}
+}
+
+// A stored relying-party ID the library would refuse still LOADS: the field
+// must never take scans, providers and arr sync offline. The load warns and
+// the save boundary is where a bad value is refused.
+func TestWebAuthnRPID_illegalValueLoadsWithAWarning(t *testing.T) {
+	logs := capture.Default(t)
+	yaml := minimalValidYAML() + `
+auth:
+  webauthn_rp_id: "Example.COM"
+`
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() with an illegal RP ID error = %v, want nil (the instance must stay configured)", err)
+	}
+	if got := cfg.WebAuthnRPID(); got != "Example.COM" {
+		t.Errorf("WebAuthnRPID() = %q, want the stored value %q", got, "Example.COM")
+	}
+	if n := logs.CountLevel(slog.LevelWarn, "auth.webauthn_rp_id is not a usable relying-party ID"); n != 1 {
+		t.Errorf("Warn records = %d, want 1; messages: %q", n, logs.Messages())
 	}
 }

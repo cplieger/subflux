@@ -335,7 +335,7 @@ func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 
 	mins := int(startSec) / 60
 	secs := int(startSec) % 60
-	desc := fmt.Sprintf("%d:%02d — dialogue-dense section", mins, secs)
+	desc := fmt.Sprintf("%d:%02d · dialogue-dense section", mins, secs)
 
 	httpapi.WriteJSON(w, PreviewStartResponse{
 		StartSeconds: startSec,

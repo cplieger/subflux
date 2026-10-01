@@ -56,3 +56,7 @@ func (nopProviderRegistry) ProviderNames() []subflux.ProviderID { return nil }
 func (nopProviderRegistry) Schema(_ subflux.ProviderID) (string, []subflux.ProviderSchemaField) {
 	return "", nil
 }
+func (nopProviderRegistry) CredentialCheck(_ subflux.ProviderID) bool { return false }
+func (nopProviderRegistry) CheckCredentials(_ context.Context, _ subflux.ProviderID, _ map[string]any) error {
+	return nil
+}

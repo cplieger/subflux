@@ -64,12 +64,12 @@
   --accent: light-dark(oklch(55% 0.16 32deg), oklch(69.86% 0.1368 32.3deg));
   --accent-dim: light-dark(oklch(55% 0.16 32deg / 8%), oklch(69.86% 0.1368 32.3deg / 12%));
   --accent-hover: light-dark(oklch(48% 0.18 32deg), oklch(78% 0.12 32deg));
-  --ok: light-dark(oklch(49% 0.14 168deg), oklch(65% 0.14 168.26deg));
-  --ok-dim: light-dark(oklch(49% 0.14 168deg / 8%), oklch(65% 0.14 168.26deg / 10%));
-  --warn: light-dark(oklch(52% 0.16 85deg), oklch(82% 0.14 85deg));
-  --warn-dim: light-dark(oklch(52% 0.16 85deg / 8%), oklch(82% 0.14 85deg / 10%));
-  --err: light-dark(oklch(50% 0.2 25deg), oklch(66% 0.18 25deg));
-  --err-dim: light-dark(oklch(50% 0.2 25deg / 8%), oklch(66% 0.18 25deg / 10%));
+  --ok: light-dark(oklch(48% 0.14 168deg), oklch(65% 0.14 168.26deg));
+  --ok-dim: light-dark(oklch(48% 0.14 168deg / 8%), oklch(65% 0.14 168.26deg / 10%));
+  --warn: light-dark(oklch(51% 0.16 85deg), oklch(82% 0.14 85deg));
+  --warn-dim: light-dark(oklch(51% 0.16 85deg / 8%), oklch(82% 0.14 85deg / 10%));
+  --err: light-dark(oklch(50% 0.2 25deg), oklch(69% 0.18 25deg));
+  --err-dim: light-dark(oklch(50% 0.2 25deg / 8%), oklch(69% 0.18 25deg / 10%));
   --info: light-dark(oklch(52% 0.15 263deg), oklch(66.34% 0.1356 262.89deg));
   --input-bg: light-dark(oklch(98% 0.003 32deg), oklch(20% 0.015 32deg));
   --input-border: light-dark(oklch(88% 0.005 32deg), oklch(28% 0.01 32deg));

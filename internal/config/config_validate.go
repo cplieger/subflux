@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/rpid"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -156,6 +157,7 @@ func validate(ctx context.Context, cfg *Config) error {
 	if cfg.Auth.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}
+	warnIllegalWebAuthnRPID(cfg.Auth.WebAuthnRPID)
 	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
 		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true (otherwise no one could log in); a CLI override can re-enable it"))
 	}
@@ -174,6 +176,18 @@ func validate(ctx context.Context, cfg *Config) error {
 		}
 	}
 	return ve.Err()
+}
+
+// warnIllegalWebAuthnRPID WARNs rather than failing the load: a passkey field
+// must not take scans, providers and arr sync offline, and the save boundary
+// refuses a bad value before it lands.
+func warnIllegalWebAuthnRPID(id string) {
+	if id == "" {
+		return
+	}
+	if err := rpid.Validate(id); err != nil {
+		slog.Warn("auth.webauthn_rp_id is not a usable relying-party ID; passkeys will be unavailable", "rp_id", id, "error", err)
+	}
 }
 
 // legacyEmbeddedProvider is the retired provider ID of the pre-separation

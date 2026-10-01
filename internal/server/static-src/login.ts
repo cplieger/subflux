@@ -6,11 +6,9 @@ import {
   loginRaw,
   me,
   oidcLinkRaw,
-  webauthnLoginBegin,
   PATH_OIDC_REDIRECT,
-  PATH_WEBAUTHN_LOGIN_FINISH,
 } from "./wire/client.gen.js";
-import type { LoginSuccess } from "./wire/types.gen.js";
+import type { LoginSuccess, SetupStatus } from "./wire/types.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
@@ -18,8 +16,13 @@ import { storePasswordCredential } from "./password-credential.js";
 import { startConfigWizard } from "./wizard.js";
 import { postLoginDestination } from "./wizard-state.js";
 import { SETUP_PATH } from "./constants.js";
-import { bufferToBase64url, requestOptionsFromJSON } from "./webauthn-utils.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
+import {
+  authenticateWithPasskey,
+  probeAvailability,
+  type Availability,
+  type LoginOutcome,
+} from "./webauthn-ceremony.js";
 
 // --- Inline interfaces for API response shapes ---
 
@@ -33,8 +36,12 @@ interface LoginRedirect {
 
 let conditionalAbort: AbortController | null = null;
 let conditionalRetryTimer: ReturnType<typeof setTimeout> | null = null;
-let webauthnSessionToken = "";
 let conditionalUIAttempts = 0;
+// The ONE offer decision: the server's "a passkey login could succeed here"
+// AND this origin's availability. Both the button and the autofill ceremony
+// read it, so they cannot disagree. Module-scope because the retry ladder
+// re-enters startConditionalUI with no arguments.
+let passkeyOffered = false;
 
 // Drain in-flight conditional WebAuthn ceremony + clear any pending retry
 // timer on page unload; otherwise a retry fires into a torn-down DOM.
@@ -104,13 +111,20 @@ async function init(): Promise<void> {
 
   showPage("loginPage");
   wireLoginForm(false);
-  await detectAuthMethods();
+  await detectAuthMethods(data);
   void startConditionalUI();
 }
 
 // --- Auth method detection ---
 
-async function detectAuthMethods(): Promise<void> {
+// The origin half fails OPEN: a probe that could not answer must not strand a
+// user whose only credential is a passkey, and Begin gives the authoritative
+// refusal with a real message.
+function positivelyUnavailable(a: Availability): boolean {
+  return !a.available && a.reason !== "probe_failed";
+}
+
+async function detectAuthMethods(setup: SetupStatus): Promise<void> {
   try {
     const res = await fetch(PATH_OIDC_REDIRECT, {
       method: "HEAD",
@@ -125,8 +139,11 @@ async function detectAuthMethods(): Promise<void> {
     /* OIDC not available */
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
-  if (window.PublicKeyCredential) {
+  // The setup half is free and is tested first, so no availability request is
+  // spent on an install where no passkey login is possible.
+  passkeyOffered =
+    setup.passkey_login_available && !positivelyUnavailable(await probeAvailability());
+  if (passkeyOffered) {
     show($("passkeyBtn"));
     show($("authDivider"));
   }
@@ -142,8 +159,7 @@ async function detectAuthMethods(): Promise<void> {
 // --- Conditional UI (passkey autofill) ---
 
 async function startConditionalUI(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
-  if (!window.PublicKeyCredential) {
+  if (!passkeyOffered) {
     return;
   }
   try {
@@ -155,37 +171,25 @@ async function startConditionalUI(): Promise<void> {
     return;
   }
 
-  try {
-    const options = await webauthnLoginBegin({ mediation: "conditional" });
-    if (!options?.publicKey) {
-      return;
-    }
-    webauthnSessionToken = options.session_token;
-    // go-webauthn's CredentialAssertion shape nests the options under a
-    // second publicKey key.
-    const pk = requestOptionsFromJSON(options.publicKey.publicKey);
-    conditionalAbort = new AbortController();
-    const credential = (await navigator.credentials.get({
-      publicKey: pk,
-      mediation: "conditional" as CredentialMediationRequirement,
-      signal: conditionalAbort.signal,
-    })) as PublicKeyCredential | null;
-    if (!credential) {
-      return;
-    }
-    conditionalUIAttempts = 0;
-    await finishWebAuthnLogin(credential, webauthnSessionToken);
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === "AbortError") {
-      return;
-    }
+  conditionalAbort = new AbortController();
+  const outcome = await authenticateWithPasskey({
+    mediation: "conditional",
+    signal: conditionalAbort.signal,
+  });
+  if (outcome.kind === "failed") {
+    // The ladder's retry/backoff is this surface's policy.
     conditionalUIAttempts++;
     if (conditionalUIAttempts >= 3) {
       return;
     }
     const delay = Math.min(1000 * 2 ** conditionalUIAttempts, 30_000);
     conditionalRetryTimer = setTimeout(startConditionalUI, delay);
+    return;
   }
+  if (outcome.kind === "authenticated") {
+    conditionalUIAttempts = 0;
+  }
+  renderLoginOutcome(outcome);
 }
 
 // --- Passkey login ---
@@ -195,78 +199,34 @@ async function passkeyLogin(): Promise<void> {
     conditionalAbort.abort();
     conditionalAbort = null;
   }
-  try {
-    const options = await webauthnLoginBegin();
-    if (!options?.publicKey) {
-      showError("loginError", "Failed to start passkey login");
-      return;
-    }
-    webauthnSessionToken = options.session_token;
-    // go-webauthn's CredentialAssertion shape nests the options under a
-    // second publicKey key.
-    const credential = (await navigator.credentials.get({
-      publicKey: requestOptionsFromJSON(options.publicKey.publicKey),
-    })) as PublicKeyCredential | null;
-    if (!credential) {
-      return;
-    }
-    await finishWebAuthnLogin(credential, webauthnSessionToken);
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === "AbortError") {
-      return;
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    showError("loginError", "Passkey error: " + msg);
-  }
+  renderLoginOutcome(await authenticateWithPasskey());
 }
 
-async function finishWebAuthnLogin(
-  credential: PublicKeyCredential,
-  sessionToken: string,
-): Promise<void> {
-  const response = credential.response as AuthenticatorAssertionResponse;
-  const body = {
-    id: credential.id,
-    rawId: bufferToBase64url(credential.rawId),
-    type: credential.type,
-    response: {
-      authenticatorData: bufferToBase64url(response.authenticatorData),
-      clientDataJSON: bufferToBase64url(response.clientDataJSON),
-      signature: bufferToBase64url(response.signature),
-      userHandle: response.userHandle ? bufferToBase64url(response.userHandle) : "",
-    },
-  };
-  const res = await fetch(PATH_WEBAUTHN_LOGIN_FINISH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-WebAuthn-Session": sessionToken },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) {
-    const data = (await res.json()) as { error?: string; signal?: string; code?: string };
-    if (data.signal === "unknown_credential") {
+function renderLoginOutcome(outcome: LoginOutcome): void {
+  switch (outcome.kind) {
+    case "authenticated":
+      window.location.href = outcome.redirect;
+      return;
+    case "cancelled":
+      return;
+    case "timeout":
+      showError("loginError", "Passkey sign-in timed out. Please try again.");
+      return;
+    case "session-expired":
+      void startConditionalUI();
+      return;
+    case "unknown-credential":
       showError(
         "loginError",
         "This passkey is not recognized. Please delete it from your authenticator and try again.",
       );
       return;
-    }
-    if (
-      data.code === ErrorCode.WebAuthnSessionInvalid ||
-      data.error === "invalid or expired session"
-    ) {
-      void startConditionalUI();
-      return;
-    }
-    if (data.code === ErrorCode.WebAuthnAssertionFailed) {
+    case "verification-failed":
       showError("loginError", "Passkey verification failed. Please try again.");
       return;
-    }
-    showError("loginError", data.error ?? "Passkey authentication failed");
-    return;
+    case "failed":
+      showError("loginError", outcome.message);
   }
-  const data = (await res.json()) as LoginRedirect;
-  window.location.href = data.redirect ?? "/";
 }
 
 // --- Login error message helper ---

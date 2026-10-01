@@ -56,7 +56,7 @@ func adminSocketRequest(body []byte) (data []byte, status int, err error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf(
-			"server admin socket unreachable at %s — is the server running in this container? (%w)",
+			"server admin socket unreachable at %s; is the server running in this container? (%w)",
 			config.AdminSocketPath, err,
 		)
 	}

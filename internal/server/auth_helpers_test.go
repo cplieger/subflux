@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v5"
-	"github.com/cplieger/auth/v5/ratelimit"
+	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/auth/v6/ratelimit"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"

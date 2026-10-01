@@ -16,6 +16,7 @@ const (
 	PathOidcLink               = "/api/auth/oidc/link"
 	PathWebauthnLoginBegin     = "/api/auth/webauthn/login/begin"
 	PathWebauthnLoginFinish    = "/api/auth/webauthn/login/finish"
+	PathWebauthnAvailability   = "/api/auth/webauthn/availability"
 	PathEvents                 = "/api/events"
 	PathEventsSync             = "/api/events/sync"
 	PathEventsAlive            = "/api/events/alive"

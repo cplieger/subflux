@@ -239,6 +239,22 @@ describe("advanced disclosure", () => {
     return rule ? byLabel(rule, "Advanced settings")[0] : undefined;
   }
 
+  /** Every gear in the rule block, in render order. */
+  function ruleGears(host: HTMLElement): HTMLButtonElement[] {
+    const rule = host.querySelector<HTMLElement>(".lang-rule");
+    return rule ? byLabel(rule, "Advanced settings") : [];
+  }
+
+  /** Every gear in the defaults list, in render order. */
+  function defaultGears(host: HTMLElement): HTMLButtonElement[] {
+    const defaults = host.querySelector<HTMLElement>("#lang-defaults");
+    return defaults ? byLabel(defaults, "Advanced settings") : [];
+  }
+
+  function expanded(gear: HTMLButtonElement | undefined): string | null | undefined {
+    return gear?.getAttribute("aria-expanded");
+  }
+
   it("opens the advanced region for a target that already has advanced values", () => {
     const host = mount({ rules: [{ audio: "en", subtitles: [{ code: "fr", min_score: 70 }] }] });
 
@@ -265,5 +281,101 @@ describe("advanced disclosure", () => {
     });
 
     expect(ruleGear(host)?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  // The settings dialog rebuilds this whole section on every open, every
+  // successful save and every reset, and nothing in the config says whether a
+  // gear is open — so the tree being replaced is the only record of it. A second
+  // mount() models that exactly: buildLanguagesSection runs while the previous
+  // mount's tree is still in the document, which is what renderConfigForm's
+  // fragment build sees before it swaps.
+
+  it("keeps a gear the reader opened open across a re-render", () => {
+    const lr: LanguageRules = { rules: [{ audio: "ja", subtitles: [{ code: "de" }] }] };
+    const first = mount(lr);
+    expect(expanded(ruleGear(first))).toBe("false");
+    ruleGear(first)?.click();
+    expect(expanded(ruleGear(first))).toBe("true");
+
+    const second = mount(lr);
+
+    expect(expanded(ruleGear(second))).toBe("true");
+  });
+
+  it("keeps a gear the reader closed on an advanced target closed across a re-render", () => {
+    const lr: LanguageRules = {
+      rules: [{ audio: "ko", subtitles: [{ code: "sv", min_score: 70 }] }],
+    };
+    const first = mount(lr);
+    expect(expanded(ruleGear(first))).toBe("true");
+    ruleGear(first)?.click();
+
+    const second = mount(lr);
+
+    expect(expanded(ruleGear(second))).toBe("false");
+  });
+
+  it("follows the target rather than the row position when a row is added above it", () => {
+    const first = mount({
+      rules: [{ audio: "no", subtitles: [{ code: "fi" }, { code: "da" }] }],
+    });
+    ruleGears(first)[1]?.click();
+
+    const second = mount({
+      rules: [{ audio: "no", subtitles: [{ code: "is" }, { code: "fi" }, { code: "da" }] }],
+    });
+
+    // Keyed by position this reads false, true, false: the new first row would
+    // inherit the gear the reader opened on a target two places below it.
+    expect(ruleGears(second).map((g) => g.getAttribute("aria-expanded"))).toStrictEqual([
+      "false",
+      "false",
+      "true",
+    ]);
+  });
+
+  // Every add button seeds its row from a fixed target ("en", or en/fr for a
+  // rule), so the row the reader just created can share an open target's gear
+  // key — and the reader expressed nothing about a row that did not exist. All
+  // three carry no captured state, so each has its own case.
+
+  it("adds a default whose gear is closed even when an open target shares its key", () => {
+    const lr: LanguageRules = { default: [{ code: "en" }] };
+    const first = mount(lr);
+    defaultGears(first)[0]?.click();
+
+    const second = mount(lr);
+    expect(expanded(defaultGears(second)[0])).toBe("true");
+    buttonWithText(second, "+ Add subtitle").click();
+
+    expect(expanded(defaultGears(second)[1])).toBe("false");
+  });
+
+  it("adds a rule target whose gear is closed even when an open target shares its key", () => {
+    const lr: LanguageRules = { rules: [{ audio: "en", subtitles: [{ code: "en" }] }] };
+    const first = mount(lr);
+    ruleGears(first)[0]?.click();
+
+    const second = mount(lr);
+    const rule = second.querySelector<HTMLElement>(".lang-rule");
+    expect(expanded(ruleGears(second)[0])).toBe("true");
+    // The rule block's own add button; the defaults' button renders first.
+    buttonWithText(rule as HTMLElement, "+ Add subtitle").click();
+
+    expect(expanded(ruleGears(second)[1])).toBe("false");
+  });
+
+  it("adds a rule whose target gear is closed even when an open target shares its key", () => {
+    const lr: LanguageRules = { rules: [{ audio: "en", subtitles: [{ code: "fr" }] }] };
+    const first = mount(lr);
+    ruleGears(first)[0]?.click();
+
+    const second = mount(lr);
+    expect(expanded(ruleGears(second)[0])).toBe("true");
+    buttonWithText(second, "+ Add rule").click();
+
+    // The seeded rule is audio "en" with an "fr" target, so it shares the key.
+    const blocks = second.querySelectorAll<HTMLElement>(".lang-rule");
+    expect(expanded(byLabel(blocks[1] as HTMLElement, "Advanced settings")[0])).toBe("false");
   });
 });

@@ -7,7 +7,7 @@
 // (sync-actions.js for the dispatch, wire/client.gen.js for the registry
 // read, sync-jobs.js for settlement watches); everything the user sees is
 // asserted through the real dialog DOM.
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 
 const dispatchSeason = vi.hoisted(() => vi.fn());
 const dispatchAudio = vi.hoisted(() => vi.fn());
@@ -111,6 +111,49 @@ function watcherFor(jobId: number): (ev: SyncDoneEvent | null) => void {
   return call[1] as (ev: SyncDoneEvent | null) => void;
 }
 
+/** The watcher registered LAST for jobId — the newest render pass's. */
+function lastWatcherFor(jobId: number): (ev: SyncDoneEvent | null) => void {
+  const calls = watchMock.mock.calls.filter((c) => c[0] === jobId);
+  const call = calls[calls.length - 1];
+  if (!call) {
+    throw new Error(`no watcher for job ${String(jobId)}`);
+  }
+  return call[1] as (ev: SyncDoneEvent | null) => void;
+}
+
+/** One item's terminal result event: applied, +0.420s at 90% confidence. */
+function resultEvent(jobId: number, episode: number): SyncDoneEvent {
+  return {
+    job_id: jobId,
+    outcome: "result",
+    batch_activity_id: "act-7",
+    file_ref: {
+      media_type: "episode",
+      media_id: `tvdb-81189-s01e${String(episode).padStart(2, "0")}`,
+      language: "en",
+      variant: "standard",
+      source: "external",
+    },
+    offset_ms: 420,
+    confidence: 0.9,
+    method: "audio",
+    applied: true,
+    dry_run: false,
+  };
+}
+
+/** Chromium QUEUES the close event as a task instead of dispatching it
+ *  synchronously, on a different task queue than timers — so wait for the
+ *  event itself. An undrained stale close lands mid-test and consumes the
+ *  next dialog's once-close teardown listener. */
+async function closeDlg(): Promise<void> {
+  const closed = new Promise((r) => {
+    dlg().addEventListener("close", r, { once: true });
+  });
+  dlg().close();
+  await closed;
+}
+
 let host: HTMLDialogElement;
 
 beforeAll(() => {
@@ -126,15 +169,7 @@ afterAll(() => {
 
 beforeEach(async () => {
   if (dlg().open) {
-    // Chromium QUEUES the close event as a task instead of dispatching it
-    // synchronously, on a different task queue than timers — so wait for
-    // the event itself. An undrained stale close lands mid-test and
-    // consumes the next dialog's once-close teardown listener.
-    const closed = new Promise((r) => {
-      dlg().addEventListener("close", r, { once: true });
-    });
-    dlg().close();
-    await closed;
+    await closeDlg();
   }
   activityObs.fns.clear();
   dispatchSeason.mockReset();
@@ -267,7 +302,7 @@ describe("the batch view drives from the registry", () => {
     });
     const text = dlg().textContent ?? "";
     // Its sibling is untouched by job 11's settlement.
-    expect(text).toContain("S01E02 · English — queued");
+    expect(text).toContain("S01E02 · English: queued");
     expect(text).toContain("Syncing 1/2");
   });
 
@@ -314,10 +349,10 @@ describe("the batch view drives from the registry", () => {
     });
 
     await vi.waitFor(() => {
-      expect(dlg().textContent).toContain("S01E01 · English — failed");
+      expect(dlg().textContent).toContain("S01E01 · English: failed");
     });
     expect(syncJobsMock.mock.calls).toHaveLength(readsBefore);
-    expect(dlg().textContent).toContain("S01E02 · English — queued");
+    expect(dlg().textContent).toContain("S01E02 · English: queued");
   });
 });
 
@@ -463,5 +498,215 @@ describe("stopping the batch", () => {
     expect(dlg().textContent).toContain("Done: 1 synced, 1 failed");
     // The dialog's own Stop button was never the trigger.
     expect(cancelActivityMock).not.toHaveBeenCalled();
+  });
+});
+
+// The dialog element is REUSED across opens and two functions write it, so a
+// reusing reconciler would hand every later pass's handler to a node from the
+// first pass. These cases drive a SECOND write of #seasonSyncConfirm — the
+// reopen, and the batch view's re-render — which is what tells a real install
+// from a copied handler property.
+describe("a second write of the reused dialog installs what it built", () => {
+  it("renders the cap refusal on a dialog opened a second time", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "error", error: { status: 429 } }),
+    });
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+    await closeDlg();
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(dispatchSeason).toHaveBeenCalledTimes(1);
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // The inline panel is the refusal's ONLY surface (no toast), so a write
+    // that lands off-document is silent in both directions.
+    expect(dlg().textContent).toContain("Sync queue is full");
+  });
+
+  it("disables Start Sync for the accept round trip on a dialog opened a second time", async () => {
+    dispatchSeason.mockReturnValue({
+      // Never settles: the in-flight window is the subject.
+      outcome: new Promise(() => undefined),
+    });
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+    await closeDlg();
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+
+    button(/Start Sync/).click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(button(/Start Sync/).disabled).toBe(true);
+  });
+
+  it("installs the batch footer's own Stop, not the confirm footer's button", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(
+        query && query["batch_activity_id"] === "act-7" ? [job(11, 1, "running")] : [],
+      ),
+    );
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 1);
+    const startNode = button(/Start Sync/);
+    startNode.click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Both footers hold two BUTTONs in the same positions, so a positional
+    // reconcile would label the confirm view's Start button "Stop" and throw
+    // the batch view's own away.
+    expect(button(/^Stop$/)).not.toBe(startNode);
+  });
+
+  it("hides Stop once every item has settled", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(
+        query && query["batch_activity_id"] === "act-7" ? [job(11, 1, "running")] : [],
+      ),
+    );
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 1);
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalledTimes(1);
+    });
+
+    lastWatcherFor(11)(resultEvent(11, 1));
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Done: 1 synced");
+    });
+
+    expect(button(/^Stop$/).hidden).toBe(true);
+  });
+
+  it("settles a row and the aggregate from a sync:done that arrives after a re-render", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(
+        query && query["batch_activity_id"] === "act-7"
+          ? [job(11, 1, "running"), job(12, 2, "queued")]
+          : [],
+      ),
+    );
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 2);
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Stop re-reads the registry and re-renders; the items have not settled
+    // server-side yet, so the second render paints the same two rows.
+    button(/^Stop$/).click();
+    await vi.waitFor(() => {
+      expect(watchMock.mock.calls.length).toBeGreaterThanOrEqual(4);
+    });
+
+    lastWatcherFor(11)(resultEvent(11, 1));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(dlg().textContent).toContain("+0.420s (90%)");
+  });
+
+  it("keeps one owner for the season-sync-status id", async () => {
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(
+        query && query["batch_activity_id"] === "act-7" ? [job(11, 1, "running")] : [],
+      ),
+    );
+
+    confirmSeasonSync("Breaking Bad", 1, 42, 1);
+    // The confirm view's refusal panel is the owner.
+    expect(dlg().querySelectorAll("#season-sync-status")).toHaveLength(1);
+
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(dlg().textContent).toContain("Syncing 0/1");
+    });
+
+    expect(dlg().querySelectorAll("#season-sync-status")).toHaveLength(0);
+  });
+});
+
+describe("the batch view's re-render keeps the reader where they were", () => {
+  let injected: HTMLStyleElement | null = null;
+
+  afterEach(() => {
+    injected?.remove();
+    injected = null;
+  });
+
+  /** Dispatch a batch of `count` running items and wait for its first paint. */
+  async function openBatch(count: number): Promise<void> {
+    const items = Array.from({ length: count }, (_, i) => job(11 + i, i + 1, "running"));
+    dispatchSeason.mockReturnValue({
+      outcome: Promise.resolve({ status: "success", value: { activity_id: "act-7" } }),
+    });
+    syncJobsMock.mockImplementation((query?: Record<string, unknown>) =>
+      Promise.resolve(query && query["batch_activity_id"] === "act-7" ? items : []),
+    );
+    confirmSeasonSync("Breaking Bad", 1, 42, count);
+    button(/Start Sync/).click();
+    await vi.waitFor(() => {
+      expect(watchMock).toHaveBeenCalledTimes(count);
+    });
+  }
+
+  it("returns focus to Stop after the re-render pressing it triggers", async () => {
+    // The cancel is an HTTP round trip, so the re-render lands a TASK later —
+    // and Chromium queues its blur of the now-disabled Stop on that same
+    // queue. Resolving instantly would let the swap win the race and hide
+    // whether the reader's key survived the blur at all.
+    cancelActivityMock.mockImplementation(() => new Promise((r) => setTimeout(() => r(true), 20)));
+    await openBatch(1);
+
+    const stop = button(/^Stop$/);
+    stop.focus();
+    expect(document.activeElement).toBe(stop);
+
+    stop.click();
+    await vi.waitFor(() => {
+      expect(button(/^Stop$/)).not.toBe(stop);
+    });
+
+    expect(document.activeElement).toBe(button(/^Stop$/));
+  });
+
+  it("carries the item list's scroll offset onto the rebuilt body", async () => {
+    // The dialog's own stylesheet is not loaded here, so the scroller has to
+    // be declared: `.dlg-body` is what overflows, and the install replaces it.
+    injected = document.createElement("style");
+    injected.textContent = ".dlg-body { max-height: 40px; overflow-y: auto; }";
+    document.head.appendChild(injected);
+
+    await openBatch(8);
+
+    const bodyBefore = dlg().querySelector(".dlg-body") as HTMLElement;
+    bodyBefore.scrollTop = 30;
+    const offset = bodyBefore.scrollTop;
+    expect(offset).toBeGreaterThan(0);
+
+    button(/^Stop$/).click();
+    await vi.waitFor(() => {
+      expect(dlg().querySelector(".dlg-body")).not.toBe(bodyBefore);
+    });
+
+    expect((dlg().querySelector(".dlg-body") as HTMLElement).scrollTop).toBe(offset);
   });
 });

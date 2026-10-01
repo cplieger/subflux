@@ -28,6 +28,16 @@ const client = vi.hoisted(() => ({
   revokeOK: true,
   unlinkResult: { ok: true } as { ok: boolean; error?: string },
   begin: null as unknown,
+  // The begin stub's failure answer when `begin` is null: the RAW client
+  // carries the server's own error and code.
+  beginFailure: { status: 400, error: "", code: "" } as {
+    status: number;
+    error: string;
+    code: string;
+  },
+  // The availability probe's answer; the default is available, or every
+  // registration case below renders the disabled control instead of a prompt.
+  availability: { ok: true, status: 200, data: { available: true } } as unknown,
   calls: [] as string[],
   changeBodies: [] as unknown[],
   renameArgs: [] as { id: unknown; body: unknown }[],
@@ -90,11 +100,28 @@ vi.mock("./wire/client.gen.js", () => ({
     client.profileBodies.push(body);
     return Promise.resolve(client.profileResult);
   },
-  webauthnRegisterBegin: (body: unknown) => {
-    client.calls.push("webauthnRegisterBegin");
+  webauthnRegisterBeginRaw: (body: unknown) => {
+    client.calls.push("webauthnRegisterBeginRaw");
     client.beginBodies.push(body);
-    return Promise.resolve(client.begin);
+    return Promise.resolve(
+      client.begin === null
+        ? {
+            ok: false,
+            status: client.beginFailure.status,
+            error: client.beginFailure.error,
+            code: client.beginFailure.code,
+          }
+        : { ok: true, status: 200, data: client.begin, headers: new Headers() },
+    );
   },
+  webauthnAvailabilityRaw: () => {
+    client.calls.push("webauthnAvailabilityRaw");
+    return Promise.resolve(client.availability);
+  },
+  // The ceremony module's LOGIN leg imports these two; no test here drives a
+  // login, but the mock must link every export the module names.
+  webauthnLoginBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
   // Pulled in by the REAL webauthn-utils.js (kept real so the finish request
   // carries genuine base64url encoding). Chromium DOES provide
   // window.PublicKeyCredential, so sendWebAuthnSignals gets past its feature
@@ -216,6 +243,7 @@ function credential(rk: boolean | undefined): Record<string, unknown> {
     response: {
       attestationObject: new Uint8Array([4, 5]).buffer,
       clientDataJSON: new Uint8Array([6]).buffer,
+      getTransports: () => ["internal", "hybrid"],
     },
     getClientExtensionResults: () => (rk === undefined ? {} : { credProps: { rk } }),
   };
@@ -433,6 +461,12 @@ beforeEach(() => {
   client.revokeOK = true;
   client.unlinkResult = { ok: true };
   client.begin = null;
+  client.beginFailure = {
+    status: 400,
+    error: "passkeys are not configured on this instance",
+    code: "webauthn_unconfigured",
+  };
+  client.availability = { ok: true, status: 200, data: { available: true } };
   client.calls = [];
   client.changeBodies = [];
   client.renameArgs = [];
@@ -440,6 +474,8 @@ beforeEach(() => {
   client.beginBodies = [];
   client.deletedIds = [];
   client.revokedIds = [];
+  client.profileResult = { ok: true };
+  client.profileBodies = [];
   asks.answers = [];
   asks.calls = [];
   toasts.errors = [];
@@ -525,6 +561,16 @@ describe("security dialog: which sections an account gets", () => {
     await openSecurity();
 
     expect(sectionTitles()).toEqual([]);
+  });
+
+  it("reports a failed identity read instead of a blank dialog", async () => {
+    client.me = null;
+
+    const body = await openSecurity();
+
+    expect(req(".empty[data-status='err']", body).textContent).toBe(
+      "Could not load your account. Close the dialog and try again.",
+    );
   });
 });
 
@@ -628,6 +674,20 @@ describe("security dialog: display name", () => {
 
     // A display name is not a credential, so it is not managed at the IdP.
     expect(sectionTitles()).toContain("Display Name");
+  });
+
+  it("saves the display name typed after a re-render", async () => {
+    client.me = user({ role: "admin", display_name: "old" });
+    client.apikeys = [apiKey(3, "CI runner")];
+    asks.answers = [true];
+    await openSecurity();
+    client.apikeys = [];
+    button("Revoke API key").click();
+    await settle();
+
+    await saveDisplayName("new name");
+
+    expect(client.profileBodies).toEqual([{ display_name: "new name" }]);
   });
 });
 
@@ -779,6 +839,35 @@ describe("security dialog: change password", () => {
     await changePassword("old-secret", "brand-new-secret");
 
     expect(req<HTMLInputElement>("#sec-new-pw").value).toBe("brand-new-secret");
+  });
+
+  it("sends the passwords typed after a re-render", async () => {
+    client.apikeys = [apiKey(3, "CI runner")];
+    asks.answers = [true];
+    await openSecurity();
+    client.apikeys = [];
+    button("Revoke API key").click();
+    await settle();
+
+    await changePassword("old-secret", "brand-new-secret");
+
+    expect(client.changeBodies).toEqual([
+      { current_password: "old-secret", new_password: "brand-new-secret" },
+    ]);
+  });
+
+  it("reports the refusal after a re-render", async () => {
+    client.apikeys = [apiKey(3, "CI runner")];
+    asks.answers = [true];
+    await openSecurity();
+    client.apikeys = [];
+    button("Revoke API key").click();
+    await settle();
+
+    button("Change Password").click();
+    await settle();
+
+    expect(feedback().textContent).toBe("Both fields are required");
   });
 });
 
@@ -971,6 +1060,9 @@ describe("security dialog: passkeys", () => {
     client.passkeys = [passkey(7, "Yubikey")];
     asks.answers = ["Work key"];
     await openSecurity();
+    // The label is re-read from the server, as it is after every other
+    // successful mutation in this dialog.
+    client.passkeys = [passkey(7, "Work key")];
 
     req<HTMLElement>(".sec-pk-name").click();
     await settle();
@@ -1050,6 +1142,86 @@ describe("security dialog: passkeys", () => {
 
     expect(req(".sec-pk-name").textContent).toBe("Yubikey");
   });
+
+  it("renames a passkey after a re-render", async () => {
+    client.passkeys = [passkey(9, "Security Key")];
+    client.apikeys = [apiKey(3, "CI runner")];
+    asks.answers = [true, "test"];
+    await openSecurity();
+    client.apikeys = [];
+    button("Revoke API key").click();
+    await settle();
+    client.passkeys = [passkey(9, "test")];
+
+    req<HTMLElement>(".sec-pk-name").click();
+    await settle();
+
+    const name = req(".sec-pk-name");
+    expect([name.textContent, name.getAttribute("aria-label")]).toEqual([
+      "test",
+      "Rename passkey test",
+    ]);
+  });
+
+  it("returns focus to the rename control after the re-render", async () => {
+    client.passkeys = [passkey(7, "Yubikey")];
+    asks.answers = ["Work key"];
+    await openSecurity();
+    const before = req<HTMLElement>(".sec-pk-name");
+    before.focus();
+    client.passkeys = [passkey(7, "Work key")];
+
+    before.click();
+    await settle();
+
+    const after = req<HTMLElement>(".sec-pk-name");
+    expect([document.activeElement === after, after === before]).toEqual([true, false]);
+  });
+
+  it("returns focus to the control the user left while a sub-dialog holds it", async () => {
+    // What production re-renders under: `ask` resolves before the fade
+    // `closeDialog` starts has finished, so a modal is still above this dialog
+    // — which makes it inert, refusing focus() — and the platform then hands
+    // focus back to an opener the re-render has already discarded.
+    client.passkeys = [passkey(7, "Yubikey")];
+    asks.answers = ["Work key"];
+    await openSecurity();
+    const rename = req<HTMLElement>(".sec-pk-name");
+    rename.focus();
+    const sub = document.createElement("dialog");
+    const subBtn = document.createElement("button");
+    sub.appendChild(subBtn);
+    document.body.appendChild(sub);
+    onTestFinished(() => {
+      sub.remove();
+    });
+    sub.showModal();
+    subBtn.focus();
+    expect(document.activeElement).toBe(subBtn);
+    client.passkeys = [passkey(7, "Work key")];
+
+    rename.click();
+    await settle();
+    const closed = new Promise<void>((resolve) => {
+      sub.addEventListener("close", () => resolve(), { once: true });
+    });
+    sub.close();
+    await closed;
+
+    expect(document.activeElement).toBe(req(".sec-pk-name"));
+  });
+
+  it("reports a failed read instead of an empty list", async () => {
+    client.passkeys = null;
+
+    await openSecurity();
+
+    const passkeys = section("Passkeys");
+    expect([
+      passkeys.querySelector(".empty[data-status='err']")?.textContent,
+      [...passkeys.querySelectorAll("p.muted")].map((p) => p.textContent),
+    ]).toEqual(["Could not load passkeys.", []]);
+  });
 });
 
 describe("security dialog: passkey registration", () => {
@@ -1102,7 +1274,7 @@ describe("security dialog: passkey registration", () => {
     expect(client.beginBodies).toEqual([{ password: "old-secret" }]);
   });
 
-  it("reports a begin response with no options", async () => {
+  it("reports the server's own begin refusal", async () => {
     asks.answers = ["old-secret"];
     client.begin = null;
     await openSecurity();
@@ -1110,7 +1282,7 @@ describe("security dialog: passkey registration", () => {
     button("Add passkey").click();
     await settle();
 
-    expect(toasts.errors).toEqual(["Failed to start passkey registration"]);
+    expect(toasts.errors).toEqual(["passkeys are not configured on this instance"]);
   });
 
   it("creates no credential when the begin step failed", async () => {
@@ -1137,7 +1309,7 @@ describe("security dialog: passkey registration", () => {
     expect(new TextDecoder().decode(opts.publicKey.challenge)).toBe("challenge");
   });
 
-  it("reports a cancelled credential creation", async () => {
+  it("stays quiet when the credential creation is cancelled", async () => {
     asks.answers = ["old-secret"];
     client.begin = beginResponse();
     creds.createResult = null;
@@ -1146,20 +1318,28 @@ describe("security dialog: passkey registration", () => {
     button("Add passkey").click();
     await settle();
 
-    expect(toasts.errors).toEqual(["Passkey creation cancelled"]);
+    expect(toasts.errors).toEqual([]);
   });
 
-  it("warns when the authenticator made a non-discoverable credential", async () => {
+  it("reports the server's refusal of a non-discoverable credential", async () => {
+    // The forwarded credProps output makes the server refuse the registration
+    // instead of the client warning beside a stored, unusable credential.
     asks.answers = ["old-secret"];
     client.begin = beginResponse();
     creds.createResult = credential(false);
+    net.finishStatus = 400;
+    net.finishBody = {
+      error:
+        "this authenticator cannot store a passkey; try a different device or a password manager",
+      code: "webauthn_not_discoverable",
+    };
     await openSecurity();
 
     button("Add passkey").click();
     await settle();
 
     expect(toasts.errors).toEqual([
-      "Your authenticator created a non-discoverable credential. Passwordless login may not work with this passkey.",
+      "this authenticator cannot store a passkey; try a different device or a password manager",
     ]);
   });
 
@@ -1217,7 +1397,12 @@ describe("security dialog: passkey registration", () => {
       id: "cred-id-1",
       rawId: "AQID",
       type: "public-key",
-      response: { attestationObject: "BAU", clientDataJSON: "Bg" },
+      response: {
+        attestationObject: "BAU",
+        clientDataJSON: "Bg",
+        transports: ["internal", "hybrid"],
+      },
+      clientExtensionResults: { credProps: { rk: true } },
     });
   });
 
@@ -1274,7 +1459,7 @@ describe("security dialog: passkey registration", () => {
     expect(toasts.errors).toEqual([]);
   });
 
-  it("reports any other registration failure", async () => {
+  it("stays quiet when the user dismisses the authenticator prompt", async () => {
     asks.answers = ["old-secret"];
     client.begin = beginResponse();
     creds.createThrows = new DOMException("not allowed", "NotAllowedError");
@@ -1283,7 +1468,52 @@ describe("security dialog: passkey registration", () => {
     button("Add passkey").click();
     await settle();
 
-    expect(toasts.errors).toEqual(["Passkey registration failed"]);
+    expect(toasts.errors).toEqual([]);
+  });
+
+  it("reports any other registration failure with its name", async () => {
+    asks.answers = ["old-secret"];
+    client.begin = beginResponse();
+    creds.createThrows = new DOMException("boom", "SecurityError");
+    await openSecurity();
+
+    button("Add passkey").click();
+    await settle();
+
+    expect(toasts.errors).toEqual(["Passkey registration failed (SecurityError)."]);
+  });
+});
+
+describe("security dialog: passkey availability", () => {
+  it("disables Add passkey and says why before any password is asked", async () => {
+    client.availability = {
+      ok: true,
+      status: 200,
+      data: { available: false, reason: "unconfigured", suggested_rp_id: "example.com" },
+    };
+    asks.answers = ["old-secret"];
+    await openSecurity();
+
+    const add = button("Add passkey");
+    add.click();
+    await settle();
+
+    expect(add.disabled).toBe(true);
+    expect(req(".sec-pk-unavailable", section("Passkeys")).textContent).toBe(
+      "Passkeys are not set up yet: no relying-party ID is configured. Save your settings once from this address and subflux fills it in as \u201cexample.com\u201d, or set auth.webauthn_rp_id under Settings \u2192 Authentication.",
+    );
+    expect(asks.calls).toEqual([]);
+    expect(client.beginBodies).toEqual([]);
+  });
+
+  it("disables Add passkey when the probe itself fails", async () => {
+    client.availability = { ok: false, status: 500, error: "internal error" };
+    await openSecurity();
+
+    expect(button("Add passkey").disabled).toBe(true);
+    expect(req(".sec-pk-unavailable", section("Passkeys")).textContent).toBe(
+      "Could not check whether passkeys are available. Reload the page to try again.",
+    );
   });
 });
 
@@ -1540,6 +1770,64 @@ describe("security dialog: API keys", () => {
 
     expect(toasts.errors).toEqual(["Failed to revoke API key"]);
   });
+
+  it("shows the new key when a second key is generated after the list re-rendered", async () => {
+    client.apikeys = [];
+    asks.answers = ["test", true, "test"];
+    await openSecurity();
+    button("Generate API key").click();
+    await settle();
+    client.apikeys = [apiKey(1, "test")];
+    button("Done").click();
+    await settle();
+    client.apikeys = [];
+    button("Revoke API key").click();
+    await settle();
+
+    button("Generate API key").click();
+    await settle();
+
+    expect(req(".sec-new-key code").textContent).toBe("sfx_new_secret");
+  });
+
+  it("generates into the live panel after any re-render", async () => {
+    asks.answers = ["test", "test"];
+    await openSecurity();
+    button("Generate API key").click();
+    await settle();
+    button("Done").click();
+    await settle();
+
+    button("Generate API key").click();
+    await settle();
+
+    expect(req(".sec-new-key code").textContent).toBe("sfx_new_secret");
+  });
+
+  it("moves focus to no other control when the revoked key's row is gone", async () => {
+    client.apikeys = [apiKey(3, "CI runner")];
+    asks.answers = [true];
+    await openSecurity();
+    button("Revoke API key").focus();
+    client.apikeys = [];
+
+    button("Revoke API key").click();
+    await settle();
+
+    expect(document.activeElement?.closest(".sec-section")).toBeNull();
+  });
+
+  it("reports a failed read instead of an empty list", async () => {
+    client.apikeys = null;
+
+    await openSecurity();
+
+    const keys = section("API Keys");
+    expect([
+      keys.querySelector(".empty[data-status='err']")?.textContent,
+      [...keys.querySelectorAll("p.muted")].map((p) => p.textContent),
+    ]).toEqual(["Could not load API keys.", []]);
+  });
 });
 
 describe("security dialog: single sign-on", () => {
@@ -1592,13 +1880,35 @@ describe("security dialog: single sign-on", () => {
     expect(net.calls[0]).toMatchObject({ url: "/api/auth/oidc", method: "HEAD" });
   });
 
-  it("treats a failed probe as SSO unavailable", async () => {
-    client.me = user({ role: "admin", oidc_linked: false });
+  it("reports a failed probe instead of hiding the section", async () => {
+    client.me = user({ role: "admin", oidc_linked: false, can_link_oidc: true });
     net.oidcThrows = true;
 
     await openSecurity();
 
-    expect(sectionTitles()).not.toContain("Single Sign-On");
+    expect(req(".empty[data-status='err']", section("Single Sign-On")).textContent).toBe(
+      "Could not check single sign-on availability.",
+    );
+  });
+
+  it("keeps the connect control when the probe fails", async () => {
+    client.me = user({ role: "admin", oidc_linked: false, can_link_oidc: true });
+    net.oidcThrows = true;
+
+    await openSecurity();
+
+    expect(button("Connect", section("Single Sign-On")).tagName).toBe("BUTTON");
+  });
+
+  it("leaves the error line off a linked account whose probe failed", async () => {
+    client.me = user({ role: "admin", oidc_linked: true });
+    net.oidcThrows = true;
+
+    await openSecurity();
+
+    // The section renders from `oidc_linked` and its Disconnect control needs
+    // no probe, so a failed one costs a linked account nothing to act on.
+    expect(section("Single Sign-On").querySelector(".empty[data-status='err']")).toBeNull();
   });
 
   it("keeps the section for a linked account even when the probe fails", async () => {

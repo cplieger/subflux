@@ -31,10 +31,11 @@ import (
 )
 
 const (
-	providerName  = subflux.ProviderNameSubSource
-	baseURL       = "https://api.subsource.net/api/v1"
-	matchedByIMDB = subflux.MatchByIMDB
-	paramAPIKey   = "api_key"
+	providerName    = subflux.ProviderNameSubSource
+	baseURL         = "https://api.subsource.net/api/v1"
+	matchedByIMDB   = subflux.MatchByIMDB
+	paramAPIKey     = "api_key"
+	paramSearchType = "searchType"
 )
 
 // Factory creates a SubSource provider from settings.
@@ -314,9 +315,9 @@ func titleCacheKey(req *subflux.SearchRequest) string {
 
 func (p *Provider) searchTitleUncached(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
-		paramAPIKey:  {p.apiKey},
-		"searchType": {string(matchedByIMDB)},
-		"imdb":       {req.ImdbID},
+		paramAPIKey:     {p.apiKey},
+		paramSearchType: {string(matchedByIMDB)},
+		"imdb":          {req.ImdbID},
 	}
 	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
 		params.Set("season", strconv.Itoa(req.Season))
@@ -339,9 +340,9 @@ func (p *Provider) searchTitleUncached(ctx context.Context, req *subflux.SearchR
 
 func (p *Provider) searchTitleByText(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
-		paramAPIKey:  {p.apiKey},
-		"searchType": {"text"},
-		"q":          {strings.ToLower(req.Title)},
+		paramAPIKey:     {p.apiKey},
+		paramSearchType: {"text"},
+		"q":             {strings.ToLower(req.Title)},
 	}
 	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
 		params.Set("season", strconv.Itoa(req.Season))

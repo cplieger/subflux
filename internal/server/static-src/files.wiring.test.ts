@@ -236,6 +236,101 @@ describe("files: loading skeleton", () => {
   });
 });
 
+describe("files: install over a painted skeleton", () => {
+  beforeEach(() => {
+    resetEnv();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // The control for the two cases below: the same production code with nothing
+  // in the container for the install to meet. Without it a broken selector
+  // reads the same as the defect.
+  it("CONTROL a listing that beats the show delay: the empty state hides once rows exist", async () => {
+    mockListFiles.mockResolvedValueOnce([extFile("tmdb-201", "en"), extFile("tmdb-201", "fr")]);
+
+    openFileManager("movie", "tmdb-201", "Movie", "/");
+    await drain();
+
+    expect(skeletonRows()).toHaveLength(0);
+    const empty = document.querySelector<HTMLElement>(".files-list .empty");
+    expect(empty?.textContent).toBe("No external subtitles.");
+    expect(empty?.isConnected).toBe(true);
+    expect(document.querySelector<HTMLElement>("table.files-table")?.hidden).toBe(false);
+    expect(empty?.hidden).toBe(true);
+  });
+
+  // The install must REPLACE whatever the container holds rather than treat it
+  // as something to patch: a reusing reconciler copies the fresh nodes onto the
+  // skeleton's own divs and discards them, so the visibility effect would write
+  // `hidden` to an element that was never inserted.
+  it("hides the empty state once rows exist, over a container holding the skeleton", async () => {
+    const settle = pendingListing();
+
+    openFileManager("movie", "tmdb-203", "Movie", "/");
+    await drain();
+    vi.advanceTimersByTime(150);
+    expect(skeletonRows()).toHaveLength(4);
+
+    settle([extFile("tmdb-203", "en"), extFile("tmdb-203", "fr")]);
+    await drain();
+    vi.advanceTimersByTime(300);
+    await drain();
+
+    const list = document.querySelector<HTMLElement>(".files-list");
+    const empty = list?.querySelector<HTMLElement>(".empty");
+    const tbl = list?.querySelector<HTMLElement>("table.files-table");
+    expect(empty?.textContent).toBe("No external subtitles.");
+    expect(empty?.isConnected).toBe(true);
+    expect(tbl?.hidden).toBe(false);
+    expect(reqTbody().children.length).toBe(2);
+    expect(empty?.hidden).toBe(true);
+  });
+
+  // The skeleton controller is one module-level slot, so the open that takes it
+  // owes the previous holder a settle: an orphaned show timer disposes the live
+  // binding and paints a skeleton over the mounted table.
+  it("a second open leaves no skeleton timer to paint over the mounted table", async () => {
+    pendingListing();
+    openFileManager("movie", "tmdb-205", "Movie", "/");
+    await drain();
+
+    mockListFiles.mockResolvedValueOnce([extFile("tmdb-205", "en")]);
+    openFileManager("movie", "tmdb-205", "Movie", "/");
+    await drain();
+    const tbody = reqTbody();
+
+    vi.advanceTimersByTime(150);
+    await drain();
+
+    expect(skeletonRows()).toHaveLength(0);
+    expect(reqTbody()).toBe(tbody);
+    expect(reqTbody().children.length).toBe(1);
+  });
+});
+
+describe("files: card-head bulk button", () => {
+  beforeEach(() => {
+    resetEnv();
+  });
+
+  it("leaves the card head when another view takes the pane", async () => {
+    mockListFiles.mockResolvedValueOnce([extFile("tmdb-209", "en")]);
+    openFileManager("movie", "tmdb-209", "Movie", "/");
+    await tick();
+    expect(reqBulkButton().hidden).toBe(false);
+
+    // The button sits outside the patched subtree, so only this view's scope
+    // can take it away; left behind it dispatches the departed view's delete.
+    contentView.mount("series:1");
+
+    expect(document.querySelector('[data-nav="bulk-delete"]')).toBeNull();
+  });
+});
+
 describe("files: sorted view", () => {
   beforeEach(() => {
     resetEnv();

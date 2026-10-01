@@ -15,11 +15,11 @@
 //    must be busy — a second Next through an un-disabled button would advance
 //    on a stale result.
 //
-// Finish is deliberately never clicked: it ends in navigateToApp, which assigns
-// window.location.href, and neither window nor location can be substituted in a
-// real browser — the assignment would reload the runner's own iframe and fail
-// the file. The passkey offer sits behind the same call, so both stay for a
-// harness that can own a page.
+// Finish is deliberately never clicked here: it ends in a navigation, and
+// neither window nor location can be substituted in a real browser — the
+// assignment would reload the runner's own iframe and fail the file. The
+// passkey offer behind it is wizard.offer.test.ts's subject, which clicks
+// Finish by replacing its one import of nav-app.ts.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as wizard from "./wizard.js";
 import { EXAMPLE_SECTIONS } from "./wizard-example.js";
@@ -49,8 +49,11 @@ vi.mock("./wire/client.gen.js", () => ({
     }
     return Promise.resolve(next());
   },
-  webauthnRegisterBegin: () => Promise.resolve(null),
+  webauthnRegisterBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnLoginBeginRaw: () => Promise.resolve({ ok: false, status: 400 }),
+  webauthnAvailabilityRaw: () => Promise.resolve({ ok: false, status: 400 }),
   webauthnSignalData: () => Promise.resolve(null),
+  PATH_WEBAUTHN_LOGIN_FINISH: "/api/auth/webauthn/login/finish",
   // Reached only by a section's Test-connection button, which these
   // tests do not click; shaped like a real answer so a future one can.
   testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),

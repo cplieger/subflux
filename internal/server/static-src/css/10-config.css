@@ -16,6 +16,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-3);
 }
 
 .cfg-title:first-child {
@@ -53,6 +54,16 @@
     & label:not(.toggle) {
       min-width: auto;
     }
+
+    /* The `flex: 1` above sizes the MAIN axis, which is the block axis once the
+     * row becomes a column: it would override the control's own height and
+     * collapse it to content (28px measured, against the 44px touch floor
+     * 07-dialogs.css sets under (width < 640px)). `align-items: stretch`
+     * already gives full width, so the flex grow has nothing left to do. */
+    & input,
+    & select {
+      flex: none;
+    }
   }
 }
 
@@ -84,7 +95,6 @@
 
 .cfg-masked {
   -webkit-text-security: disc;
-  font-family: text-security-disc, password, sans-serif;
 }
 
 .cfg-required {
@@ -112,6 +122,13 @@
   align-items: center;
   gap: var(--sp-5);
   flex-wrap: wrap;
+}
+
+/* The `display: flex` above beats the UA sheet's `[hidden] { display: none }`,
+ * so the reusable error slot rendered as an empty red box until this existed.
+ * `.auth-error` in login-03-forms.css carries the same guard. */
+.cfg-banner[hidden] {
+  display: none;
 }
 
 .cfg-textarea {
@@ -222,6 +239,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--sp-3);
 }
 
 .provider-head .badge-health {

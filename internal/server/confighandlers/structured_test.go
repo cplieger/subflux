@@ -656,12 +656,15 @@ const keepSecretsPayloadOmittedLeaf = `{"sections": {
 	"providers": {"opensubtitles": {"enabled": true, "settings": {"username": "u"}}}
 }}`
 
-// explicitSecretsPayload carries every schema secret non-empty: no keep
-// semantics, so the baseline is irrelevant to it.
+// explicitSecretsPayload carries every schema secret non-empty AND the
+// relying-party ID: no keep semantics anywhere, so the baseline is irrelevant
+// to it. The RP ID belongs in the set because a payload without one is
+// filled from the stored value, which makes the baseline load-bearing.
 const explicitSecretsPayload = `{"sections": {
 	"sonarr": {"url": "http://s:8989", "api_key": "k-new"},
 	"languages": {"default": [{"code": "en"}]},
-	"providers": {"opensubtitles": {"enabled": true, "settings": {"username": "u", "password": "p-new"}}}
+	"providers": {"opensubtitles": {"enabled": true, "settings": {"username": "u", "password": "p-new"}}},
+	"auth": {"webauthn_rp_id": "example.com"}
 }}`
 
 // TestStructuredSave_baseline_read_error_fails_closed: a baseline read
@@ -739,9 +742,11 @@ func TestStructuredSave_malformed_baseline_fails_closed(t *testing.T) {
 }
 
 // TestStructuredSave_baseline_failure_with_explicit_secrets_saves: when the
-// payload carries every secret explicitly, the baseline is irrelevant — the
-// save must proceed even over a corrupted existing file, which is also the
-// operator's recovery path (a complete re-submit repairs the file).
+// payload carries every secret and the relying-party ID explicitly, the
+// baseline is irrelevant — the save must proceed even over a corrupted
+// existing file, which is also the operator's recovery path (a complete
+// re-submit repairs the file). A payload with no RP ID over the same corrupt
+// file fails closed instead (TestStructuredSave_rpid_unreadable_baseline).
 func TestStructuredSave_baseline_failure_with_explicit_secrets_saves(t *testing.T) {
 	t.Parallel()
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")

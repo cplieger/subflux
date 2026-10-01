@@ -1,6 +1,7 @@
 import { el, option, icon, withHelp } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
-import { connTestControl } from "./conn-test.js";
+import { mountConnTest } from "./conn-test.js";
+import { CONFIG_BANNER_ID } from "./constants.js";
 import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
 import { prettyLabel } from "./utils.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -129,27 +130,44 @@ export function renderFieldsSection(schema: SchemaSection, pc: ParsedConfig | nu
       });
     }
     renderFieldsInto(content, schema, pc);
-    appendConnTest(content, schema);
+    appendConnTest(header, content, schema);
     sec.appendChild(content);
   } else {
-    sec.appendChild(el("div", { className: "cfg-title" }, schema.title));
+    const header = el("div", { className: "cfg-title" }, schema.title);
+    sec.appendChild(header);
     renderFieldsInto(sec, schema, pc);
-    appendConnTest(sec, schema);
+    appendConnTest(header, sec, schema);
   }
   return sec;
 }
 
-// appendConnTest adds the "Test connection" control to a section that declares
-// one. It goes at the END of the collapsible body rather than in the header, so
-// a disabled section collapses its test along with its fields — testing an arr
-// you have switched off answers nothing.
-function appendConnTest(container: HTMLElement, schema: SchemaSection): void {
+// appendConnTest adds the credential-check control to a section that declares
+// one. It goes in the section HEADER, inline with the title, which is also where
+// the provider cards carry theirs — so the control reads the same on every
+// surface that has one.
+//
+// The header sits outside the collapsible body, so a disabled section's control
+// stays reachable. That is deliberate: the question is whether the credentials
+// are right, which has the same answer whether or not the section is switched
+// on, and an operator fixing a key before enabling an arr is the normal order.
+//
+// Every field the section declares is sent, minus the enable toggle: the server
+// reads what it needs by name, and a client that sent a hand-picked subset would
+// be the caller-supplied probe description this endpoint refuses to take.
+function appendConnTest(header: HTMLElement, fields: HTMLElement, schema: SchemaSection): void {
   if (!schema.conn_test) {
     return;
   }
-  const find = (key: string): HTMLInputElement | null =>
-    container.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, key))}`);
-  container.appendChild(connTestControl(schema.key, { url: find("url"), apiKey: find("api_key") }));
+  const inputs: Record<string, HTMLInputElement | null> = {};
+  for (const field of schema.fields ?? []) {
+    if (field.key === schema.enable_key) {
+      continue;
+    }
+    inputs[field.key] = fields.querySelector<HTMLInputElement>(
+      `#${CSS.escape(fieldId(schema.key, field.key))}`,
+    );
+  }
+  mountConnTest(header, schema.key, { inputs, bannerId: CONFIG_BANNER_ID });
 }
 
 // wireShowWhen sets up show_when visibility toggling for fields.
@@ -385,10 +403,9 @@ export function renderListSection(schema: SchemaSection): HTMLElement {
 }
 
 // renderRawSection displays a config section the schema does not know
-// (a hand-added top-level key). Display-only: the UI save regenerates the
-// file from schema-driven form values, so unknown sections are not round-
-// tripped (unchanged, documented behavior). Shown as pretty-printed JSON
-// now that the raw YAML text never reaches the browser.
+// (a hand-added top-level key), as pretty-printed JSON because the raw
+// YAML text never reaches the browser. buildSectionsFromForm round-trips
+// the stored value for such a section, so nothing rendered here is read back.
 export function renderRawSection(name: string, value: unknown): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
   sec.appendChild(el("div", { className: "cfg-title" }, prettyLabel(name)));
