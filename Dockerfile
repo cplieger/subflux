@@ -20,7 +20,7 @@ ARG FFMPEG_VERSION
 ARG X264_COMMIT
 # Alpine package versions are implicitly pinned via the base-image digest
 # above; pinning each apk package separately drifts faster than it helps
-# (mirrors the DL3008 convention used in apps/vibekit and apps/web-terminal-kiro).
+# (mirrors the DL3008 convention used in apps/marotte and apps/web-terminal-kiro).
 # hadolint ignore=DL3018
 RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
     && apk add --no-cache curl git \
@@ -156,7 +156,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 
 # --- TypeScript type gate (tsc --noEmit over static-src) ---
 # Uses the same tsc (TypeScript 7 native compiler) tarball pattern as
-# apps/vibekit. Now that TS7 shipped stable, renovate tracks the `typescript`
+# apps/marotte. Now that TS7 shipped stable, renovate tracks the `typescript`
 # npm package and we fetch its per-platform native binary
 # (@typescript/typescript-linux-<arch>, published in lockstep with the
 # metapackage at the same version). Plain alpine here (not golang-alpine)
@@ -188,7 +188,7 @@ COPY internal/server/static-src/ ./
 
 # Fetch @cplieger/actions and @cplieger/reactive TS source from npm registry
 # so tsc can resolve the `import ... from "@cplieger/<lib>"` statements at
-# build time. Each lib publishes TS source only — same pattern as vibekit /
+# build time. Each lib publishes TS source only — same pattern as marotte /
 # web-terminal-kiro. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsc's
 # bundler resolution finds the package + its types.
 # renovate: datasource=npm depName=@cplieger/actions

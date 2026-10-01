@@ -11,7 +11,7 @@ export default [
   // 1. Ignore generated/build outputs and configs that don't need linting.
   {
     ignores: [
-      // Dependencies (any depth — vibekit's web/static-src/node_modules nests deep)
+      // Dependencies (any depth — marotte's web/static-src/node_modules nests deep)
       "**/node_modules/**",
       // Build output / generated bundles (TS->JS, CSS bundles, etc.)
       "**/static/**",

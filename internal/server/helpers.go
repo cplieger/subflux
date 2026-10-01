@@ -17,7 +17,7 @@ import (
 // These helpers return a bool indicating whether the handler should
 // continue. They write the error response themselves.
 //
-// Pattern mirrors apps/vibekit/web/internal/git/helpers.go:
+// Pattern mirrors apps/marotte/web/internal/git/helpers.go:
 // tiny, single-purpose, opinionated about the response shape.
 
 // maxDefaultBodySize references the canonical constant from api.
