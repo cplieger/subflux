@@ -78,7 +78,7 @@ async function freshStatus(): Promise<typeof StatusModule> {
   vi.resetModules();
   document.body.innerHTML =
     '<button id="statusBtn"><span class="nav-label"></span></button>' +
-    '<span id="statusIcon"></span><div id="statusPopup"></div>';
+    '<span id="statusIcon"></span>';
   return (await import(
     /* @vite-ignore */ `./status.ts?stress=${String(++bootCount)}`
   )) as typeof StatusModule;

@@ -29,6 +29,7 @@ import {
 import type { SchemaSection } from "./api-types.js";
 import type { WizardStep } from "./wizard-state.js";
 import type { PathValidationResponse } from "./wire/types.gen.js";
+import wizardCSS from "./css/login-04-wizard.css?raw";
 
 const wire = vi.hoisted(() => ({
   schema: [] as unknown,
@@ -489,6 +490,29 @@ describe("search step", () => {
     cb.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(row?.hidden).toBe(false);
+  });
+
+  it("does not RENDER the hidden upgrade-window field", async () => {
+    // The property was always written correctly; what no markup-level case can
+    // see is that `.wiz-field`'s own `display: flex` beat the UA sheet's
+    // `[hidden]` rule, so the field rendered on every fresh install.
+    const style = document.createElement("style");
+    style.textContent = wizardCSS;
+    document.head.appendChild(style);
+    try {
+      const host = await boot();
+      buildSearchStep().render(host);
+      const row = document.getElementById("wiz-search-upgrade-window-row");
+      expect(getComputedStyle(row as HTMLElement).display).toBe("none");
+
+      const cb = input("wiz-search-upgrade_enabled");
+      cb.checked = true;
+      cb.dispatchEvent(new Event("change", { bubbles: true }));
+
+      expect(getComputedStyle(row as HTMLElement).display).toBe("flex");
+    } finally {
+      style.remove();
+    }
   });
 
   it("names a boolean row's checkbox with its visible label", async () => {

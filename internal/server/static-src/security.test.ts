@@ -369,9 +369,9 @@ function sectionTitles(): string[] {
   return [...document.querySelectorAll("#securityDialog h3")].map((h) => h.textContent ?? "");
 }
 
-/** The `.sec-section` block whose heading is `title`. Every section renders a
- *  `.sec-feedback` and most a `.sec-fields`, so a first-match query would
- *  silently resolve to whichever section happens to come first. */
+/** The `.sec-section` block whose heading is `title`. Most sections render a
+ *  `.sec-fields` and any of them may hold a `.sec-feedback` message, so a
+ *  first-match query would silently resolve to whichever section comes first. */
 function section(title: string): HTMLElement {
   const found = [...document.querySelectorAll<HTMLElement>("#securityDialog .sec-section")].find(
     (s) => s.querySelector("h3")?.textContent === title,
@@ -404,8 +404,16 @@ async function changePassword(current: string, next: string): Promise<HTMLButton
   return btn;
 }
 
-function feedback(): HTMLElement {
-  return req<HTMLElement>(".sec-feedback", section("Change Password"));
+/** The change-password feedback MESSAGE, which exists only while one is
+ *  showing: `.sec-feedback` is on the message, not on the permanent host. */
+function feedback(): HTMLElement | null {
+  return section("Change Password").querySelector<HTMLElement>(".sec-feedback");
+}
+
+/** The live region the message lands in. `role`/`aria-live` are written on the
+ *  permanent host, so an announcement case reads the message's parent. */
+function feedbackRegion(): HTMLElement | null {
+  return feedback()?.parentElement ?? null;
 }
 
 function releaseChange(result: { ok: boolean; error?: string }): void {
@@ -582,8 +590,8 @@ describe("security dialog: display name", () => {
     await settle();
   }
 
-  function nameFeedback(): HTMLElement {
-    return req<HTMLElement>(".sec-feedback", section("Display Name"));
+  function nameFeedback(): HTMLElement | null {
+    return section("Display Name").querySelector<HTMLElement>(".sec-feedback");
   }
 
   it("prefills the field with the stored display name", async () => {
@@ -627,7 +635,7 @@ describe("security dialog: display name", () => {
 
     await saveDisplayName("Ada Lovelace");
 
-    expect(nameFeedback().textContent).toBe("Display name saved");
+    expect(nameFeedback()?.textContent).toBe("Display name saved");
   });
 
   it("says the name was cleared when the field is emptied", async () => {
@@ -636,7 +644,7 @@ describe("security dialog: display name", () => {
 
     await saveDisplayName("");
 
-    expect(nameFeedback().textContent).toBe("Display name cleared");
+    expect(nameFeedback()?.textContent).toBe("Display name cleared");
   });
 
   it("shows the server's rejection message", async () => {
@@ -645,7 +653,7 @@ describe("security dialog: display name", () => {
 
     await saveDisplayName("Ada\u202eevoL");
 
-    expect(nameFeedback().textContent).toBe("display name contains a disallowed character");
+    expect(nameFeedback()?.textContent).toBe("display name contains a disallowed character");
   });
 
   it("sends no signal when the save is rejected", async () => {
@@ -664,7 +672,7 @@ describe("security dialog: display name", () => {
 
     await saveDisplayName("Ada Lovelace");
 
-    expect(nameFeedback().textContent).toBe("Failed to save display name");
+    expect(nameFeedback()?.textContent).toBe("Failed to save display name");
   });
 
   it("offers the section to a password-less SSO account too", async () => {
@@ -692,10 +700,10 @@ describe("security dialog: display name", () => {
 });
 
 describe("security dialog: change password", () => {
-  it("starts with an empty feedback area kept out of the accessibility tree", async () => {
+  it("renders no feedback message before anything has been submitted", async () => {
     await openSecurity();
 
-    expect([feedback().hidden, feedback().className]).toEqual([true, "sec-feedback"]);
+    expect(feedback()).toBeNull();
   });
 
   it("refuses an empty current password", async () => {
@@ -703,7 +711,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("", "brand-new-secret");
 
-    expect(feedback().textContent).toBe("Both fields are required");
+    expect(feedback()?.textContent).toBe("Both fields are required");
   });
 
   it("sends no request when the current password is empty", async () => {
@@ -719,7 +727,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("", "brand-new-secret");
 
-    expect(feedback().getAttribute("role")).toBe("alert");
+    expect(feedbackRegion()?.getAttribute("role")).toBe("alert");
   });
 
   it("refuses an empty new password", async () => {
@@ -727,7 +735,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "");
 
-    expect(feedback().textContent).toBe("Both fields are required");
+    expect(feedback()?.textContent).toBe("Both fields are required");
   });
 
   it("refuses a new password shorter than eight characters", async () => {
@@ -735,7 +743,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "1234567");
 
-    expect(feedback().textContent).toBe("Password must be at least 8 characters");
+    expect(feedback()?.textContent).toBe("Password must be at least 8 characters");
   });
 
   it("announces a too-short password assertively", async () => {
@@ -743,7 +751,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "1234567");
 
-    expect(feedback().getAttribute("role")).toBe("alert");
+    expect(feedbackRegion()?.getAttribute("role")).toBe("alert");
   });
 
   it("sends no request for a too-short new password", async () => {
@@ -759,7 +767,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "12345678");
 
-    expect(feedback().textContent).toBe("Password changed");
+    expect(feedback()?.textContent).toBe("Password changed");
   });
 
   it("sends both passwords under their wire names", async () => {
@@ -777,17 +785,20 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "brand-new-secret");
 
-    expect(feedback().getAttribute("role")).toBe("status");
+    expect(feedbackRegion()?.getAttribute("role")).toBe("status");
   });
 
-  it("marks the success feedback with the ok class and unhides it", async () => {
+  it("replaces a refusal with ONE ok-classed success message", async () => {
     await openSecurity();
 
+    // The refusal first, so the success has a message to replace: a writer that
+    // appended would leave the operator reading both verdicts at once.
+    await changePassword("", "brand-new-secret");
     await changePassword("old-secret", "brand-new-secret");
 
-    expect([feedback().className, feedback().hidden]).toEqual([
-      "sec-feedback sec-feedback-ok",
-      false,
+    const msgs = [...section("Change Password").querySelectorAll(".sec-feedback")];
+    expect(msgs.map((m) => [m.className, m.textContent])).toEqual([
+      ["sec-feedback sec-feedback-ok", "Password changed"],
     ]);
   });
 
@@ -808,7 +819,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "brand-new-secret");
 
-    expect(feedback().textContent).toBe("Current password is wrong");
+    expect(feedback()?.textContent).toBe("Current password is wrong");
   });
 
   it("announces a rejection assertively as an alert", async () => {
@@ -817,10 +828,10 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "brand-new-secret");
 
-    expect([feedback().getAttribute("role"), feedback().getAttribute("aria-live")]).toEqual([
-      "alert",
-      "assertive",
-    ]);
+    expect([
+      feedbackRegion()?.getAttribute("role"),
+      feedbackRegion()?.getAttribute("aria-live"),
+    ]).toEqual(["alert", "assertive"]);
   });
 
   it("falls back to a generic message when the rejection carries no text", async () => {
@@ -829,7 +840,7 @@ describe("security dialog: change password", () => {
 
     await changePassword("old-secret", "brand-new-secret");
 
-    expect(feedback().textContent).toBe("Failed to change password");
+    expect(feedback()?.textContent).toBe("Failed to change password");
   });
 
   it("keeps the inputs after a rejected change", async () => {
@@ -867,7 +878,7 @@ describe("security dialog: change password", () => {
     button("Change Password").click();
     await settle();
 
-    expect(feedback().textContent).toBe("Both fields are required");
+    expect(feedback()?.textContent).toBe("Both fields are required");
   });
 });
 

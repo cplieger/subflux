@@ -99,17 +99,8 @@ function req<T extends HTMLElement>(id: string): T {
 }
 
 export const $ = {
-  get coverageContent(): HTMLElement {
-    return req("coverageContent");
-  },
-  get libHeading(): HTMLElement {
-    return req("lib-heading");
-  },
-  get coveragePanel(): HTMLElement {
-    return req("coveragePanel");
-  },
-  get historyPanel(): HTMLElement {
-    return req("historyPanel");
+  get main(): HTMLElement {
+    return req("main");
   },
   get historyBtn(): HTMLElement {
     return req("historyBtn");
@@ -117,45 +108,16 @@ export const $ = {
   get configClose(): HTMLElement {
     return req("configClose");
   },
-  get statusPopup(): HTMLElement {
-    return req("statusPopup");
-  },
   get statusBtn(): HTMLElement {
     return req("statusBtn");
   },
 };
 
-// themeBtn/configBtn/userBtn stay raw lookups: user-menu.ts removes
-// themeBtn/configBtn from the DOM after init, and a $ getter would throw on
-// post-removal access.
-
 export function dialog(id: string): HTMLDialogElement {
   return document.getElementById(id) as HTMLDialogElement;
-}
-
-export function input(id: string): HTMLInputElement {
-  return document.getElementById(id) as HTMLInputElement;
-}
-
-export function select(id: string): HTMLSelectElement {
-  return document.getElementById(id) as HTMLSelectElement;
 }
 
 // Cancel / Escape / backdrop-click all resolve false.
 export function confirm(title: string, message: string, confirmLabel?: string): Promise<boolean> {
   return ask(message, confirmLabel !== undefined ? { title, confirmLabel } : { title });
-}
-
-// Insert an element into the card header, before the arr link if present.
-export function insertNavButton(btn: HTMLElement): void {
-  const headerEl = document.querySelector("#coveragePanel .card-head");
-  if (!headerEl) {
-    return;
-  }
-  const arrEl = headerEl.querySelector('[data-nav="arr"]');
-  if (arrEl) {
-    headerEl.insertBefore(btn, arrEl);
-  } else {
-    headerEl.appendChild(btn);
-  }
 }

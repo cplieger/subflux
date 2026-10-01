@@ -11,7 +11,8 @@
 // nothing repaints; a changed row repaints whole, gated by `data-sig`.
 
 import * as store from "./store.js";
-import { $, el, text, icon, errDiv, input, select } from "./dom.js";
+import { el, text, icon, errDiv } from "./dom.js";
+import { libraryPanel } from "./panels.js";
 import { coverageSeries, coverageMovies } from "./wire/client.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from "./utils.js";
@@ -35,7 +36,17 @@ import {
   registerCollectionPair,
   setCoveragePair,
 } from "./coverage-store.js";
-import { signal, computed, effect, bindList, patch, batch, touch } from "@cplieger/reactive";
+import {
+  signal,
+  computed,
+  effect,
+  bindList,
+  patch,
+  batch,
+  touch,
+  reconcile,
+  type ReconcileSpec,
+} from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 
 // --- Coverage view ---
@@ -49,10 +60,18 @@ const filterTick = signal(0);
 const pageLimit = signal(COV_PAGE_SIZE);
 
 // Filtered + sorted full list (reactive on the collection + filter changes).
+let derives = 0;
 const filteredItems = computed(() => {
   touch(filterTick); // dep: re-run when a filter/sort control changes
+  derives += 1;
   return applyFilters(coverageItems());
 });
+
+/** Recomputes of the filtered+sorted view since module load — a CACHED read is
+ *  not one. _resetCoverageForTest() zeroes it. */
+export function _coverageDerivesForTest(): number {
+  return derives;
+}
 
 // Paged id list — the structure tier `bindList` renders. Shallow-equal so a
 // per-row content update (badge change) does not trigger a structural
@@ -140,6 +159,7 @@ export function _resetCoverageForTest(): void {
   _resetCoverageStoreForTest();
   coverageAbort?.abort();
   coverageAbort = null;
+  derives = 0;
   // A fresh tab has no mounted view: release the library view so the next
   // render mounts rather than reusing a departed document's binding.
   contentView.clear();
@@ -160,7 +180,7 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
   if (store.get("isUnconfigured")) {
     return;
   }
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   const showSkeleton = !silent && coverageIds.peek().length === 0;
   // Start the fetch first so the anti-flicker timing can honor THIS load's
   // AbortSignal: fetchAndMergeCoverage aborts any prior in-flight load and
@@ -209,17 +229,25 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
   }
 }
 
-export function configurePanel(visible: boolean, detail?: DetailConfig): void {
-  const ctrl = $.coveragePanel.querySelector<HTMLElement>(".controls");
-  if (ctrl) {
-    ctrl.style.display = visible ? "" : "none";
-  }
-  const heading = $.libHeading;
-  const headerEl = $.coveragePanel.querySelector<HTMLElement>(".card-head");
-  if (!headerEl) {
+/** The `.controls` node's presence in the head IS the condition. The
+ *  already-in-place check keeps a library route apply from re-seating an
+ *  attached node, which would blur the filter input being typed in (web.md,
+ *  re-inserting an attached node). */
+export function showLibraryControls(visible: boolean): void {
+  const p = libraryPanel();
+  if (!visible) {
+    p.controls.remove();
     return;
   }
-  headerEl.hidden = false;
+  if (p.controls.parentNode !== p.head) {
+    p.head.appendChild(p.controls);
+  }
+}
+
+export function configurePanel(visible: boolean, detail?: DetailConfig): void {
+  showLibraryControls(visible);
+  const heading = libraryPanel().heading;
+  const headerEl = libraryPanel().head;
 
   // Remove any previous detail nav elements.
   headerEl.querySelectorAll("[data-nav]").forEach((e: Element) => {
@@ -411,11 +439,25 @@ function updateCoverageRow(row: HTMLElement, item: CoverageItem, view: Scope, id
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
 
+type CovSlot = "empty:no-data" | "empty:no-match" | "table" | "more";
+
+/** At most one `empty:*` key, so two messages at once — or a placeholder above a
+ *  populated table — is unrepresentable. */
+function covSlotsOf(hasData: boolean, matched: number, visible: number): readonly CovSlot[] {
+  if (!hasData) {
+    return ["empty:no-data"];
+  }
+  if (matched === 0) {
+    return ["empty:no-match"];
+  }
+  return visible >= matched ? ["table"] : ["table", "more"];
+}
+
 /** The library table's view id in the shared content host. */
 const VIEW_LIBRARY = "library";
 
 function ensureMounted(): void {
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   // Already the host's occupant: the table this view bound is still the
   // container's content, so the live binding renders it. Ownership answers
   // this — a DOM probe cannot tell a live table from one another view has
@@ -458,12 +500,13 @@ function ensureMounted(): void {
     },
     "Show more\u2026",
   );
-  // replaceChildren, not patch: the installed tree must BE the tree the
-  // visibility effect below closed over. A reusing reconciler copies a fresh
-  // node's attributes into whatever the container already holds — a skeleton
-  // row, a departing view's empty state — and discards the fresh node, so the
-  // effect's `hidden` writes would land on a detached subtree.
-  out.replaceChildren(el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
+  // replaceChildren, not patch: a reusing reconciler copies a fresh node's
+  // attributes into whatever the container already holds — a skeleton row, a
+  // departing view's empty state — and discards the fresh node, so the list the
+  // effect below reconciles into would never be inserted. EMPTY: every child of
+  // it is reconcile's, because an unkeyed one would sit there forever.
+  const list = el("div", { className: "cov-list" });
+  out.replaceChildren(list);
 
   // Content + structure tiers: per-row repaint on entity change, structural
   // reconcile on visibleIds change. Each row builds in a CHILD scope of this
@@ -486,18 +529,34 @@ function ensureMounted(): void {
     ),
   );
 
-  // Empty-state / show-more visibility, derived from the collection +
-  // filtered view.
+  const slots: ReconcileSpec<CovSlot> = {
+    key: (s) => s,
+    // All four are per-MOUNT singletons, so the row binding outlives every
+    // absence: reconcile detaches the table when nothing matches and re-inserts
+    // THIS node, with its bindings and its rows, when something does again.
+    mount: (s) => {
+      switch (s) {
+        case "table":
+          return tbl;
+        case "more":
+          return showMore;
+        case "empty:no-data":
+          return emptyEl;
+        case "empty:no-match":
+          return noMatchEl;
+      }
+    },
+  };
+
   scope.add(
     effect(() => {
+      // Read every signal UNCONDITIONALLY before any branch: covSlotsOf consults
+      // `visible` only in the rows arm, and a read inside a branch leaves this
+      // effect unsubscribed from the signal that would flip it.
       const hasData = coverageIds.value.length > 0;
-      const filtered = filteredItems.value;
+      const matched = filteredItems.value.length;
       const visibleCount = visibleIds.value.length;
-      emptyEl.hidden = hasData;
-      noMatchEl.hidden = !(hasData && filtered.length === 0);
-      const tableEmpty = !hasData || filtered.length === 0;
-      tbl.hidden = tableEmpty;
-      showMore.hidden = tableEmpty || visibleCount >= filtered.length;
+      reconcile(list, covSlotsOf(hasData, matched, visibleCount), slots);
     }),
   );
 }
@@ -520,10 +579,11 @@ export function filterCoverage(): void {
 }
 
 function applyFilters(data: CoverageItem[]): CoverageItem[] {
-  const filter = input("cov-filter").value.toLowerCase();
-  const missingOnly = input("cov-missing").checked;
-  const typeFilter = select("cov-type-filter").value;
-  const sortBy = select("cov-sort").value;
+  const p = libraryPanel();
+  const filter = p.filter.value.toLowerCase();
+  const missingOnly = p.missingOnly.checked;
+  const typeFilter = p.typeFilter.value;
+  const sortBy = p.sort.value;
 
   let filtered: CoverageItem[] = data;
   if (typeFilter === "series") {

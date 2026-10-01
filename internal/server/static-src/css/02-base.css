@@ -126,10 +126,6 @@ input[type="search"] {
     background var(--dur-micro) var(--ease-micro),
     translate 0.08s var(--ease-micro);
 
-  &[hidden] {
-    display: none;
-  }
-
   &:hover {
     background: var(--accent-hover);
   }

@@ -1,7 +1,8 @@
 // detail.ts — series and movie detail drilldown views
 
 import * as store from "./store.js";
-import { $, el, icon, errDiv, pad, insertNavButton } from "./dom.js";
+import { el, icon, errDiv, pad } from "./dom.js";
+import { insertNavButton, libraryPanel } from "./panels.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import { coverageSeriesDetail, mediaEpisodes, stateIDs } from "./wire/client.gen.js";
 import { readMovieDetail, type MovieDetailReads } from "./movie-detail-read.js";
@@ -225,7 +226,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
       arrName: "Sonarr",
     },
   });
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   // Anti-flicker skeleton (150ms show-delay + 300ms min-visible, abort-aware).
   // The commit always releases the pane and detaches current content before
   // rendering, so a series detail render never reuses a previous view's binding.
@@ -760,37 +761,35 @@ export function renderSeriesDetail(
   store.set("detailCtx", { series, seasons, tvdbId: series.tvdb_id });
 
   const hasExtSubs = subFiles.some((f) => f.source === "external");
-  const headerEl = document.querySelector("#coveragePanel .card-head");
-  if (headerEl) {
-    const oldFiles = headerEl.querySelector('[data-nav="files"]');
-    if (oldFiles) {
-      oldFiles.remove();
-    }
-    if (hasExtSubs && store.get("isAdmin")) {
-      const filesBtn = el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          "data-nav": "files",
-          onclick: () => {
-            openFileManager(
-              "episode",
-              `tvdb-${series.tvdb_id}-`,
-              series.title,
-              `/series/${series.tvdb_id}`,
-              series.id,
-            );
-          },
+  const headerEl = libraryPanel().head;
+  const oldFiles = headerEl.querySelector('[data-nav="files"]');
+  if (oldFiles) {
+    oldFiles.remove();
+  }
+  if (hasExtSubs && store.get("isAdmin")) {
+    const filesBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "ghost",
+        "data-nav": "files",
+        onclick: () => {
+          openFileManager(
+            "episode",
+            `tvdb-${series.tvdb_id}-`,
+            series.title,
+            `/series/${series.tvdb_id}`,
+            series.id,
+          );
         },
-        icon("file"),
-        el("span", { className: "btn-text" }, " Files"),
-      );
-      insertNavButton(filesBtn);
-    }
+      },
+      icon("file"),
+      el("span", { className: "btn-text" }, " Files"),
+    );
+    insertNavButton(filesBtn);
   }
 
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
   const ls = series.targets;
   const targetLangs = ls.map((t) => ({
     lang: t.language,
@@ -993,8 +992,7 @@ function configureMovieHeader(m: MovieDetail): void {
 
 /** Add the History nav button (idempotent). */
 function addMovieHistoryButton(m: MovieDetail): void {
-  const headerEl = document.querySelector("#coveragePanel .card-head");
-  if (!headerEl || headerEl.querySelector('[data-nav="hist"]')) {
+  if (libraryPanel().head.querySelector('[data-nav="hist"]')) {
     return;
   }
   const histBtn = el(
@@ -1047,7 +1045,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
   }
   enterMovieDetail(m);
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
 
   const timing = skeletonTiming(
     () => {
@@ -1095,7 +1093,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
 function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   const { subs, historyIDs } = reads;
   const targets = m.targets;
-  const out = $.coverageContent;
+  const out = libraryPanel().content;
 
   if (historyIDs.length > 0) {
     addMovieHistoryButton(m);
@@ -1103,47 +1101,45 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
 
   // Collect all external subtitles for the sync button.
   const extSubs = subs.filter((s) => s.source !== EMBEDDED_PROVIDER);
-  const headerEl = document.querySelector("#coveragePanel .card-head");
-  if (headerEl) {
-    // Replace, not append: a same-movie refresh re-runs this with fresh rows.
-    headerEl.querySelector('[data-nav="sync"]')?.remove();
-    const firstExtSub = extSubs[0];
-    if (extSubs.length > 0 && firstExtSub) {
-      const syncBtn = el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          "data-nav": "sync",
-          "data-tip": "Adjust subtitle timing",
-          onclick: () => {
-            openSyncDialog(extSubs, "movie", m.id, m.title);
-          },
+  const headerEl = libraryPanel().head;
+  // Replace, not append: a same-movie refresh re-runs this with fresh rows.
+  headerEl.querySelector('[data-nav="sync"]')?.remove();
+  const firstExtSub = extSubs[0];
+  if (extSubs.length > 0 && firstExtSub) {
+    const syncBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "ghost",
+        "data-nav": "sync",
+        "data-tip": "Adjust subtitle timing",
+        onclick: () => {
+          openSyncDialog(extSubs, "movie", m.id, m.title);
         },
-        icon("sync"),
-        el("span", { className: "btn-text" }, " Sync"),
-      );
-      insertNavButton(syncBtn);
-    }
+      },
+      icon("sync"),
+      el("span", { className: "btn-text" }, " Sync"),
+    );
+    insertNavButton(syncBtn);
+  }
 
-    headerEl.querySelector('[data-nav="files"]')?.remove();
-    if (extSubs.length > 0 && store.get("isAdmin")) {
-      const filesBtn = el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          "data-nav": "files",
-          "data-tip": "Manage subtitle files",
-          onclick: () => {
-            openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
-          },
+  headerEl.querySelector('[data-nav="files"]')?.remove();
+  if (extSubs.length > 0 && store.get("isAdmin")) {
+    const filesBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "ghost",
+        "data-nav": "files",
+        "data-tip": "Manage subtitle files",
+        onclick: () => {
+          openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
         },
-        icon("file"),
-        el("span", { className: "btn-text" }, " Files"),
-      );
-      insertNavButton(filesBtn);
-    }
+      },
+      icon("file"),
+      el("span", { className: "btn-text" }, " Files"),
+    );
+    insertNavButton(filesBtn);
   }
 
   if (targets.length === 0) {

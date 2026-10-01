@@ -20,8 +20,9 @@ import type { StructuredConfig } from "./wire/types.gen.js";
 import { apiAction, bindLoadingState, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
-import { YAML_TIMEOUT_MS, CONFIG_BANNER_ID } from "./constants.js";
+import { YAML_TIMEOUT_MS } from "./constants.js";
 import { setCfgSections, cfgSectionEntries, cfgValue } from "./config-values.js";
+import { configBanner, configBannerHost } from "./config-banner.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
 import { renderProvidersSection, genProviders } from "./config-providers.js";
@@ -305,14 +306,15 @@ function renderConfigForm(): void {
   const frag = document.createDocumentFragment();
   const rendered = new Set<string>();
 
-  // The form's one error slot, rendered hidden and reused. Every error on this
-  // surface reports at the top of the form, so the credential-check controls
-  // scattered through the sections have somewhere to put a failure without
-  // inventing a second visual language; .cfg-banner is already err-tinted with
-  // an err border, which is what the notices below borrow it for.
-  frag.appendChild(
-    el("div", { id: CONFIG_BANNER_ID, className: "cfg-banner", role: "alert", hidden: true }),
-  );
+  // The form's one error slot: config-banner.ts's permanent live region, whose
+  // message child carries .cfg-banner. Every error on this surface reports at
+  // the top of the form, so the credential-check controls scattered through the
+  // sections have somewhere to put a failure without inventing a second visual
+  // language; .cfg-banner is already err-tinted with an err border, which is
+  // what the notices below borrow it for. The host is module-held and re-seated
+  // into every render, so a verdict from the previous open is cleared first.
+  configBanner.hide();
+  frag.appendChild(configBannerHost);
 
   // Show setup banner only for first-time setup (no config file).
   if (isFirstSetup) {

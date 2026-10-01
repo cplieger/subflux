@@ -78,9 +78,13 @@ type qhMockStore struct {
 	attempts   int
 }
 
-func (m *qhMockStore) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+func (m *qhMockStore) State(_ context.Context, q *subflux.StateQuery) (subflux.StatePage, error) {
 	m.stateLimit = q.Limit
-	return m.state, m.stateErr
+	entries := m.state
+	if entries == nil {
+		entries = []subflux.StateEntry{}
+	}
+	return subflux.StatePage{Entries: entries, UnfilteredTotal: len(entries)}, m.stateErr
 }
 
 func (m *qhMockStore) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {

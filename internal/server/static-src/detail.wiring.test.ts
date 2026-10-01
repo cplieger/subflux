@@ -137,7 +137,7 @@ import { openSearchPopup } from "./search.js";
 import { confirmSeasonSync } from "./sync.js";
 import { seasonScopeKey } from "./scan-scope.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
-import { contentView } from "./view-scope.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -235,10 +235,6 @@ async function flush(): Promise<void> {
   }
 }
 
-const PANEL_HTML =
-  '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-  '<div id="coverageContent"></div></div>';
-
 function resetEnv(): void {
   storeState.ignoredCodecs = new Set<string>();
   storeState.isAdmin = false;
@@ -252,8 +248,8 @@ function resetEnv(): void {
   clientState.pendingSeasons = [];
   clientState.pendingStateIDs = [];
   history.replaceState(null, "", "/");
-  document.body.innerHTML = PANEL_HTML;
-  contentView.clear();
+  _resetPanelsForTest();
+  document.body.replaceChildren(libraryPanel().root);
   scanReg.live = [];
 }
 

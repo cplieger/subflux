@@ -2,6 +2,7 @@ package boltstore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -166,6 +167,60 @@ func TestQuery_RecentlyScanned_inclusiveCutoff(t *testing.T) {
 	}
 	if got["excluded"] {
 		t.Error("RecentlyScanned: 'excluded' (before cutoff) should not be present")
+	}
+}
+
+// TestState_unfilteredTotalExceedsACappedPage asserts UnfilteredTotal counts
+// every row the store holds even when the page's own Limit truncates Entries
+// below it. Reading the counter with the page's limit applied, or reporting
+// len(Entries), is indistinguishable from a correct implementation on any
+// uncapped read, so the capped read is what separates them.
+func TestState_unfilteredTotalExceedsACappedPage(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := t.Context()
+
+	const total = 5
+	const pageLimit = total - 2
+	base := time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC)
+	for i := range total {
+		putStateRow(t, db, subflux.MediaTypeMovie, "m-cap-"+itoa(i), "en",
+			stateRec{Title: "Capped", MediaImported: base.Add(time.Duration(i) * time.Hour)})
+	}
+
+	page, err := db.State(ctx, &subflux.StateQuery{Limit: pageLimit})
+	if err != nil {
+		t.Fatalf("State(limit=%d): %v", pageLimit, err)
+	}
+	if len(page.Entries) != pageLimit {
+		t.Errorf("State(limit=%d) returned %d rows, want %d", pageLimit, len(page.Entries), pageLimit)
+	}
+	if page.UnfilteredTotal != total {
+		t.Errorf("State(limit=%d).UnfilteredTotal = %d, want %d (the page's limit must not reach the counter)",
+			pageLimit, page.UnfilteredTotal, total)
+	}
+}
+
+// TestState_zeroRowPageMarshalsAnEmptyArray asserts the marshalled zero-row
+// page carries "entries":[] and never "entries":null. It is pinned here, over
+// the real page, because every handler marshals whatever its store hands it, so
+// a nil produced by the store is invisible over a fake — and the readers that
+// would notice are the CLI, which prints this body verbatim, and the functional
+// suite.
+func TestState_zeroRowPageMarshalsAnEmptyArray(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := t.Context()
+
+	page, err := db.State(ctx, &subflux.StateQuery{})
+	if err != nil {
+		t.Fatalf("State(empty store): %v", err)
+	}
+	b, err := json.Marshal(page)
+	if err != nil {
+		t.Fatalf("json.Marshal(page): %v", err)
+	}
+	const want = `{"entries":[],"unfiltered_total":0}`
+	if string(b) != want {
+		t.Errorf("json.Marshal(State(empty store)) = %s, want %s", b, want)
 	}
 }
 
@@ -341,18 +396,18 @@ func TestReconcileConvergence(t *testing.T) {
 	}
 
 	// Both should have the same number of rows (4 auto rows reset in place).
-	if len(stateA) != len(stateB) {
-		t.Errorf("convergence: stateA has %d rows, stateB has %d rows", len(stateA), len(stateB))
+	if len(stateA.Entries) != len(stateB.Entries) {
+		t.Errorf("convergence: stateA has %d rows, stateB has %d rows", len(stateA.Entries), len(stateB.Entries))
 	}
 
 	// Every row in both should have the "reset" shape: empty path, score=0,
 	// empty provider, empty release.
-	for i, s := range stateA {
+	for i, s := range stateA.Entries {
 		if s.Path != "" || s.Score != 0 {
 			t.Errorf("stateA[%d] not reset: path=%q score=%d", i, s.Path, s.Score)
 		}
 	}
-	for i, s := range stateB {
+	for i, s := range stateB.Entries {
 		if s.Path != "" || s.Score != 0 {
 			t.Errorf("stateB[%d] not reset: path=%q score=%d", i, s.Path, s.Score)
 		}

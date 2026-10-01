@@ -304,8 +304,8 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(all): %v", err)
 	}
-	if len(all) != 4 {
-		t.Errorf("unfiltered count = %d, want 4", len(all))
+	if len(all.Entries) != 4 {
+		t.Errorf("unfiltered count = %d, want 4", len(all.Entries))
 	}
 
 	// MediaType filter.
@@ -313,10 +313,10 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(type): %v", err)
 	}
-	if len(eps) != 2 {
-		t.Errorf("type=episode count = %d, want 2", len(eps))
+	if len(eps.Entries) != 2 {
+		t.Errorf("type=episode count = %d, want 2", len(eps.Entries))
 	}
-	for _, e := range eps {
+	for _, e := range eps.Entries {
 		if e.MediaType != subflux.MediaTypeEpisode {
 			t.Errorf("type filter leaked %s", e.MediaType)
 		}
@@ -327,10 +327,10 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(lang): %v", err)
 	}
-	if len(fr) != 2 {
-		t.Errorf("lang=fr count = %d, want 2", len(fr))
+	if len(fr.Entries) != 2 {
+		t.Errorf("lang=fr count = %d, want 2", len(fr.Entries))
 	}
-	for _, e := range fr {
+	for _, e := range fr.Entries {
 		if e.Language != "fr" {
 			t.Errorf("lang filter leaked %s", e.Language)
 		}
@@ -341,10 +341,10 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(provider): %v", err)
 	}
-	if len(sd) != 2 {
-		t.Errorf("provider=subdl count = %d, want 2", len(sd))
+	if len(sd.Entries) != 2 {
+		t.Errorf("provider=subdl count = %d, want 2", len(sd.Entries))
 	}
-	for _, e := range sd {
+	for _, e := range sd.Entries {
 		if e.Provider != subflux.ProviderNameSubDL {
 			t.Errorf("provider filter leaked %s", e.Provider)
 		}
@@ -357,8 +357,8 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(combo): %v", err)
 	}
-	if len(combo) != 1 || combo[0].MediaID != "mv-fr-sd" {
-		t.Errorf("combined filter = %+v, want exactly the mv-fr-sd row", combo)
+	if len(combo.Entries) != 1 || combo.Entries[0].MediaID != "mv-fr-sd" {
+		t.Errorf("combined filter = %+v, want exactly the mv-fr-sd row", combo.Entries)
 	}
 }
 
@@ -398,11 +398,11 @@ func TestGetState_titleSearchTreatsWildcardsLiterally(t *testing.T) {
 			if err != nil {
 				t.Fatalf("State(search=%q): %v", c.search, err)
 			}
-			if len(got) != len(c.wantMIDs) {
+			if len(got.Entries) != len(c.wantMIDs) {
 				t.Fatalf("search %q matched %d rows %v, want %d %v",
-					c.search, len(got), stateMIDs(got), len(c.wantMIDs), c.wantMIDs)
+					c.search, len(got.Entries), stateMIDs(got.Entries), len(c.wantMIDs), c.wantMIDs)
 			}
-			for _, e := range got {
+			for _, e := range got.Entries {
 				if !c.wantMIDs[e.MediaID] {
 					t.Errorf("search %q unexpectedly matched %q (%q)", c.search, e.MediaID, e.Title)
 				}
@@ -459,8 +459,8 @@ func TestGetState_defaultThousandRowCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
-	if len(got) != defaultQueryLimit {
-		t.Errorf("unlimited query returned %d rows, want the %d default cap", len(got), defaultQueryLimit)
+	if len(got.Entries) != defaultQueryLimit {
+		t.Errorf("unlimited query returned %d rows, want the %d default cap", len(got.Entries), defaultQueryLimit)
 	}
 }
 
@@ -502,7 +502,7 @@ func TestGetState_orderingMediaImportedDescThenIDDesc(t *testing.T) {
 		t.Fatalf("State: %v", err)
 	}
 	want := []int64{idA, idC, idB} // t2 first; then t1 tie broken by id DESC
-	if gotIDs := stateIDs(got); !equalIDs(gotIDs, want) {
+	if gotIDs := stateIDs(got.Entries); !equalIDs(gotIDs, want) {
 		t.Errorf("order = %v, want %v (media_imported DESC, id DESC; tie %d>%d)", gotIDs, want, idC, idB)
 	}
 }
@@ -529,8 +529,8 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(page1): %v", err)
 	}
-	if want := fullDesc[0:2]; !equalIDs(stateIDs(p1), want) {
-		t.Errorf("page1 = %v, want %v", stateIDs(p1), want)
+	if want := fullDesc[0:2]; !equalIDs(stateIDs(p1.Entries), want) {
+		t.Errorf("page1 = %v, want %v", stateIDs(p1.Entries), want)
 	}
 
 	// Shallow page 2.
@@ -538,8 +538,8 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(page2): %v", err)
 	}
-	if want := fullDesc[2:4]; !equalIDs(stateIDs(p2), want) {
-		t.Errorf("page2 = %v, want %v", stateIDs(p2), want)
+	if want := fullDesc[2:4]; !equalIDs(stateIDs(p2.Entries), want) {
+		t.Errorf("page2 = %v, want %v", stateIDs(p2.Entries), want)
 	}
 
 	// Deep page: offset past the shallow pages returns the tail only.
@@ -547,8 +547,8 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(deep): %v", err)
 	}
-	if want := fullDesc[4:5]; !equalIDs(stateIDs(deep), want) {
-		t.Errorf("deep page = %v, want %v", stateIDs(deep), want)
+	if want := fullDesc[4:5]; !equalIDs(stateIDs(deep.Entries), want) {
+		t.Errorf("deep page = %v, want %v", stateIDs(deep.Entries), want)
 	}
 
 	// Offset beyond the end returns nothing.
@@ -556,8 +556,8 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("State(beyond): %v", err)
 	}
-	if len(empty) != 0 {
-		t.Errorf("offset beyond end = %v, want empty", stateIDs(empty))
+	if len(empty.Entries) != 0 {
+		t.Errorf("offset beyond end = %v, want empty", stateIDs(empty.Entries))
 	}
 }
 

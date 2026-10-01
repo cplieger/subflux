@@ -5,7 +5,7 @@ import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { providerTimeouts } from "./wire/client.gen.js";
 import { cfgProviderBlock, scalarString } from "./config-values.js";
 import { mountConnTest } from "./conn-test.js";
-import { CONFIG_BANNER_ID } from "./constants.js";
+import { configBanner } from "./config-banner.js";
 import type { ProviderSchema, SchemaField, SchemaSection } from "./api-types.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
 
@@ -165,7 +165,7 @@ function appendProviderConnTest(card: HTMLElement, prov: ProviderSchema): void {
   }
   const head = card.querySelector(".provider-head");
   if (head) {
-    mountConnTest(head, prov.name, { inputs, bannerId: CONFIG_BANNER_ID });
+    mountConnTest(head, prov.name, { inputs, banner: configBanner });
   }
 }
 

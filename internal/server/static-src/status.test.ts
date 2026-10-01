@@ -71,21 +71,32 @@ vi.mock("./wire/client.gen.js", () => ({
   PATH_DISMISS_ACTIVITY: "/api/activity",
   PATH_DISMISS_ALERT: "/api/alerts",
 }));
-// The status popover fake reports open so poll runs paint the popup; plain
+// The status popover fake. `isOpen` is read live off this state, so a case
+// opens the panel the way a click does (the harness boots it closed); plain
 // functions keep it reset-proof. onOpen is never fired, so the skeleton
 // anti-flicker path stays disarmed and paints are synchronous.
+const popover = vi.hoisted(() => ({ isOpen: false }));
+
 vi.mock("./popover-menu.js", () => ({
   createMenuPopover: () => ({
     toggle: () => undefined,
     hide: () => undefined,
-    isOpen: true,
+    get isOpen(): boolean {
+      return popover.isOpen;
+    },
     reposition: () => undefined,
     dispose: () => undefined,
   }),
 }));
 
 import * as store from "./store.js";
-import { buildActivityItem, streamDegraded, type StreamTransition } from "./status.js";
+import {
+  buildActivityItem,
+  streamDegraded,
+  initStatusPopover as staticInitStatusPopover,
+  _statusPanelForTest as staticStatusPanel,
+  type StreamTransition,
+} from "./status.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
@@ -146,6 +157,24 @@ function providersRes(providers: Record<string, ProviderStatus>): ProvidersRespo
 // to the fields under test.
 function configWithProviders(providers: Record<string, boolean>): ParsedConfig {
   return { providers } as unknown as ParsedConfig;
+}
+
+/** status.ts builds its popup panel in initStatusPopover() and holds it, and the
+ *  library appends it only on a real first show -- so it is detached in this suite
+ *  and every read of popup content goes through it rather than through the document. */
+let statusPanel: HTMLElement | null = null;
+
+function panel(): HTMLElement {
+  if (statusPanel === null) {
+    throw new Error("status panel not captured");
+  }
+  return statusPanel;
+}
+
+/** Report the popup open, the way the primitive does once the button is
+ *  clicked. The panel exists either way; only what a poll paints changes. */
+function openPopup(): void {
+  popover.isOpen = true;
 }
 
 /** The status button, or a hard failure if the harness DOM is missing. */
@@ -210,7 +239,11 @@ describe("status: buildActivityItem terminal renders", () => {
 
 describe("status: stop control", () => {
   beforeEach(() => {
-    document.body.innerHTML = "";
+    // requestStopScan overlays the row inside the module's own panel, which is
+    // where production paints it, so these cases mount there rather than in the
+    // body — and initStatusPopover is what builds that panel.
+    document.body.innerHTML = '<button id="statusBtn"></button>';
+    staticInitStatusPopover();
     store.set("isAdmin", false);
     dispatchers.get("activity.cancel")?.mockClear();
     dispatchers.get("activity.cancel")?.mockResolvedValue(undefined);
@@ -239,7 +272,7 @@ describe("status: stop control", () => {
   it("clicking stop dispatches the cancel action and enters the optimistic stopping state", async () => {
     const e = entry({ id: "s1", cancellable: true, kind: "movie", media_id: 7 });
     const item = buildActivityItem(e);
-    document.body.appendChild(item);
+    staticStatusPanel().appendChild(item);
 
     const btn = item.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]');
     expect(btn).not.toBeNull();
@@ -262,7 +295,7 @@ describe("status: stop control", () => {
     dispatchers.get("activity.cancel")?.mockResolvedValue(null);
     const e = entry({ id: "s2", cancellable: true, kind: "series", media_id: 9 });
     const item = buildActivityItem(e);
-    document.body.appendChild(item);
+    staticStatusPanel().appendChild(item);
 
     item.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')?.click();
     await flush();
@@ -436,9 +469,10 @@ interface PollHarness {
 let bootCount = 0;
 async function freshPollHarness(): Promise<PollHarness> {
   vi.resetModules();
+  popover.isOpen = false;
   document.body.innerHTML =
     '<button id="statusBtn"><span class="nav-label"></span></button>' +
-    '<span id="statusIcon"></span><div id="statusPopup"></div>';
+    '<span id="statusIcon"></span>';
   const st = await import("./store.js");
   st.set("isUnconfigured", true);
   st.set("isAdmin", false);
@@ -446,6 +480,8 @@ async function freshPollHarness(): Promise<PollHarness> {
   const status = (await import(
     /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
   )) as typeof StatusModule;
+  status.initStatusPopover();
+  statusPanel = status._statusPanelForTest();
   const run = actionRuns.get("status.poll");
   if (!run) {
     throw new Error("status.poll run not captured");
@@ -515,15 +551,15 @@ describe("status: dismissActivity success and rollback", () => {
 
   beforeEach(async () => {
     h = await freshPollHarness();
-    // The fake popover reports open, so poll runs paint activity rows into
-    // #statusPopup and the dismiss buttons are clickable.
-    h.status.initStatusPopover();
+    // The fake popover reports open, so poll runs paint activity rows into the
+    // module's panel and the dismiss buttons are clickable.
+    openPopup();
   });
 
   it("keeps the row hidden when the server dismissal succeeds", async () => {
     const done = entry({ id: "x1", done: true, ended_at: "2026-07-19T10:05:00Z" });
     await h.runPoll([done]);
-    const row = document.querySelector('[data-act-id="x1"]');
+    const row = panel().querySelector('[data-act-id="x1"]');
     expect(row).not.toBeNull();
 
     dispatchers.get("activity.dismiss")?.mockResolvedValue(undefined);
@@ -535,7 +571,7 @@ describe("status: dismissActivity success and rollback", () => {
     // even while the server still reports the entry.
     expect(dispatchers.get("status.poll")).not.toHaveBeenCalled();
     await h.runPoll([done]);
-    expect(document.querySelector('[data-act-id="x1"]')).toBeNull();
+    expect(panel().querySelector('[data-act-id="x1"]')).toBeNull();
   });
 
   it("rolls back the optimistic hide and repolls when the dismissal fails", async () => {
@@ -544,7 +580,7 @@ describe("status: dismissActivity success and rollback", () => {
 
     // Terminal failure (retries exhausted): the action resolves null.
     dispatchers.get("activity.dismiss")?.mockResolvedValue(null);
-    document
+    panel()
       .querySelector('[data-act-id="y1"]')
       ?.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')
       ?.click();
@@ -554,7 +590,7 @@ describe("status: dismissActivity success and rollback", () => {
     expect(dispatchers.get("status.poll")).toHaveBeenCalled();
     // …and the id left the dismissed set: the row renders again.
     await h.runPoll([done]);
-    expect(document.querySelector('[data-act-id="y1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="y1"]')).not.toBeNull();
   });
 
   it("surfaces the framework error notification for failed dismissals", () => {
@@ -610,34 +646,30 @@ describe("status: unreachable server", () => {
   });
 
   it("leaves a closed popup untouched when the server is unreachable", async () => {
-    const popup = document.getElementById("statusPopup");
-    popup?.appendChild(document.createElement("hr"));
+    const popup = panel();
+    popup.appendChild(document.createElement("hr"));
     await h.runPollWith({ alerts: { ok: false, status: 0 } });
-    expect(popup?.querySelector("hr")).not.toBeNull();
+    expect(popup.querySelector("hr")).not.toBeNull();
   });
 
   it("replaces an open popup's content with the unreachable-server row", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     await h.runPollWith({ alerts: { ok: false, status: 0 } });
-    const row = document.querySelector("#statusPopup .pop-item.muted");
+    const row = panel().querySelector(".pop-item.muted");
     expect(row?.textContent).toContain("Server unreachable");
   });
 
   it("sweeps the unreachable-server row once the server answers again", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     await h.runPollWith({ activities: [entry({ id: "o1", detail: "scanning" })] });
 
     await h.runPollWith({ alerts: { ok: false, status: 0 } });
-    expect(document.querySelector("#statusPopup .pop-item.muted")?.textContent).toContain(
-      "Server unreachable",
-    );
+    expect(panel().querySelector(".pop-item.muted")?.textContent).toContain("Server unreachable");
 
     // The recovered paint reconciles, and reconcile removes only children it
     // keyed — so an unkeyed notice would sit above the rows forever.
     await h.runPollWith({ activities: [entry({ id: "o1", detail: "scanning again" })] });
-    expect(
-      [...document.querySelectorAll("#statusPopup > *")].map((n) => n.getAttribute("data-act-id")),
-    ).toEqual(["o1"]);
+    expect([...panel().children].map((n) => n.getAttribute("data-act-id"))).toEqual(["o1"]);
   });
 });
 
@@ -646,7 +678,7 @@ describe("status: popup controls after a repeat poll re-patched their row", () =
 
   beforeEach(async () => {
     h = await freshPollHarness();
-    h.status.initStatusPopover();
+    openPopup();
     for (const name of ["activity.cancel", "activity.dismiss", "alerts.dismiss"]) {
       dispatchers.get(name)?.mockClear();
       dispatchers.get(name)?.mockResolvedValue(undefined);
@@ -654,7 +686,7 @@ describe("status: popup controls after a repeat poll re-patched their row", () =
   });
 
   function actRow(id: string): HTMLElement {
-    const row = document.querySelector<HTMLElement>(`#statusPopup [data-act-id="${id}"]`);
+    const row = panel().querySelector<HTMLElement>(`[data-act-id="${id}"]`);
     if (!row) {
       throw new Error(`no activity row ${id}`);
     }
@@ -704,13 +736,13 @@ describe("status: popup controls after a repeat poll re-patched their row", () =
   it("keeps an alert's dismiss button hiding the live row", async () => {
     const a = alertEntry({ id: 7, message: "provider down" });
     await h.runPollWith({ alerts: { ok: true, status: 200, data: [a] } });
-    const first = document.querySelector("#statusPopup .pop-item");
+    const first = panel().querySelector(".pop-item");
     expect(first?.textContent).toContain("provider down");
 
     await h.runPollWith({
       alerts: { ok: true, status: 200, data: [alertEntry({ ...a, level: "error" })] },
     });
-    const row = document.querySelector("#statusPopup .pop-item");
+    const row = panel().querySelector(".pop-item");
     expect(row).toBe(first);
 
     const dismiss = row?.querySelector<HTMLButtonElement>("button.pop-dismiss");
@@ -820,7 +852,7 @@ describe("status: what the poll fetches", () => {
   });
 
   it("an unconfigured server is asked for neither provider health nor stats", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     await h.runPollWith({});
     expect(wire.providerTimeouts).not.toHaveBeenCalled();
     expect(wire.stateStats).not.toHaveBeenCalled();
@@ -835,7 +867,7 @@ describe("status: what the poll fetches", () => {
 
   it("an open popup fetches both", async () => {
     h.store.set("isUnconfigured", false);
-    h.status.initStatusPopover();
+    openPopup();
     await h.runPollWith({});
     expect(wire.providerTimeouts).toHaveBeenCalled();
     expect(wire.stateStats).toHaveBeenCalled();
@@ -844,7 +876,7 @@ describe("status: what the poll fetches", () => {
   it("a closed popup is never painted", async () => {
     h.store.set("isUnconfigured", false);
     await h.runPollWith({ activities: [entry({ id: "r1" })] });
-    expect(document.getElementById("statusPopup")?.childElementCount).toBe(0);
+    expect(panel().childElementCount).toBe(0);
   });
 });
 
@@ -904,11 +936,11 @@ describe("status: poll side effects", () => {
   });
 
   it("keeps the optimistic stopping overlay while the scan is still running", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     dispatchers.get("activity.cancel")?.mockResolvedValue(undefined);
     const running = entry({ id: "st1", cancellable: true, kind: "series", media_id: 3 });
     await h.runPollWith({ activities: [running] });
-    document
+    panel()
       .querySelector('[data-act-id="st1"]')
       ?.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')
       ?.click();
@@ -922,11 +954,11 @@ describe("status: poll side effects", () => {
   });
 
   it("drops the stopping overlay once the entry stops running", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     dispatchers.get("activity.cancel")?.mockResolvedValue(undefined);
     const running = entry({ id: "st2", cancellable: true, kind: "series", media_id: 4 });
     await h.runPollWith({ activities: [running] });
-    document
+    panel()
       .querySelector('[data-act-id="st2"]')
       ?.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')
       ?.click();
@@ -951,7 +983,7 @@ describe("status: popup content", () => {
     h = await freshPollHarness();
     h.store.set("isUnconfigured", false);
     h.store.set("config", null);
-    h.status.initStatusPopover();
+    openPopup();
   });
 
   afterEach(() => {
@@ -959,15 +991,15 @@ describe("status: popup content", () => {
   });
 
   function popupRows(): string[] {
-    return [...document.querySelectorAll("#statusPopup > *")].map((n) => n.textContent ?? "");
+    return [...panel().children].map((n) => n.textContent ?? "");
   }
 
   function header(): Element | null {
-    return document.querySelector("#statusPopup .pop-header");
+    return panel().querySelector(".pop-header");
   }
 
   function mutedRow(): Element | null {
-    return document.querySelector("#statusPopup .pop-item.muted");
+    return panel().querySelector(".pop-item.muted");
   }
 
   it("summarises media, downloads and missing counts in one header row", async () => {
@@ -1016,12 +1048,12 @@ describe("status: popup content", () => {
   it("keys activity rows so a repeat poll reuses the mounted node", async () => {
     const running = entry({ id: "a1", detail: "Scanning A" });
     await h.runPollWith({ activities: [running] });
-    const first = document.querySelector('[data-act-id="a1"]');
+    const first = panel().querySelector('[data-act-id="a1"]');
     expect(first).not.toBeNull();
 
     await h.runPollWith({ activities: [running] });
 
-    expect(document.querySelector('[data-act-id="a1"]')).toBe(first);
+    expect(panel().querySelector('[data-act-id="a1"]')).toBe(first);
   });
 
   it("hides manual search and manual download activities from the popup", async () => {
@@ -1032,9 +1064,9 @@ describe("status: popup content", () => {
         entry({ id: "s1", action: "Series Search" }),
       ],
     });
-    expect(document.querySelector('[data-act-id="m1"]')).toBeNull();
-    expect(document.querySelector('[data-act-id="m2"]')).toBeNull();
-    expect(document.querySelector('[data-act-id="s1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="m1"]')).toBeNull();
+    expect(panel().querySelector('[data-act-id="m2"]')).toBeNull();
+    expect(panel().querySelector('[data-act-id="s1"]')).not.toBeNull();
   });
 
   it("renders one warning row per timed-out provider carrying its last error", async () => {
@@ -1049,8 +1081,8 @@ describe("status: popup content", () => {
         gestdown: { timed_out: false, recent_failures: 0, threshold: 5 },
       }),
     });
-    expect(document.querySelectorAll("#statusPopup .pop-item").length).toBe(1);
-    const row = document.querySelector("#statusPopup .pop-item");
+    expect(panel().querySelectorAll(".pop-item").length).toBe(1);
+    const row = panel().querySelector(".pop-item");
     expect(row?.textContent).toBe("subdl: 429 too many requests");
     expect(row?.querySelector(".level-warn")?.textContent).toBe("subdl: ");
   });
@@ -1069,7 +1101,7 @@ describe("status: popup content", () => {
     await h.runPollWith({
       providers: providersRes({ subdl: { timed_out: true, recent_failures: 4, threshold: 5 } }),
     });
-    expect(document.querySelector("#statusPopup .pop-item")?.textContent).toBe("subdl: 4 failures");
+    expect(panel().querySelector(".pop-item")?.textContent).toBe("subdl: 4 failures");
   });
 
   it("renders a transient alert with its level, message and dismiss control", async () => {
@@ -1080,7 +1112,7 @@ describe("status: popup content", () => {
         data: [alertEntry({ id: 7, message: "disk almost full", source: "scanner" })],
       },
     });
-    const row = document.querySelector("#statusPopup .pop-item");
+    const row = panel().querySelector(".pop-item");
     expect(row?.querySelector(".level-warn")?.textContent).toBe("[warn]");
     expect(row?.textContent).toContain("disk almost full");
     expect(row?.querySelector('button[aria-label="Dismiss alert"]')).not.toBeNull();
@@ -1102,7 +1134,7 @@ describe("status: popup content", () => {
         ],
       },
     });
-    const row = document.querySelector("#statusPopup .pop-item.persistent");
+    const row = panel().querySelector(".pop-item.persistent");
     expect(row?.querySelector(".level-warn")?.textContent).toBe("[config]");
     expect(row?.textContent).toContain("no providers enabled");
     expect(row?.querySelector(".pop-time")).not.toBeNull();
@@ -1225,7 +1257,7 @@ describe("status: identity-stable renders (task 13)", () => {
 
   beforeEach(async () => {
     h = await freshPollHarness();
-    h.status.initStatusPopover();
+    openPopup();
   });
 
   it("an unchanged poll mutates nothing in the DOM", async () => {
@@ -1239,18 +1271,22 @@ describe("status: identity-stable renders (task 13)", () => {
       alerts: { ok: true, status: 200, data: [alertEntry({ id: 3 })] },
     };
     await h.runPollWith(snapshot);
-    expect(document.querySelector('[data-act-id="s1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="s1"]')).not.toBeNull();
 
     // Records delivered mid-poll (each await is a microtask turn) land in the
     // callback; drain the queue at the end for the rest.
     const seen: MutationRecord[] = [];
     const mo = new MutationObserver((records) => seen.push(...records));
-    mo.observe(document.documentElement, {
+    // Both halves of what the poll paints: the header chrome in the document,
+    // and the popup panel, which is detached until the library shows it.
+    const opts = {
       subtree: true,
       childList: true,
       attributes: true,
       characterData: true,
-    });
+    };
+    mo.observe(document.documentElement, opts);
+    mo.observe(panel(), opts);
     await h.runPollWith(snapshot);
     seen.push(...mo.takeRecords());
     mo.disconnect();
@@ -1260,7 +1296,7 @@ describe("status: identity-stable renders (task 13)", () => {
 
   it("a running→done transition updates the open popup row in place (R7.2)", async () => {
     await h.runPoll([entry({ id: "u1", detail: "Scanning X" })]);
-    const row = document.querySelector('[data-act-id="u1"]');
+    const row = panel().querySelector('[data-act-id="u1"]');
     expect(row).not.toBeNull();
     expect(row?.querySelector(".act-active .spinner")).not.toBeNull();
 
@@ -1274,7 +1310,7 @@ describe("status: identity-stable renders (task 13)", () => {
       }),
     });
 
-    const after = document.querySelector('[data-act-id="u1"]');
+    const after = panel().querySelector('[data-act-id="u1"]');
     expect(after).toBe(row);
     expect(after?.classList.contains("pop-done")).toBe(true);
     expect(after?.querySelector(".act-done")).not.toBeNull();
@@ -1328,7 +1364,7 @@ describe("status: activity dismissal animation", () => {
 
   beforeEach(async () => {
     h = await freshPollHarness();
-    h.status.initStatusPopover();
+    openPopup();
     dispatchers.get("activity.dismiss")?.mockResolvedValue(undefined);
   });
 
@@ -1340,7 +1376,7 @@ describe("status: activity dismissal animation", () => {
     await h.runPollWith({
       activities: [entry({ id, done: true, ended_at: "2026-07-19T10:01:00Z" })],
     });
-    const row = document.querySelector(`[data-act-id="${id}"]`);
+    const row = panel().querySelector(`[data-act-id="${id}"]`);
     if (!row) {
       throw new Error(`row ${id} not rendered`);
     }
@@ -1352,21 +1388,21 @@ describe("status: activity dismissal animation", () => {
     const row = await dismissRow("z1");
     expect(row.querySelector<HTMLButtonElement>(".close-btn")?.disabled).toBe(true);
     expect(row.classList.contains("pop-dismissing")).toBe(true);
-    expect(row.isConnected).toBe(true);
+    expect(panel().contains(row)).toBe(true);
 
     row.dispatchEvent(new Event("transitionend"));
 
-    expect(row.isConnected).toBe(false);
+    expect(panel().contains(row)).toBe(false);
   });
 
   it("removes the row on the fallback timer when no transition ever fires", async () => {
     vi.useFakeTimers();
     const row = await dismissRow("z2");
-    expect(row.isConnected).toBe(true);
+    expect(panel().contains(row)).toBe(true);
 
     vi.advanceTimersByTime(300);
 
-    expect(row.isConnected).toBe(false);
+    expect(panel().contains(row)).toBe(false);
   });
 });
 
@@ -1375,12 +1411,12 @@ describe("status: alert dismissal", () => {
 
   beforeEach(async () => {
     h = await freshPollHarness();
-    h.status.initStatusPopover();
+    openPopup();
   });
 
   async function alertRow(): Promise<Element> {
     await h.runPollWith({ alerts: { ok: true, status: 200, data: [alertEntry({ id: 7 })] } });
-    const row = document.querySelector("#statusPopup .pop-item");
+    const row = panel().querySelector(".pop-item");
     if (!row) {
       throw new Error("alert row not rendered");
     }
@@ -1635,12 +1671,12 @@ describe("status: event-fed store", () => {
   });
 
   it("events repaint an open popup", () => {
-    h.status.initStatusPopover();
+    openPopup();
     h.status.applyActivityEvent({
       op: "upsert",
       entry: entry({ id: "pv1", detail: "Scanning X" }),
     });
-    expect(document.querySelector('[data-act-id="pv1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="pv1"]')).not.toBeNull();
   });
 
   it("a terminal activity event toasts once seeded, and a replay does not re-toast", async () => {
@@ -1698,22 +1734,22 @@ describe("status: notification-set hygiene (F2)", () => {
   });
 
   it("an activity remove prunes the dismissed set: the id renders again on reappearance", async () => {
-    h.status.initStatusPopover();
+    openPopup();
     dispatchers.get("activity.dismiss")?.mockResolvedValue(undefined);
     const done = entry({ id: "d1", done: true, ended_at: "2026-07-19T10:01:00Z" });
     await h.runPoll([done]);
-    document
+    panel()
       .querySelector('[data-act-id="d1"]')
       ?.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')
       ?.click();
     await flush();
     await h.runPoll([done]);
-    expect(document.querySelector('[data-act-id="d1"]')).toBeNull(); // stays hidden
+    expect(panel().querySelector('[data-act-id="d1"]')).toBeNull(); // stays hidden
 
     h.status.applyActivityEvent({ op: "remove", entry: done });
     h.status.applyActivityEvent({ op: "upsert", entry: done });
 
-    expect(document.querySelector('[data-act-id="d1"]')).not.toBeNull();
+    expect(panel().querySelector('[data-act-id="d1"]')).not.toBeNull();
   });
 
   it("the toast memory respects its cap: dead ids are evicted, live ones never", async () => {

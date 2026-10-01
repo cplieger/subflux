@@ -20,10 +20,6 @@
   margin-block-end: var(--sp-5);
   gap: var(--sp-4);
 
-  &[hidden] {
-    display: none;
-  }
-
   & h2 {
     font-size: var(--text-lg);
     font-weight: 500;

@@ -1,4 +1,4 @@
-// One property of `@cplieger/reactive` that subflux code reasons from and the
+// Two properties of `@cplieger/reactive` that subflux code reasons from and the
 // library's own docs do not state. A DEPENDENCY contract: its subject is the
 // library, and its value is a version bump going red rather than a per-row throw
 // found later in the detail view.
@@ -12,13 +12,28 @@
 // element it found in the parent under that key — including one it ADOPTED
 // rather than mounted, which carries none of the cells `rowCell` requires.
 //
-// Behavioural, against the installed library: both cases drive a real `bindList`
-// and read what each `update` was handed. A row's own effect error is reported to
-// the effect error handler and the run continues, so a throw in a paint would not
-// fail a suite on its own either.
+// The second is `reconcile`'s identity guard, which `history.ts`'s panel render
+// relies on for correctness rather than for speed: that effect re-runs on every
+// landing, and a re-seat of a child already in place restarts the animations in
+// it and drops `:hover` and focus. The case here drives `reconcile` directly and
+// pins the library's property; `history.test.ts` pins the consequence a reader
+// feels, through the real panel. Neither subsumes the other.
+//
+// Behavioural, against the installed library: every case drives the real API and
+// reads what it did. A row's own effect error is reported to the effect error
+// handler and the run continues, so a throw in a paint would not fail a suite on
+// its own either.
 
 import { describe, it, expect } from "vitest";
-import { bindList, createCollection, el, KEY_ATTR, type ListSpec } from "@cplieger/reactive";
+import {
+  bindList,
+  createCollection,
+  el,
+  reconcile,
+  KEY_ATTR,
+  type ListSpec,
+  type ReconcileSpec,
+} from "@cplieger/reactive";
 
 interface Row {
   readonly id: string;
@@ -117,6 +132,41 @@ describe("bindList drives no structural update path", () => {
       expect(s.painted).toStrictEqual([]);
     } finally {
       dispose();
+      host.remove();
+    }
+  });
+
+  it("re-seats no child when the keyed list did not change", () => {
+    const host = document.createElement("div");
+    document.body.replaceChildren(host);
+    const spec: ReconcileSpec<string> = { key: (k) => k, mount: (k) => el("div", null, k) };
+    // A re-seat PRESERVES element identity (insertBefore on an attached node is
+    // a remove plus an insert of the same object), so identity alone cannot see
+    // one and a childList record is the instrument. takeRecords() reads the queue
+    // synchronously, so no timing is involved.
+    const seen = new MutationObserver(() => {
+      /* records are read synchronously below */
+    });
+    seen.observe(host, { childList: true });
+    try {
+      reconcile(host, ["a", "b", "c"], spec);
+      const before = [...host.children];
+      expect(before).toHaveLength(3);
+      seen.takeRecords();
+
+      reconcile(host, ["a", "b", "c"], spec);
+
+      expect(seen.takeRecords()).toStrictEqual([]);
+      // toBe per index, never toEqual: toEqual compares DOM nodes STRUCTURALLY
+      // and passes for a rebuilt twin, which is the other half of what this rules
+      // out.
+      const after = [...host.children];
+      expect(after).toHaveLength(before.length);
+      for (const [i, node] of before.entries()) {
+        expect(after[i]).toBe(node);
+      }
+    } finally {
+      seen.disconnect();
       host.remove();
     }
   });

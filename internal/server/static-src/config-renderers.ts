@@ -1,7 +1,7 @@
 import { el, option, icon, withHelp } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { mountConnTest } from "./conn-test.js";
-import { CONFIG_BANNER_ID } from "./constants.js";
+import { configBanner } from "./config-banner.js";
 import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
 import { prettyLabel } from "./utils.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -167,7 +167,7 @@ function appendConnTest(header: HTMLElement, fields: HTMLElement, schema: Schema
       `#${CSS.escape(fieldId(schema.key, field.key))}`,
     );
   }
-  mountConnTest(header, schema.key, { inputs, bannerId: CONFIG_BANNER_ID });
+  mountConnTest(header, schema.key, { inputs, banner: configBanner });
 }
 
 // wireShowWhen sets up show_when visibility toggling for fields.

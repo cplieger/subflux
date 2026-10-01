@@ -478,8 +478,10 @@ func (s *suite) sectionState() {
 	s.assertJSONNotEmpty(stats, ".total_series", "Stats has total_series")
 	s.assertJSONNotEmpty(stats, ".total_movies", "Stats has total_movies")
 
-	s.apiGet("/api/state")
+	state := s.apiGet("/api/state")
 	s.assertStatus("200", "GET /api/state")
+	s.assertJSONNotEmpty(state, ".entries", "State page has entries")
+	s.assertJSONNotEmpty(state, ".unfiltered_total", "State page has unfiltered_total")
 	s.apiGet("/api/state?type=episode&limit=5")
 	s.assertStatus("200", "State filter: episode")
 	s.apiGet("/api/state?type=movie&limit=5")

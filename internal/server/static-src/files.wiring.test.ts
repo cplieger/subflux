@@ -78,6 +78,7 @@ vi.mock("./dom.js", async (importOriginal) => {
 import { openFileManager } from "./files.js";
 import { openSyncDialog } from "./sync.js";
 import * as store from "./store.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import { contentView } from "./view-scope.js";
 
 // Mirrors the wire FileEntry fields files.ts consumes. No paths on the wire
@@ -156,8 +157,12 @@ function firstCol(i: number): string {
   return reqRow(i).children.item(0)?.textContent ?? "";
 }
 
+function bulkButton(): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>('[data-nav="bulk-delete"]');
+}
+
 function reqBulkButton(): HTMLButtonElement {
-  const btn = document.querySelector<HTMLButtonElement>('[data-nav="bulk-delete"]');
+  const btn = bulkButton();
   if (!btn) {
     throw new Error("bulk-delete button not mounted");
   }
@@ -179,6 +184,14 @@ function skeletonRows(): NodeListOf<Element> {
   return document.querySelectorAll("#coverageContent div.skeleton-row");
 }
 
+function listShape(): string[] {
+  return Array.from(document.querySelectorAll("#coverageContent > .files-list > *")).map((e) =>
+    e.classList.contains("empty")
+      ? `${e.tagName}.empty "${e.textContent ?? ""}"`
+      : `${e.tagName}.${e.className}`,
+  );
+}
+
 function resetEnv(): void {
   mockListFiles.mockReset();
   mockListFiles.mockResolvedValue([]);
@@ -188,11 +201,8 @@ function resetEnv(): void {
   confirmState.messages = [];
   history.replaceState(null, "", "/");
   store.set("currentPage", "library");
-  // ensureMounted() renders into #coverageContent; the bulk-delete button is
-  // appended to #coveragePanel .card-head, both of which must exist.
-  document.body.innerHTML =
-    '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
-  contentView.clear();
+  _resetPanelsForTest();
+  document.body.replaceChildren(libraryPanel().root);
 }
 
 describe("files: loading skeleton", () => {
@@ -249,25 +259,21 @@ describe("files: install over a painted skeleton", () => {
   // The control for the two cases below: the same production code with nothing
   // in the container for the install to meet. Without it a broken selector
   // reads the same as the defect.
-  it("CONTROL a listing that beats the show delay: the empty state hides once rows exist", async () => {
+  it("CONTROL a listing that beats the show delay: no placeholder once rows exist", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-201", "en"), extFile("tmdb-201", "fr")]);
 
     openFileManager("movie", "tmdb-201", "Movie", "/");
     await drain();
 
     expect(skeletonRows()).toHaveLength(0);
-    const empty = document.querySelector<HTMLElement>(".files-list .empty");
-    expect(empty?.textContent).toBe("No external subtitles.");
-    expect(empty?.isConnected).toBe(true);
-    expect(document.querySelector<HTMLElement>("table.files-table")?.hidden).toBe(false);
-    expect(empty?.hidden).toBe(true);
+    expect(listShape()).toEqual(["TABLE.files-table"]);
   });
 
   // The install must REPLACE whatever the container holds rather than treat it
-  // as something to patch: a reusing reconciler copies the fresh nodes onto the
-  // skeleton's own divs and discards them, so the visibility effect would write
-  // `hidden` to an element that was never inserted.
-  it("hides the empty state once rows exist, over a container holding the skeleton", async () => {
+  // as something to patch: a reusing reconciler copies the fresh list onto the
+  // skeleton's own div and discards it, so the table would be reconciled into a
+  // subtree that reaches no document.
+  it("reconciles the table into the installed list, over a container holding the skeleton", async () => {
     const settle = pendingListing();
 
     openFileManager("movie", "tmdb-203", "Movie", "/");
@@ -280,14 +286,8 @@ describe("files: install over a painted skeleton", () => {
     vi.advanceTimersByTime(300);
     await drain();
 
-    const list = document.querySelector<HTMLElement>(".files-list");
-    const empty = list?.querySelector<HTMLElement>(".empty");
-    const tbl = list?.querySelector<HTMLElement>("table.files-table");
-    expect(empty?.textContent).toBe("No external subtitles.");
-    expect(empty?.isConnected).toBe(true);
-    expect(tbl?.hidden).toBe(false);
+    expect(listShape()).toEqual(["TABLE.files-table"]);
     expect(reqTbody().children.length).toBe(2);
-    expect(empty?.hidden).toBe(true);
   });
 
   // The skeleton controller is one module-level slot, so the open that takes it
@@ -321,7 +321,7 @@ describe("files: card-head bulk button", () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-209", "en")]);
     openFileManager("movie", "tmdb-209", "Movie", "/");
     await tick();
-    expect(reqBulkButton().hidden).toBe(false);
+    expect(bulkButton()).not.toBeNull();
 
     // The button sits outside the patched subtree, so only this view's scope
     // can take it away; left behind it dispatches the departed view's delete.
@@ -531,9 +531,7 @@ describe("files: bulk delete", () => {
     reqBulkButton().click();
     await tick();
 
-    expect(reqTbody().children.length).toBe(0);
-    expect(document.querySelector<HTMLElement>("table.files-table")?.hidden).toBe(true);
-    expect(document.querySelector<HTMLElement>(".files-list .empty")?.hidden).toBe(false);
+    expect(listShape()).toEqual(['DIV.empty "No external subtitles."']);
 
     settle([extFile("tmdb-75", "fr")]);
     await tick();

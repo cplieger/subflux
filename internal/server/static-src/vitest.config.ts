@@ -7,9 +7,11 @@
 //
 // The opt-out is the `.node.test.ts` suffix: the reason lives in the stem, the
 // placement in the suffix, so membership is readable off the filename instead
-// of enumerated here where the list would drift undetected. Exactly two files
-// carry it, and both need a genuine filesystem read:
+// of enumerated here where the list would drift undetected. Exactly three files
+// carry it, and each needs a genuine filesystem read:
 //
+//   - coverage-store.node.test.ts reads its sibling modules through node:fs to
+//     assert the import graph the coverage leaf's layering rests on.
 //   - theme-snippet.node.test.ts reads ../static/index.html and login.html to
 //     compare the inlined anti-FOUC bytes against the library snippet.
 //   - wizard-example.node.test.ts reads config.example.yaml from the repo

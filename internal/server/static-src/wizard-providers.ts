@@ -13,9 +13,8 @@ import {
 } from "./wizard-store.js";
 import { wizField, wizToggle } from "./wizard-fields.js";
 import { type WizardStep, providerEnabledInSections } from "./wizard-state.js";
-import { SECRET_SAVED_PLACEHOLDER } from "./wizard-steps.js";
+import { SECRET_SAVED_PLACEHOLDER, WIZARD_BANNER } from "./wizard-steps.js";
 import { mountConnTest } from "./conn-test.js";
-import { WIZARD_BANNER_ID } from "./constants.js";
 
 /** provSecretPath is the dotted presence path of one provider setting. */
 function provSecretPath(provName: string, fieldKey: string): string {
@@ -170,7 +169,7 @@ function appendWizProvConnTest(card: HTMLElement, header: HTMLElement, prov: Pro
       `#${CSS.escape("wiz-prov-" + prov.name + "-" + f.key)}`,
     );
   }
-  mountConnTest(header, prov.name, { inputs, bannerId: WIZARD_BANNER_ID });
+  mountConnTest(header, prov.name, { inputs, banner: WIZARD_BANNER });
 }
 
 function collectProviders(): void {

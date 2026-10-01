@@ -4,9 +4,10 @@
 // secrets render a keep-placeholder instead of a value.
 
 import { validateConfigPath } from "./wire/client.gen.js";
-import { $ } from "./dom-core.js";
+import { $, showError, hideError, bannerText } from "./dom-core.js";
 import { el, withHelp, icon } from "./dom.js";
 import { mountConnTest } from "./conn-test.js";
+import type { ConnTestBanner } from "./conn-test.js";
 import { WIZARD_BANNER_ID } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -17,6 +18,19 @@ import type { WizardStep } from "./wizard-state.js";
 /** SECRET_SAVED_PLACEHOLDER marks a secret the config file already holds:
  *  leaving the field blank keeps the stored value (server-side merge). */
 export const SECRET_SAVED_PLACEHOLDER = "\u2022\u2022\u2022\u2022 saved, leave blank to keep";
+
+// The wizard's red top banner, as the object the credential-check control
+// takes. dom-core's trio bound to the one id; the login document keeps
+// `hidden` for this slot, and this is where that fact is spelled once.
+export const WIZARD_BANNER: ConnTestBanner = {
+  show: (msg) => {
+    showError(WIZARD_BANNER_ID, msg);
+  },
+  hide: () => {
+    hideError(WIZARD_BANNER_ID);
+  },
+  text: () => bannerText(WIZARD_BANNER_ID),
+};
 
 // --- Step 1: Sonarr + Radarr ---
 
@@ -105,7 +119,7 @@ function renderArrGroup(
         `#${CSS.escape("wiz-" + key + "-" + field.key)}`,
       );
     }
-    mountConnTest(header, key, { inputs, bannerId: WIZARD_BANNER_ID });
+    mountConnTest(header, key, { inputs, banner: WIZARD_BANNER });
   }
   container.appendChild(group);
 }

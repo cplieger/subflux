@@ -30,22 +30,11 @@
   <span class="nav-icon"><span class="icon icon-history"></span></span>
   <span class="nav-label">History</span>
 </button>
-<button type="button" class="nav-btn ghost" id="configBtn" aria-label="Settings" hidden>
-  <span class="nav-icon"><span class="icon icon-settings"></span></span>
-  <span class="nav-label">Settings</span>
-</button>
-<button type="button" class="nav-btn ghost" id="themeBtn" data-action="theme" aria-label="Toggle theme" hidden>
-  <span class="nav-icon"><span class="icon icon-moon"></span></span>
-</button>
 <button type="button" class="nav-btn ghost" id="userBtn" aria-label="User menu">
   <span class="nav-icon"><span class="icon icon-user"></span></span>
 </button>
 </nav>
 </header>
-
-<div id="statusPopup" hidden role="group" aria-label="Status"></div>
-
-<div id="userMenuPopup" class="pop-menu" hidden role="menu" aria-label="User menu"></div>
 
 <dialog class="dlg-security" id="securityDialog" aria-label="Security settings"></dialog>
 
@@ -60,55 +49,6 @@
 
 
 <main id="main">
-
-<section class="card" id="coveragePanel" data-page="coverage" aria-labelledby="lib-heading">
-<div class="card-head" hidden>
-  <h2 id="lib-heading">Library</h2>
-  <div class="controls">
-    <label class="toggle" aria-label="Missing only">
-      <span data-tip="Show only items with incomplete subtitle coverage">Missing only</span>
-      <input type="checkbox" id="cov-missing"><span></span>
-    </label>
-    <select id="cov-type-filter" aria-label="Media type filter">
-      <option value="all">All</option>
-      <option value="series">Series</option>
-      <option value="movies">Movies</option>
-    </select>
-    <select id="cov-sort" aria-label="Sort by">
-      <option value="title">A-Z</option>
-      <option value="title-desc">Z-A</option>
-      <option value="newest">Newest</option>
-      <option value="oldest">Oldest</option>
-    </select>
-    <input id="cov-filter" type="search" placeholder="Filter library&#x2026;"
-      aria-label="Filter library" autocomplete="off" enterkeyhint="search" spellcheck="false">
-  </div>
-</div>
-<div id="coverageContent"></div>
-</section>
-
-<section class="card" id="historyPanel" data-page="history" aria-labelledby="hist-heading" hidden>
-<div class="card-head">
-  <h2 id="hist-heading">History</h2>
-  <div class="controls">
-    <select id="h-type" aria-label="Media type filter">
-      <option value="">All types</option>
-      <option value="episode">Episodes</option>
-      <option value="movie">Movies</option>
-    </select>
-    <select id="h-lang" aria-label="Language filter">
-      <option value="">All languages</option>
-    </select>
-    <select id="h-provider" aria-label="Provider filter">
-      <option value="">All providers</option>
-    </select>
-    <input id="h-filter" type="search" placeholder="Filter media&#x2026;"
-      aria-label="Filter downloads" autocomplete="off" enterkeyhint="search" spellcheck="false">
-  </div>
-</div>
-<div id="historyContent"></div>
-</section>
-
 </main>
 
 <footer>

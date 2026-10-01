@@ -4,7 +4,8 @@
 // serializer's foreground priority, depth-preserving reload semantics, and
 // the transaction leg join.
 
-import { el, input, select, option, errDiv } from "./dom.js";
+import { el, option, errDiv } from "./dom.js";
+import { historyPanel } from "./panels.js";
 import { listStateRaw } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import type { StateEntry } from "./wire/types.gen.js";
@@ -17,7 +18,8 @@ import {
   bindList,
   patch,
   batch,
-  touch,
+  reconcile,
+  type ReconcileSpec,
 } from "@cplieger/reactive";
 import { historyView } from "./view-scope.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
@@ -35,9 +37,14 @@ const history = createCollection<StateEntry>(historyKey);
 
 // One of the two facts behind "Show more"; the other is loaded < HISTORY_DEPTH_CAP.
 const hasMore = signal(false);
-// Forces the filter-aware empty-state effect to re-run even when the id
-// list is unchanged (empty -> empty on a filter change).
-const renderTick = signal(0);
+
+/** What the last completed read said about the history as a whole. Both facts land
+ *  in ONE batch off ONE response, so no pair of them can describe two reads. */
+interface HistoryRead {
+  readonly filtered: boolean; // the query that produced these rows carried a filter
+  readonly total: number; // rows the store holds with NO filter applied
+}
+const lastRead = signal<HistoryRead>({ filtered: false, total: 0 });
 
 // --- THE SERIALIZER (E4) ---
 //
@@ -273,20 +280,68 @@ store.subscribe("currentPage", (page) => {
   }
 });
 
+/** The history filter controls, read once. Both readers fold `filterParams`,
+ *  which is keyed by `keyof HistoryFilters`, so a fifth control is one new
+ *  field the compiler will not let either of them forget. Enumerating the
+ *  fields instead costs more than a missing query param: a control
+ *  `anyFilterActive` does not know about makes `runReload` record a FILTERED
+ *  read as the whole dataset. */
+interface HistoryFilters {
+  readonly type: string;
+  readonly lang: string;
+  readonly provider: string;
+  readonly search: string;
+}
+
+function readFilters(): HistoryFilters {
+  const p = historyPanel();
+  return {
+    type: p.type.value,
+    lang: p.lang.value,
+    provider: p.provider.value,
+    search: p.filter.value.trim(),
+  };
+}
+
+const EMPTY_FILTERS: HistoryFilters = { type: "", lang: "", provider: "", search: "" };
+
+/** The query param each filter field sends, absent while the control is at its
+ *  DEFAULT — compared against `EMPTY_FILTERS` rather than tested for emptiness,
+ *  so a control whose default is not `""` cannot read as active at rest, and a
+ *  control the server reads as a filter cannot be dropped from the query while
+ *  `anyFilterActive` still reports "unfiltered". The `keyof HistoryFilters`
+ *  return type is load-bearing twice over: a new field fails the typecheck until
+ *  it is named here, and "a filter is active" cannot disagree with "the query
+ *  carried a filter", because both answers fold this one record.
+ *
+ *  Unguarded, knowingly: every control this page ships defaults to `""`, so no
+ *  test can tell this comparison from `filters[k] || undefined`, and a revert to
+ *  that form would go green. The type forces a fifth control to be NAMED here;
+ *  nothing forces it to be compared against its own default. */
+function filterParams(filters: HistoryFilters): Record<keyof HistoryFilters, QueryValue> {
+  const at = (k: keyof HistoryFilters): QueryValue =>
+    filters[k] === EMPTY_FILTERS[k] ? undefined : filters[k];
+  return {
+    type: at("type"),
+    lang: at("lang"),
+    provider: at("provider"),
+    search: at("search"),
+  };
+}
+
 /** Query for a history page: limit always, offset only past page 0, filter
- *  params only when non-empty. */
-function buildQuery(offset: number, limit: number): Record<string, QueryValue> {
-  const type = select("h-type").value;
-  const lang = select("h-lang").value;
-  const prov = select("h-provider").value;
-  const search = input("h-filter").value.trim();
+ *  params only when non-empty. `filters` is never defaulted: every dispatcher
+ *  snapshots the controls before its first await, so "nothing reads the controls
+ *  except at dispatch" is checkable by reading this signature. */
+function buildQuery(
+  offset: number,
+  limit: number,
+  filters: HistoryFilters,
+): Record<string, QueryValue> {
   return {
     limit,
     offset: offset > 0 ? offset : undefined,
-    type: type || undefined,
-    lang: lang || undefined,
-    provider: prov || undefined,
-    search: search || undefined,
+    ...filterParams(filters),
   };
 }
 
@@ -303,25 +358,34 @@ function historyMediaHref(entry: StateEntry): string {
   return "";
 }
 
-function buildHistoryRow(entry: StateEntry): HTMLElement {
-  const time = fmtDateTime(new Date(entry.media_imported));
+/** The row's six cells in column order, each the CSS column role plus the text
+ *  the entry yields. The shell and the repaint both fold this one list, so a
+ *  seventh column cannot reach the markup and miss the repaint. */
+function historyCells(entry: StateEntry): readonly { col: string; text: string }[] {
   let label = entry.title || "";
   const season = entry.season ?? 0;
   const episode = entry.episode ?? 0;
   if (season > 0 || episode > 0) {
     label += ` \u00B7 ${fmtEpisode(season, episode)}`;
   }
-  const href = historyMediaHref(entry);
   // Non-standard variants qualify the language cell; standard stays bare.
   const lang = entry.variant !== "standard" ? `${entry.language} ${entry.variant}` : entry.language;
-  const cells = [
-    el("td", { "data-col": "meta" }, time),
-    el("td", { "data-col": "title" }, label),
-    el("td", { "data-col": "meta" }, lang),
-    el("td", { "data-col": "meta" }, entry.provider),
-    el("td", { "data-col": "meta" }, entry.manual ? "manual" : "auto"),
-    el("td", { "data-col": "meta" }, entry.release_name || ""),
+  return [
+    { col: "meta", text: fmtDateTime(new Date(entry.media_imported)) },
+    { col: "title", text: label },
+    { col: "meta", text: lang },
+    { col: "meta", text: entry.provider },
+    { col: "meta", text: entry.manual ? "manual" : "auto" },
+    { col: "meta", text: entry.release_name || "" },
   ];
+}
+
+/** The row shell, with EMPTY cells: paintHistoryRow is the only writer, so a
+ *  binding that drops it renders blanks rather than values silently frozen at
+ *  their first render. */
+function buildHistoryRow(entry: StateEntry): HTMLElement {
+  const cells = historyCells(entry).map((c) => el("td", { "data-col": c.col }));
+  const href = historyMediaHref(entry);
   return href
     ? clickableRow(
         () => {
@@ -330,6 +394,13 @@ function buildHistoryRow(entry: StateEntry): HTMLElement {
         ...cells,
       )
     : el("tr", null, ...cells);
+}
+
+function paintHistoryRow(row: HTMLElement, entry: StateEntry): void {
+  const cells = historyCells(entry);
+  for (const [i, cell] of [...row.children].entries()) {
+    cell.textContent = cells[i]?.text ?? "";
+  }
 }
 
 /** Populate language and provider dropdowns from the stable sources
@@ -348,7 +419,7 @@ function updateHistoryFilters(data: StateEntry[]): void {
     }
   }
 
-  const hLang = select("h-lang");
+  const hLang = historyPanel().lang;
   {
     const current = hLang.value;
     hLang.replaceChildren(option("", "All languages"));
@@ -358,7 +429,7 @@ function updateHistoryFilters(data: StateEntry[]): void {
     hLang.value = current;
   }
 
-  const hProv = select("h-provider");
+  const hProv = historyPanel().provider;
   {
     const current = hProv.value;
     hProv.replaceChildren(option("", "All providers"));
@@ -369,25 +440,46 @@ function updateHistoryFilters(data: StateEntry[]): void {
   }
 }
 
-function anyFilterActive(): boolean {
-  return Boolean(
-    select("h-type").value ||
-    select("h-lang").value ||
-    select("h-provider").value ||
-    input("h-filter").value.trim(),
-  );
+function anyFilterActive(filters: HistoryFilters): boolean {
+  return Object.values(filterParams(filters)).some((v) => v !== undefined);
 }
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
+
+/** Which of the three shapes the panel is in. Loading and error are the HOST's
+ *  occupant rather than a shape of the panel, so neither is in here. */
+type HistoryShape = "rows" | "filtered" | "no-data";
+
+/** An empty history beats an active filter: you have nothing at all, whatever
+ *  you asked for. */
+function shapeOf(loaded: number, read: HistoryRead): HistoryShape {
+  if (loaded > 0) {
+    return "rows";
+  }
+  return read.filtered && read.total > 0 ? "filtered" : "no-data";
+}
+
+type Slot = "empty:no-data" | "empty:filtered" | "table" | "more";
+
+/** Exhaustive over HistoryShape, so a fourth shape fails the typecheck here
+ *  rather than rendering nothing. At most one `empty:*` key, so two messages at
+ *  once — or a message above a populated table — is unrepresentable. */
+function slotsOf(shape: HistoryShape, canLoadMore: boolean): readonly Slot[] {
+  switch (shape) {
+    case "rows":
+      return canLoadMore ? ["table", "more"] : ["table"];
+    case "filtered":
+      return ["empty:filtered"];
+    case "no-data":
+      return ["empty:no-data"];
+  }
+}
 
 /** The history table's view id in the history-panel host. */
 const VIEW_HISTORY = "history";
 
 function ensureMounted(): void {
-  const out = document.getElementById("historyContent");
-  if (!out) {
-    throw new Error("historyContent not found");
-  }
+  const out = historyPanel().content;
   // Already the host's occupant — the live binding renders the table.
   if (historyView.scopeFor(VIEW_HISTORY) !== null) {
     return;
@@ -410,8 +502,6 @@ function ensureMounted(): void {
     ),
   );
   const tbl = el("table", { className: "history" }, thead, tbody);
-  const emptyNoData = emptyState("No downloads yet.");
-  const emptyFiltered = emptyState("No downloads matching filter.");
   const showMore = el(
     "button",
     {
@@ -423,31 +513,60 @@ function ensureMounted(): void {
     },
     "Show more\u2026",
   );
-  patch(out, el("div", { className: "hist-list" }, emptyNoData, emptyFiltered, tbl, showMore));
+  // EMPTY: every child of this container is reconcile's, because an unkeyed one
+  // would sit there forever — reconcile tracks only the keyed ones.
+  const list = el("div", { className: "hist-list" });
+  // NOT patch: it may copy a fresh node's content into a recycled child and
+  // never insert the node itself, so the references the effect below closes
+  // over would be writing to detached nodes. The skeleton this container holds
+  // at commit is exactly that case.
+  out.replaceChildren(list);
 
-  scope.add(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
+  // update, not mount alone: a re-downloaded auto row keeps its subtitle_state
+  // id while its provider and release_name move, so the id sequence is
+  // unchanged and no reconcile runs — the content tier is what repaints it.
+  scope.add(
+    bindList(tbody, history, {
+      mount: (entry) => buildHistoryRow(entry),
+      update: (row, entry) => {
+        paintHistoryRow(row, entry);
+      },
+    }),
+  );
+
+  const slots: ReconcileSpec<Slot> = {
+    key: (s) => s,
+    // tbl and showMore are per-MOUNT singletons, so the row binding outlives
+    // every absence: reconcile detaches the table when the shape leaves "rows"
+    // and re-inserts THIS node, with its bindings and its rows, when it returns.
+    mount: (s) =>
+      s === "table"
+        ? tbl
+        : s === "more"
+          ? showMore
+          : emptyState(
+              s === "empty:no-data" ? "No downloads yet." : "No downloads matching filter.",
+            ),
+  };
+
   scope.add(
     effect(() => {
-      touch(renderTick);
+      // Read every signal UNCONDITIONALLY before any branch: slotsOf consults
+      // `more` only in the rows arm, and a read inside a branch leaves this
+      // effect unsubscribed from the signal that would flip it.
       const loaded = history.ids.value.length;
-      const empty = loaded === 0;
-      const filtered = anyFilterActive();
-      emptyNoData.hidden = !(empty && !filtered);
-      emptyFiltered.hidden = !(empty && filtered);
-      tbl.hidden = empty;
-      // Two facts: the server has more AND the client is below the cap —
-      // past it the server's silent LIMIT clamp would truncate undetectably.
-      showMore.hidden = empty || !hasMore.value || loaded >= HISTORY_DEPTH_CAP;
+      const read = lastRead.value;
+      const more = hasMore.value;
+      // Below the cap as well as hasMore: past it the server's silent LIMIT
+      // clamp would truncate a depth-preserving reload undetectably.
+      reconcile(list, slotsOf(shapeOf(loaded, read), more && loaded < HISTORY_DEPTH_CAP), slots);
     }),
   );
 }
 
 function showError(e: unknown): void {
   historyView.clear();
-  const out = document.getElementById("historyContent");
-  if (out) {
-    patch(out, errDiv(e instanceof Error ? e.message : String(e)));
-  }
+  patch(historyPanel().content, errDiv(e instanceof Error ? e.message : String(e)));
 }
 
 // runReload takes the slot, fetches the newest window through the raw list
@@ -457,11 +576,14 @@ function showError(e: unknown): void {
 // intact. Filters and depth are captured at dispatch, before the first await.
 async function runReload(g: number, limit: number, signal?: AbortSignal): Promise<void> {
   beginReload(g, limit);
+  // Snapshotted before the first await so a control changed mid-flight cannot
+  // be read back as the one this query was built from.
+  const filters = readFilters();
   // Anti-flicker skeleton for the first mount only: filter-change reloads
   // keep current rows until data lands (a skeleton over a live reactive
   // table would drop bindings).
-  const out = document.getElementById("historyContent");
-  const firstMount = out !== null && historyView.scopeFor(VIEW_HISTORY) === null;
+  const out = historyPanel().content;
+  const firstMount = historyView.scopeFor(VIEW_HISTORY) === null;
   const timing = firstMount
     ? skeletonTiming(
         () => {
@@ -482,7 +604,7 @@ async function runReload(g: number, limit: number, signal?: AbortSignal): Promis
       )
     : null;
   try {
-    const res = await listStateRaw(buildQuery(0, limit), signal ? { signal } : undefined);
+    const res = await listStateRaw(buildQuery(0, limit, filters), signal ? { signal } : undefined);
     if (g !== liveGen) {
       timing?.cancel();
       return; // superseded — the superseder settled this generation at start
@@ -501,16 +623,22 @@ async function runReload(g: number, limit: number, signal?: AbortSignal): Promis
       }
       return;
     }
-    const items = res.data ?? [];
-    history.setAll(items);
-    hasMore.value = items.length >= limit;
+    const page = res.data ?? { entries: [], unfiltered_total: 0 };
+    // One batch, so the render that setAll triggers cannot read a fact left
+    // over from the dataset the PREVIOUS query described. `filters` is the
+    // dispatch snapshot, so an empty page is judged against the filters its OWN
+    // query carried.
+    batch(() => {
+      history.setAll(page.entries);
+      hasMore.value = page.entries.length >= limit;
+      lastRead.value = { filtered: anyFilterActive(filters), total: page.unfiltered_total };
+    });
     updateHistoryFilters(history.items());
     const mount = (): void => {
       if (g !== liveGen) {
         return;
       }
       ensureMounted();
-      renderTick.value += 1;
     };
     if (timing) {
       timing.commit(mount);
@@ -519,7 +647,7 @@ async function runReload(g: number, limit: number, signal?: AbortSignal): Promis
     }
     settleGeneration(g, { kind: "applied" });
   } catch (e: unknown) {
-    // A pending (not yet painted) skeleton must never land over the error panel.
+    // A pending (not yet shown) skeleton must never land over the error panel.
     timing?.cancel();
     settleGeneration(g, {
       kind: "failed",
@@ -531,9 +659,6 @@ async function runReload(g: number, limit: number, signal?: AbortSignal): Promis
 }
 
 async function loadMore(): Promise<void> {
-  if (!hasMore.value || history.size >= HISTORY_DEPTH_CAP) {
-    return;
-  }
   // FOREGROUND PRIORITY: the gesture takes the slot now. An in-flight
   // event/leg reload's fetch is superseded, but it re-latches at the new
   // depth after the append commits.
@@ -543,9 +668,11 @@ async function loadMore(): Promise<void> {
   const g = allocGeneration();
   supersedePriors(g, pendingReload);
   beginGesture(g);
+  // Snapshotted before the first await, like runReload's.
+  const filters = readFilters();
   const scrollPos = window.scrollY;
   try {
-    const res = await listStateRaw(buildQuery(history.size, PAGE_SIZE));
+    const res = await listStateRaw(buildQuery(history.size, PAGE_SIZE, filters));
     if (g !== liveGen) {
       return; // superseded (e.g. a filter-change reload won)
     }
@@ -554,23 +681,25 @@ async function loadMore(): Promise<void> {
       // failure so a chained transaction rejects rather than committing on
       // masked data.
       hasMore.value = false;
-      renderTick.value += 1;
       settleGeneration(g, {
         kind: "failed",
         error: new Error(res.error ?? `history load failed (${String(res.status)})`),
       });
       return;
     }
-    const items = res.data ?? [];
+    const page = res.data ?? { entries: [], unfiltered_total: 0 };
+    // NO lastRead write: this runs only while hasMore, which is only true after
+    // a page came back at >= limit, so `loaded > 0` both on entry and after —
+    // and shapeOf answers "rows" for every loaded > 0 whatever lastRead holds.
+    //
     // One structural reconcile per appended page: each upsert writes the
     // collection's order signal, so an unbatched loop costs a full pass per row.
     batch(() => {
-      for (const entry of items) {
+      for (const entry of page.entries) {
         history.upsert(entry);
       }
-      hasMore.value = items.length >= PAGE_SIZE;
+      hasMore.value = page.entries.length >= PAGE_SIZE;
       updateHistoryFilters(history.items());
-      renderTick.value += 1;
     });
     window.scrollTo(0, scrollPos);
     settleGeneration(g, { kind: "applied" });
@@ -670,6 +799,6 @@ export function _resetHistoryForTest(): void {
     triggerTimer = null;
   }
   hasMore.value = false;
-  renderTick.value = 0;
+  lastRead.value = { filtered: false, total: 0 };
   historyView.clear();
 }

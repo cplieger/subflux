@@ -139,28 +139,14 @@ vi.mock("./wire/client.gen.js", async (importOriginal) => ({
     wire.stateIDsCalls += 1;
     return Promise.resolve([]);
   },
-  listStateRaw: () => Promise.resolve({ ok: true, status: 200, data: [] }),
+  listStateRaw: () =>
+    Promise.resolve({ ok: true, status: 200, data: { entries: [], unfiltered_total: 0 } }),
 }));
 
-/** The subset of index.html the router + coverage modules touch. Built
- *  before the imports because router.ts resolves the filter controls at
- *  module scope. */
+/** The shell index.html still authors; showPage attaches a panel into <main>. */
 document.body.innerHTML = `
   <button type="button" id="historyBtn">History</button>
-  <div id="coveragePanel">
-    <div class="card-head"><h2 id="lib-heading">Library</h2></div>
-    <div class="controls">
-      <select id="cov-type-filter"><option value="all"></option><option value="movies"></option></select>
-      <input id="cov-filter" type="search" />
-      <input id="cov-missing" type="checkbox" />
-      <select id="cov-sort"><option value="title"></option><option value="missing"></option></select>
-    </div>
-    <div id="coverageContent"></div>
-  </div>
-  <div id="historyPanel" hidden>
-    <div class="card-head"><h2 id="hist-heading">History</h2></div>
-    <input id="h-filter" type="search" />
-  </div>`;
+  <main id="main"></main>`;
 
 import * as store from "./store.js";
 import { on, BusEvent } from "./bus.js";
@@ -170,8 +156,8 @@ import { _resetHealForTest } from "./coverage-heal.js";
 import { _resetSubjectsForTest, versionMap } from "./subjects.js";
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
 
-// router.ts resolves the four filter controls at IMPORT time, so it must
-// load AFTER the fixture above — a static import would hoist past it.
+// router.ts reads $.main when a route applies, so the shell above must exist
+// first — a static import would hoist past it.
 const { applyRoute } = await import("./router.js");
 const events = await import("./events.js");
 

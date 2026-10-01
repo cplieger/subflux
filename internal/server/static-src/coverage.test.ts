@@ -101,6 +101,7 @@ vi.mock("./store.js", () => ({
 }));
 
 import {
+  _coverageDerivesForTest,
   _resetCoverageForTest,
   configurePanel,
   fetchAndMergeCoverage,
@@ -108,6 +109,7 @@ import {
   loadCoverage,
   renderCoverage,
 } from "./coverage.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import {
   applyHealedRow,
   coverageItems,
@@ -168,35 +170,12 @@ function movie(
   };
 }
 
-const FIXTURE = `
-<section class="card" id="coveragePanel">
-  <div class="card-head" hidden>
-    <h2 id="lib-heading">Library</h2>
-    <div class="controls">
-      <input type="checkbox" id="cov-missing">
-      <select id="cov-type-filter">
-        <option value="all">All</option>
-        <option value="series">Series</option>
-        <option value="movies">Movies</option>
-      </select>
-      <select id="cov-sort">
-        <option value="title">A-Z</option>
-        <option value="title-desc">Z-A</option>
-        <option value="newest">Newest</option>
-        <option value="oldest">Oldest</option>
-      </select>
-      <input id="cov-filter" type="search">
-    </div>
-  </div>
-  <div id="coverageContent"></div>
-</section>`;
-
 // The module holds ONE collection plus the filter/page signals for the whole
 // file, and several paths branch on whether that collection is EMPTY (a first
 // load paints through the skeleton controller, a refresh paints directly). So
-// every test starts from a cleared collection, a fresh DOM, controls back to
-// defaults, and filterCoverage() to reset pageLimit and bump the filter tick —
-// nothing is inherited from whichever sibling ran before.
+// every test starts from a cleared collection, a freshly built panel, and
+// filterCoverage() to reset pageLimit and bump the filter tick — nothing is
+// inherited from whichever sibling ran before.
 beforeEach(async () => {
   clientState.series = [];
   clientState.movies = [];
@@ -206,7 +185,8 @@ beforeEach(async () => {
   await fetchAndMergeCoverage();
   _resetCoverageForTest(); // gate + registrations back to a fresh tab
   clientState.signals = [];
-  document.body.innerHTML = FIXTURE;
+  _resetPanelsForTest();
+  document.body.replaceChildren(libraryPanel().root);
   bus.emitted = [];
   heal.resets = 0;
   heal.onReset = null;
@@ -292,9 +272,18 @@ function settleDeferredSeries(rows: Record<string, unknown>[]): void {
   resolve(rows);
 }
 
-/** The no-media empty state INSIDE the installed list — the node the
- *  visibility effect's write has to be able to reach. */
-const LIVE_EMPTY = "#coverageContent .cov-list > .empty";
+const LIVE_LIST = "#coverageContent > .cov-list";
+
+function listShape(): string[] {
+  return Array.from(document.querySelectorAll(`${LIVE_LIST} > *`)).map((e) =>
+    e.classList.contains("empty")
+      ? `${e.tagName}.empty "${e.textContent ?? ""}"`
+      : `${e.tagName}.${e.className}`,
+  );
+}
+
+const NO_MEDIA =
+  'DIV.empty "No media found. Titles appear once Sonarr or Radarr has imported files."';
 
 describe("coverage: fetchAndMergeCoverage", () => {
   it("merges series and movies under one _type discriminant", async () => {
@@ -620,11 +609,10 @@ describe("coverage: row interaction", () => {
 });
 
 describe("coverage: identity-preserving merge", () => {
-  /** applyFilters reads #cov-filter exactly once per run, so counting that
-   *  lookup counts recomputes of the filtered+sorted view (sort included). */
+  /** Derives of the filtered+sorted view since this call. */
   function countRecomputes(): () => number {
-    const byId = vi.spyOn(document, "getElementById");
-    return () => byId.mock.calls.filter(([id]) => id === "cov-filter").length;
+    const base = _coverageDerivesForTest();
+    return () => _coverageDerivesForTest() - base;
   }
 
   it("a no-op refresh repaints zero rows and recomputes nothing", async () => {
@@ -830,45 +818,38 @@ describe("coverage: signature field audit", () => {
 });
 
 describe("coverage: empty states", () => {
-  it("shows the no-media empty state and hides the table with no data", async () => {
+  it("renders the no-media placeholder and no table with no data", async () => {
     await load([]);
 
-    expect(reqEl(".cov-list .empty").hidden).toBe(false);
-    expect(reqEl<HTMLElement>("table.library").hidden).toBe(true);
+    expect(listShape()).toEqual([NO_MEDIA]);
   });
 
-  it("shows the no-match empty state when a filter excludes everything", async () => {
+  it("blames the filter when a filter excludes everything", async () => {
     await load([series(1, "Show")]);
 
     reqEl<HTMLInputElement>("#cov-filter").value = "nothing matches this";
     filterCoverage();
 
-    const empties = Array.from(document.querySelectorAll<HTMLElement>(".cov-list .empty"));
-    expect(empties.map((e) => e.hidden)).toEqual([true, false]);
-    expect(reqEl<HTMLElement>("table.library").hidden).toBe(true);
+    expect(listShape()).toEqual(['DIV.empty "No matching items."']);
   });
 
-  it("hides both empty states once rows are visible", async () => {
+  it("renders no placeholder at all once rows are visible", async () => {
     await load([series(1, "Show")]);
 
-    const empties = Array.from(document.querySelectorAll<HTMLElement>(".cov-list .empty"));
-    expect(empties.map((e) => e.hidden)).toEqual([true, true]);
-    expect(reqEl<HTMLElement>("table.library").hidden).toBe(false);
+    expect(listShape()).toEqual(["TABLE.library"]);
   });
 
   // The three cases below differ ONLY in whether the skeleton painted before
   // the list was installed. The first is the control: without it a selector
   // that stopped matching would look exactly like the defect.
-  it("hides the no-media state on a load fast enough to skip the skeleton", async () => {
+  it("renders no placeholder on a load fast enough to skip the skeleton", async () => {
     await load([series(1, "Alpha")]);
 
     expect(rowTitles()).toEqual(["Alpha"]);
-    const empty = reqEl<HTMLElement>(LIVE_EMPTY);
-    expect(empty.textContent).toContain("No media found");
-    expect(empty.hidden).toBe(true);
+    expect(listShape()).toEqual(["TABLE.library"]);
   });
 
-  it("hides the no-media state on a load that painted the skeleton first", async () => {
+  it("renders no placeholder on a load that painted the skeleton first", async () => {
     clientState.defer = true;
     const done = loadCoverage();
     await sleep(220);
@@ -879,28 +860,26 @@ describe("coverage: empty states", () => {
     await sleep(400);
 
     expect(rowTitles()).toEqual(["Alpha"]);
-    const empty = reqEl<HTMLElement>(LIVE_EMPTY);
-    expect(empty.textContent).toContain("No media found");
-    expect(empty.hidden).toBe(true);
+    expect(listShape()).toEqual(["TABLE.library"]);
   });
 
-  it("installs the empty state the effect holds, not a node the skeleton left behind", async () => {
+  it("installs the list the effect reconciles into, not a node the skeleton left behind", async () => {
     clientState.defer = true;
     const done = loadCoverage();
     await sleep(220);
-    const skeletonInner = reqEl<HTMLElement>("#coverageContent .skeleton-row > .skeleton");
+    const skeletonRow = reqEl<HTMLElement>("#coverageContent > .skeleton-row");
 
     settleDeferredSeries([series(1, "Alpha")]);
     await done;
     await sleep(400);
 
-    // A reusing install seats the list on the skeleton row and the empty state
-    // on its inner div, copying the class across and leaving the node the
-    // visibility effect closed over detached — same node, right class, and a
-    // `hidden` write that lands nowhere.
-    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
-    expect(installed).not.toBe(skeletonInner);
-    expect(installed.hidden).toBe(true);
+    // A reusing install copies the list's class onto the skeleton row and
+    // discards the fresh node, so the table would be reconciled into a subtree
+    // that reaches no document: the right class in the container, nothing under
+    // it.
+    const list = reqEl<HTMLElement>(LIVE_LIST);
+    expect(list).not.toBe(skeletonRow);
+    expect(listShape()).toEqual(["TABLE.library"]);
   });
 });
 
@@ -916,22 +895,26 @@ describe("coverage: pagination", () => {
     await load(manySeries());
 
     expect(tbody().children.length).toBe(50);
-    expect(reqEl<HTMLElement>(".more-btn").hidden).toBe(false);
+    expect(listShape()).toEqual(["TABLE.library", "BUTTON.more-btn"]);
   });
 
   it("extends the window by a page per Show more click", async () => {
     await load(manySeries());
+    const base = _coverageDerivesForTest();
 
     reqEl<HTMLButtonElement>(".more-btn").click();
 
     expect(tbody().children.length).toBe(60);
-    expect(reqEl<HTMLElement>(".more-btn").hidden).toBe(true);
+    expect(listShape()).toEqual(["TABLE.library"]);
+    // A wider window is a pageLimit write only: the filtered+sorted view is
+    // read from cache, so the sort must not run again.
+    expect(_coverageDerivesForTest() - base).toBe(0);
   });
 
-  it("hides Show more when everything fits on one page", async () => {
+  it("offers no Show more when everything fits on one page", async () => {
     await load([series(1, "Show")]);
 
-    expect(reqEl<HTMLElement>(".more-btn").hidden).toBe(true);
+    expect(listShape()).toEqual(["TABLE.library"]);
   });
 
   it("returns to the first page when a filter changes", async () => {
@@ -1244,22 +1227,28 @@ describe("coverage: sorting", () => {
 });
 
 describe("coverage: configurePanel", () => {
-  it("reveals the card header", () => {
+  it("keeps the filter controls in the head in library mode", () => {
     configurePanel(true);
 
-    expect(reqEl<HTMLElement>("#coveragePanel .card-head").hidden).toBe(false);
+    expect(libraryPanel().head.querySelector(".controls")).not.toBeNull();
   });
 
-  it("shows the filter controls in library mode", () => {
-    configurePanel(true);
-
-    expect(reqEl<HTMLElement>("#coveragePanel .controls").style.display).toBe("");
-  });
-
-  it("hides the filter controls in detail mode", () => {
+  it("takes the filter controls out of the head in detail mode", () => {
     configurePanel(false, { title: "Show" });
 
-    expect(reqEl<HTMLElement>("#coveragePanel .controls").style.display).toBe("none");
+    expect(libraryPanel().head.querySelector(".controls")).toBeNull();
+  });
+
+  it("leaves the controls where they are on a library re-apply, so typing survives it", () => {
+    // Re-inserting an attached node blurs whatever is focused inside it, and
+    // configurePanel(true) runs on every library route apply (web.md).
+    configurePanel(true);
+    libraryPanel().filter.focus();
+    expect(document.activeElement).toBe(libraryPanel().filter);
+
+    configurePanel(true);
+
+    expect(document.activeElement).toBe(libraryPanel().filter);
   });
 
   it("restores the Library heading and clears the detail context", () => {
@@ -1292,7 +1281,7 @@ describe("coverage: configurePanel", () => {
   it("puts the Back button before the heading", () => {
     configurePanel(false, { title: "The Wire" });
 
-    const head = reqEl("#coveragePanel .card-head");
+    const head = libraryPanel().head;
     expect(head.children.item(0)?.getAttribute("data-nav")).toBe("back");
     expect(head.children.item(1)?.id).toBe("lib-heading");
   });
@@ -1375,14 +1364,13 @@ describe("coverage: configurePanel", () => {
 describe("coverage: renderCoverage", () => {
   it("shows the library chrome and mounts the table", async () => {
     await load([series(1, "Show")]);
-    document.body.innerHTML = FIXTURE;
-    contentView.clear(); // a fresh document is a released pane
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
 
     renderCoverage();
 
-    expect(reqEl<HTMLElement>("#coveragePanel .card-head").hidden).toBe(false);
     // Library mode, so the filter controls come back with it.
-    expect(reqEl<HTMLElement>("#coveragePanel .controls").style.display).toBe("");
+    expect(libraryPanel().head.querySelector(".controls")).not.toBeNull();
     expect(rowTitles()).toEqual(["Show"]);
   });
 

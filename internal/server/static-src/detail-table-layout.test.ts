@@ -15,6 +15,7 @@
 import { describe, it, vi, beforeEach, expect } from "vitest";
 
 import tokensCSS from "./css/_shared-tokens.css?raw";
+import sharedIconsCSS from "./css/_shared-icons.css?raw";
 import baseCSS from "./css/02-base.css?raw";
 import componentsCSS from "./css/03-components.css?raw";
 import cardCSS from "./css/05-card.css?raw";
@@ -67,12 +68,16 @@ vi.mock("./store.js", () => ({
 
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
-import { contentView } from "./view-scope.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 
 // The real stylesheets, once per file. Order matches the MANIFEST slice this
-// suite exercises (tokens -> base -> components -> card -> table).
+// suite exercises (tokens -> shared icons -> base -> components -> card ->
+// table). Without _shared-icons.css's `.icon` mask height, an action cell's
+// span grows the measured row by a pixel.
 const style = document.createElement("style");
-style.textContent = [tokensCSS, baseCSS, componentsCSS, cardCSS, tableCSS].join("\n");
+style.textContent = [tokensCSS, sharedIconsCSS, baseCSS, componentsCSS, cardCSS, tableCSS].join(
+  "\n",
+);
 document.head.appendChild(style);
 
 // --- Fixtures ---
@@ -149,15 +154,9 @@ async function openMovieSettled(m: MovieDetail): Promise<void> {
  *  container section. `width` pins the card's inline size so the container
  *  query resolves the chosen breakpoint (>=700px desktop, <700px mobile). */
 function mountPanel(width?: string): HTMLElement {
-  document.body.innerHTML =
-    '<section class="card" id="coveragePanel">' +
-    '<div class="card-head"><h2 id="lib-heading">Show 1</h2></div>' +
-    '<div id="coverageContent"></div></section>';
-  contentView.clear();
-  const panel = document.getElementById("coveragePanel");
-  if (!panel) {
-    throw new Error("panel missing");
-  }
+  _resetPanelsForTest();
+  const panel = libraryPanel().root;
+  document.body.replaceChildren(panel);
   if (width) {
     panel.style.width = width;
   }

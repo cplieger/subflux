@@ -112,9 +112,10 @@ function createViewHost(): ViewHost {
   };
 }
 
-/** THE coverage-panel content host (`$.coverageContent`): the library table,
- *  the series detail, the movie detail and the file manager are four views of
- *  one container, so every write to it goes through this host. */
+/** THE coverage-panel content host (`panels.ts`'s `libraryPanel().content`):
+ *  the library table, the series detail, the movie detail and the file manager
+ *  are four views of one container, so every write to it goes through this
+ *  host. */
 export const contentView: ViewHost = createViewHost();
 
 /** THE history-panel content host (`#historyContent`). */

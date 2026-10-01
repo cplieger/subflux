@@ -82,6 +82,7 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[subflux.SchemaSection](),
 		wiregen.TypeRef[subflux.ProviderSchema](),
 		wiregen.TypeRef[subflux.StateEntry](),
+		wiregen.TypeRef[subflux.StatePage](),
 		wiregen.TypeRef[subflux.ScorePreview](),
 		wiregen.TypeRef[subflux.SearchTarget](),
 		wiregen.TypeRef[subflux.SearchTargets](),
@@ -459,7 +460,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "listState", Method: http.MethodGet, Path: "/api/state", AuthGroup: GroupUserConfigured,
-			Query: true, Response: wiregen.TypeRef[subflux.StateEntry](), RespShape: wiregen.RespArray,
+			Query: true, Response: wiregen.TypeRef[subflux.StatePage](),
 		},
 		{
 			Name: "stateStats", Method: http.MethodGet, Path: "/api/state/stats", AuthGroup: GroupUserConfigured,

@@ -30,10 +30,14 @@ type mockQueryStore struct {
 	attempts       int
 }
 
-func (m *mockQueryStore) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+func (m *mockQueryStore) State(_ context.Context, q *subflux.StateQuery) (subflux.StatePage, error) {
 	cp := *q
 	m.lastState = &cp
-	return m.stateEntries, m.err
+	entries := m.stateEntries
+	if entries == nil {
+		entries = []subflux.StateEntry{}
+	}
+	return subflux.StatePage{Entries: entries, UnfilteredTotal: len(entries)}, m.err
 }
 
 func (m *mockQueryStore) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
@@ -74,12 +78,15 @@ func TestHandleState(t *testing.T) {
 		if ct := w.Header().Get("Content-Type"); ct != "application/json" {
 			t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 		}
-		var entries []subflux.StateEntry
-		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		var page subflux.StatePage
+		if err := json.NewDecoder(w.Body).Decode(&page); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if len(entries) != 1 {
-			t.Errorf("HandleState() returned %d entries, want 1", len(entries))
+		if len(page.Entries) != 1 {
+			t.Errorf("HandleState() returned %d entries, want 1", len(page.Entries))
+		}
+		if page.UnfilteredTotal != 1 {
+			t.Errorf("HandleState() unfiltered_total = %d, want 1", page.UnfilteredTotal)
 		}
 	})
 

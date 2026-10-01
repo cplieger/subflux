@@ -220,13 +220,6 @@ td[data-col="actions"] button {
   flex-direction: column;
   align-items: center;
   gap: var(--sp-4);
-
-  /* An author `display` outranks the UA `[hidden] { display: none }` rule
-     whatever the specificity, so every `.empty` the JS toggles needs this
-     arm or the message paints in every state. */
-  &[hidden] {
-    display: none;
-  }
 }
 
 .empty[data-status="err"] {

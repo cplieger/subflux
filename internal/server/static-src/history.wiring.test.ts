@@ -18,13 +18,14 @@ import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 // or, for a page that must stay in flight, with deferPage().
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 vi.mock("./wire/client.gen.js", () => ({
-  // Same shim as history.test.ts: the RAW list read over the queued pages.
-  listStateRaw: async (query?: unknown, opts?: unknown) => {
-    const items = (await dispatch(query, opts)) as unknown;
-    return items === null
-      ? { ok: false, status: 502, error: "history load failed" }
-      : { ok: true, status: 200, data: items };
-  },
+  // ONE arm. Every case queues a page; the one error case REJECTS (see the
+  // error-path suite), which reaches runReload's catch without passing through
+  // here, and no case in this file aborts a controller.
+  listStateRaw: async (query?: unknown, opts?: unknown) => ({
+    ok: true as const,
+    status: 200,
+    data: (await dispatch(query, opts)) as unknown,
+  }),
 }));
 
 // PLAIN functions, never vi.fn: history.ts registers its LoadHistory handler in
@@ -47,6 +48,7 @@ vi.mock("./bus.js", () => ({
 
 import * as store from "./store.js";
 import { reloadHistory } from "./history.js";
+import { _resetPanelsForTest, historyPanel } from "./panels.js";
 import { historyView } from "./view-scope.js";
 
 // Mirrors the wire StateEntry fields buildHistoryRow reads.
@@ -85,6 +87,17 @@ function makeEntry(id: number, extra: Partial<Entry> = {}): Entry {
 
 const PAGE = 50;
 
+/** One StatePage response. Most cases are about the ROWS, so the total defaults
+ *  to the page's own length; the cases that are about the total pass it. */
+interface Page {
+  entries: Entry[];
+  unfiltered_total: number;
+}
+const page = (rows: Entry[], total = rows.length): Page => ({
+  entries: rows,
+  unfiltered_total: total,
+});
+
 /** A page the server says is full, so hasMore turns on and Show more appears. */
 function fullPage(): Entry[] {
   return Array.from({ length: PAGE }, (_, i) => makeEntry(i + 1));
@@ -104,35 +117,22 @@ async function drain(): Promise<void> {
 
 /** Queue a page that never settles on its own; the returned function finishes
  *  it. Each call owns its own promise, so several can be in flight at once. */
-function deferPage(): (rows: Entry[]) => void {
-  let settle: (rows: Entry[]) => void = () => undefined;
+function deferPage(): (p: Page) => void {
+  let settle: (p: Page) => void = () => undefined;
   dispatch.mockImplementationOnce(
     () =>
-      new Promise<Entry[]>((resolve) => {
+      new Promise<Page>((resolve) => {
         settle = resolve;
       }),
   );
-  return (rows: Entry[]) => {
-    settle(rows);
+  return (p: Page) => {
+    settle(p);
   };
 }
 
-// The history panel shell every suite renders into. h-type carries real options
-// because a <select> silently refuses a value it has no option for; h-lang and
-// h-provider are rebuilt by updateHistoryFilters, so they start bare.
 function mountShell(): void {
-  document.body.innerHTML =
-    '<div id="historyPanel">' +
-    '<select id="h-type">' +
-    '<option value=""></option>' +
-    '<option value="movie">Movies</option>' +
-    "</select>" +
-    '<select id="h-lang"></select>' +
-    '<select id="h-provider"></select>' +
-    '<input id="h-filter" />' +
-    '<div id="historyContent"></div>' +
-    "</div>";
-  historyView.clear();
+  _resetPanelsForTest();
+  document.body.replaceChildren(historyPanel().root);
 }
 
 beforeEach(() => {
@@ -192,7 +192,7 @@ describe("history: first-mount skeleton", () => {
     // without it is an invisible blank line.
     expect(rows.every((r) => r.querySelector("div.skeleton") !== null)).toBe(true);
 
-    settle([makeEntry(1)]);
+    settle(page([makeEntry(1)]));
     await drain();
     vi.advanceTimersByTime(300);
   });
@@ -206,7 +206,7 @@ describe("history: first-mount skeleton", () => {
     vi.advanceTimersByTime(150);
     expect(skeletonRows()).toHaveLength(6);
 
-    settle([makeEntry(1)]);
+    settle(page([makeEntry(1)]));
     await drain();
 
     // Painting the table now would blink the skeleton away the instant it
@@ -223,7 +223,7 @@ describe("history: first-mount skeleton", () => {
   it("suppresses the skeleton of a reload a newer one superseded", async () => {
     vi.useFakeTimers();
     const settleStale = deferPage();
-    dispatch.mockResolvedValueOnce([makeEntry(9)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(9)]));
 
     reloadHistory();
     await drain();
@@ -239,7 +239,7 @@ describe("history: first-mount skeleton", () => {
     expect(skeletonRows()).toHaveLength(0);
     expect(rowCount()).toBe(1);
 
-    settleStale([]);
+    settleStale(page([]));
     await drain();
   });
 
@@ -253,7 +253,7 @@ describe("history: first-mount skeleton", () => {
     expect(skeletonRows()).toHaveLength(6);
 
     // The page lands, so its mount is queued behind the min-visible window.
-    settleFirst([makeEntry(1), makeEntry(2)]);
+    settleFirst(page([makeEntry(1), makeEntry(2)]));
     await drain();
     expect(document.querySelector("table.history")).toBeNull();
 
@@ -268,10 +268,100 @@ describe("history: first-mount skeleton", () => {
     // reload now, and it has nothing to show yet.
     expect(document.querySelector("table.history")).toBeNull();
 
-    settleSecond([makeEntry(3)]);
+    settleSecond(page([makeEntry(3)]));
     await drain();
     vi.advanceTimersByTime(500);
     expect(rowCount()).toBe(1);
+  });
+});
+
+describe("history: empty states over the first-mount skeleton", () => {
+  // The count, not the first match: the two messages are mutually exclusive, and
+  // a querySelector read returns the first one whatever the second is doing.
+  // Presence is the whole question — nothing hides a message any more.
+  function emptyTexts(): string[] {
+    return Array.from(document.querySelectorAll("#historyContent .empty")).map(
+      (e) => e.textContent ?? "",
+    );
+  }
+
+  it("mounts the filtered-empty shape through the skeleton path", async () => {
+    vi.useFakeTimers();
+    reqEl<HTMLInputElement>("#h-filter").value = "nothing matches";
+    const settle = deferPage();
+
+    reloadHistory();
+    await drain();
+    vi.advanceTimersByTime(150);
+    expect(skeletonRows()).toHaveLength(6);
+
+    // An empty page whose unfiltered total is nonzero: the filter is what
+    // emptied this one.
+    settle(page([], 1));
+    await drain();
+    vi.advanceTimersByTime(300);
+    await drain();
+
+    expect(emptyTexts()).toEqual(["No downloads matching filter."]);
+    expect(document.querySelector("table.history")).toBeNull();
+  });
+
+  it("shows no empty state once rows land over a mount that started out empty", async () => {
+    vi.useFakeTimers();
+    const settle = deferPage();
+
+    reloadHistory();
+    await drain();
+    vi.advanceTimersByTime(150);
+    settle(page([]));
+    await drain();
+    vi.advanceTimersByTime(300);
+    await drain();
+    expect(emptyTexts()).toEqual(["No downloads yet."]);
+
+    dispatch.mockResolvedValueOnce(page([makeEntry(1)]));
+    reloadHistory();
+    await drain();
+
+    // A placeholder left painted above a populated table is what a write to a
+    // node the mount never inserted looks like from the reader's seat.
+    expect(emptyTexts()).toEqual([]);
+    expect(rowCount()).toBe(1);
+  });
+
+  it("mounts the empty-dataset shape through the skeleton path", async () => {
+    vi.useFakeTimers();
+    const settle = deferPage();
+
+    reloadHistory();
+    await drain();
+    vi.advanceTimersByTime(150);
+
+    settle(page([]));
+    await drain();
+    vi.advanceTimersByTime(300);
+    await drain();
+
+    expect(emptyTexts()).toEqual(["No downloads yet."]);
+    expect(document.querySelector("table.history")).toBeNull();
+  });
+
+  it("mounts the rows shape through the skeleton path", async () => {
+    vi.useFakeTimers();
+    const settle = deferPage();
+
+    reloadHistory();
+    await drain();
+    vi.advanceTimersByTime(150);
+    expect(skeletonRows()).toHaveLength(6);
+
+    settle(page([makeEntry(1), makeEntry(2)]));
+    await drain();
+    vi.advanceTimersByTime(300);
+    await drain();
+
+    expect(emptyTexts()).toEqual([]);
+    expect(rowCount()).toBe(2);
   });
 });
 
@@ -279,7 +369,9 @@ describe("history: row labelling", () => {
   it("marks an entry with a season but no episode number as an episode", async () => {
     // Either coordinate alone makes it an episode; a season-scoped row that
     // fell through would render like a movie and lose the distinction.
-    dispatch.mockResolvedValueOnce([makeEntry(1, { title: "The Wire", season: 2, episode: 0 })]);
+    dispatch.mockResolvedValueOnce(
+      page([makeEntry(1, { title: "The Wire", season: 2, episode: 0 })]),
+    );
 
     reloadHistory();
     await tick();
@@ -290,18 +382,20 @@ describe("history: row labelling", () => {
 
 describe("history: media id recognition", () => {
   it("navigates only from an id whose whole shape is one it recognises", async () => {
-    dispatch.mockResolvedValueOnce([
-      // A tmdb id is a prefix AND the complete value: trailing extra means this
-      // is not a movie, and linking it to /movie/12 sends the user elsewhere.
-      makeEntry(1, { media_id: "tmdb-12-s01e01" }),
-      // A recognised prefix has to be the START of the id, not a substring:
-      // otherwise any id merely containing one links to the wrong item.
-      makeEntry(2, { media_id: "x-tmdb-13" }),
-      makeEntry(3, { media_id: "x-tvdb-14" }),
-      // Control: a well-formed movie id does navigate, so the three above are
-      // rejected on their shape rather than by a broken fixture.
-      makeEntry(4, { media_id: "tmdb-15" }),
-    ]);
+    dispatch.mockResolvedValueOnce(
+      page([
+        // A tmdb id is a prefix AND the complete value: trailing extra means this
+        // is not a movie, and linking it to /movie/12 sends the user elsewhere.
+        makeEntry(1, { media_id: "tmdb-12-s01e01" }),
+        // A recognised prefix has to be the START of the id, not a substring:
+        // otherwise any id merely containing one links to the wrong item.
+        makeEntry(2, { media_id: "x-tmdb-13" }),
+        makeEntry(3, { media_id: "x-tvdb-14" }),
+        // Control: a well-formed movie id does navigate, so the three above are
+        // rejected on their shape rather than by a broken fixture.
+        makeEntry(4, { media_id: "tmdb-15" }),
+      ]),
+    );
 
     reloadHistory();
     await tick();
@@ -325,35 +419,39 @@ describe("history: media id recognition", () => {
 
 describe("history: render disposal", () => {
   it("a re-mounted table leaves its predecessor's bindings disposed", async () => {
-    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(1)]));
     reloadHistory();
     await tick();
     const discarded = reqEl<HTMLElement>("table.history");
-    expect(discarded.hidden).toBe(false);
+    // The premise the freeze claim at the end rests on, in the same terms:
+    // this render put its one row in, so the identical read down there reads
+    // "unchanged" rather than "never populated".
+    expect(discarded.querySelector("tbody")?.children.length).toBe(1);
 
     // An error paint releases the render target (the only thing that replaces
     // the history pane), so the next reload re-mounts. Release is immediate,
     // so the discarded table is frozen from here on.
     historyView.clear();
     reqEl("#historyContent").replaceChildren();
-    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(1)]));
     reloadHistory();
     await tick();
     const live = reqEl<HTMLElement>("table.history");
     expect(live).not.toBe(discarded);
 
-    dispatch.mockResolvedValueOnce([]);
+    dispatch.mockResolvedValueOnce(page([]));
     reloadHistory();
     await tick();
 
-    // Only the live render reacts to the collection now; the discarded table is
-    // frozen in the state it was dropped in.
-    expect(live.hidden).toBe(true);
-    expect(discarded.hidden).toBe(false);
+    // Only the live render reacts to the collection now: the zero-row reload
+    // took the live table out of the DOM, and left the discarded one holding
+    // the row it was frozen with.
+    expect(live.isConnected).toBe(false);
+    expect(discarded.querySelector("tbody")?.children.length).toBe(1);
   });
 
   it("a failed page leaves the render its error replaced disposed", async () => {
-    dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(1), makeEntry(2)]));
     reloadHistory();
     await tick();
     const discarded = reqTbody();
@@ -366,7 +464,7 @@ describe("history: render disposal", () => {
 
     // The recovering reload loads the collection BEFORE it re-mounts, so a
     // detached tbody still bound to it would reconcile to the new page first.
-    dispatch.mockResolvedValueOnce([makeEntry(3), makeEntry(4), makeEntry(5)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(3), makeEntry(4), makeEntry(5)]));
     reloadHistory();
     await tick();
 
@@ -377,13 +475,13 @@ describe("history: render disposal", () => {
 
 describe("history: show more", () => {
   it("restores the scroll offset it captured before appending the next page", async () => {
-    dispatch.mockResolvedValueOnce(fullPage());
+    dispatch.mockResolvedValueOnce(page(fullPage()));
     reloadHistory();
     await tick();
 
     window.scrollTo(0, 420);
     const scrollTo = vi.spyOn(window, "scrollTo");
-    dispatch.mockResolvedValueOnce([makeEntry(51)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(51)]));
 
     clickShowMore();
     await tick();
@@ -399,7 +497,7 @@ describe("history: staleness token", () => {
   it("discards the oldest of three in-flight fetches whichever kind bumped the token last", async () => {
     // A full page turns Show more on and gives the stale reload something
     // distinguishable to overwrite.
-    dispatch.mockResolvedValueOnce(fullPage());
+    dispatch.mockResolvedValueOnce(page(fullPage()));
     reloadHistory();
     await tick();
     expect(rowCount()).toBe(PAGE);
@@ -413,7 +511,7 @@ describe("history: staleness token", () => {
     clickShowMore();
     await drain();
 
-    settleStale([makeEntry(999)]);
+    settleStale(page([makeEntry(999)]));
     await tick();
 
     // The token has moved twice since this fetch started — once by a reload and
@@ -421,8 +519,8 @@ describe("history: staleness token", () => {
     // keep moving in one direction would let it land.
     expect(rowCount()).toBe(PAGE);
 
-    settleNewer([makeEntry(7)]);
-    settleMore([]);
+    settleNewer(page([makeEntry(7)]));
+    settleMore(page([]));
     await tick();
   });
 });
@@ -431,7 +529,7 @@ describe("history: bus entry point", () => {
   it("loads the page when the bus asks for history", async () => {
     const handler = bus.handlers.get("load:history");
     expect(handler).toBeDefined();
-    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    dispatch.mockResolvedValueOnce(page([makeEntry(1)]));
 
     handler?.();
     await tick();

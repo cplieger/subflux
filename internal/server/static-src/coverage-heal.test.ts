@@ -91,11 +91,13 @@ import {
 } from "./coverage-heal.js";
 import type { CoverageRoot } from "./coverage-heal.js";
 import {
+  _coverageDerivesForTest,
   _resetCoverageForTest,
   fetchAndMergeCoverage,
   filterCoverage,
   loadCoverage,
 } from "./coverage.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import {
   applyHealedRow,
   coverageRow,
@@ -169,26 +171,6 @@ function okRes(data: unknown): { ok: boolean; status: number; data?: unknown } {
   return { ok: true, status: 200, data };
 }
 
-const FIXTURE = `
-<section class="card" id="coveragePanel">
-  <div class="card-head" hidden>
-    <h2 id="lib-heading">Library</h2>
-    <div class="controls">
-      <input type="checkbox" id="cov-missing">
-      <select id="cov-type-filter">
-        <option value="all">All</option>
-        <option value="series">Series</option>
-        <option value="movies">Movies</option>
-      </select>
-      <select id="cov-sort">
-        <option value="title">A-Z</option>
-      </select>
-      <input id="cov-filter" type="search">
-    </div>
-  </div>
-  <div id="coverageContent"></div>
-</section>`;
-
 /** Land a pair through the real route-loader read (mounts the table). */
 async function load(
   seriesRows: Record<string, unknown>[],
@@ -243,7 +225,8 @@ beforeEach(() => {
   setDetailRefresher((root) => {
     coupled.push({ root, row: coverageRow(root.rootKey) });
   });
-  document.body.innerHTML = FIXTURE;
+  _resetPanelsForTest();
+  document.body.replaceChildren(libraryPanel().root);
   store.set("currentPage", "library");
   store.set("detailCtx", null);
   filterCoverage();
@@ -402,11 +385,10 @@ describe("coverage-heal: gate", () => {
 // --- The coalescer ---
 
 describe("coverage-heal: coalescer", () => {
-  /** applyFilters reads #cov-filter exactly once per run, so counting that
-   *  lookup counts derives of the filtered+sorted view. */
+  /** Derives of the filtered+sorted view since this call. */
   function countDerives(): () => number {
-    const byId = vi.spyOn(document, "getElementById");
-    return () => byId.mock.calls.filter(([id]) => id === "cov-filter").length;
+    const base = _coverageDerivesForTest();
+    return () => _coverageDerivesForTest() - base;
   }
 
   it("a synchronous 200-event burst across 3 roots costs 3 GETs, one flush, one derive", async () => {
@@ -760,7 +742,8 @@ describe("coverage-heal: R7.1 parity", () => {
     // Full-refetch path, from the same v1 mount.
     _resetHealForTest();
     _resetCoverageForTest();
-    document.body.innerHTML = FIXTURE;
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     filterCoverage();
     await load([seriesWire(1)]);
     wire.series = [seriesV2()];
@@ -788,7 +771,8 @@ describe("coverage-heal: R7.1 parity", () => {
 
     _resetHealForTest();
     _resetCoverageForTest();
-    document.body.innerHTML = FIXTURE;
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     filterCoverage();
     await load([], [movieWire(2)]);
     wire.movies = [movieV2()];

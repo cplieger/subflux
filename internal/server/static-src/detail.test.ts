@@ -122,7 +122,8 @@ vi.mock("./store.js", () => ({
 }));
 
 import { renderSeriesDetail, renderMovieDetailFromLeg, openMovieDetail } from "./detail.js";
-import { contentView, releaseRouteViews } from "./view-scope.js";
+import { releaseRouteViews } from "./view-scope.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import { split } from "@cplieger/keyenc";
 import { openSyncDialog } from "./sync.js";
 import { openFileManager } from "./files.js";
@@ -324,14 +325,8 @@ describe("detail: renderSeriesDetail", () => {
     storeState.ignoredCodecs = new Set<string>();
     storeState.isAdmin = false;
     storeState.config = null;
-    // The real dom.js `$.coverageContent` getter reads #coverageContent; the
-    // Files button (admin-gated, off here) targets #coveragePanel .card-head.
-    // A fresh document is a released pane: ownership decides reuse now, so the
-    // wipe is paired with the release a real view swap performs.
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("initial render builds season heads, column headers, and episode rows", () => {
@@ -785,9 +780,8 @@ describe("detail: renderSeriesDetail", () => {
       document.querySelector("tr.season-head [data-tip='Audio sync all subtitles in this season']"),
     ).toBeNull();
 
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     renderSeriesDetail(
       series,
       makeSeasons("Pilot", "Second", "Return"),
@@ -909,9 +903,8 @@ describe("detail: renderSeriesDetail", () => {
     expect(document.querySelector('[data-nav="files"]')).toBeNull();
 
     storeState.isAdmin = true;
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     renderSeriesDetail(makeSeries(321, "Show X"), makeSeasons("a", "b", "c"), [embedded]);
     expect(document.querySelector('[data-nav="files"]')).toBeNull();
   });
@@ -1029,10 +1022,8 @@ describe("detail: openSeriesDetail", () => {
     clientState.defer = false;
     clientState.pending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("pushes the series URL, titles the tab and summarises the item", () => {
@@ -1148,10 +1139,8 @@ describe("detail: openMovieDetail", () => {
     clientState.subsDefer = false;
     clientState.subsPending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("coverage refresh repaints only the changed language row and keeps row identity", async () => {
@@ -1561,10 +1550,8 @@ describe("detail: renderMovieDetailFromLeg (the transaction's movie render)", ()
     clientState.subsDefer = false;
     clientState.subsPending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("paints from the leg's pre-fetched reads — no fetch of its own, context set", () => {
@@ -1612,10 +1599,8 @@ describe("detail: the movie-detail render seam", () => {
     clientState.subsDefer = false;
     clientState.subsPending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("paints the same view from the same payload whichever caller read it", async () => {
@@ -1642,10 +1627,8 @@ describe("detail: the movie-detail render seam", () => {
     });
     expect(clientState.movieSubsCalls).toBe(1);
 
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
     releaseRouteViews();
 
     renderMovieDetailFromLeg(makeMovie(93), { subs, historyIDs });
@@ -1696,10 +1679,8 @@ describe("detail: renderSeriesDetail table chrome", () => {
     storeState.ignoredCodecs = new Set<string>();
     storeState.isAdmin = false;
     storeState.config = null;
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("frames the table with explicit table semantics, column headers and a season gap", () => {
@@ -2055,10 +2036,8 @@ describe("detail: openSeriesDetail panel", () => {
     clientState.defer = false;
     clientState.pending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("configures the panel for a detail view with the library controls hidden", () => {
@@ -2104,10 +2083,8 @@ describe("detail: openMovieDetail chrome", () => {
     clientState.subsDefer = false;
     clientState.subsPending = [];
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("offers the Files button when only SOME subtitles are embedded tracks", async () => {
@@ -2187,10 +2164,8 @@ describe("detail: release on leave (C2)", () => {
     clientState.subsPending = [];
     clientState.stateIDs = null;
     history.replaceState(null, "", "/");
-    document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
-      '<div id="coverageContent"></div></div>';
-    contentView.clear();
+    _resetPanelsForTest();
+    document.body.replaceChildren(libraryPanel().root);
   });
 
   it("a disposed series binding never reuses: the next render rebuilds fresh row effects", () => {

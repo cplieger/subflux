@@ -141,6 +141,12 @@
   margin-block-end: var(--sp-4);
 }
 
+/* `display: flex` above beats the UA sheet's `[hidden] { display: none }`, so the
+   upgrade-window field wizard-steps.ts hides needs its own arm (web.md). */
+.wiz-field[hidden] {
+  display: none;
+}
+
 /* min-width matches .cfg-field's floor in 10-config.css so both surfaces align
  * their inputs at the same column. It has to clear the longest label the schema
  * ships ("Streaming Service", 108px in the sidecar's face and 118px in DejaVu

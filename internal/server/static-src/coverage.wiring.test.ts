@@ -129,6 +129,7 @@ vi.mock("./store.js", () => ({
 }));
 
 import { configurePanel, fetchAndMergeCoverage, filterCoverage, loadCoverage } from "./coverage.js";
+import { _resetPanelsForTest, libraryPanel } from "./panels.js";
 import { renderSeriesDetail } from "./detail.js";
 import type { CoverageItem, CoverageTarget, SeriesItem } from "./api-types.js";
 import { contentView } from "./view-scope.js";
@@ -173,33 +174,23 @@ function seriesDetailItem(tvdbId: number): SeriesItem {
   } as SeriesItem;
 }
 
-const FIXTURE = `
-<section class="card" id="coveragePanel">
-  <div class="card-head" hidden>
-    <h2 id="lib-heading">Library</h2>
-    <div class="controls">
-      <input type="checkbox" id="cov-missing">
-      <select id="cov-type-filter"><option value="all">All</option></select>
-      <select id="cov-sort"><option value="title">A-Z</option></select>
-      <input id="cov-filter" type="search">
-    </div>
-  </div>
-  <div id="coverageContent"></div>
-</section>
+const SHELL = `
 <button type="button" id="historyBtn">History</button>
-<section class="card" id="historyPanel" hidden></section>`;
+<main id="main"></main>`;
 
 // The module holds ONE collection plus the filter/page signals for the whole
 // file, and every path under test branches on whether that collection is EMPTY
 // (a first load paints through the skeleton controller, a refresh paints
-// directly). So each test starts from a cleared collection and a fresh DOM.
+// directly). So each test starts from a cleared collection and a freshly built
+// panel.
 beforeEach(async () => {
   clientState.series = [];
   clientState.movies = [];
   clientState.next = [];
   await fetchAndMergeCoverage();
-  document.body.innerHTML = FIXTURE;
-  contentView.clear();
+  _resetPanelsForTest();
+  document.body.innerHTML = SHELL;
+  document.body.appendChild(libraryPanel().root);
   bus.emitted = [];
   storeState.isUnconfigured = false;
   scanState.running = false;
@@ -435,6 +426,22 @@ describe("coverage: nav button labels", () => {
   });
 });
 
+describe("coverage: library chrome on a detail route", () => {
+  it("takes the filter controls out of the head before the detail paints", async () => {
+    const router = await import("./router.js");
+    const home = location.pathname + location.search;
+    expect(libraryPanel().head.querySelector(".controls")).not.toBeNull();
+
+    history.replaceState(null, "", "/series/999");
+    await router.applyRoute();
+    history.replaceState(null, "", home);
+
+    // Left in the head they show the library for a frame before the detail
+    // loader paints.
+    expect(libraryPanel().head.querySelector(".controls")).toBeNull();
+  });
+});
+
 describe("coverage: render disposal", () => {
   /** Row titles of one specific table element (the global rowTitles() only
    *  sees the table attached to the document). */
@@ -466,47 +473,48 @@ describe("coverage: render disposal", () => {
 
     await load([]);
 
-    expect(live.hidden).toBe(true);
-    expect(discarded.hidden).toBe(false);
+    expect(live.parentElement).toBeNull();
+    expect(discarded.parentElement).not.toBeNull();
   });
 });
 
-/** The installed no-media panel. A reusing install leaves the container's OLD
- *  node wearing this class, which is why the cases below assert identity too. */
-const LIVE_EMPTY = "#coverageContent .cov-list > .empty";
+/** The installed list. A reusing install leaves the container's OLD node wearing
+ *  this class, which is why the cases below assert identity too. */
+const LIVE_LIST = "#coverageContent > .cov-list";
 
 // Two arrivals that leave a `div.empty` in the container rather than a skeleton
-// row: a reusing install seats the list on it and the empty state on its message
-// div. `reqEl` throws on a selector miss, which is what keeps a broken selector
+// row: a reusing install seats the list on that node and discards the fresh one,
+// so the table would be reconciled into a subtree that reaches no document.
+// `reqEl` throws on a selector miss, which is what keeps a broken selector
 // distinguishable from the defect without a third control case.
 describe("coverage: install over a departing view's empty state", () => {
-  it("installs its own empty state over a season-less series' empty state", async () => {
+  it("installs its own list over a season-less series' empty state", async () => {
     renderSeriesDetail(seriesDetailItem(1), [], []);
-    const armedMessage = reqEl<HTMLElement>("#coverageContent .empty > div");
-    expect(armedMessage.textContent).toContain("No episodes with video files");
+    const armed = reqEl<HTMLElement>("#coverageContent .empty");
+    expect(armed.textContent).toContain("No episodes with video files");
 
     await load([series(1, "Show")]);
 
     expect(rowTitles()).toEqual(["Show"]);
-    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
-    expect(installed).not.toBe(armedMessage);
-    expect(installed.hidden).toBe(true);
+    const list = reqEl<HTMLElement>(LIVE_LIST);
+    expect(list).not.toBe(armed);
+    expect(list.querySelector("table.library")).not.toBeNull();
   });
 
-  it("installs its own empty state over a 404 deep link's not-found panel", async () => {
+  it("installs its own list over a 404 deep link's not-found panel", async () => {
     const router = await import("./router.js");
     const home = location.pathname + location.search;
     history.replaceState(null, "", "/series/999");
     await router.applyRoute();
     history.replaceState(null, "", home);
-    const armedMessage = reqEl<HTMLElement>("#coverageContent .empty > div");
-    expect(armedMessage.textContent).toContain("Not found");
+    const armed = reqEl<HTMLElement>("#coverageContent .empty");
+    expect(armed.textContent).toContain("Not found");
 
     await load([series(1, "Show")]);
 
     expect(rowTitles()).toEqual(["Show"]);
-    const installed = reqEl<HTMLElement>(LIVE_EMPTY);
-    expect(installed).not.toBe(armedMessage);
-    expect(installed.hidden).toBe(true);
+    const list = reqEl<HTMLElement>(LIVE_LIST);
+    expect(list).not.toBe(armed);
+    expect(list.querySelector("table.library")).not.toBeNull();
   });
 });
