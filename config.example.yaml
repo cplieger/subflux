@@ -17,6 +17,13 @@ radarr:
 # Must match the media paths inside Sonarr/Radarr containers.
 # If you change this, update the volume mounts in compose.yaml too.
 # Multiple roots supported (e.g. /movies and /tv mounted separately).
+# Each listed root must exist and be writable. subflux writes and deletes a
+# small hidden test file to check this at these times:
+#   - in each root before a full scan
+#   - in the folder a scan of one series or movie, an import or a manual
+#     download writes into, before it starts
+#   - in a folder where a save just failed
+#   - every 5 minutes in a folder found unwritable
 media_roots:
   - /media
 
@@ -106,6 +113,10 @@ embedded_subtitles:
 # ---------------------------------------------------------------------------
 # Subtitle providers
 # ---------------------------------------------------------------------------
+# A provider that rejects its credentials is paused after the first and second
+# rejection and disabled after the third, so a wrong password cannot get the
+# account locked. It stays disabled until you save different credentials, press
+# its Test button in the settings dialog, or reset provider state.
 
 providers:
   hdbits:

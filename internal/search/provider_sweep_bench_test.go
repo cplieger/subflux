@@ -8,6 +8,7 @@ import (
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 func BenchmarkSearchProviders(b *testing.B) {
@@ -23,6 +24,7 @@ func BenchmarkSearchProviders(b *testing.B) {
 			WithSyncer(syncing.Syncer{}),
 			WithTracks(noopDetector{}),
 			WithTimeout(noopHealth{}),
+			WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()),
 		)
 		req := &subflux.SearchRequest{
 			MediaType: subflux.MediaTypeEpisode,

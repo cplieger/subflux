@@ -25,19 +25,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"go.etcd.io/bbolt"
 )
-
-// statFunc checks a path's existence for ReconcileState's filesystem oracle. It
-// mirrors the legacy SQLite store's injectable stat function: production uses
-// os.Stat, and tests substitute a fake so reconciliation can be exercised
-// without touching the real filesystem. ReconcileState only inspects whether
-// the returned error is os.ErrNotExist (file gone) versus any other error
-// (treated as present/skip), matching the old reconcile classifier.
-type statFunc func(path string) (os.FileInfo, error)
 
 // openTimeout bounds how long Open waits for the bbolt file lock before failing
 // fast. bbolt takes an exclusive OS lock on the file, so a second opener (for
@@ -58,12 +49,6 @@ const initialMmapSize = 256 << 20
 // store shares.
 type DB struct {
 	db *bbolt.DB
-
-	// statFn is the filesystem-existence oracle ReconcileState uses to decide
-	// whether each row's video and subtitle files still exist. It defaults to
-	// os.Stat in Open; tests override it to drive reconciliation deterministically
-	// without real files.
-	statFn statFunc
 }
 
 // openOptions returns the bbolt open options shared by Open and the
@@ -153,7 +138,7 @@ func openWithDomains(path string, core, auth *migrationDomain) (*DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("boltstore: open %q: %w", path, err)
 	}
-	return &DB{db: db, statFn: os.Stat}, nil
+	return &DB{db: db}, nil
 }
 
 // bootstrap creates every core and auth bucket and stamps the supplied schema

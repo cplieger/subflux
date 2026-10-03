@@ -45,6 +45,13 @@ type Deps struct {
 	Resolve   *resolve.Resolver
 	StateFunc func() *LiveState
 	Events    EventPublisher
+	Presence  Presence
+}
+
+// Presence decides whether a manual subtitle is gone from disk;
+// *mediapresence.Checker satisfies it.
+type Presence interface {
+	Gone(ctx context.Context, path string) (bool, error)
 }
 
 // FileSonarrClient is the Sonarr surface the bound orphan fallback needs:
@@ -477,9 +484,9 @@ type lockQuad struct {
 	variant  subflux.Variant
 }
 
-// maybeRevertManualLock checks if there are any remaining manual subtitle
-// files on disk for a media+language+variant quad. If none remain, clears
-// that quad's manual lock (sibling variants keep theirs).
+// maybeRevertManualLock clears a media+language+variant quad's manual lock
+// once every manual subtitle file it recorded is definitely gone from disk
+// (sibling variants keep theirs); a file Presence cannot judge keeps the lock.
 func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) {
 	key := subflux.ManualLockKey{
 		MediaType: mediaType, MediaID: mediaID, Language: language, Variant: variant,
@@ -490,7 +497,7 @@ func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType subflux.M
 		return
 	}
 	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
+		if gone, err := h.deps.Presence.Gone(ctx, p); err != nil || !gone {
 			return
 		}
 	}

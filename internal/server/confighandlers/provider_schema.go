@@ -25,6 +25,9 @@ type SchemaRegistry interface {
 	// whether its credentials are accepted. A nil error means they are; a
 	// *subflux.AuthError means they were refused.
 	CheckCredentials(ctx context.Context, name subflux.ProviderID, settings map[string]any) error
+	// Normalize types raw settings the way the provider's factory reads them,
+	// which is also the form the credential gate fingerprints.
+	Normalize(name subflux.ProviderID, raw map[string]any) map[string]any
 }
 
 // BuildProviderSchemas converts the registry's provider metadata into

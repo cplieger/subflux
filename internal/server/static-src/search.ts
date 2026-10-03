@@ -10,7 +10,7 @@ import { join } from "@cplieger/keyenc";
 import { manualSearchRaw, PATH_DOWNLOAD_SUBTITLE } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import { decodeDownloadAccepted } from "./wire/decoders.gen.js";
-import type { DownloadAccepted, SearchResult } from "./wire/types.gen.js";
+import type { DownloadAccepted, ManualProviderNotice, SearchResult } from "./wire/types.gen.js";
 import { apiAction, retryNetwork, registerCleanup } from "@cplieger/actions";
 import { observeActivities } from "./status.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
@@ -412,12 +412,26 @@ async function runPopupSearch(
     patch(out, errDiv("Empty response"));
     return;
   }
-  renderPopupResults(out, payload.results, lang, mediaType, media, season, episode);
+  const notices = providerNoticeLines(payload.providers ?? []);
+  renderPopupResults(out, payload.results, notices, lang, mediaType, media, season, episode);
+}
+
+/** One line per provider that contributed nothing: skipped by the provider
+ *  gate, or failed. */
+function providerNoticeLines(notices: readonly ManualProviderNotice[]): HTMLElement[] {
+  return notices.map((n) =>
+    el(
+      "div",
+      { className: "result-notice" },
+      `${n.provider} ${n.kind === "gated" ? "skipped" : "failed"}: ${n.message}`,
+    ),
+  );
 }
 
 function renderPopupResults(
   out: HTMLElement,
   results: SearchResult[],
+  notices: readonly HTMLElement[],
   lang: string,
   mediaType: MediaType,
   media: CoverageMedia,
@@ -425,7 +439,7 @@ function renderPopupResults(
   episode: CoverageEpisode | null,
 ): void {
   if (results.length === 0) {
-    patch(out, emptyDiv("No results found."));
+    patch(out, emptyDiv("No results found."), ...notices);
     return;
   }
 
@@ -521,6 +535,7 @@ function renderPopupResults(
     );
     frag.appendChild(row);
   }
+  frag.append(...notices);
   patch(out, frag);
 }
 

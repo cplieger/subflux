@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -247,14 +249,15 @@ func (h *Handler) finishScan(unregister func(), actID, action, detail string, ou
 	}
 }
 
-// preflightSeries synchronously resolves the series for a scan start: the
-// arr existence lookup that must answer 404 BEFORE the 202 is written.
-// Lookup failures that aren't "not found" surface as 502 (upstream proxy
-// failure). Runs on the REQUEST context — the scan itself has not started.
+// preflightSeries synchronously resolves the series for a scan start and
+// write-tests its folder: the checks that must answer BEFORE the 202 is
+// written. A missing series is 404, any other lookup failure 502 (upstream
+// proxy failure), an unwritable folder 409. Runs on the REQUEST context —
+// the scan itself has not started.
 func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
-	st *HandlerState, seriesID int,
+	op *opState, seriesID int,
 ) (arrapi.Series, bool) {
-	series, err := st.Sonarr.SeriesByID(r.Context(), seriesID)
+	series, err := op.st.Sonarr.SeriesByID(r.Context(), seriesID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "series not found")
@@ -264,14 +267,18 @@ func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 		}
 		return arrapi.Series{}, false
 	}
+	if !preflightFolder(w, r, op.deps.Media, series.Path) {
+		return arrapi.Series{}, false
+	}
 	return series, true
 }
 
-// preflightMovie is preflightSeries for Radarr movies.
+// preflightMovie is preflightSeries for Radarr movies; the folder tested is
+// the movie file's own, or the movie's folder when it has no file.
 func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
-	st *HandlerState, movieID int,
+	op *opState, movieID int,
 ) (arrapi.Movie, bool) {
-	movie, err := st.Radarr.MovieByID(r.Context(), movieID)
+	movie, err := op.st.Radarr.MovieByID(r.Context(), movieID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "movie not found")
@@ -281,7 +288,29 @@ func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 		}
 		return arrapi.Movie{}, false
 	}
+	folder := movie.Path
+	if movie.MovieFile != nil {
+		folder = filepath.Dir(movie.MovieFile.Path)
+	}
+	if !preflightFolder(w, r, op.deps.Media, folder) {
+		return arrapi.Movie{}, false
+	}
 	return movie, true
+}
+
+// preflightFolder write-tests folder and its known-bad relatives, answering
+// 409 media_unwritable on a refusal; a request whose client left writes
+// nothing.
+func preflightFolder(w http.ResponseWriter, r *http.Request, media MediaPreflight, folder string) bool {
+	err := media.Preflight(r.Context(), mediawrite.PreflightRequest{Folders: []string{folder}, Raise: true})
+	switch {
+	case err == nil:
+		return true
+	case r.Context().Err() != nil:
+		return false
+	}
+	httpapi.ConflictC(w, r, subflux.CodeMediaUnwritable, err.Error())
+	return false
 }
 
 // HandleScanSeries scans all missing subtitles for a specific series.
@@ -307,7 +336,7 @@ func (h *Handler) HandleScanSeries(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
-	series, ok := h.preflightSeries(w, r, op.st, seriesID)
+	series, ok := h.preflightSeries(w, r, op, seriesID)
 	if !ok {
 		return
 	}
@@ -351,7 +380,7 @@ func (h *Handler) HandleScanSeason(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
-	series, ok := h.preflightSeries(w, r, op.st, seriesID)
+	series, ok := h.preflightSeries(w, r, op, seriesID)
 	if !ok {
 		return
 	}
@@ -402,7 +431,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 			httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgRadarrNotConfigured)
 			return
 		}
-		movie, ok := h.preflightMovie(w, r, op.st, req.MediaID)
+		movie, ok := h.preflightMovie(w, r, op, req.MediaID)
 		if !ok {
 			return
 		}
@@ -419,7 +448,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
-	series, ok := h.preflightSeries(w, r, op.st, req.MediaID)
+	series, ok := h.preflightSeries(w, r, op, req.MediaID)
 	if !ok {
 		return
 	}
@@ -458,7 +487,7 @@ func (h *Handler) HandleScanMovie(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgRadarrNotConfigured)
 		return
 	}
-	movie, ok := h.preflightMovie(w, r, op.st, movieID)
+	movie, ok := h.preflightMovie(w, r, op, movieID)
 	if !ok {
 		return
 	}

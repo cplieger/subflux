@@ -3,6 +3,8 @@
 package schema
 
 import (
+	"slices"
+
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -15,6 +17,7 @@ const (
 	fieldSecret   = "secret"
 	fieldSelect   = "select"
 	fieldFields   = "fields"
+	fieldNested   = "nested"
 
 	// Section-level constants.
 	fieldList        = "list"
@@ -31,9 +34,14 @@ const (
 
 // Sections returns the full configuration schema for the UI, in the order
 // config.example.yaml uses. providerSchemas is built from the provider
-// registry by the caller.
+// registry by the caller. Every field of type secret comes back with Secret
+// set, at any depth, because redaction and the save-side merge key on the flag.
 func Sections(providerSchemas []subflux.ProviderSchema) []subflux.SchemaSection {
-	return []subflux.SchemaSection{
+	providers := slices.Clone(providerSchemas)
+	for i := range providers {
+		providers[i].Settings = withSecretFlags(providers[i].Settings)
+	}
+	sections := []subflux.SchemaSection{
 		sonarrSection(),
 		radarrSection(),
 		mediaRootsSection(),
@@ -44,7 +52,7 @@ func Sections(providerSchemas []subflux.ProviderSchema) []subflux.SchemaSection 
 		embeddedSection(),
 		{
 			Key: sectionProviders, Title: "Providers", Type: sectionProviders,
-			Providers: providerSchemas,
+			Providers: providers,
 		},
 		searchSection(),
 		adaptiveSection(),
@@ -54,4 +62,19 @@ func Sections(providerSchemas []subflux.ProviderSchema) []subflux.SchemaSection 
 		backupSection(),
 		loggingSection(),
 	}
+	for i := range sections {
+		sections[i].Fields = withSecretFlags(sections[i].Fields)
+	}
+	return sections
+}
+
+// withSecretFlags copies at every level because provider settings are the
+// registry's own slices, which building a schema must not mutate.
+func withSecretFlags(fields []subflux.SchemaField) []subflux.SchemaField {
+	out := slices.Clone(fields)
+	for i := range out {
+		out[i].Secret = out[i].Secret || out[i].Type == fieldSecret
+		out[i].Fields = withSecretFlags(out[i].Fields)
+	}
+	return out
 }

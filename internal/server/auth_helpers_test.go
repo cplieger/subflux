@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // --- Test helpers ---
@@ -67,6 +68,8 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 		ceremonies:    authhandlers.NewCeremonyStore(),
 		activity:      activity.New(50),
 		alerts:        activity.NewAlertLog(100),
+		media:         testsupport.MediaWriter(),
+		presence:      testsupport.MediaPresence(),
 	}
 	// check_breached_passwords: OFF, stated rather than inherited. The real
 	// config DEFAULTS IT ON, so these tests have never run the production

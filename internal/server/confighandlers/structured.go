@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -41,9 +41,9 @@ type StructuredConfig struct {
 	// SecretsPresent lists the dotted schema paths of secrets that hold a
 	// non-empty value in the config file (e.g. "sonarr.api_key",
 	// "providers.opensubtitles.settings.password"). GET-only metadata: the
-	// values themselves stay redacted-empty, but the first-boot wizard needs
-	// presence to distinguish "key saved" from "key missing" for its
-	// satisfied/ping decisions. Ignored on save.
+	// values themselves stay redacted-empty, but the first-boot wizard and the
+	// settings form need presence to distinguish "key saved" from "key
+	// missing". Ignored on save.
 	SecretsPresent []string `json:"secrets_present,omitempty"`
 }
 
@@ -118,7 +118,7 @@ func (h *Handler) HandleGetConfigStructured(w http.ResponseWriter, r *http.Reque
 func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "failed to read body")
+		rejectSave(w, r, subflux.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(body)) > maxBodySize {
@@ -129,11 +129,11 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 
 	var sc StructuredConfig
 	if decErr := json.Unmarshal(body, &sc); decErr != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid JSON: "+decErr.Error())
+		rejectSave(w, r, subflux.CodeBadRequest, "invalid JSON: "+decErr.Error())
 		return
 	}
 	if len(sc.Sections) == 0 {
-		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "no config sections provided")
+		rejectSave(w, r, subflux.CodeConfigInvalid, "no config sections provided")
 		return
 	}
 
@@ -156,7 +156,7 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "secret merge")
 			return
 		}
-		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
+		rejectSave(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
 		return
 	}
 	slog.Debug("structured config canonicalized", "bytes", len(data), "sections", len(sc.Sections))
@@ -341,21 +341,21 @@ func emptyYAMLDocument(root *yaml.Node) bool {
 func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byte) {
 	newCfg, err := h.loadConfig(data)
 	if err != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
+		rejectSave(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
 		return
 	}
 	if err := h.checkWebAuthnRPID(r, newCfg.WebAuthnRPID()); err != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "auth.webauthn_rp_id: "+err.Error())
+		rejectSave(w, r, subflux.CodeConfigInvalid, "auth.webauthn_rp_id: "+err.Error())
 		return
 	}
 
 	live := h.state()
 	if pingErr := h.pingArrIfChanged(r.Context(), arrSonarr, newCfg.Sonarr(), live.Sonarr); pingErr != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
+		rejectSave(w, r, subflux.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
 		return
 	}
 	if pingErr := h.pingArrIfChanged(r.Context(), arrRadarr, newCfg.Radarr(), live.Radarr); pingErr != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
+		rejectSave(w, r, subflux.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
 		return
 	}
 

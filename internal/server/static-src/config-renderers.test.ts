@@ -518,6 +518,60 @@ describe("renderFieldsSection", () => {
   });
 });
 
+describe("renderFieldsSection: nested fields", () => {
+  const AUTH: SchemaSection = {
+    key: "auth",
+    title: "Authentication",
+    type: "fields",
+    fields: [
+      field({ key: "oidc_enabled", type: "bool" }),
+      field({
+        key: "oidc",
+        type: "nested",
+        fields: [
+          field({ key: "issuer_url", type: "text", show_when: "oidc_enabled=true" }),
+          field({ key: "client_id", type: "text", show_when: "oidc_enabled=true" }),
+        ],
+      }),
+    ],
+  };
+
+  it("renders each leaf inline under its dotted path, prefilled from the stored nested block", () => {
+    setCfgSections({
+      auth: { oidc_enabled: true, oidc: { issuer_url: "https://auth.example.com/" } },
+    });
+    const sec = mount(renderFieldsSection(AUTH, null));
+
+    const issuer = sec.querySelector<HTMLInputElement>(
+      `#${CSS.escape("cfg-auth-oidc.issuer_url")}`,
+    );
+    const clientID = sec.querySelector<HTMLInputElement>(
+      `#${CSS.escape("cfg-auth-oidc.client_id")}`,
+    );
+    expect(issuer?.value).toBe("https://auth.example.com/");
+    expect(clientID?.value).toBe("");
+    expect(sec.querySelector(`#${CSS.escape("cfg-auth-oidc")}`)).toBeNull();
+  });
+
+  it("applies a leaf's show_when against its section sibling", () => {
+    setCfgSections({ auth: { oidc_enabled: false } });
+    const sec = mount(renderFieldsSection(AUTH, null));
+    const issuerRow = sec
+      .querySelector(`#${CSS.escape("cfg-auth-oidc.issuer_url")}`)
+      ?.closest<HTMLElement>(".cfg-field");
+    const toggle = sec.querySelector<HTMLInputElement>("#cfg-auth-oidc_enabled");
+    if (!issuerRow || !toggle) {
+      throw new Error("nested leaf or its dependency was not rendered");
+    }
+    expect(issuerRow.style.display).toBe("none");
+
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change"));
+
+    expect(issuerRow.style.display).toBe("");
+  });
+});
+
 describe("renderListSection", () => {
   const schema: SchemaSection = {
     key: "media_roots",

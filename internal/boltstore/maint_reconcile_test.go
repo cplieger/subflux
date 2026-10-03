@@ -1,6 +1,8 @@
 package boltstore
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,20 +12,26 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// This file covers the task-6.3 ReconcileState three-way, group-aware semantics
-// (Requirements 7.1-7.5), tested against REAL files on disk so the production
-// os.Stat-based classifier (DB.statFn defaults to os.Stat in Open) is exercised
-// end to end rather than a fake oracle:
-//
-//   - video gone -> delete the whole fan-out (rows + orphaned subtitle files +
-//     backoff + orphaned scan_state);
-//   - subtitle gone with a sibling still present -> delete ONLY that row,
-//     preserving the manual lock, clearing no backoff, resetting nothing;
-//   - all subtitles for a triple gone -> reset the auto rows in place, delete
-//     the manual rows, clear the triple's backoff;
-//
-// plus idempotency (run twice == run once), unrelated-media isolation, and
-// counter consistency.
+// ReconcileState's three branches against real files read through statGone,
+// plus idempotency, unrelated-media isolation and counter consistency.
+
+// statGone adapts a stat function into ReconcileState's oracle: not-exist is
+// gone, success is present, and any other error decides nothing.
+func statGone(stat func(string) (os.FileInfo, error)) func(context.Context, string) (bool, error) {
+	return func(_ context.Context, path string) (bool, error) {
+		_, err := stat(path)
+		switch {
+		case err == nil:
+			return false, nil
+		case errors.Is(err, os.ErrNotExist):
+			return true, nil
+		}
+		return false, err
+	}
+}
+
+// noFault is the unavailable oracle for a stat-only reconcile: no root faults.
+func noFault(string) (string, bool) { return "", false }
 
 // mkfile writes a placeholder file at path so os.Stat reports it present, and
 // returns the path for convenience.
@@ -63,7 +71,7 @@ func assertDownloadsConsistent(t *testing.T, db *DB) {
 // TestReconcileState_noRecords is a no-op on an empty store.
 func TestReconcileState_noRecords(t *testing.T) {
 	db, _ := openTemp(t)
-	res, err := db.ReconcileState(t.Context())
+	res, err := db.ReconcileState(t.Context(), statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -88,7 +96,7 @@ func TestReconcileState_allPresentIsNoop(t *testing.T) {
 	}
 	seedAttempt(t, db, subflux.MediaTypeMovie, "tt1", "fr", subflux.ProviderNameGestdown)
 
-	res, err := db.ReconcileState(ctx)
+	res, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -141,7 +149,7 @@ func TestReconcileState_videoGoneDeletesFanout(t *testing.T) {
 	// Video disappears from disk.
 	rmfile(t, video)
 
-	res, err := db.ReconcileState(ctx)
+	res, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -214,7 +222,7 @@ func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 	rmfile(t, autoSub)    // the auto row's subtitle disappears
 	rmfile(t, manualGone) // a second row's subtitle disappears; manualSub remains
 
-	res, err := db.ReconcileState(ctx)
+	res, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -284,7 +292,7 @@ func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
 	rmfile(t, manualSub)
 	time.Sleep(10 * time.Millisecond) // ensure the reset timestamp is strictly later
 
-	res, err := db.ReconcileState(ctx)
+	res, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -369,7 +377,7 @@ func TestReconcileState_allSubsGoneAutoOnlyReset(t *testing.T) {
 	rmfile(t, sub1)
 	rmfile(t, sub2)
 
-	res, err := db.ReconcileState(ctx)
+	res, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -417,7 +425,7 @@ func TestReconcileState_unrelatedMediaUntouched(t *testing.T) {
 
 	rmfile(t, delVideo)
 
-	if _, err := db.ReconcileState(ctx); err != nil {
+	if _, err := db.ReconcileState(ctx, statGone(os.Stat), noFault); err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
 
@@ -488,7 +496,7 @@ func TestReconcileState_idempotent(t *testing.T) {
 	rmfile(t, sibAuto)
 	time.Sleep(10 * time.Millisecond)
 
-	first, err := db.ReconcileState(ctx)
+	first, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState(first): %v", err)
 	}
@@ -510,7 +518,7 @@ func TestReconcileState_idempotent(t *testing.T) {
 	resetImported := reset1[0].MediaImported
 
 	// Second pass must be a no-op: nothing deleted, nothing reset.
-	second, err := db.ReconcileState(ctx)
+	second, err := db.ReconcileState(ctx, statGone(os.Stat), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState(second): %v", err)
 	}

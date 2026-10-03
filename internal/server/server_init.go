@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -100,6 +100,7 @@ func (s *Server) initHandlers() {
 		DefaultConfig: s.defaultConfig,
 		Registry:      s.registry,
 		Alerts:        s.alerts,
+		ProviderAuth:  s.gate,
 		// The config handlers only ping, so their factory types return
 		// confighandlers.ArrPinger. Go has no return-type covariance for func
 		// values, so narrowing the server's own factory to what that consumer
@@ -123,6 +124,8 @@ func (s *Server) initHandlers() {
 		Alerts:     s.alerts,
 		Events:     s.events,
 		StatsCache: s.queryH.StatsInvalidator(),
+		Media:      s.media,
+		Presence:   s.presence,
 	}, s.pollerLiveState)
 	s.scanH = s.initScanHandler()
 	resolver := s.newResolver()
@@ -151,6 +154,7 @@ func (s *Server) initHandlers() {
 		Exec: (&synchandlers.AudioExecutor{
 			Store:  s.stores.sync,
 			Proc:   s.subtitleProc,
+			Media:  s.media,
 			Runner: s.syncRunner,
 		}).Execute,
 		Log:         s.activity,
@@ -181,6 +185,7 @@ func (s *Server) initHandlers() {
 		Resolve:   resolver,
 		StateFunc: s.fileLiveState,
 		Events:    s.events,
+		Presence:  s.presence,
 	})
 	s.mediaH = mediahandlers.NewHandler(mediahandlers.Deps{
 		StateFunc: func() *mediahandlers.LiveState {
@@ -197,6 +202,7 @@ func (s *Server) initHandlers() {
 		Store:        s.stores.sync,
 		Files:        s.db,
 		SubtitleProc: s.subtitleProc,
+		Media:        s.media,
 		Jobs:         s.syncJobs,
 		Resolve:      resolver,
 		SeasonState:  s.syncSeasonState,
@@ -261,6 +267,7 @@ func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handle
 		Activity:   s.activity,
 		Alerts:     s.alerts,
 		Events:     s.events,
+		Media:      s.media,
 		StateFunc:  func() *manualops.LiveState { return manualLiveState(s.state()) },
 		BGTracker:  &s.bgWg,
 		ServerCtx:  func() context.Context { return s.lifetime },

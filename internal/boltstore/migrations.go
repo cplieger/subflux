@@ -41,8 +41,8 @@ package boltstore
 // post-v1 bumps never have to. The machinery is proven by injected test
 // ladders (migrate_test.go and siblings), which never mutate these registries.
 var (
-	// coreMigrations is the core-domain ladder (search_attempts,
-	// subtitle_state, subtitle_files, scan_state, sync_offsets, poll_state and
+	// coreMigrations is the core-domain ladder (search_attempts, subtitle_state,
+	// subtitle_files, scan_state, sync_offsets, poll_state, provider_auth and
 	// their indexes). Empty: coreSchemaVersion has never been bumped.
 	coreMigrations []migration
 

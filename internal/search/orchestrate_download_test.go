@@ -11,6 +11,7 @@ import (
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -608,5 +609,31 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 	if metrics.searches.Load() != 1 {
 		t.Errorf("metrics.searches = %d, want 1 (single query for grouped language)",
 			metrics.searches.Load())
+	}
+}
+
+// Candidates whose only provider has downloads paused are a failed download,
+// not a no-result: nothing is stamped and no backoff row is written, so the
+// next pass retries them once the pause ends.
+func TestSearchTargets_paused_downloads_are_a_failed_target(t *testing.T) {
+	t.Parallel()
+	paused := &countingProvider{name: "opensubtitles", results: candidates("opensubtitles", 2)}
+	r := newOutcomeRig(t, newRankedConfig(3, "opensubtitles"), paused)
+	r.gate.binding.Observe(t.Context(), "opensubtitles", providergate.OpDownload,
+		&subflux.RateLimitError{Msg: "download limit exceeded (406)", RetryAfter: 10 * time.Hour})
+
+	result := r.search(t)
+
+	if got := result.Langs[0]; got.Failed != 1 || got.Found() {
+		t.Errorf("LangOutcome = %+v, want Failed 1 and nothing found", got)
+	}
+	if got := paused.downloads.Load(); got != 0 {
+		t.Errorf("provider downloads = %d, want 0", got)
+	}
+	if len(r.store.stamps) != 0 {
+		t.Errorf("resume stamps = %v, want none", r.store.stamps)
+	}
+	if r.store.failureCalled {
+		t.Error("a search_attempts row was written for a failed download")
 	}
 }

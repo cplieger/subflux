@@ -3,6 +3,7 @@ package polling
 import (
 	"context"
 	"log/slog"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -11,7 +12,9 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/keyenc"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
@@ -45,6 +48,22 @@ type Deps struct {
 	Alerts     WarnRecorder
 	Events     PollerEvents
 	StatsCache StatsCacheInvalidator
+	Media      MediaGuard
+	Presence   PresenceGuard
+}
+
+// PresenceGuard decides whether an imported video is gone or its media root
+// unreadable; *mediapresence.Checker satisfies it.
+type PresenceGuard interface {
+	Gone(ctx context.Context, path string) (bool, error)
+	Unavailable(path string) (root string, unavailable bool)
+}
+
+// MediaGuard is the media writer surface the poller consumes;
+// *mediawrite.Writer satisfies it.
+type MediaGuard interface {
+	scanning.MediaGuard
+	RecheckInterval() time.Duration
 }
 
 // importSearcher is the one thing the poller asks of the search engine: search
@@ -74,20 +93,52 @@ type Poller struct {
 	stateFunc     StateFunc
 	importRetries map[string]int
 	work          chan sourceBatch
-	detectHigh    map[subflux.PollKey]time.Time
-	retryMu       sync.Mutex
-	detectMu      sync.Mutex
+	// detectHigh, detectGen, behind, heldOn and observed are guarded by
+	// detectMu.
+	detectHigh map[subflux.PollKey]time.Time
+	// detectGen counts the writes of detectHigh, so a discarded batch rewinds
+	// only while its own write is still the newest.
+	detectGen map[subflux.PollKey]uint64
+	// behind marks a source whose durable cursor is deliberately held below
+	// entries already detected: until a batch from that cursor completes,
+	// a batch detected past it is discarded rather than run.
+	behind map[subflux.PollKey]bool
+	heldOn map[subflux.PollKey]heldFolder
+	// observed is the newest entry date detection has returned per source,
+	// so a re-fetch of held entries is not counted as new activity.
+	observed map[subflux.PollKey]time.Time
+	retryMu  sync.Mutex
+	detectMu sync.Mutex
+}
+
+// heldFolder is the folder whose refusal holds a behind source, and when the
+// hold was last decided from a fresh read of the arr.
+type heldFolder struct {
+	at     time.Time
+	folder string
 }
 
 // sourceBatch is one detection fetch handed to the executor: the entries a
 // single HistorySince returned, plus the cursor that fetch used (the base
-// advanceWatermark compares against after execution).
+// advanceWatermark compares against after execution). mark is the detectGen
+// value its enqueue wrote, zero for a batch that wrote nothing.
 type sourceBatch struct {
 	source  PollSource
 	key     subflux.PollKey
 	since   time.Time
 	entries []arrapi.HistoryRecord
+	mark    uint64
 }
+
+type batchOutcome int
+
+const (
+	batchCompleted batchOutcome = iota
+	batchCancelled
+	// batchHeld: an entry's folder refuses writes; the batch stopped before
+	// that entry, or before any entry when the batch's write test refused.
+	batchHeld
+)
 
 // maxImportRetries is how many poll cycles a transiently-failing import
 // (arr metadata fetch error, e.g. Sonarr restarting mid-poll) holds the
@@ -107,11 +158,15 @@ func NewPoller(deps Deps, stateFunc StateFunc) *Poller { //nolint:gocritic // hu
 		importRetries: make(map[string]int),
 		work:          make(chan sourceBatch, 8),
 		detectHigh:    make(map[subflux.PollKey]time.Time),
+		detectGen:     make(map[subflux.PollKey]uint64),
+		behind:        make(map[subflux.PollKey]bool),
+		heldOn:        make(map[subflux.PollKey]heldFolder),
+		observed:      make(map[subflux.PollKey]time.Time),
 	}
 }
 
 // Adaptive-poll burst window. When a poll cycle observes activity (any
-// imported-history entries), subsequent cycles fire at burstPollInterval
+// imported-history entries not seen before), subsequent cycles fire at burstPollInterval
 // instead of the configured PollInterval until burstPollWindow has passed
 // without further activity. Captures most user imports inside 5s with no
 // configuration, while keeping the steady-state load at the configured
@@ -166,8 +221,8 @@ func (p *Poller) Run(ctx context.Context) {
 
 // PollOnce checks both Sonarr and Radarr for new import events and enqueues
 // what it finds for the executor; it performs NO import processing itself.
-// Returns the number of imported-history entries observed across both arr
-// clients (used by Run to decide whether to enter adaptive-burst mode).
+// Returns the number of imported-history entries not seen before across both
+// arr clients (used by Run to decide whether to enter adaptive-burst mode).
 func (p *Poller) PollOnce(ctx context.Context) int {
 	start := time.Now()
 	ls := p.stateFunc()
@@ -227,18 +282,23 @@ func (p *Poller) detectSince(ctx context.Context, key subflux.PollKey) time.Time
 // deferred instead: the cursor stays put and the same entries are re-fetched
 // next cycle — bounded backpressure with no loss.
 func (p *Poller) enqueue(b *sourceBatch) {
+	var latest time.Time
+	for i := range b.entries {
+		if b.entries[i].Date.After(latest) {
+			latest = b.entries[i].Date
+		}
+	}
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	b.mark = 0
+	if !latest.IsZero() {
+		b.mark = p.detectGen[b.key] + 1
+	}
 	select {
 	case p.work <- *b:
-		var latest time.Time
-		for i := range b.entries {
-			if b.entries[i].Date.After(latest) {
-				latest = b.entries[i].Date
-			}
-		}
-		if !latest.IsZero() {
-			p.detectMu.Lock()
+		if b.mark != 0 {
 			p.detectHigh[b.key] = latest.Add(time.Millisecond)
-			p.detectMu.Unlock()
+			p.detectGen[b.key] = b.mark
 		}
 	default:
 		slog.Warn("poll: executor queue full, batch deferred to next cycle",
@@ -248,12 +308,94 @@ func (p *Poller) enqueue(b *sourceBatch) {
 
 // rewindDetection pulls the fetched-through cursor back to the durable
 // watermark so the next detection re-fetches from it (the retry transport
-// for transiently-failed entries, and the recovery path for dropped batches).
+// for transiently-failed entries and held batches, and the recovery path for
+// dropped batches).
 func (p *Poller) rewindDetection(ctx context.Context, key subflux.PollKey) {
 	durable := p.deps.PollCache.Get(ctx, key)
 	p.detectMu.Lock()
 	p.detectHigh[key] = durable
+	p.detectGen[key]++
 	p.detectMu.Unlock()
+}
+
+// rewindDetectionIf rewinds only while mark is still the newest write of the
+// fetched-through cursor, so a discarded batch cannot erase the mark of a
+// valid detection made after it.
+func (p *Poller) rewindDetectionIf(ctx context.Context, key subflux.PollKey, mark uint64) {
+	durable := p.deps.PollCache.Get(ctx, key)
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	if mark == 0 || p.detectGen[key] != mark {
+		return
+	}
+	p.detectHigh[key] = durable
+	p.detectGen[key]++
+}
+
+func (p *Poller) isBehind(key subflux.PollKey) bool {
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	return p.behind[key]
+}
+
+// release ends a source's hold once a batch from its durable cursor completes.
+func (p *Poller) release(key subflux.PollKey) {
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	p.behind[key] = false
+	delete(p.heldOn, key)
+}
+
+// hold keeps a batch's entries for a later re-fetch: detection rewinds to
+// the durable cursor and batches detected past it are discarded until a
+// batch from it completes. folder is the folder that refused, "" for a
+// transient arr failure.
+func (p *Poller) hold(ctx context.Context, key subflux.PollKey, folder string) {
+	p.rewindDetection(ctx, key)
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	p.behind[key] = true
+	p.heldOn[key] = heldFolder{folder: folder, at: time.Now()}
+}
+
+// skipHeld reports the folder a held source waits on when detection should
+// not fetch it: the media writer still marks the folder, or Presence the root,
+// and the hold was decided less than a recheck interval ago. The bounded
+// re-read is what lets a held entry that stopped asking for a subtitle there
+// (an exclude tag, a rule with no subtitles, a deleted video) release the
+// source.
+func (p *Poller) skipHeld(key subflux.PollKey) (string, bool) {
+	p.detectMu.Lock()
+	h := p.heldOn[key]
+	p.detectMu.Unlock()
+	if h.folder == "" || time.Since(h.at) >= p.deps.Media.RecheckInterval() {
+		return "", false
+	}
+	// Blocked takes a file path and starts its walk at that file's folder.
+	held := filepath.Join(h.folder, "held")
+	_, blocked := p.deps.Media.Blocked(held)
+	if !blocked {
+		_, blocked = p.deps.Presence.Unavailable(held)
+	}
+	return h.folder, blocked
+}
+
+// noteObserved records a fetch's entries and returns how many are newer than
+// every entry the source returned before.
+func (p *Poller) noteObserved(key subflux.PollKey, entries []arrapi.HistoryRecord) int {
+	p.detectMu.Lock()
+	defer p.detectMu.Unlock()
+	seen := p.observed[key]
+	n := 0
+	for i := range entries {
+		if entries[i].Date.After(seen) {
+			n++
+		}
+	}
+	if latest := latestDate(entries); latest.After(seen) {
+		p.observed[key] = latest
+	}
+	return n
 }
 
 // runExecutor is the single worker draining detected batches: one batch at
@@ -272,12 +414,19 @@ func (p *Poller) runExecutor(ctx context.Context) {
 
 // executeBatch processes one detected history batch: per-entry import
 // handling with scan_delay pacing, retry accounting, and the durable
-// watermark advancement — exactly the semantics the pre-P12 inline loop had.
+// watermark advancement. The durable cursor never moves past an entry whose
+// folder refuses writes, whether the batch's write test, the entry's or a save
+// found it.
 func (p *Poller) executeBatch(ctx context.Context, b *sourceBatch) {
+	if p.isBehind(b.key) && b.since.After(p.deps.PollCache.Get(ctx, b.key)) {
+		slog.Debug("poll: batch detected past a held batch, discarded", "source", b.source)
+		p.rewindDetectionIf(ctx, b.key, b.mark)
+		return
+	}
 	ls := p.stateFunc()
 
 	var resolver tagResolver
-	var process func(context.Context, *LiveState, *arrapi.HistoryRecord, map[int]struct{}) (bool, bool)
+	var resolve resolveFunc
 	switch b.source {
 	case PollSourceSonarr:
 		if ls.Sonarr == nil {
@@ -285,14 +434,14 @@ func (p *Poller) executeBatch(ctx context.Context, b *sourceBatch) {
 			return
 		}
 		resolver = ls.Sonarr
-		process = p.processSonarrImport
+		resolve = p.resolveSonarrImport
 	case PollSourceRadarr:
 		if ls.Radarr == nil {
 			p.rewindDetection(ctx, b.key)
 			return
 		}
 		resolver = ls.Radarr
-		process = p.processRadarrImport
+		resolve = p.resolveRadarrImport
 	default:
 		return
 	}
@@ -306,107 +455,212 @@ func (p *Poller) executeBatch(ctx context.Context, b *sourceBatch) {
 	// instead of holding "no exclusions" for a poll interval.
 	excludeIDs := resolver.ResolveExcludeTagIDs(ctx, searchCfg.ExcludeArrTags, false)
 
-	latest, oldestFailed, completed := p.runBatchEntries(ctx, ls, b, process, excludeIDs, scanDelay)
-	if !completed {
-		// Cancelled mid-batch: leave the durable cursor untouched so a
-		// restart replays the whole batch (at-least-once, as before).
+	run := p.runBatchEntries(ctx, ls, b, resolve, excludeIDs, scanDelay)
+	switch run.outcome {
+	case batchCancelled:
+		// Leave the durable cursor untouched so a restart replays the whole
+		// batch (at-least-once).
+		return
+	case batchHeld:
+		// Entries ahead of the held one are done: the cursor moves up to the
+		// held entry so a hold of any length re-runs none of them.
+		p.advanceWatermark(ctx, b.key, b.since, run.latest, earliest(run.oldestFailed, run.heldFrom))
+		p.hold(ctx, b.key, run.heldOn)
+		return
+	case batchCompleted:
+	}
+
+	p.advanceWatermark(ctx, b.key, b.since, run.latest, run.oldestFailed)
+	if !run.oldestFailed.IsZero() {
+		// A transiently-failed entry holds the durable watermark below
+		// itself: re-fetch it next cycle (one attempt per poll cycle), and
+		// keep a batch queued behind this one from advancing past it.
+		p.hold(ctx, b.key, "")
 		return
 	}
-
-	p.advanceWatermark(ctx, b.key, b.since, latest, oldestFailed)
-	if !oldestFailed.IsZero() {
-		// A transiently-failed entry holds the durable watermark below
-		// itself; rewind detection to it so the next cycle re-fetches the
-		// entry (today's retry spacing: one attempt per poll cycle).
-		p.rewindDetection(ctx, b.key)
-	}
+	p.release(b.key)
 }
 
-// runBatchEntries iterates a batch's deduplicated entries through the given
-// import processor, pacing only BETWEEN entries that actually queried
-// providers: the delay spaces provider traffic, and skip paths (gone file,
-// tag-excluded, metadata-fetch retries) issue none — their 1-2 arr metadata
-// calls are local-service traffic the delay was never for. Sleeping before
-// the next working entry rather than after every entry also removes the dead
-// sleep between the batch's last entry and the watermark advance, narrowing
-// the cancel-replay window. Reports the newest entry date seen, the oldest
-// transiently-failed entry, and whether the batch ran to completion (false =
-// cancelled mid-batch; the caller must leave the durable cursor untouched).
-func (p *Poller) runBatchEntries(ctx context.Context, ls *LiveState, b *sourceBatch,
-	process func(context.Context, *LiveState, *arrapi.HistoryRecord, map[int]struct{}) (bool, bool),
-	excludeIDs map[int]struct{}, scanDelay time.Duration,
-) (latest, oldestFailed time.Time, completed bool) {
-	seen := make(map[string]bool)
-	needPace := false
+// batchRun is how runBatchEntries ended: the newest entry date, the oldest
+// transiently-failed entry, and for a held batch the earliest date among the
+// entries that did not run and the folder that refused, when known.
+type batchRun struct {
+	latest       time.Time
+	oldestFailed time.Time
+	heldFrom     time.Time
+	heldOn       string
+	outcome      batchOutcome
+}
 
+type resolveFunc func(context.Context, *LiveState, *arrapi.HistoryRecord, map[int]struct{}) pendingImport
+
+// batchEntry is one deduplicated entry of a batch, resolved before any entry
+// searches; at is its index in the batch.
+type batchEntry struct {
+	pendingImport
+	entry arrapi.HistoryRecord
+	at    int
+}
+
+// runBatchEntries resolves a batch's deduplicated entries, write-tests the
+// folders of every entry that asks for a subtitle, and only then runs them,
+// so a refused folder anywhere holds the whole batch before any search. The
+// pacing delay falls only before a searching entry that follows one that
+// queried providers, so no dead sleep sits ahead of the watermark advance.
+// A held entry stops the batch there with no retry counted against it, and a
+// stop stops it with the cursor left for a restart to replay.
+func (p *Poller) runBatchEntries(ctx context.Context, ls *LiveState, b *sourceBatch,
+	resolve resolveFunc, excludeIDs map[int]struct{}, scanDelay time.Duration,
+) batchRun {
+	run := batchRun{latest: latestDate(b.entries), outcome: batchCancelled}
+	pending := resolveBatch(ctx, ls, b, resolve, excludeIDs)
+	if ctx.Err() != nil {
+		return run
+	}
+	if err := p.preflightBatch(ctx, pending); err != nil {
+		if ctx.Err() == nil {
+			run.outcome = batchHeld
+			run.heldFrom = earliestDate(b.entries)
+			run.heldOn = refusedFolder(err)
+		}
+		return run
+	}
+	p.runResolved(ctx, ls, b, pending, scanDelay, &run)
+	return run
+}
+
+// runResolved runs a batch's resolved entries in order and sets run's
+// outcome, which stays batchCancelled when ctx ends first.
+func (p *Poller) runResolved(ctx context.Context, ls *LiveState, b *sourceBatch,
+	pending []batchEntry, scanDelay time.Duration, run *batchRun,
+) {
+	needPace := false
+	for i := range pending {
+		be := &pending[i]
+		if be.result != nil && needPace {
+			if err := httpx.SleepCtx(ctx, scanDelay); err != nil {
+				return
+			}
+		}
+		res := p.runImport(ctx, ls, &be.pendingImport)
+		// Whatever an entry reports once the poller is stopping was decided
+		// by the cancellation, not by the entry.
+		if ctx.Err() != nil {
+			return
+		}
+		if res.held {
+			run.outcome = batchHeld
+			run.heldFrom = earliestDate(b.entries[be.at:])
+			run.heldOn = res.heldOn
+			return
+		}
+		if be.result != nil {
+			needPace = res.queried
+		}
+		p.trackImportOutcome(b.source, be.entry.ID, be.entry.Date, be.path, res.retryable, &run.oldestFailed)
+	}
+	run.outcome = batchCompleted
+}
+
+// resolveBatch resolves each entry with a path once, in batch order.
+func resolveBatch(ctx context.Context, ls *LiveState, b *sourceBatch,
+	resolve resolveFunc, excludeIDs map[int]struct{},
+) []batchEntry {
+	var out []batchEntry
+	seen := make(map[string]bool)
 	for i := range b.entries {
 		entry := b.entries[i]
-		if entry.Date.After(latest) {
-			latest = entry.Date
-		}
 		path := entry.ImportedPath()
 		if path == "" || seen[path] {
 			continue
 		}
 		seen[path] = true
-
-		if needPace {
-			if err := httpx.SleepCtx(ctx, scanDelay); err != nil {
-				return latest, oldestFailed, false
-			}
+		out = append(out, batchEntry{pendingImport: resolve(ctx, ls, &entry, excludeIDs), entry: entry, at: i})
+		if ctx.Err() != nil {
+			return nil
 		}
-
-		retryable, queried := process(ctx, ls, &entry, excludeIDs)
-		needPace = queried
-		p.trackImportOutcome(b.source, entry.ID, entry.Date, path, retryable, &oldestFailed)
 	}
-	return latest, oldestFailed, true
+	return out
 }
 
-// detectSonarr fetches new Sonarr import events and enqueues them for the
-// executor. Returns the number of imported-history entries observed (used by
-// PollOnce to drive adaptive-burst polling).
+// preflightBatch write-tests the folder of every entry that asks for a
+// subtitle and returns the first refusal, or ctx's error.
+func (p *Poller) preflightBatch(ctx context.Context, pending []batchEntry) error {
+	var folders []string
+	for i := range pending {
+		if pending[i].asksForSubtitles() {
+			folders = append(folders, filepath.Dir(pending[i].path))
+		}
+	}
+	if len(folders) == 0 {
+		return nil
+	}
+	return p.deps.Media.Preflight(ctx, mediawrite.PreflightRequest{Folders: folders})
+}
+
+func latestDate(entries []arrapi.HistoryRecord) time.Time {
+	var out time.Time
+	for i := range entries {
+		if entries[i].Date.After(out) {
+			out = entries[i].Date
+		}
+	}
+	return out
+}
+
+func earliestDate(entries []arrapi.HistoryRecord) time.Time {
+	var out time.Time
+	for i := range entries {
+		out = earliest(out, entries[i].Date)
+	}
+	return out
+}
+
+func earliest(a, b time.Time) time.Time {
+	if a.IsZero() || (!b.IsZero() && b.Before(a)) {
+		return b
+	}
+	return a
+}
+
 func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
-	since := p.detectSince(ctx, subflux.PollKeySonarr)
-	entries, err := ls.Sonarr.HistorySince(ctx, since, arrapi.EventDownloadImported)
-	if err != nil {
-		slog.Warn("sonarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
-		return 0
-	}
-	if len(entries) == 0 {
-		slog.Debug("sonarr poll: no new events")
-		return 0
-	}
-
-	slog.Info("sonarr poll: new events", "count", len(entries))
-	p.enqueue(&sourceBatch{
-		source: PollSourceSonarr, key: subflux.PollKeySonarr,
-		since: since, entries: entries,
-	})
-	return len(entries)
+	return p.detect(ctx, PollSourceSonarr, subflux.PollKeySonarr, ls.Sonarr.HistorySince)
 }
 
-// detectRadarr fetches new Radarr import events and enqueues them for the
-// executor. Returns the number of imported-history entries observed (used by
-// PollOnce to drive adaptive-burst polling).
 func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
-	since := p.detectSince(ctx, subflux.PollKeyRadarr)
-	entries, err := ls.Radarr.HistorySince(ctx, since, arrapi.EventDownloadImported)
+	return p.detect(ctx, PollSourceRadarr, subflux.PollKeyRadarr, ls.Radarr.HistorySince)
+}
+
+type historyFunc func(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
+
+// detect fetches a source's import events and enqueues them for the
+// executor. It returns how many of them it had not seen before, which drives
+// adaptive-burst polling. A source held on a folder the media writer or
+// Presence still marks is fetched at most once per the writer's recheck interval.
+func (p *Poller) detect(ctx context.Context, source PollSource, key subflux.PollKey, history historyFunc) int {
+	if folder, skip := p.skipHeld(key); skip {
+		slog.Debug(string(source)+" poll: held on an unusable media folder, not fetched", "folder", folder)
+		return 0
+	}
+	since := p.detectSince(ctx, key)
+	entries, err := history(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
-		slog.Warn("radarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
+		slog.Warn(string(source)+" poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
 	}
 	if len(entries) == 0 {
-		slog.Debug("radarr poll: no new events")
+		slog.Debug(string(source) + " poll: no new events")
 		return 0
 	}
 
-	slog.Info("radarr poll: new events", "count", len(entries))
-	p.enqueue(&sourceBatch{
-		source: PollSourceRadarr, key: subflux.PollKeyRadarr,
-		since: since, entries: entries,
-	})
-	return len(entries)
+	n := p.noteObserved(key, entries)
+	if n > 0 {
+		slog.Info(string(source)+" poll: new events", "count", n)
+	} else {
+		slog.Debug(string(source)+" poll: re-fetched events already seen", "count", len(entries))
+	}
+	p.enqueue(&sourceBatch{source: source, key: key, since: since, entries: entries})
+	return n
 }
 
 // retryKey is the importRetries map key for one history entry.
@@ -472,19 +726,21 @@ func (p *Poller) clearImportRetry(key string) {
 }
 
 // advanceWatermark persists the poll cursor after a pass. Normally it moves
-// just past the newest entry; while a transiently-failed entry is being
-// retried it is held just BEFORE that entry so the next HistorySince
-// re-fetches it. Entries after the failed one are re-fetched too — that is
-// cheap and bounded: re-processing an already-handled import finds its
-// targets covered and skips, and the hold lasts at most maxImportRetries
-// cycles. The cursor never moves backward past `since`.
-func (p *Poller) advanceWatermark(ctx context.Context, key subflux.PollKey, since, latest, oldestFailed time.Time) {
-	target := latest
-	if !oldestFailed.IsZero() {
-		target = oldestFailed.Add(-time.Millisecond)
-	}
-	if target.IsZero() || !target.After(since) {
+// just past the newest entry; given a bound (the oldest transiently-failed
+// entry, or the first entry a held batch did not run) it stops at that bound
+// so the next HistorySince re-fetches it. Entries after a transiently-failed
+// one run again with it, for at most maxImportRetries cycles. The cursor never
+// moves backward past `since`.
+func (p *Poller) advanceWatermark(ctx context.Context, key subflux.PollKey, since, latest, bound time.Time) {
+	if latest.IsZero() && bound.IsZero() {
 		return
 	}
-	p.deps.PollCache.Set(ctx, key, target.Add(time.Millisecond))
+	next := latest.Add(time.Millisecond)
+	if !bound.IsZero() {
+		next = bound
+	}
+	if !next.After(since) {
+		return
+	}
+	p.deps.PollCache.Set(ctx, key, next)
 }

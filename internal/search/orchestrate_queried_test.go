@@ -8,6 +8,7 @@ import (
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search/providerhealth"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // fakeHealth is a ProviderHealth stub with a fixed timed-out answer, for
@@ -122,7 +123,8 @@ func TestSearchTargets_queried_zero_when_all_providers_timed_out(t *testing.T) {
 		WithScorer(scorer.New(&subflux.DefaultScores)),
 		WithSyncer(Syncer{}),
 		WithTracks(noopDetector{}),
-		WithTimeout(fakeHealth{timedOut: true}))
+		WithTimeout(fakeHealth{timedOut: true}),
+		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
 
 	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	result, err := e.SearchTargets(t.Context(), req, "",

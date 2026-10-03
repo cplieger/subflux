@@ -6,9 +6,12 @@ package manualops
 
 import (
 	"context"
+	"time"
 
 	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -47,6 +50,13 @@ type SearchDeps struct {
 	Activity ActivityTracker
 	Alerts   WarnRecorder
 	Events   EventPublisher
+}
+
+// MediaWriter saves a manual subtitle and write-tests its folder before the
+// download is accepted; *mediawrite.Writer satisfies it.
+type MediaWriter interface {
+	WriteFile(ctx context.Context, path string, data []byte) error
+	Preflight(ctx context.Context, req mediawrite.PreflightRequest) error
 }
 
 // Store is the two rows a manual search touches: what is already on disk
@@ -88,11 +98,14 @@ type EventPublisher interface {
 
 // manualEngine is the narrow slice of the search engine the manual path
 // uses; SearchTargets and the query path's timeout controls belong to the
-// automated scan, not here.
+// automated scan, not here. Every provider call goes through the engine, so
+// the provider gate applies to manual searches and downloads too.
 type manualEngine interface {
 	HashFile(ctx context.Context, path string) (hash string, size int64, err error)
 	ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult
 	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant subflux.Variant) (synced []byte, offsetMs int64)
+	SweepProviders(ctx context.Context, req *subflux.SearchRequest, perProviderTimeout time.Duration) ([]subflux.Subtitle, []search.SweepNotice)
+	Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error)
 }
 
 // tierLabeller maps a numeric score onto the tier label the manual-search

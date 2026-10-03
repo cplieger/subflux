@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 func TestSyncSubtitle(t *testing.T) {
@@ -225,6 +226,38 @@ func TestDownloadFromProvider_error_with_metrics(t *testing.T) {
 	}
 	if metrics.downloads.Load() != 1 {
 		t.Errorf("metrics.downloads = %d, want 1 (should record even on error)", metrics.downloads.Load())
+	}
+}
+
+// --- save counter ---
+
+func TestDownloadAndSave_counts_only_saved_subtitles(t *testing.T) {
+	t.Parallel()
+	srt := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello.\n\n")
+	for name, tc := range map[string]struct {
+		videoDir  string
+		wantSaved int64
+		wantErr   bool
+	}{
+		"written":           {videoDir: "", wantSaved: 1},
+		"missing media dir": {videoDir: "gone", wantErr: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			metrics := &mockMetrics{}
+			p := &mockProvider{name: "subdl", data: srt}
+			e := newEngine([]provider.Provider{p}, &mockStore{}, &mockConfig{}, metrics,
+				scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
+			videoPath := filepath.Join(t.TempDir(), tc.videoDir, "movie.mkv")
+			best := &scoredSub{sub: subflux.Subtitle{Provider: "subdl", ID: "1", Language: "fr"}, score: 10}
+
+			_, err := e.downloadAndSave(t.Context(), &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie},
+				best, videoPath, subflux.MediaTypeMovie, "tmdb-1", "fr", subflux.VariantStandard)
+			if metrics.saved.Load() != tc.wantSaved || (err != nil) != tc.wantErr {
+				t.Errorf("downloadAndSave(%s) saved = %d, err = %v; want %d saved, error %v",
+					name, metrics.saved.Load(), err, tc.wantSaved, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -485,7 +518,8 @@ func TestSyncSubtitle_audio_fallback_result_is_applied(t *testing.T) {
 
 	e := New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
 		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}),
-		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}))
+		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}),
+		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
 
 	got, offsetMs := e.syncSubtitle(t.Context(), data, videoPath, "fr",
 		subflux.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true})
@@ -515,7 +549,8 @@ func TestSyncSubtitle_audio_fallback_low_confidence_is_ignored(t *testing.T) {
 
 	e := New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
 		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}),
-		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}))
+		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}),
+		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
 
 	got, offsetMs := e.syncSubtitle(t.Context(), data, videoPath, "fr",
 		subflux.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true})
@@ -738,5 +773,51 @@ func TestDownloadBestCandidate_numbers_each_failed_attempt(t *testing.T) {
 	if got, ok := recs.AttrValueExact("all download attempts failed", "attempted"); !ok || got != "2" {
 		t.Errorf(`SearchTargets(2 failing candidates) logged msg="all download attempts failed" attempted=%q (present=%v), want "2"`,
 			got, ok)
+	}
+}
+
+// cancellingProvider stops the scan from inside its own download, the way a
+// shutdown lands mid-request.
+type cancellingProvider struct {
+	mockProvider
+	cancel context.CancelFunc
+}
+
+func (p *cancellingProvider) Download(ctx context.Context, _ *subflux.Subtitle) ([]byte, error) {
+	p.cancel()
+	return nil, ctx.Err()
+}
+
+// A download cut short by a stop is not a failed attempt, so it logs none of
+// the attempt or summary lines an operator reads as provider trouble.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestDownloadBestCandidate_a_stop_mid_download_logs_no_failure(t *testing.T) {
+	recs := capture.Default(t)
+	videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+	ctx, cancel := context.WithCancel(t.Context())
+	p := &cancellingProvider{cancel: cancel}
+	p.name = "test"
+	p.results = []subflux.Subtitle{
+		{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: subflux.MatchByIMDB, Language: "fr"},
+		{Provider: "test", ReleaseName: "Movie-OTHER", MatchedBy: subflux.MatchByIMDB, Language: "fr"},
+	}
+	e := newEngine([]provider.Provider{p}, &mockStore{},
+		&mockConfig{searchCfg: subflux.SearchConfig{}, minScore: 0}, nil,
+		fixedScorer{score: 10}, &recordingSyncer{}, noopDetector{})
+
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, _ := e.SearchTargets(ctx, req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
+	if len(result.Paths()) != 0 {
+		t.Fatalf("SearchTargets(stopped mid-download) = %v, want no paths", result.Paths())
+	}
+	for _, msg := range []string{
+		"download attempt failed, trying next",
+		"all download attempts failed",
+		"no download candidate could be tried",
+	} {
+		if n := recs.CountExact(msg); n != 0 {
+			t.Errorf("SearchTargets(stopped mid-download) logged msg=%q %d times, want 0", msg, n)
+		}
 	}
 }

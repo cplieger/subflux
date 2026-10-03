@@ -54,6 +54,8 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
     btn.removeAttribute("data-status");
     btn.removeAttribute("aria-busy");
     btn.disabled = false;
+    btn.setAttribute("aria-label", LABEL);
+    btn.setAttribute("data-tip", LABEL);
     btn.replaceChildren(icon("flask"));
   };
 
@@ -71,9 +73,13 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
     posted = "";
   };
 
-  const settleOK = (): void => {
+  const settleOK = (message: string | undefined): void => {
     btn.dataset["status"] = "ok";
     btn.replaceChildren(icon("check"));
+    if (message) {
+      btn.setAttribute("aria-label", message);
+      btn.setAttribute("data-tip", message);
+    }
     clearBanner();
     fade = setTimeout(() => {
       fade = null;
@@ -116,9 +122,11 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
 
     // Empty secrets are sent as-is; the server reads them as "keep what you
     // have", as a save does, since a stored secret renders as an empty field.
+    // A checkbox sends its checked state: its `value` is "on" either way,
+    // which matches no saved boolean.
     const settings: Record<string, string> = {};
     for (const [key, input] of Object.entries(host.inputs)) {
-      settings[key] = input?.value ?? "";
+      settings[key] = input?.type === "checkbox" ? String(input.checked) : (input?.value ?? "");
     }
 
     void (async (): Promise<void> => {
@@ -131,7 +139,7 @@ export function connTestControl(kind: string, host: ConnTestHost): HTMLButtonEle
         btn.removeAttribute("aria-busy");
         const failure = failureOf(res);
         if (failure === null) {
-          settleOK();
+          settleOK(res.data?.message);
           return;
         }
         settleError(failure);

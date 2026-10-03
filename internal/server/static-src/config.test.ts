@@ -33,6 +33,7 @@ vi.mock("@cplieger/actions", () => ({
 
 import { markRequiredFields, buildSectionsFromForm } from "./config.js";
 import { fieldId } from "./config-renderers.js";
+import { setCfgSections } from "./config-values.js";
 import type { SchemaSection } from "./api-types.js";
 
 // Two sonarr/radarr sections sharing a single required_group ("arr").
@@ -240,6 +241,58 @@ function addSelect(parent: HTMLElement, className: string, options: string[], va
 describe("config: buildSectionsFromForm", () => {
   beforeEach(() => {
     document.body.replaceChildren();
+    setCfgSections({});
+  });
+
+  const OIDC_SCHEMA: SchemaSection[] = [
+    {
+      key: "auth",
+      title: "Authentication",
+      type: "fields",
+      fields: [
+        { key: "oidc_enabled", label: "OIDC Login", type: "bool" },
+        {
+          key: "oidc",
+          label: "",
+          type: "nested",
+          fields: [
+            { key: "issuer_url", label: "OIDC Issuer URL", type: "text" },
+            { key: "client_secret", label: "OIDC Client Secret", type: "secret", secret: true },
+          ],
+        },
+      ],
+    },
+  ];
+
+  it("emits a nested field as a nested object, never as dotted keys", () => {
+    addCheckbox(fieldId("auth", "oidc_enabled"), true);
+    addInput(fieldId("auth", "oidc.issuer_url"), "https://auth.example.com/");
+    addInput(fieldId("auth", "oidc.client_secret"), "");
+
+    expect(buildSectionsFromForm(OIDC_SCHEMA)["auth"]).toStrictEqual({
+      oidc_enabled: true,
+      oidc: { issuer_url: "https://auth.example.com/", client_secret: "" },
+    });
+  });
+
+  it("omits a nested field whose leaves are empty and whose secret was never stored", () => {
+    addCheckbox(fieldId("auth", "oidc_enabled"), false);
+    addInput(fieldId("auth", "oidc.issuer_url"), "");
+    addInput(fieldId("auth", "oidc.client_secret"), "");
+
+    expect(buildSectionsFromForm(OIDC_SCHEMA)["auth"]).toStrictEqual({ oidc_enabled: false });
+  });
+
+  it("keeps an otherwise empty nested field when its secret is stored, so the save keeps it", () => {
+    setCfgSections({}, ["auth.oidc.client_secret"]);
+    addCheckbox(fieldId("auth", "oidc_enabled"), false);
+    addInput(fieldId("auth", "oidc.issuer_url"), "");
+    addInput(fieldId("auth", "oidc.client_secret"), "");
+
+    expect(buildSectionsFromForm(OIDC_SCHEMA)["auth"]).toStrictEqual({
+      oidc_enabled: false,
+      oidc: { client_secret: "" },
+    });
   });
 
   it("maps a fields section with typed values and omits empty optional scalars", () => {
@@ -357,6 +410,85 @@ describe("config: buildSectionsFromForm", () => {
     expect(providers["opensubtitles"]).toEqual({
       enabled: true,
       settings: { password: "" },
+    });
+  });
+
+  it("writes back a stored key the section renders no control for", () => {
+    setCfgSections({
+      search: { min_score: 40, max_provider_concurrency: 4, download_max_attempts: 2 },
+    });
+    const schema: SchemaSection[] = [
+      {
+        key: "search",
+        title: "Search",
+        type: "fields",
+        fields: [{ key: "min_score", label: "Min Score", type: "number" }],
+      },
+    ];
+    addInput(fieldId("search", "min_score"), "55");
+
+    expect(buildSectionsFromForm(schema)["search"]).toStrictEqual({
+      min_score: 55,
+      max_provider_concurrency: 4,
+      download_max_attempts: 2,
+    });
+  });
+
+  it("does not bring back a stored value whose rendered field was emptied", () => {
+    setCfgSections({ search: { min_score: 40 } });
+    const schema: SchemaSection[] = [
+      {
+        key: "search",
+        title: "Search",
+        type: "fields",
+        fields: [{ key: "min_score", label: "Min Score", type: "number" }],
+      },
+    ];
+    addInput(fieldId("search", "min_score"), "");
+
+    expect(buildSectionsFromForm(schema)["search"]).toStrictEqual({});
+  });
+
+  it("writes back a stored key a nested field renders no control for", () => {
+    setCfgSections({ auth: { oidc: { issuer_url: "https://old/", scopes: ["openid"] } } });
+    addCheckbox(fieldId("auth", "oidc_enabled"), false);
+    addInput(fieldId("auth", "oidc.issuer_url"), "");
+    addInput(fieldId("auth", "oidc.client_secret"), "");
+
+    expect(buildSectionsFromForm(OIDC_SCHEMA)["auth"]).toStrictEqual({
+      oidc_enabled: false,
+      oidc: { scopes: ["openid"], client_secret: "" },
+    });
+  });
+
+  it("writes back a stored provider and provider setting the schema does not list", () => {
+    setCfgSections({
+      providers: {
+        opensubtitles: { enabled: true, settings: { password: "", legacy_mode: "x" } },
+        retired: { enabled: false, priority: 3 },
+      },
+    });
+    const schema: SchemaSection[] = [
+      {
+        key: "providers",
+        title: "Providers",
+        type: "providers",
+        providers: [
+          {
+            name: "opensubtitles",
+            label: "OpenSubtitles",
+            settings: [{ key: "password", label: "Password", type: "secret", secret: true }],
+          },
+        ],
+      },
+    ];
+    addCheckbox("cfg-prov-opensubtitles-enabled", true);
+    addInput("cfg-prov-opensubtitles-priority", "");
+    addInput("cfg-prov-opensubtitles-s-password", "");
+
+    expect(buildSectionsFromForm(schema)["providers"]).toStrictEqual({
+      opensubtitles: { enabled: true, settings: { password: "", legacy_mode: "x" } },
+      retired: { enabled: false, priority: 3 },
     });
   });
 
@@ -557,6 +689,7 @@ const SEARCH_SECTION: SchemaSection[] = [
 describe("config: markRequiredFields field state", () => {
   beforeEach(() => {
     document.body.replaceChildren();
+    setCfgSections({});
   });
 
   it("flags an empty required field", () => {
@@ -627,11 +760,11 @@ describe("config: markRequiredFields field state", () => {
     expect(hasError(optional)).toBe(false);
   });
 
-  it("accepts a redacted secret as filled outside a group", () => {
+  it("accepts a stored secret as filled outside a group", () => {
     const body = document.createElement("div");
     document.body.appendChild(body);
     const secret = fieldInput(body, "search", "token", "");
-    secret.placeholder = "****";
+    setCfgSections({}, ["search.token"]);
 
     markRequiredFields(SEARCH_SECTION, body);
 
@@ -639,9 +772,9 @@ describe("config: markRequiredFields field state", () => {
     expect(hasError(secret)).toBe(false);
   });
 
-  it("still flags an empty secret with no placeholder", () => {
-    // No placeholder means the server holds no value: this one really is
-    // missing, redaction is not what makes a secret optional.
+  it("still flags an empty secret the stored config does not hold", () => {
+    // Absent from secrets_present means the server holds no value: this one
+    // really is missing, redaction is not what makes a secret optional.
     const body = document.createElement("div");
     document.body.appendChild(body);
     const secret = fieldInput(body, "search", "token", "");
@@ -651,13 +784,14 @@ describe("config: markRequiredFields field state", () => {
     expect(secret.classList.contains("cfg-required")).toBe(true);
   });
 
-  it("accepts a redacted secret as filled", () => {
-    // A stored secret comes back as the "****" placeholder with an empty value;
-    // flagging it would tell the user to retype a key the server already has.
-    // The proof is the SIBLING: only a satisfied group clears radarr too.
+  it("accepts a stored secret as filled", () => {
+    // A stored secret comes back redacted to an empty value and listed in
+    // secrets_present; flagging it would tell the user to retype a key the
+    // server already has. The proof is the SIBLING: only a satisfied group
+    // clears radarr too.
     const f = buildArrForm();
     f.sonarrUrl.value = "http://sonarr:8989";
-    f.sonarrKey.placeholder = "****";
+    setCfgSections({}, ["sonarr.api_key"]);
 
     markRequiredFields(ARR_SECTIONS, f.body);
 

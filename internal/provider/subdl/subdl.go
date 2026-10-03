@@ -82,7 +82,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, err
 	}
 
-	items, statusErr := checkAPIStatus(result, logsafe.Field(req.MediaLabel()))
+	items, statusErr := p.checkAPIStatus(result, logsafe.Field(req.MediaLabel()))
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -147,18 +147,24 @@ func buildSearchParams(apiKey string, req *subflux.SearchRequest, langs []string
 	return params
 }
 
-// errSubDLNotFound is a sentinel error indicating the SubDL API could not
-// find the requested media. Callers can use errors.Is for dispatch.
-var errSubDLNotFound = errors.New("subdl: not found")
-
 // notFoundPatterns lists error message substrings that indicate the SubDL API
 // could not find the requested media. Checked case-insensitively.
 var notFoundPatterns = []string{"can't find", "cannot find", "not found"}
 
+// authRefusalPatterns lists error message substrings with which a status:false
+// answer refuses the API key, checked case-insensitively. Measured on /me: a
+// rejected key answers `{"status":false,"error":"Not Authorized"}`.
+var authRefusalPatterns = []string{"not authorized", "api key", "invalid key"}
+
 // isNotFoundError reports whether msg matches any known not-found pattern.
-func isNotFoundError(msg string) bool {
+func isNotFoundError(msg string) bool { return containsAny(msg, notFoundPatterns) }
+
+func isAuthRefusal(msg string) bool { return containsAny(msg, authRefusalPatterns) }
+
+// containsAny reports whether msg contains any of patterns, case-insensitively.
+func containsAny(msg string, patterns []string) bool {
 	lower := strings.ToLower(msg)
-	for _, p := range notFoundPatterns {
+	for _, p := range patterns {
 		if strings.Contains(lower, p) {
 			return true
 		}
@@ -167,19 +173,23 @@ func isNotFoundError(msg string) bool {
 }
 
 // checkAPIStatus interprets the SubDL API status field. Returns the subtitle
-// items on success, nil on "not found", or an error for API failures.
-func checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
+// items on success, nil on "not found", *subflux.AuthError for a refused key,
+// or an error for other API failures. The upstream text can echo the request,
+// so it is redacted of the API key before it reaches either error.
+func (p *Provider) checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
 	if result.Status {
 		return result.Subtitles, nil
 	}
-	if isNotFoundError(result.Error.Raw()) {
+	msg := logsafe.RedactedField(result.Error.Raw(), httpx.Secret(p.apiKey))
+	if isAuthRefusal(msg) {
+		return nil, &subflux.AuthError{Msg: "subdl API: " + msg}
+	}
+	if isNotFoundError(msg) {
 		slog.Debug("subdl: no results", "media", label)
 		return nil, nil
 	}
-	if result.Error != "" {
-		// Untrusted upstream text passed to slog; neutralize control/bidi
-		// runes at construction.
-		return nil, fmt.Errorf("subdl API: %w: %s", errSubDLNotFound, result.Error.SingleLine())
+	if msg != "" {
+		return nil, fmt.Errorf("subdl API: %s", msg)
 	}
 	slog.Warn("subdl: API returned status=false with no error message", "media", label)
 	return nil, nil
@@ -325,8 +335,8 @@ func handleDownloadResponse(resp *http.Response, want epmarker.Target) ([]byte, 
 // --- API types ---
 
 type apiResponse struct {
-	// Error is upstream-controlled text, tagged at the decode boundary; the
-	// error construction applies the strict single-line form explicitly.
+	// Error is upstream-controlled text, tagged at the decode boundary;
+	// checkAPIStatus redacts and bounds it before any error carries it.
 	Error     runesafe.Untrusted `json:"error"`
 	Subtitles []subtitleItem     `json:"subtitles"`
 	Status    bool               `json:"status"`

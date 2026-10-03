@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -152,14 +152,13 @@ func TestEnforceBackupMode_refusesASymlinkInsteadOfChmodingItsTarget(t *testing.
 	}
 }
 
-// TestAtomicfileIsTheV3Module pins which major every atomicfile call site
-// resolves to. /v2 and /v3 are distinct modules that can coexist in one build,
-// so a file left behind on /v2 during the major migration compiles silently
-// while missing v3's unconditional symlink refusal and temp-side fsync — the
-// guarantees the test above and the config writes rely on.
-func TestAtomicfileIsTheV3Module(t *testing.T) {
+// TestAtomicfileIsTheV4Module pins which major every atomicfile call site
+// resolves to. Two majors are distinct modules that can coexist in one build,
+// so a file left on /v3 compiles silently while applying v3's fixed 0644 mode
+// to every write, which is the mode policy the subtitle writes must not get.
+func TestAtomicfileIsTheV4Module(t *testing.T) {
 	t.Parallel()
-	const want = "github.com/cplieger/atomicfile/v3"
+	const want = "github.com/cplieger/atomicfile/v4"
 	if got := reflect.TypeFor[atomicfile.PendingFile]().PkgPath(); got != want {
 		t.Errorf("atomicfile package path = %q, want %q", got, want)
 	}

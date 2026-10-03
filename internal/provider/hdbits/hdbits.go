@@ -128,43 +128,87 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 
 	slog.Debug("hdbits torrents found", "count", len(ids))
 
+	results, err := p.collectSubtitles(ctx, ids, req)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("hdbits search complete", "results", len(results), "media", logsafe.Field(req.MediaLabel()))
+	return results, nil
+}
+
+// collectSubtitles fetches every torrent's subtitles. A failed torrent is
+// skipped, except a refused credential or a rate limit: those stop the
+// remaining lookups and are returned, because every later call would get the
+// same answer.
+func (p *Provider) collectSubtitles(ctx context.Context, ids []int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	var (
 		mu      sync.Mutex
 		results []subflux.Subtitle
 	)
-
+	add := func(subs []subflux.Subtitle) {
+		mu.Lock()
+		results = append(results, subs...)
+		mu.Unlock()
+	}
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(p.cfg.TorrentLookupConcurrency)
-
 	for i, id := range ids {
 		// Rate limit between dispatches, not completions.
-		if i > 0 {
-			t := time.NewTimer(p.cfg.TorrentLookupDelay)
-			select {
-			case <-gctx.Done():
-				t.Stop()
-				return results, gctx.Err()
-			case <-t.C:
-			}
+		if i > 0 && !sleepCtx(gctx, p.cfg.TorrentLookupDelay) {
+			break
 		}
-
-		g.Go(func() error {
-			subs, err := p.fetchSubtitles(gctx, id, req)
-			if err != nil {
-				slog.Warn("hdbits: failed to get subtitles for torrent", "error", err)
-				return nil
-			}
-			mu.Lock()
-			results = append(results, subs...)
-			mu.Unlock()
-			return nil
-		})
+		g.Go(func() error { return p.lookupTorrent(gctx, id, req, add) })
 	}
-
-	_ = g.Wait()
-
-	slog.Info("hdbits search complete", "results", len(results), "media", logsafe.Field(req.MediaLabel()))
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("fetch subtitles: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return results, nil
+}
+
+// lookupTorrent passes torrent id's subtitles to add. It returns only a stop
+// error; any other failure is logged and skipped.
+func (p *Provider) lookupTorrent(ctx context.Context, id int, req *subflux.SearchRequest, add func([]subflux.Subtitle)) error {
+	// A slot freed by a stopping lookup is handed over after the group is
+	// cancelled, so this lookup would only repeat its answer.
+	if ctx.Err() != nil {
+		return nil
+	}
+	subs, err := p.fetchSubtitles(ctx, id, req)
+	switch {
+	case isStopError(err):
+		return err
+	case err != nil:
+		if ctx.Err() == nil {
+			slog.Warn("hdbits: failed to get subtitles for torrent", "error", err)
+		}
+		return nil
+	}
+	add(subs)
+	return nil
+}
+
+// isStopError reports whether err is an answer every later call would repeat.
+func isStopError(err error) bool {
+	if _, ok := errors.AsType[*subflux.AuthError](err); ok {
+		return true
+	}
+	_, ok := errors.AsType[*subflux.RateLimitError](err)
+	return ok
+}
+
+// sleepCtx waits d, returning false when ctx ends first.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
 
 // Download fetches the subtitle content for the given search result.
@@ -310,6 +354,9 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	if err != nil {
 		return nil, httpx.RedactSecret(err, p.passkey)
 	}
+	if err := p.downloadVerdict(data); err != nil {
+		return nil, err
+	}
 
 	p.dlCache.Put(subID, data, func() {
 		slog.Warn("hdbits: download too large or cache full, will re-fetch for each episode",
@@ -348,11 +395,16 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	}
 
 	var result struct {
-		Data []struct {
+		Message string `json:"message"`
+		Data    []struct {
 			ID int `json:"id"`
 		} `json:"data"`
+		Status int `json:"status"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // torrent list limit
+		return nil, err
+	}
+	if err := apiStatusError(result.Status, p.redact(result.Message)); err != nil {
 		return nil, err
 	}
 
@@ -395,11 +447,39 @@ func (p *Provider) fetchSubtitles(ctx context.Context, torrentID int, searchReq 
 	}
 
 	var result struct {
-		Data []hdbSubtitleItem `json:"data"`
+		Message string            `json:"message"`
+		Data    []hdbSubtitleItem `json:"data"`
+		Status  int               `json:"status"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // subtitle list limit
 		return nil, err
 	}
+	if err := apiStatusError(result.Status, p.redact(result.Message)); err != nil {
+		return nil, err
+	}
 
 	return filterSubtitleData(result.Data, searchReq), nil
+}
+
+// downloadVerdict reads an API verdict out of a getdox body that is a JSON
+// object carrying a status, which a subtitle or archive body never is.
+func (p *Provider) downloadVerdict(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return nil
+	}
+	var verdict struct {
+		Status  *int   `json:"status"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(trimmed, &verdict) != nil || verdict.Status == nil {
+		return nil
+	}
+	return apiStatusError(*verdict.Status, p.redact(verdict.Message))
+}
+
+// redact prepares upstream text for an error: the request carried the
+// username and passkey, so the text may echo either.
+func (p *Provider) redact(s string) string {
+	return logsafe.RedactedField(s, httpx.Secret(p.username), httpx.Secret(p.passkey))
 }

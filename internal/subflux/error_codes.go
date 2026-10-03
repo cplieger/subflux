@@ -98,6 +98,9 @@ const (
 	CodeSearchNoResults        ErrorCode = "search_no_results"
 	CodeDownloadFailed         ErrorCode = "download_failed"
 	CodeUnlockNotHeld          ErrorCode = "unlock_not_held"
+	// CodeMediaUnwritable: a media folder the work would write into failed
+	// its write test, so nothing was started.
+	CodeMediaUnwritable ErrorCode = "media_unwritable"
 )
 
 // File / preview / sync codes.

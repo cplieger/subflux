@@ -5,11 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // Behavior-stability fixtures for the embedded-detector separation (R4.2):
@@ -253,4 +256,37 @@ func TestNew_nil_detector_panics(t *testing.T) {
 	}()
 	New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
 		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}))
+}
+
+// A nil pointer boxed in a required option's interface is as missing as no
+// option, and New says so instead of deferring the panic to first use.
+func TestNew_a_nil_pointer_for_a_required_option_panics(t *testing.T) {
+	t.Parallel()
+	var noStore *mockStore
+	var noConfig *mockConfig
+	var noMedia *mediawrite.Writer
+	tests := []struct {
+		name   string
+		option Option
+		want   string
+	}{
+		{name: "store", option: WithStore(noStore), want: "WithStore is required"},
+		{name: "config", option: WithConfig(noConfig), want: "WithConfig is required"},
+		{name: "media writer", option: WithMediaWriter(noMedia), want: "WithMediaWriter is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				msg, _ := recover().(string)
+				if !strings.Contains(msg, tt.want) {
+					t.Errorf("New() with a nil %s panicked with %q, want %q", tt.name, msg, tt.want)
+				}
+			}()
+			New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
+				WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}), WithTracks(noopDetector{}),
+				WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()),
+				tt.option)
+		})
+	}
 }

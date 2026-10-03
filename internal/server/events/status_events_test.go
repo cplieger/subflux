@@ -63,19 +63,19 @@ func TestWireFormat_provider_delta(t *testing.T) {
 	readHello(t, st.sc)
 	waitClients(t, bus, 1)
 
-	bus.PublishProvider(ProviderRaise, &ProviderTimeoutEntry{
+	bus.PublishProvider(&ProviderEvent{Op: ProviderRaise, TimeoutsEnabled: true, Entry: &ProviderTimeoutEntry{
 		Provider: "opensubtitles",
 		Status: subflux.ProviderStatus{
 			TimedOut: true, CooldownRemaining: time.Hour, RecentFailures: 5, Threshold: 5,
 		},
-	})
+	}})
 
 	lines := readUntil(t, st.sc, func(l string) bool { return strings.HasPrefix(l, "data: ") })
 	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, "event: provider") {
 		t.Errorf("missing named event field: %v", lines)
 	}
-	for _, want := range []string{`"type":"provider"`, `"op":"raise"`, `"provider":"opensubtitles"`, `"timed_out":true`} {
+	for _, want := range []string{`"type":"provider"`, `"op":"raise"`, `"provider":"opensubtitles"`, `"timed_out":true`, `"timeouts_enabled":true`} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("provider payload missing %s: %v", want, lines)
 		}

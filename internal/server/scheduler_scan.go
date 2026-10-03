@@ -23,6 +23,7 @@ func (s *Server) scanDeps() *scanning.Deps {
 		Activity:      s.activity,
 		Alerts:        s.alerts,
 		ShowSkipCache: s.showSkipCache,
+		Media:         s.media,
 		ClearCaches:   provider.ClearCaches,
 	}
 }
@@ -35,6 +36,16 @@ func scanLiveState(ls *liveState) *scanning.LiveState {
 		Sonarr:      ls.sonarr,
 		Radarr:      ls.radarr,
 		Providers:   ls.providers,
-		ShowCounter: provider.ResolveShowCounter(ls.providers),
+		ShowCounter: showCounterOf(ls),
 	}
+}
+
+// showCounterOf returns the live engine as the show-level counter, or a nil
+// interface when there is no engine or no counting provider: boxing a nil
+// *search.Engine would read as a live counter.
+func showCounterOf(ls *liveState) scanning.ShowCounter {
+	if ls.engine == nil || !ls.engine.HasShowCounter() {
+		return nil
+	}
+	return ls.engine
 }

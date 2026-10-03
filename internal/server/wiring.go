@@ -1,6 +1,6 @@
 package server
 
-import "reflect"
+import "github.com/cplieger/subflux/internal/required"
 
 // requireServiceable panics unless every collaborator a request can reach is
 // wired. Called at the top of both Start paths — the moment after which a
@@ -38,8 +38,13 @@ func (s *Server) requireServiceable() {
 		{name: "db", v: s.db},
 		{name: "events", v: s.events},
 		{name: "activity", v: s.activity},
-		{name: "alerts", v: s.alerts},
 		{name: "stores", v: s.stores},
+
+		// Set by options the composition root must pass.
+		{name: "gate", v: s.gate},
+		{name: "alerts", v: s.alerts},
+		{name: "media", v: s.media},
+		{name: "presence", v: s.presence},
 
 		// Set by SetAuth, which Start does not call and cannot verify any other
 		// way. These two are the ones that actually shipped as a nil deref.
@@ -59,30 +64,8 @@ func (s *Server) requireServiceable() {
 		{name: "previewH", v: s.previewH},
 		{name: "scanH", v: s.scanH},
 	} {
-		if isNil(c.v) {
+		if required.Missing(c.v) {
 			panic("server: " + c.name + " is not wired; Start requires New, then SetAuth, then Start")
 		}
-	}
-}
-
-// isNil reports whether v is nil, INCLUDING a typed nil pointer inside a
-// non-nil interface.
-//
-// The bare `v == nil` misses that case, and it is the case that occurs here:
-// every field above except stores is an interface or a pointer, so a field left
-// at its zero value arrives as a nil *T boxed in a live interface, for which
-// `v == nil` is false. A guard that only caught the untyped nil would have passed
-// while the bug it exists for was live — which is how the same class of guard
-// was first written wrong in the sibling app.
-func isNil(v any) bool {
-	if v == nil {
-		return true
-	}
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
-		return rv.IsNil()
-	default:
-		return false
 	}
 }

@@ -138,6 +138,24 @@ describe("conn-test: what it sends", () => {
 
     expect(wire.calls).toEqual([{ kind: "hdbits", settings: { username: "", passkey: "pk" } }]);
   });
+
+  it("sends a checkbox as its checked state, matching the boolean a save writes", async () => {
+    // A checkbox's `value` is "on" whether checked or not, and no saved boolean
+    // equals it, so a passing check sending it would leave the disable in place.
+    const m = mount("opensubtitles", ["username", "use_hash", "include_ai_translated"]);
+    m.inputs["use_hash"]!.type = "checkbox";
+    m.inputs["use_hash"]!.checked = true;
+    m.inputs["include_ai_translated"]!.type = "checkbox";
+    m.btn.click();
+    await settle();
+
+    expect(wire.calls).toEqual([
+      {
+        kind: "opensubtitles",
+        settings: { username: "", use_hash: "true", include_ai_translated: "false" },
+      },
+    ]);
+  });
 });
 
 describe("conn-test: every state is reachable", () => {
@@ -178,6 +196,32 @@ describe("conn-test: every state is reachable", () => {
 
     expect(state(m.btn)).toBe("err");
     expect(m.btn.dataset["status"]).toBe("err");
+  });
+});
+
+describe("conn-test: a pass that re-enabled a provider says so", () => {
+  it("names what the pass did on the control until it fades", async () => {
+    wire.answers = [
+      {
+        ok: true,
+        status: 200,
+        data: { valid: true, message: "credentials accepted; provider re-enabled" },
+      },
+    ];
+    const m = mount("hdbits", ["username", "passkey"]);
+    m.btn.click();
+    await settle();
+    expect([m.btn.getAttribute("aria-label"), m.btn.getAttribute("data-tip")]).toEqual([
+      "credentials accepted; provider re-enabled",
+      "credentials accepted; provider re-enabled",
+    ]);
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect([m.btn.getAttribute("aria-label"), m.btn.getAttribute("data-tip")]).toEqual([
+      "Test credentials",
+      "Test credentials",
+    ]);
   });
 });
 

@@ -9,23 +9,37 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
-// RunFullScan iterates all wanted episodes and movies, searching for missing
-// subtitles. Episodes and movies are sorted alphabetically by title.
-//
-// The activity entry is started by the CALLER (HTTP handler or scheduler) at
-// the accept boundary — actID identifies it; the returned outcome is applied
-// by the caller via FinishScanActivity. The stop channel is the graceful
-// cancel signal, checked between items only: the context stays server-derived
-// and reaches the current item's provider calls, so cancelling it is a hard
-// kill reserved for process shutdown.
-func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *LiveState, actID string) activity.Outcome {
+// FullScanResult is how a full scan ended. MediaUnwritable reports that an
+// unwritable media folder refused the scan or stopped it, so the scheduler
+// retries sooner than scan_interval.
+type FullScanResult struct {
+	Outcome         activity.Outcome
+	MediaUnwritable bool
+}
+
+// RunFullScan searches every wanted episode and movie, sorted by title, after
+// write-testing the media roots: a refusal fails it before any arr or
+// provider request. The caller started actID's activity and applies the
+// outcome via FinishScanActivity. stop is the graceful cancel, checked
+// between items; cancelling ctx is a hard kill reserved for shutdown.
+func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *LiveState, actID string) FullScanResult {
 	start := time.Now()
+
+	if err := deps.Media.Preflight(ctx, mediawrite.PreflightRequest{Roots: true, RecheckBad: true, Raise: true}); err != nil {
+		if ctx.Err() != nil {
+			return FullScanResult{Outcome: activity.OutcomeShutdown}
+		}
+		slog.Warn("full scan not started", "error", err)
+		deps.Activity.Progress(actID, 0, 0, "Not started: "+err.Error())
+		return FullScanResult{Outcome: activity.OutcomeFailed, MediaUnwritable: true}
+	}
 
 	var stats subflux.ScanStats
 	searchCfg := ls.Cfg.Search()
@@ -61,7 +75,7 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 	}
 	if err := g.Wait(); err != nil {
 		slog.Error("fetch media failed", "error", err)
-		return activity.OutcomeFailed
+		return FullScanResult{Outcome: activity.OutcomeFailed}
 	}
 
 	queue := SortByTitle(episodes, movies)
@@ -77,7 +91,7 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 	cycleStart := resumeCycleStart(ctx, deps.DB)
 	recentlyScanned := loadRecentScans(ctx, deps.DB, scanInterval, cycleStart)
 
-	resumed, loopOutcome := processItems(ctx, stop, deps, ls, queue, recentlyScanned, &stats, actID, scanDelay)
+	resumed, loopOutcome, writeFailure := processItems(ctx, stop, deps, ls, queue, recentlyScanned, &stats, actID, scanDelay)
 
 	dur := time.Since(start).Round(time.Second)
 	totalFound := stats.EpisodesFound + stats.MoviesFound
@@ -87,7 +101,19 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 			"episodes_searched", stats.EpisodesSearched,
 			"movies_searched", stats.MoviesSearched,
 			"duration", dur.String())
-		return activity.OutcomeShutdown
+		return FullScanResult{Outcome: activity.OutcomeShutdown}
+	}
+	if writeFailure != nil {
+		// Like a user stop, the cycle mark stays dangling so the retry
+		// resumes past the items already scanned.
+		slog.Warn("full scan stopped: media folder not writable",
+			"folder", writeFailure.Folder,
+			"episodes_searched", stats.EpisodesSearched,
+			"movies_searched", stats.MoviesSearched,
+			"found", totalFound,
+			"duration", dur.String())
+		deps.Activity.Progress(actID, stats.EpisodesSearched+stats.MoviesSearched, 0, "Stopped: "+writeFailure.Error())
+		return FullScanResult{Outcome: activity.OutcomeFailed, MediaUnwritable: true}
 	}
 	if loopOutcome == activity.OutcomeCancelled {
 		// A user-stopped scan is an interrupted cycle: the cycle mark stays
@@ -97,16 +123,23 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 			"movies_searched", stats.MoviesSearched,
 			"found", totalFound,
 			"duration", dur.String())
-		return activity.OutcomeCancelled
+		return FullScanResult{Outcome: activity.OutcomeCancelled}
 	}
 
-	// Normal completion closes the resume window: clear the cycle mark so
-	// the next scan applies the plain interval cutoff. An interrupted scan
-	// leaves the mark dangling, which is exactly the resume signal.
+	completeFullScan(ctx, deps, ls, &stats, resumed, start)
+	return FullScanResult{Outcome: activity.OutcomeCompleted}
+}
+
+// completeFullScan closes a full pass: it clears the cycle mark, so the next
+// scan applies the plain interval cutoff, then reports the totals and frees
+// the provider download caches.
+func completeFullScan(ctx context.Context, deps *Deps, ls *LiveState, stats *subflux.ScanStats, resumed int, start time.Time) {
 	if err := deps.DB.ClearScanCycleStart(ctx); err != nil {
 		slog.Warn("failed to clear scan cycle mark", "error", err)
 	}
 
+	dur := time.Since(start).Round(time.Second)
+	totalFound := stats.EpisodesFound + stats.MoviesFound
 	slog.Info("full scan complete",
 		"episodes", stats.EpisodesSearched, "movies", stats.MoviesSearched,
 		"found", totalFound, "resumed", resumed,
@@ -118,45 +151,51 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 	if backedOff := stats.EpisodesBackedOff + stats.MoviesBackedOff; backedOff > 0 {
 		summary += fmt.Sprintf(" (%d backed off)", backedOff)
 	}
+	if failed := stats.EpisodesDownloadFailed + stats.MoviesDownloadFailed; failed > 0 {
+		summary += fmt.Sprintf(" (%d download failed)", failed)
+	}
+	if blocked := stats.EpisodesWriteBlocked + stats.MoviesWriteBlocked; blocked > 0 {
+		summary += fmt.Sprintf(" (%d in unwritable folders)", blocked)
+	}
 	deps.Alerts.RecordInfo(summary)
 	slog.Info("scan results: episodes",
 		"searched", stats.EpisodesSearched, "found", stats.EpisodesFound,
 		"skipped", stats.EpisodesSkipped, "no_result", stats.EpisodesNoResult,
-		"backed_off", stats.EpisodesBackedOff,
-		"series_skipped", stats.SeriesSkipped)
+		"backed_off", stats.EpisodesBackedOff, "download_failed", stats.EpisodesDownloadFailed,
+		"write_blocked", stats.EpisodesWriteBlocked, "series_skipped", stats.SeriesSkipped)
 	slog.Info("scan results: movies",
 		"searched", stats.MoviesSearched, "found", stats.MoviesFound,
 		"skipped", stats.MoviesSkipped, "no_result", stats.MoviesNoResult,
-		"backed_off", stats.MoviesBackedOff)
+		"backed_off", stats.MoviesBackedOff, "download_failed", stats.MoviesDownloadFailed,
+		"write_blocked", stats.MoviesWriteBlocked)
 	deps.Metrics.RecordScan(
 		stats.EpisodesSearched+stats.MoviesSearched,
 		totalFound, time.Since(start),
 	)
 
-	// Clear provider download caches to free memory.
 	deps.ClearCaches(ls.Providers)
-	return activity.OutcomeCompleted
 }
 
 // processItems iterates the sorted scan queue, processing each item. The
 // stop signal is honoured between items (and during the inter-item delay);
 // the item in flight always completes. Returns the number of items skipped
-// due to recent scanning and the loop outcome ("" for a full pass,
-// cancelled/shutdown when ended early).
+// due to recent scanning, the loop outcome ("" for a full pass,
+// cancelled/shutdown/failed when ended early) and, for a failed loop, the
+// folder fault that stopped it after the item in flight.
 func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *LiveState,
 	queue []ScanItem, recentlyScanned map[string]bool,
 	stats *subflux.ScanStats, actID string, scanDelay time.Duration,
-) (resumed int, outcome activity.Outcome) {
+) (resumed int, outcome activity.Outcome, writeFailure *mediawrite.UnwritableError) {
 	tracker := newSeasonTracker(ls.ShowCounter, deps.ShowSkipCache, buildSeedDeps(deps, ls))
 	langs := ls.Cfg.LanguageCodes()
 	skippedSeries := make(map[string]struct{})
 
 	for _, item := range queue {
 		if err := ctx.Err(); err != nil {
-			return resumed, activity.OutcomeShutdown
+			return resumed, activity.OutcomeShutdown, nil
 		}
 		if stopRequested(stop) {
-			return resumed, activity.OutcomeCancelled
+			return resumed, activity.OutcomeCancelled, nil
 		}
 
 		if SkipResumed(item, recentlyScanned, stats) {
@@ -164,7 +203,11 @@ func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Liv
 			continue
 		}
 
-		if !scanQueueItem(ctx, deps, ls, item, tracker, langs, skippedSeries, stats, actID) {
+		queried, wf := scanQueueItem(ctx, deps, ls, item, tracker, langs, skippedSeries, stats, actID)
+		if wf != nil {
+			return resumed, activity.OutcomeFailed, wf
+		}
+		if !queried {
 			// The item generated no provider traffic (tracker skip, all
 			// targets covered on disk, manually locked, in adaptive
 			// backoff, or every eligible provider health-timed-out): the
@@ -173,7 +216,7 @@ func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Liv
 			continue
 		}
 		if o := waitOrStop(ctx, stop, scanDelay); o != "" {
-			return resumed, o
+			return resumed, o, nil
 		}
 	}
 	// The final item has no next-iteration boundary check: shutdown FIRST
@@ -181,43 +224,87 @@ func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Liv
 	// landing during the last in-flight item terminates the scan as
 	// cancelled rather than publishing a false success.
 	if ctx.Err() != nil {
-		return resumed, activity.OutcomeShutdown
+		return resumed, activity.OutcomeShutdown, nil
 	}
 	if stopRequested(stop) {
-		return resumed, activity.OutcomeCancelled
+		return resumed, activity.OutcomeCancelled, nil
 	}
-	return resumed, ""
+	return resumed, "", nil
 }
 
 // scanQueueItem processes one scan-queue item (episode or movie) and reports
-// whether it actually queried any provider — the caller keys the inter-item
-// pacing delay on that.
+// whether it actually queried any provider (the caller keys the inter-item
+// pacing delay on that) and the folder fault its save learned.
 func scanQueueItem(ctx context.Context, deps *Deps, ls *LiveState, item ScanItem,
 	tracker *seasonTracker, langs []string,
 	skippedSeries map[string]struct{}, stats *subflux.ScanStats, actID string,
-) (queried bool) {
+) (queried bool, writeFailure *mediawrite.UnwritableError) {
 	if item.Ep == nil {
 		return scanFullMovie(ctx, deps, ls, item.Movie, stats, actID)
 	}
-	trackerSkipped, queried := scanFullEpisode(ctx, deps, ls,
+	trackerSkipped, queried, writeFailure := scanFullEpisode(ctx, deps, ls,
 		item.Series, item.Ep, tracker, langs, skippedSeries, stats, actID)
 	if trackerSkipped {
 		// Tracker skip: zero provider work was done.
-		return false
+		return false, nil
 	}
-	return queried
+	return queried, writeFailure
 }
 
 // scanFullEpisode scans one episode within the full-scan loop. It reports
 // whether the season tracker skipped the episode outright (show-level or
 // season-level skip) and, when it did run, whether any provider was actually
-// queried: both feed the caller's decision to bypass the inter-item scan
-// delay for items that generated no provider traffic.
+// queried and the folder fault its save learned.
 func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 	series *arrapi.Series, ep *arrapi.Episode,
 	tracker *seasonTracker, langs []string,
 	skippedSeries map[string]struct{}, stats *subflux.ScanStats, actID string,
-) (trackerSkipped, queried bool) {
+) (trackerSkipped, queried bool, writeFailure *mediawrite.UnwritableError) {
+	if trackerSkips(ctx, deps, series, ep, tracker, langs, skippedSeries, stats) {
+		inventorySkipped(ctx, deps, ls, series, ep)
+		return true, false, nil
+	}
+
+	scan := ScanEpisode(ctx, deps, ls, series, ep)
+
+	seasonEpCount := arrsvc.SeasonEpisodeFileCount(series, ep.SeasonNumber)
+	recordEpisodeOutcomes(ctx, tracker, series, ep.SeasonNumber,
+		scan.Langs, seasonEpCount)
+
+	switch scan.Outcome {
+	case ScanFound:
+		stats.EpisodesFound++
+	case ScanSkipped:
+		stats.EpisodesSkipped++
+	case ScanBackedOff:
+		stats.EpisodesBackedOff++
+	case ScanDownloadFailed:
+		stats.EpisodesDownloadFailed++
+	case ScanWriteBlocked:
+		stats.EpisodesWriteBlocked++
+	default:
+		stats.EpisodesNoResult++
+	}
+	stats.EpisodesSearched++
+	total := stats.EpisodesSearched + stats.MoviesSearched
+	deps.Activity.Progress(actID, total, 0,
+		fmt.Sprintf("%d episodes, %d movies",
+			stats.EpisodesSearched, stats.MoviesSearched))
+	return false, scan.Queried, scan.WriteFailure
+}
+
+// trackerSkips reports whether the season tracker writes the episode off at
+// show or season level, counting the skip. An episode in a folder already
+// known to refuse writes is never written off: the show-level check asks a
+// provider and a skip stamps the item, where ScanEpisode reports it
+// write-blocked and leaves it unstamped.
+func trackerSkips(ctx context.Context, deps *Deps, series *arrapi.Series, ep *arrapi.Episode,
+	tracker *seasonTracker, langs []string,
+	skippedSeries map[string]struct{}, stats *subflux.ScanStats,
+) bool {
+	if _, blocked := deps.Media.Blocked(ep.EpisodeFile.Path); blocked {
+		return false
+	}
 	epCount := 0
 	if series.Statistics != nil {
 		epCount = series.Statistics.EpisodeFileCount
@@ -227,49 +314,19 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 			skippedSeries[series.ImdbID] = struct{}{}
 			stats.SeriesSkipped++
 		}
-		stats.EpisodesSkipped++
-		stats.EpisodesSearched++
-		inventorySkipped(ctx, deps, ls, series, ep)
-		return true, false
+	} else if !tracker.shouldSkipEpisode(series.ImdbID, ep.SeasonNumber, langs) {
+		return false
 	}
-
-	if tracker.shouldSkipEpisode(series.ImdbID, ep.SeasonNumber, langs) {
-		stats.EpisodesSkipped++
-		stats.EpisodesSearched++
-		inventorySkipped(ctx, deps, ls, series, ep)
-		return true, false
-	}
-
-	outcome, langOutcomes, queried := ScanEpisode(ctx, deps, ls, series, ep)
-
-	seasonEpCount := arrsvc.SeasonEpisodeFileCount(series, ep.SeasonNumber)
-	recordEpisodeOutcomes(ctx, tracker, series, ep.SeasonNumber,
-		langOutcomes, seasonEpCount)
-
-	switch outcome {
-	case ScanFound:
-		stats.EpisodesFound++
-	case ScanSkipped:
-		stats.EpisodesSkipped++
-	case ScanBackedOff:
-		stats.EpisodesBackedOff++
-	default:
-		stats.EpisodesNoResult++
-	}
+	stats.EpisodesSkipped++
 	stats.EpisodesSearched++
-	total := stats.EpisodesSearched + stats.MoviesSearched
-	deps.Activity.Progress(actID, total, 0,
-		fmt.Sprintf("%d episodes, %d movies",
-			stats.EpisodesSearched, stats.MoviesSearched))
-	return false, queried
+	return true
 }
 
 // recordEpisodeOutcomes records the per-language scan result for an episode's
-// season, over ONLY the languages whose group actually ran (Kind ==
-// subflux.LangSearched). A language skipped for this episode — covered on disk,
-// manually locked, or not a target at all — or fully backed off is not
-// recorded, so it can never accrue a false no-result streak that
-// early-terminates the season for episodes that genuinely need it.
+// season. Only evidence counts: a found subtitle, or a no-result from a group
+// that ran, saved nothing, had no failed target and got at least one
+// provider answer. A group with a write-blocked target records nothing at
+// all, since the folder, not the item, decided it.
 func recordEpisodeOutcomes(ctx context.Context, tracker *seasonTracker,
 	series *arrapi.Series, season int,
 	outcomes []subflux.LangOutcome, seasonEpCount int,
@@ -280,9 +337,16 @@ func recordEpisodeOutcomes(ctx context.Context, tracker *seasonTracker,
 		if o.Kind != subflux.LangSearched {
 			continue
 		}
-		kind := ScanNoResult
-		if o.Found() {
+		var kind ScanOutcome
+		switch {
+		case o.WriteBlocked > 0:
+			continue
+		case o.Found():
 			kind = ScanFound
+		case o.Failed > 0, o.Answered == 0:
+			continue
+		default:
+			kind = ScanNoResult
 		}
 		tracker.recordOutcome(ctx, series.ImdbID, season, o.Lang,
 			seasonIDPrefix, kind, seasonEpCount)
@@ -310,18 +374,23 @@ func inventorySkipped(ctx context.Context, deps *Deps, ls *LiveState,
 }
 
 // scanFullMovie scans one movie within the full-scan loop, reporting whether
-// any provider was actually queried (the inter-item pacing signal).
+// any provider was actually queried (the inter-item pacing signal) and the
+// folder fault its save learned.
 func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
 	m *arrapi.Movie, stats *subflux.ScanStats, actID string,
-) (queried bool) {
-	outcome, queried := ScanMovie(ctx, deps, ls, m)
-	switch outcome {
+) (queried bool, writeFailure *mediawrite.UnwritableError) {
+	scan := scanMovieDetail(ctx, deps, ls, m)
+	switch scan.Outcome {
 	case ScanFound:
 		stats.MoviesFound++
 	case ScanSkipped:
 		stats.MoviesSkipped++
 	case ScanBackedOff:
 		stats.MoviesBackedOff++
+	case ScanDownloadFailed:
+		stats.MoviesDownloadFailed++
+	case ScanWriteBlocked:
+		stats.MoviesWriteBlocked++
 	default:
 		stats.MoviesNoResult++
 	}
@@ -330,7 +399,7 @@ func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
 	deps.Activity.Progress(actID, total, 0,
 		fmt.Sprintf("%d episodes, %d movies",
 			stats.EpisodesSearched, stats.MoviesSearched))
-	return queried
+	return scan.Queried, scan.WriteFailure
 }
 
 // resumeCycleStart resolves this scan pass's logical cycle start and persists

@@ -126,8 +126,8 @@ func TestCheckCredentials_asks_the_status_route(t *testing.T) {
 	}
 }
 
-// roundTripFunc adapts a function to http.RoundTripper for the one test that
-// needs to read the request rather than only answer it.
+// roundTripFunc adapts a function to http.RoundTripper so a test can answer,
+// or read, a request without a network dial.
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

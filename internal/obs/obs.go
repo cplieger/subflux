@@ -18,6 +18,7 @@ import (
 
 	"github.com/cplieger/metrics/v4"
 	"github.com/cplieger/sse"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v3"
 )
@@ -56,6 +57,16 @@ type Metrics struct {
 	httpPanics   *metrics.Counter
 	registry     *metrics.Registry
 
+	// Provider credential gate and subtitle saves.
+	providerDisabled     *metrics.LabeledGauge
+	providerSettingRej   *metrics.LabeledGauge
+	providerAuthFailures *metrics.LabeledCounter
+	providerRateLimited  *metrics.LabeledCounter
+	subtitlesSaved       *metrics.LabeledCounter
+	subtitleWriteErrors  *metrics.Counter
+	mediaRootUnwritable  *metrics.LabeledGauge
+	mediaRootUnavail     *metrics.LabeledGauge
+
 	// Store observability.
 	storeFileBytes     *metrics.Gauge
 	storeFreelistBytes *metrics.Gauge
@@ -84,14 +95,16 @@ type Metrics struct {
 	totalSearch atomic.Int64
 }
 
+const providerLabel = "provider"
+
 // New creates a new Metrics instance.
 func New() *Metrics {
-	labels := []string{"provider"}
+	labels := []string{providerLabel}
 
 	m := &Metrics{
 		searches:     metrics.NewLabeledCounter("searches_total", "Total subtitle searches by provider", labels),
 		errors:       metrics.NewLabeledCounter("search_errors_total", "Total search errors by provider", labels),
-		downloads:    metrics.NewLabeledCounter("downloads_total", "Total subtitle downloads by provider", labels),
+		downloads:    metrics.NewLabeledCounter("downloads_total", "Total subtitle files fetched from providers", labels),
 		dlErrors:     metrics.NewLabeledCounter("download_errors_total", "Total download errors by provider", labels),
 		durations:    metrics.NewLabeledHistogram("search_duration_seconds", "Search duration", labels, metrics.WithBuckets(metrics.APIBuckets())),
 		imports:      metrics.NewLabeledCounter("imports_detected_total", "Total imports detected by source", []string{"source"}),
@@ -104,6 +117,15 @@ func New() *Metrics {
 		httpRequests: metrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
 		httpDuration: metrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
 		httpPanics:   metrics.NewCounter("http_panics_total", "Total HTTP handler panics recovered by the Recoverer middleware"),
+
+		providerDisabled:     metrics.NewLabeledGauge("provider_disabled", "1 while a provider is disabled because it rejected its credentials", labels),
+		providerSettingRej:   metrics.NewLabeledGauge("provider_setting_rejected", "1 while a provider ignores an optional setting it rejected", []string{providerLabel, "setting"}),
+		providerAuthFailures: metrics.NewLabeledCounter("provider_auth_failures_total", "Total credential rejections counted by the provider gate", labels),
+		providerRateLimited:  metrics.NewLabeledCounter("provider_rate_limited_total", "Total rate-limit answers that paused a provider", []string{providerLabel, "op"}),
+		subtitlesSaved:       metrics.NewLabeledCounter("subtitles_saved_total", "Total subtitle files written next to the media by automated search", labels),
+		subtitleWriteErrors:  metrics.NewCounter("subtitle_write_errors_total", "Total failed subtitle file writes and media folder write tests"),
+		mediaRootUnwritable:  metrics.NewLabeledGauge("media_root_unwritable", "1 while subtitle files cannot be written under this media root (the root itself or a folder below it)", []string{"root"}),
+		mediaRootUnavail:     metrics.NewLabeledGauge("media_root_unavailable", "1 while this media root cannot be read, so no file under it is treated as deleted", []string{"root"}),
 
 		// Store observability.
 		storeFileBytes:     metrics.NewGauge("store_file_bytes", "Current bbolt database file size in bytes"),
@@ -162,6 +184,14 @@ func New() *Metrics {
 		m.httpRequests,
 		m.httpDuration,
 		m.httpPanics,
+		m.providerDisabled,
+		m.providerSettingRej,
+		m.providerAuthFailures,
+		m.providerRateLimited,
+		m.subtitlesSaved,
+		m.subtitleWriteErrors,
+		m.mediaRootUnwritable,
+		m.mediaRootUnavail,
 		m.storeFileBytes,
 		m.storeFreelistBytes,
 		m.reconcileDuration,
@@ -286,6 +316,76 @@ func (m *Metrics) AdaptiveSkip() {
 // search engine excludes context cancellations before calling this.
 func (m *Metrics) RecordEmbeddedDetectorError() {
 	m.embDetErrs.Inc()
+}
+
+// --- Provider credential gate and subtitle saves ---
+
+// SetProviderDisabled sets the provider's disabled gauge.
+func (m *Metrics) SetProviderDisabled(id subflux.ProviderID, disabled bool) {
+	m.providerDisabled.Set(boolGauge(disabled), string(id))
+}
+
+// DeleteProviderDisabled removes the provider's disabled series.
+func (m *Metrics) DeleteProviderDisabled(id subflux.ProviderID) {
+	m.providerDisabled.Delete(string(id))
+}
+
+// IncProviderAuthFailure counts one credential rejection for the provider.
+func (m *Metrics) IncProviderAuthFailure(id subflux.ProviderID) {
+	m.providerAuthFailures.Inc(string(id))
+}
+
+// IncProviderRateLimited counts one rate-limit pause for the provider and op.
+func (m *Metrics) IncProviderRateLimited(id subflux.ProviderID, op providergate.Op) {
+	m.providerRateLimited.Inc(string(id), string(op))
+}
+
+// SetProviderSettingRejected sets the series for a rejected optional setting,
+// or deletes it when the rejection clears.
+func (m *Metrics) SetProviderSettingRejected(id subflux.ProviderID, setting string, rejected bool) {
+	if rejected {
+		m.providerSettingRej.Set(1, string(id), setting)
+		return
+	}
+	m.providerSettingRej.Delete(string(id), setting)
+}
+
+// RecordSubtitleSaved counts one subtitle file written for the provider.
+func (m *Metrics) RecordSubtitleSaved(provider subflux.ProviderID) {
+	m.subtitlesSaved.Inc(string(provider))
+}
+
+// IncSubtitleWriteError counts one failed subtitle write or media folder
+// write test.
+func (m *Metrics) IncSubtitleWriteError() {
+	m.subtitleWriteErrors.Inc()
+}
+
+// SetMediaRootUnwritable sets the media root's unwritable gauge.
+func (m *Metrics) SetMediaRootUnwritable(root string, unwritable bool) {
+	m.mediaRootUnwritable.Set(boolGauge(unwritable), root)
+}
+
+// DeleteMediaRoot removes the media root's unwritable series.
+func (m *Metrics) DeleteMediaRoot(root string) {
+	m.mediaRootUnwritable.Delete(root)
+}
+
+// SetMediaRootUnavailable sets the media root's unavailable gauge.
+func (m *Metrics) SetMediaRootUnavailable(root string, unavailable bool) {
+	m.mediaRootUnavail.Set(boolGauge(unavailable), root)
+}
+
+// DeleteMediaRootUnavailable removes the media root's unavailable series.
+func (m *Metrics) DeleteMediaRootUnavailable(root string) {
+	m.mediaRootUnavail.Delete(root)
+}
+
+func boolGauge(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // TotalSearches returns the cumulative search count across all providers.

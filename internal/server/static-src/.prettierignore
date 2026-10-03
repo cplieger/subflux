@@ -3,3 +3,6 @@
 .vitest-cache/
 
 coverage/
+
+# Written by the Go suite and vitest and compared byte for byte
+/testdata/

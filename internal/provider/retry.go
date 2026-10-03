@@ -130,3 +130,20 @@ func (r *retryProvider) ClearCache() {
 		cc.ClearCache()
 	}
 }
+
+// SettingVerdict forwards to the inner provider if it implements
+// SettingReporter.
+func (r *retryProvider) SettingVerdict() (setting string, refusal error) {
+	if sr, ok := r.inner.(SettingReporter); ok {
+		return sr.SettingVerdict()
+	}
+	return "", nil
+}
+
+// ForgetSettingVerdict forwards to the inner provider if it implements
+// SettingReporter.
+func (r *retryProvider) ForgetSettingVerdict() {
+	if sr, ok := r.inner.(SettingReporter); ok {
+		sr.ForgetSettingVerdict()
+	}
+}

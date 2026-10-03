@@ -1,17 +1,19 @@
 package search
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log/slog"
 	"time"
 	"unicode/utf8"
 
-	"github.com/cplieger/atomicfile/v3"
-	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/required"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/search/providerhealth"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -21,8 +23,7 @@ import (
 )
 
 // Metrics is the narrow observability interface consumed by the search
-// engine. Only the 4 methods actually called are required; the concrete
-// *obs.Metrics satisfies this via structural typing.
+// engine; the concrete *obs.Metrics satisfies it via structural typing.
 type Metrics interface {
 	RecordSearch(provider subflux.ProviderID, dur time.Duration, err error)
 	RecordDownload(provider subflux.ProviderID, err error)
@@ -31,13 +32,18 @@ type Metrics interface {
 	// (subflux_embedded_detector_errors_total). Context cancellation is
 	// excluded by the caller.
 	RecordEmbeddedDetectorError()
+	// RecordSubtitleSaved counts a subtitle file written next to the media.
+	RecordSubtitleSaved(provider subflux.ProviderID)
 }
 
-// FileWriter abstracts atomic file writes, decoupling the search engine from
-// the concrete atomicfile implementation. The default wraps atomicfile.WriteFile;
-// tests can inject a stub that records writes without touching disk.
-type FileWriter interface {
+// MediaWriter writes subtitles into the media tree and knows which folders
+// refuse writes; *mediawrite.Writer is the implementation.
+type MediaWriter interface {
+	// WriteFile returns an error matching mediawrite.ErrUnwritable when the
+	// subtitle's folder refuses writes; any other error is about the target.
 	WriteFile(ctx context.Context, path string, data []byte) error
+	// Blocked reports the unwritable folder at or above path's folder.
+	Blocked(path string) (folder string, blocked bool)
 }
 
 // SubtitleSyncer synchronizes subtitle timing and applies post-processing.
@@ -85,8 +91,11 @@ type Engine struct {
 	scorer          Scorer
 	syncer          SubtitleSyncer
 	tracks          TrackDetector
-	fileWriter      FileWriter
+	media           MediaWriter
 	timeout         providerHealth
+	providerGate    *providergate.Binding
+	showCounter     provider.ShowSubtitleCounter
+	showCounterID   subflux.ProviderID
 	gate            *mediaGate
 	syncExec        syncing.SyncExec
 	searchGroup     singleflight.Group
@@ -121,6 +130,13 @@ func WithSyncExec(x syncing.SyncExec) Option { return func(e *Engine) { e.syncEx
 // WithTracks sets the engine's embedded-track detector.
 func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t } }
 
+// WithProviderGate sets the provider gate binding every provider call goes
+// through. Required.
+func WithProviderGate(b *providergate.Binding) Option { return func(e *Engine) { e.providerGate = b } }
+
+// WithMediaWriter sets the writer every subtitle save goes through. Required.
+func WithMediaWriter(w MediaWriter) Option { return func(e *Engine) { e.media = w } }
+
 // WithTimeout sets the provider health tracker. When not set, the engine
 // constructs one from config (or uses noopHealth if disabled).
 func WithTimeout(h providerHealth) Option { return func(e *Engine) { e.timeout = h } }
@@ -147,19 +163,6 @@ func (noopHealth) Status() map[subflux.ProviderID]subflux.ProviderStatus { retur
 func (noopHealth) Reset()                                                {}
 func (noopHealth) SetOnChange(providerhealth.OnChange)                   {}
 
-// atomicWriter is the default FileWriter that delegates to atomicfile.WriteFile.
-// WithMaxBytes mirrors the read bound on the data it persists: downloaded
-// subtitle payloads are capped at httpwire.MaxDownloadBytes and read back by
-// the sync handlers under the same bound, so a post-processed payload the
-// read path would refuse to load fails the write instead of landing on disk.
-type atomicWriter struct{}
-
-func (atomicWriter) WriteFile(ctx context.Context, path string, data []byte) error {
-	_, err := atomicfile.WriteFile(ctx, path, data,
-		atomicfile.WithMaxBytes(httpwire.MaxDownloadBytes))
-	return err
-}
-
 // New creates a search engine. The providers slice is required; all other
 // dependencies are supplied via functional options.
 func New(providers []provider.Provider, opts ...Option) *Engine {
@@ -170,22 +173,11 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	e.providersByName = make(map[subflux.ProviderID]provider.Provider, len(providers))
 	for _, p := range providers {
 		e.providersByName[p.Name()] = p
+		if c, ok := p.(provider.ShowSubtitleCounter); ok && e.showCounter == nil {
+			e.showCounter, e.showCounterID = c, p.Name()
+		}
 	}
-	if e.store == nil {
-		panic("search.New: WithStore is required")
-	}
-	if e.cfg == nil {
-		panic("search.New: WithConfig is required")
-	}
-	if e.scorer == nil {
-		panic("search.New: WithScorer is required")
-	}
-	if e.syncer == nil {
-		panic("search.New: WithSyncer is required")
-	}
-	if e.tracks == nil {
-		panic("search.New: WithTracks is required (use embedded.Detector{} or search.NoopDetector{})")
-	}
+	e.requireDeps()
 	if e.timeout == nil {
 		cooldown := e.cfg.Search().ProviderTimeout
 		if cooldown > 0 {
@@ -197,10 +189,28 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	if e.timeout == nil {
 		e.timeout = noopHealth{}
 	}
-	if e.fileWriter == nil {
-		e.fileWriter = atomicWriter{}
-	}
 	return e
+}
+
+// requireDeps panics naming the first required option New was not given, or
+// was given a nil pointer.
+func (e *Engine) requireDeps() {
+	for _, d := range []struct {
+		v      any
+		option string
+	}{
+		{v: e.store, option: "WithStore"},
+		{v: e.cfg, option: "WithConfig"},
+		{v: e.scorer, option: "WithScorer"},
+		{v: e.syncer, option: "WithSyncer"},
+		{v: e.tracks, option: "WithTracks (use embedded.Detector{} or search.NoopDetector{})"},
+		{v: e.providerGate, option: "WithProviderGate"},
+		{v: e.media, option: "WithMediaWriter"},
+	} {
+		if required.Missing(d.v) {
+			panic("search.New: " + d.option + " is required")
+		}
+	}
 }
 
 // ScoreSubtitles filters results by identity and returns them scored against req.
@@ -241,20 +251,6 @@ func (e *Engine) HashFile(ctx context.Context, path string) (hash string, size i
 		return "", 0, errors.New("unexpected singleflight result type")
 	}
 	return r.hash, r.size, nil
-}
-
-// ProviderTimeouts returns (nil, false) when timeouts are disabled.
-func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStatus, bool) {
-	s := e.timeout.Status()
-	if s == nil {
-		return nil, false
-	}
-	return s, true
-}
-
-// ResetTimeouts clears all provider timeout state.
-func (e *Engine) ResetTimeouts() {
-	e.timeout.Reset()
 }
 
 // SetProviderHealthHook installs the observer for provider timeout raise and
@@ -429,7 +425,9 @@ func gateKey(mediaType subflux.MediaType, mediaID string) string {
 }
 
 // SearchTargets always searches for regular (non-HI, non-forced) subs, with
-// HI as fallback.
+// HI as fallback. Its error is the context's, or the first
+// *mediawrite.UnwritableError a save produced (also in WriteFailure), which
+// is the caller's signal to stop.
 func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	videoPath string, targets []subflux.SubtitleTarget,
 ) (subflux.SearchResult, error) {
@@ -452,13 +450,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	}
 
 	if req.VideoHash == "" && videoPath != "" {
-		if hash, size, err := e.HashFile(ctx, videoPath); err == nil {
-			req.VideoHash = hash
-			req.VideoSize = size
-		} else {
-			slog.Debug("video hash failed, searching without hash",
-				"path", videoPath, "error", err)
-		}
+		e.hashVideo(ctx, req, videoPath)
 	}
 
 	existing, probeOK := e.detectExistingObserved(ctx, videoPath)
@@ -483,6 +475,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	// singleflight deduplicates identical provider queries across languages
 	// processed concurrently here.
 	result.Langs = make([]subflux.LangOutcome, len(langOrder))
+	writeFailures := make([]*mediawrite.UnwritableError, len(langOrder))
 
 	g := new(errgroup.Group)
 	g.SetLimit(4)
@@ -492,18 +485,51 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 			if err := ctx.Err(); err != nil {
 				return nil
 			}
-			result.Langs[idx] = e.searchLangGroup(ctx, req, langTargets,
+			result.Langs[idx], writeFailures[idx] = e.searchLangGroup(ctx, req, langTargets,
 				videoPath, mediaType, mediaID, &existing, &searchCfg, upgradeCutoff)
 			return nil
 		})
 	}
 	_ = g.Wait()
+	if wf := cmp.Or(writeFailures...); wf != nil {
+		result.WriteFailure = wf
+	}
 
 	// A cancellation mid-item must not mark the item recently-scanned, or a
 	// restart would resume-skip unfinished work for a full cycle.
-	if ctx.Err() == nil {
+	if ctx.Err() == nil && !unfinished(&result) {
 		e.stampScanState(ctx, mediaType, mediaID, req, true)
 	}
 
+	if result.WriteFailure != nil {
+		return result, result.WriteFailure
+	}
 	return result, nil
+}
+
+// hashVideo fills the request's hash and size from the video file; a file
+// that cannot be hashed is searched without them.
+func (e *Engine) hashVideo(ctx context.Context, req *subflux.SearchRequest, videoPath string) {
+	hash, size, err := e.HashFile(ctx, videoPath)
+	if err != nil {
+		slog.Debug("video hash failed, searching without hash",
+			"path", videoPath, "error", err)
+		return
+	}
+	req.VideoHash = hash
+	req.VideoSize = size
+}
+
+// unfinished reports whether a search left work the next pass must redo: a
+// target had candidates and saved none, a searched language got no answer
+// from any provider, or a target's folder refused writes. Such an item is
+// not stamped, so the resume set does not skip it.
+func unfinished(result *subflux.SearchResult) bool {
+	for i := range result.Langs {
+		l := &result.Langs[i]
+		if l.Failed > 0 || l.WriteBlocked > 0 || (l.Kind == subflux.LangSearched && l.Answered == 0) {
+			return true
+		}
+	}
+	return false
 }

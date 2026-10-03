@@ -145,8 +145,8 @@ var cliSpecs = map[string]cliparse.Spec{
 	},
 	cmdTimeoutsReset: {
 		Name:     cmdTimeoutsReset,
-		Synopsis: "Clear all provider timeouts",
-		Help:     "Re-enables every timed-out provider immediately.",
+		Synopsis: "Clear all provider timeouts and credential disables",
+		Help:     "Re-enables every timed-out, rate-limited or credential-disabled provider immediately.",
 		Run: func(p cliparse.Params) int {
 			return runCLIAction(p, apipaths.PathResetProviderTimeouts,
 				"provider timeouts reset, all providers re-enabled")

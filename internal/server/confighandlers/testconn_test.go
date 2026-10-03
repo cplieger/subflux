@@ -12,10 +12,16 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // testArrSchema is the minimum HandleTestConnection needs: both arr sections with a
@@ -54,6 +60,13 @@ func (r testRegistry) Schema(name subflux.ProviderID) (string, []subflux.Provide
 }
 
 func (r testRegistry) CredentialCheck(name subflux.ProviderID) bool { return name == r.name }
+
+func (r testRegistry) Normalize(name subflux.ProviderID, raw map[string]any) map[string]any {
+	if name != r.name {
+		return raw
+	}
+	return provider.NormalizeSettings(r.fields, raw)
+}
 
 func (r testRegistry) CheckCredentials(_ context.Context, name subflux.ProviderID, settings map[string]any) error {
 	if r.calls != nil {
@@ -549,8 +562,9 @@ func TestHandleTestConnection_provider_arm(t *testing.T) {
 			var gotSettings map[string]any
 			checks := 0
 			h := New(&Deps{
-				Registry:   opensubsRegistry(&gotSettings, &checks, tt.checkErr),
-				ConfigPath: func() string { return configPath },
+				Registry:     opensubsRegistry(&gotSettings, &checks, tt.checkErr),
+				ProviderAuth: openGate(t, nil),
+				ConfigPath:   func() string { return configPath },
 			})
 
 			rec := doArrTest(t, h, tt.body)
@@ -626,4 +640,143 @@ func TestDescribeCredentialFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+// gateStore is an in-memory providergate.Store, so a second gate can load what
+// a first one persisted.
+type gateStore struct {
+	recs map[subflux.ProviderID]subflux.ProviderAuthRecord
+	mu   sync.Mutex
+}
+
+func (s *gateStore) ProviderAuthRecords(context.Context) ([]subflux.ProviderAuthRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Collect(maps.Values(s.recs)), nil
+}
+
+func (s *gateStore) PutProviderAuthRecord(_ context.Context, rec *subflux.ProviderAuthRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.recs == nil {
+		s.recs = map[subflux.ProviderID]subflux.ProviderAuthRecord{}
+	}
+	s.recs[rec.Provider] = *rec
+	return nil
+}
+
+func (s *gateStore) DeleteProviderAuthRecord(_ context.Context, id subflux.ProviderID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.recs, id)
+	return nil
+}
+
+func (s *gateStore) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.recs)
+}
+
+// openGate opens a credential gate over store (memory-only when nil) whose
+// clock is now.
+func openGate(t *testing.T, store *gateStore, now ...func() time.Time) *providergate.Gate {
+	t.Helper()
+	cfg := providergate.Config{Metrics: testsupport.NopGateMetrics{}}
+	if store != nil {
+		h, err := auth.NewHasher(auth.Argon2Params{Memory: 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+		if err != nil {
+			t.Fatalf("NewHasher: %v", err)
+		}
+		cfg.Store, cfg.Hasher = store, h
+	}
+	if len(now) > 0 {
+		cfg.Now = now[0]
+	}
+	g, err := providergate.Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf("providergate.Open: %v", err)
+	}
+	return g
+}
+
+// disabledGate returns a gate whose live binding has opensubtitles disabled
+// for rejecting settings.
+func disabledGate(t *testing.T, store *gateStore, settings map[string]any) *providergate.Gate {
+	t.Helper()
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	gate := openGate(t, store, func() time.Time { return at })
+	b := gate.Bind(map[subflux.ProviderID]map[string]any{"opensubtitles": settings})
+	gate.Activate(b)
+	for range providergate.MaxAuthFailures {
+		b.Observe(t.Context(), "opensubtitles", providergate.OpSearch, &subflux.AuthError{Msg: "HTTP 401"})
+		at = at.Add(time.Hour)
+	}
+	if !gate.Status()["opensubtitles"].Disabled {
+		t.Fatal("setup: opensubtitles is not disabled after the ladder")
+	}
+	return gate
+}
+
+// A passing check is the operator's proof that the credentials work, so it
+// re-enables a provider disabled for exactly those settings, and says so. A
+// pass with other settings cannot vouch for the recorded ones: the disable
+// stays until those settings are saved. With no engine live, the record the
+// gate loaded at start is cleared all the same.
+func TestHandleTestConnection_provider_check_clears_a_matching_disable(t *testing.T) {
+	t.Parallel()
+	recorded := map[string]any{"username": "u", "password": "p", "api_key": "k"}
+	const matching = `{"kind":"opensubtitles","settings":{"username":"u","password":"p","api_key":"k"}}`
+	check := func(t *testing.T, gate ProviderAuthClearer, body string) ConnTestResponse {
+		t.Helper()
+		h := New(&Deps{
+			Registry:     opensubsRegistry(nil, nil, nil),
+			ProviderAuth: gate,
+			ConfigPath:   func() string { return filepath.Join(t.TempDir(), "config.yaml") },
+		})
+		var got ConnTestResponse
+		if err := json.Unmarshal(doArrTest(t, h, body).Body.Bytes(), &got); err != nil {
+			t.Fatalf("HandleTestConnection(%s): %v", body, err)
+		}
+		return got
+	}
+
+	t.Run("recorded settings", func(t *testing.T) {
+		t.Parallel()
+		gate := disabledGate(t, nil, recorded)
+		got := check(t, gate, matching)
+		if !got.Valid || got.Message != "credentials accepted; provider re-enabled" {
+			t.Errorf("HandleTestConnection(recorded settings) = %+v, want valid and re-enabled", got)
+		}
+		if gate.Status()["opensubtitles"].Disabled {
+			t.Error("opensubtitles still disabled after a passing check with its recorded settings")
+		}
+	})
+	t.Run("other settings", func(t *testing.T) {
+		t.Parallel()
+		gate := disabledGate(t, nil, recorded)
+		got := check(t, gate, `{"kind":"opensubtitles","settings":{"username":"u","password":"p2","api_key":"k"}}`)
+		if !got.Valid || got.Message != "credentials accepted; save to apply them and re-enable the provider" {
+			t.Errorf("HandleTestConnection(other settings) = %+v, want valid and asked to save", got)
+		}
+		if !gate.Status()["opensubtitles"].Disabled {
+			t.Error("a check with other settings re-enabled the provider")
+		}
+	})
+	t.Run("no live binding", func(t *testing.T) {
+		t.Parallel()
+		store := &gateStore{}
+		disabledGate(t, store, recorded)
+		got := check(t, openGate(t, store), matching)
+		if got.Message != "credentials accepted; provider re-enabled" || store.count() != 0 {
+			t.Errorf("HandleTestConnection(unconfigured) = %+v with %d stored record(s), want re-enabled and none",
+				got, store.count())
+		}
+	})
+	t.Run("nothing recorded", func(t *testing.T) {
+		t.Parallel()
+		if got := check(t, openGate(t, nil), matching); !got.Valid || got.Message != "" {
+			t.Errorf("HandleTestConnection(no record) = %+v, want valid with no message", got)
+		}
+	})
 }

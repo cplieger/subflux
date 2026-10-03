@@ -32,16 +32,15 @@
 //
 // # Filesystem dependency
 //
-// ReconcileState classifies each row against the real filesystem (an engine
-// defaults its stat oracle to os.Stat), so the reconcile cases create real
-// video/subtitle files under t.TempDir() and reference those paths. This keeps
-// the suite engine-agnostic: it drives reconcile entirely through SaveDownload
-// + RecordNoResult + RecordScanState and real files, with no engine-specific
-// stat injection.
+// The reconcile cases pass osGone, so they create real video/subtitle files
+// under t.TempDir() and reference those paths. This keeps the suite
+// engine-agnostic: it drives reconcile entirely through SaveDownload +
+// RecordNoResult + RecordScanState and real files.
 package storetest
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -125,7 +124,7 @@ type Store interface {
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 	DeleteStateByPaths(ctx context.Context, paths []string) (subflux.CleanupResult, error)
 	CleanupDrift(ctx context.Context, drift subflux.ConfigDrift) error
-	ReconcileState(ctx context.Context) (subflux.ReconcileResult, error)
+	ReconcileState(ctx context.Context, gone func(context.Context, string) (bool, error), unavailable func(string) (string, bool)) (subflux.ReconcileResult, error)
 }
 
 // Suite runs the engine-agnostic behavioral contract against any Store
@@ -238,7 +237,23 @@ func defaultBackoff() subflux.BackoffParams {
 	return subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
 }
 
-// writeFile creates a real file so ReconcileState's os.Stat oracle classifies
+// osGone is the reconcile oracle the contract passes: not-exist is gone,
+// success is present, and any other stat error decides nothing.
+func osGone(_ context.Context, path string) (bool, error) {
+	_, err := os.Stat(path)
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.Is(err, os.ErrNotExist):
+		return true, nil
+	}
+	return false, err
+}
+
+// noFault is the unavailable oracle the contract passes: no root is faulted.
+func noFault(string) (string, bool) { return "", false }
+
+// writeFile creates a real file so osGone classifies
 // the path as present. Used by the reconcile cases to stand up the on-disk
 // state the engine under test inspects.
 func writeFile(t *testing.T, path string) {
@@ -1122,7 +1137,7 @@ func testReconcileVideoGone(t *testing.T, s Store) {
 		t.Fatalf("RecordNoResult(gone): %v", err)
 	}
 
-	result, err := s.ReconcileState(ctx)
+	result, err := s.ReconcileState(ctx, osGone, noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -1202,7 +1217,7 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
-	result, err := s.ReconcileState(ctx)
+	result, err := s.ReconcileState(ctx, osGone, noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -1271,7 +1286,7 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
-	result, err := s.ReconcileState(ctx)
+	result, err := s.ReconcileState(ctx, osGone, noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // listEntries drives HandleListFiles and decodes the response.
@@ -373,6 +374,7 @@ func newFileHandlerArr(store FileStore, sonarr FileSonarrClient, radarr FileRada
 		},
 		StateFunc: func() *LiveState { return &LiveState{Cfg: cfg, Sonarr: sonarr, Radarr: radarr} },
 		Events:    events.New(0, nil),
+		Presence:  testsupport.MediaPresence("/"),
 	})
 }
 

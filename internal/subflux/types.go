@@ -37,13 +37,20 @@ type RateLimitError struct {
 
 func (e *RateLimitError) Error() string { return e.Msg }
 
-// ProviderStatus is the state of a single provider's timeout.
+// ProviderStatus is one provider's callability: the health tracker's timeout
+// (TimedOut, CooldownRemaining, RecentFailures, Threshold, LastError) and the
+// credential gate's disable, rate-limit pause and rejected optional settings.
 type ProviderStatus struct {
 	LastError         string        `json:"last_error,omitempty"`
+	DisabledReason    string        `json:"disabled_reason,omitempty"`
+	RejectedSettings  []string      `json:"rejected_settings,omitempty"`
 	CooldownRemaining time.Duration `json:"cooldown_remaining,omitempty"`
+	PausedFor         time.Duration `json:"paused_for,omitempty"`
 	RecentFailures    int           `json:"recent_failures"`
 	Threshold         int           `json:"threshold"`
+	AuthFailures      int           `json:"auth_failures,omitempty"`
 	TimedOut          bool          `json:"timed_out"`
+	Disabled          bool          `json:"disabled"`
 }
 
 // --- Config types (canonical, moved from config package) ---

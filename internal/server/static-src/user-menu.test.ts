@@ -1,18 +1,10 @@
 // user-menu.test.ts — the header user menu.
 //
-// Mostly wiring, with two pieces that carry real risk. The theme item is
-// labelled with the stop it switches TO and keyed off the STORED choice, not
-// the resolved data-theme attribute, because a resolved attribute cannot
-// distinguish system-dark from pinned dark — get that wrong and the item lies
-// about what it does. And the panel announces role="menu", so it owes the
-// WAI-ARIA menu contract; the roving-focus primitive is left REAL here so the
-// single-Tab-stop invariant is actually exercised rather than mocked away.
-//
-// One thing is deliberately never done: the Logout item is never clicked.
-// doLogout assigns window.location.href, which cannot be stubbed in a real
-// browser (window and location are non-configurable) and would reload the test
-// runner's own iframe, failing the whole file. Its presence is asserted, its
-// activation is not.
+// The theme item names the STORED choice, not the resolved data-theme, which
+// cannot tell system-dark from pinned dark. The roving-focus primitive stays
+// REAL so the menu's single-Tab-stop invariant is exercised. The Logout item is
+// never clicked: doLogout assigns window.location.href, which cannot be stubbed
+// in a real browser and would reload the runner's own iframe.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as bus from "./bus.js";
 import * as store from "./store.js";
@@ -183,7 +175,7 @@ describe("user menu content", () => {
     await boot();
 
     expect(_userMenuPanelForTest().querySelector(".um-name")?.textContent).toBe("cplieger");
-    expect(labels()).toStrictEqual(["Security", "Settings", "Light mode", "Logout"]);
+    expect(labels()).toStrictEqual(["Security", "Settings", "System theme", "Logout"]);
   });
 
   it("omits Settings for a non-admin", async () => {
@@ -191,7 +183,7 @@ describe("user menu content", () => {
 
     await boot();
 
-    expect(labels()).toStrictEqual(["Security", "Light mode", "Logout"]);
+    expect(labels()).toStrictEqual(["Security", "System theme", "Logout"]);
   });
 
   it("marks the username row non-interactive so the menu contract stays honest", async () => {
@@ -221,14 +213,14 @@ describe("user menu content", () => {
     expect(stops).toHaveLength(1);
   });
 
-  it("rebuilds on open so a theme flipped while closed is not stale", async () => {
+  it("rebuilds on open from the stored theme choice", async () => {
     await boot();
-    expect(labels()).toContain("Light mode");
+    expect(labels()).toContain("System theme");
 
     themeState.choice = "light";
     menu.options?.onOpen?.();
 
-    expect(labels()).toContain("Dark mode");
+    expect(labels()).toContain("Light theme");
   });
 
   it("renders a Logout row (never activated here — see the file header)", async () => {
@@ -273,35 +265,56 @@ describe("user menu actions", () => {
 
 describe("theme item", () => {
   const cases = [
-    { choice: "light" as const, label: "Dark mode", glyph: "icon-moon" },
-    { choice: "dark" as const, label: "System theme", glyph: "icon-monitor" },
-    { choice: "system" as const, label: "Light mode", glyph: "icon-sun" },
+    {
+      choice: "light" as const,
+      label: "Light theme",
+      glyph: "icon-sun",
+      name: "Theme: Light, activate to switch",
+      tip: "Switch to dark theme",
+    },
+    {
+      choice: "dark" as const,
+      label: "Dark theme",
+      glyph: "icon-moon",
+      name: "Theme: Dark, activate to switch",
+      tip: "Switch to system theme",
+    },
+    {
+      choice: "system" as const,
+      label: "System theme",
+      glyph: "icon-monitor",
+      name: "Theme: System, activate to switch",
+      tip: "Switch to light theme",
+    },
   ];
 
   for (const tc of cases) {
-    it(`labels the ${tc.choice} choice with the next stop, ${tc.label}`, async () => {
+    it(`names the current ${tc.choice} choice as ${tc.label}`, async () => {
       themeState.choice = tc.choice;
 
       await boot();
 
       const item = itemNamed(tc.label);
       expect(item.querySelector(`.${tc.glyph}`)).not.toBeNull();
+      expect(item.getAttribute("aria-label")).toBe(tc.name);
+      expect(item.getAttribute("data-tip")).toBe(tc.tip);
     });
   }
 
-  it("cycles the theme and relabels itself in place", async () => {
+  it("cycles the theme on click and then names the new current choice", async () => {
     themeState.choice = "light";
     await boot();
 
     // The click cycles; the module then re-reads the stored choice, so the
-    // label must follow without a rebuild.
+    // item must follow without a rebuild.
     themeState.choice = "dark";
-    itemNamed("Dark mode").click();
+    itemNamed("Light theme").click();
 
+    const item = itemNamed("Dark theme");
     expect(themeState.cycles).toBe(1);
-    expect(_userMenuPanelForTest().querySelector(".um-theme-label")?.textContent).toBe(
-      "System theme",
-    );
-    expect(_userMenuPanelForTest().querySelector(".um-theme-icon .icon-monitor")).not.toBeNull();
+    expect(item.querySelector(".um-theme-icon .icon-moon")).not.toBeNull();
+    expect(item.querySelectorAll(".um-theme-icon .icon")).toHaveLength(1);
+    expect(item.getAttribute("aria-label")).toBe("Theme: Dark, activate to switch");
+    expect(item.getAttribute("data-tip")).toBe("Switch to system theme");
   });
 });

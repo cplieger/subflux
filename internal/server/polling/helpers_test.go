@@ -1,5 +1,11 @@
 package polling
 
+import (
+	"context"
+
+	"github.com/cplieger/subflux/internal/testsupport"
+)
+
 // Level-scoped log assertions go through capture.Recorder.CountLevel
 // directly (the former in-package hasRecord walk is gone): the poller's
 // WARN/ERROR branch messages are package-unique prefixes, so
@@ -15,5 +21,16 @@ func fullDeps(store PollerStore) Deps {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
+}
+
+// importOne resolves and runs one import the way a batch does, without the
+// batch's write test.
+func importOne(ctx context.Context, p *Poller, ls *LiveState, path string,
+	buildFn func() (*ImportResult, error), refreshFn func(context.Context, int) error,
+) importResult {
+	pi := p.resolveImport(ctx, ls, path, buildFn, refreshFn)
+	return p.runImport(ctx, ls, &pi)
 }

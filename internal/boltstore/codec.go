@@ -119,18 +119,8 @@ func decodeRecord[T any](mode kv.DecodeMode, bucket string, key, data []byte, v 
 
 const (
 	// coreSchemaVersion is the core-domain (search_attempts, subtitle_state,
-	// subtitle_files, scan_state, sync_offsets, poll_state) schema version
-	// this build writes and understands.
-	//
-	// v1 is the first (and, pre-release, only) core schema: subtitle_state
-	// keyed by a be64 surrogate id with a self-contained value (the record
-	// carries its own media_type/media_id/language/variant quad, and every
-	// state index key derives from the value), the ix_state_quad /
-	// ix_state_imported / ix_state_video indexes, and no secondary index on
-	// search_attempts. The counter was reset to 1 before the first release
-	// (the internal pre-release iterations that bumped it never shipped);
-	// a dev file stamped with a higher version is refused by the
-	// newer-than-binary guard (restore a matching build or a snapshot).
+	// subtitle_files, scan_state, sync_offsets, poll_state, provider_auth)
+	// schema version this build writes and understands.
 	coreSchemaVersion uint64 = 1
 
 	// authSchemaVersion is the auth-domain (auth_users, auth_passkeys,
@@ -182,27 +172,15 @@ func writeSchemaVersion(tx *bolt.Tx, key []byte, version uint64) error {
 // any affected lock as held) so a security-relevant record is never silently
 // dropped.
 
-// TolerantSkip (skip-with-warning) buckets: the four derived core buckets whose
-// contents the next full scan rebuilds.
-//
-//   - search_attempts (adaptive backoff; a missing row just means eligible)
-//   - subtitle_state  (auto rows re-detected by the scanner)
-//   - subtitle_files  (coverage re-detected by the scanner)
-//   - scan_state      (re-populated on the next scan)
-//
-// FAIL-CLOSED buckets (everything else): auth_users, auth_passkeys,
-// auth_api_keys, and meta. An undecodable auth record must abort the read, not
-// vanish.
-//
-// OVERRIDE: a lock-bearing read (IsManuallyLocked and the manual-row reads it
-// guards) or a uniqueness-bearing read MUST pass kv.FailClosed explicitly
-// even though subtitle_state defaults to TolerantSkip, and MUST treat the
-// affected triple as locked on a decode error. bucketDecodeMode gives the
-// per-bucket DEFAULT for ordinary scans; the convention for those special
-// reads is to override.
+// bucketDecodeMode is a bucket's default decode mode. The buckets the next
+// full scan rebuilds, and provider_auth, where an unreadable record must not
+// pin a provider disabled, skip a bad record with a warning; every other one
+// fails closed. A lock- or uniqueness-bearing read such as IsManuallyLocked
+// passes kv.FailClosed and treats the affected triple as locked on an error.
 func bucketDecodeMode(bucket string) kv.DecodeMode {
 	switch bucket {
-	case bucketSearchAttempts, bucketSubtitleState, bucketSubtitleFiles, bucketScanState:
+	case bucketSearchAttempts, bucketSubtitleState, bucketSubtitleFiles, bucketScanState,
+		bucketProviderAuth:
 		return kv.TolerantSkip
 	default:
 		// auth_users, auth_passkeys, auth_api_keys, meta, and any unknown

@@ -235,7 +235,8 @@ func newTestServer(t *testing.T, db *qhMockStore) *Server {
 		search.WithStore(db), search.WithConfig(cfg),
 		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+		search.WithTracks(embedded.Detector{}),
+		search.WithProviderGate(testsupport.ProviderGateBinding()), search.WithMediaWriter(testsupport.MediaWriter()))
 	s := &Server{
 		db: db,
 		stores: storeFacade{
@@ -245,6 +246,8 @@ func newTestServer(t *testing.T, db *qhMockStore) *Server {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
+		presence: testsupport.MediaPresence(),
 		events:   events.New(0, nil),
 		// context.Background(): no *testing.T in scope, and this is the server's own long-lived context rather than a per-test one.
 		lifetime: context.Background(),

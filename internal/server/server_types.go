@@ -9,9 +9,12 @@ import (
 	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/mediapresence"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -208,19 +211,26 @@ type Server struct {
 	// wave-admission FIFO both arr sides share, so the recovery concurrency
 	// ceiling is aggregate. One per server, surviving reloads; activation
 	// hands it to the factories beside each activation's fresh client pair.
-	arrReads   *arrsvc.ReadGate
-	wire       wiring.Func
-	activity   *activity.Log
-	live       atomic.Pointer[liveState]
-	queryH     *queryhandlers.Handler
-	schemaFunc subflux.SchemaFunc
-	configH    *confighandlers.Handler
-	alerts     *activity.AlertLog
-	events     *events.EventBus
-	coverageH  *coveragehandlers.Handler
-	activityH  *activityhandlers.Handler
-	storeOps   *storeops.Runner
-	syncH      *synchandlers.Handler
+	arrReads *arrsvc.ReadGate
+	wire     wiring.Func
+	// gate is the process-lifetime provider credential gate. REQUIRED (WithProviderGate).
+	gate *providergate.Gate
+	// publishProvider is the one provider SSE publisher (NewProviderPublisher),
+	// shared by the gate hook and every engine's health hook.
+	publishProvider func(op events.ProviderOp, id subflux.ProviderID)
+	activity        *activity.Log
+	live            atomic.Pointer[liveState]
+	queryH          *queryhandlers.Handler
+	schemaFunc      subflux.SchemaFunc
+	configH         *confighandlers.Handler
+	alerts          *activity.AlertLog
+	media           *mediawrite.Writer
+	presence        *mediapresence.Checker
+	events          *events.EventBus
+	coverageH       *coveragehandlers.Handler
+	activityH       *activityhandlers.Handler
+	storeOps        *storeops.Runner
+	syncH           *synchandlers.Handler
 	// syncJobs is the async sync dispatcher (D1): the FIFO + admission lease
 	// + job registry POST /api/sync/audio dispatches into. Built by
 	// initHandlers; its Run loop starts with Start on bgWg.
@@ -294,6 +304,21 @@ func WithConfig(cfg *config.Config) Option {
 
 // WithWire sets the provider wiring function.
 func WithWire(w wiring.Func) Option { return func(s *Server) { s.wire = w } }
+
+// WithProviderGate sets the provider credential gate. REQUIRED: New installs
+// its event hook and every activation hands it the new binding.
+func WithProviderGate(g *providergate.Gate) Option { return func(s *Server) { s.gate = g } }
+
+// WithAlertLog sets the alert log (required). The composition root owns it
+// because the media writer raises into it before the server exists.
+func WithAlertLog(al *activity.AlertLog) Option { return func(s *Server) { s.alerts = al } }
+
+// WithMediaWriter sets the process-wide media write guard (required by Start).
+func WithMediaWriter(mw *mediawrite.Writer) Option { return func(s *Server) { s.media = mw } }
+
+// WithMediaPresence sets the process-wide judge of which media files are gone
+// (required by Start).
+func WithMediaPresence(c *mediapresence.Checker) Option { return func(s *Server) { s.presence = c } }
 
 // WithSchema sets the config schema function.
 func WithSchema(f subflux.SchemaFunc) Option { return func(s *Server) { s.schemaFunc = f } }

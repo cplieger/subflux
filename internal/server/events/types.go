@@ -147,8 +147,9 @@ type AlertEvent struct {
 
 func (AlertEvent) eventData() {}
 
-// ProviderOp discriminates a provider event: a provider tripped into timeout
-// cooldown (raise) or left it (clear).
+// ProviderOp discriminates a provider event: a provider became uncallable
+// (raise: timed out, disabled, paused, or a setting rejected) or callable again
+// (clear).
 type ProviderOp string
 
 // Provider event operations.
@@ -157,21 +158,22 @@ const (
 	ProviderClear ProviderOp = "clear"
 )
 
-// ProviderTimeoutEntry pairs a provider with its timeout status, the same
+// ProviderTimeoutEntry pairs a provider with its status, the same
 // per-provider shape GET /api/providers/timeout serves in ProvidersResponse.
 type ProviderTimeoutEntry struct {
 	Provider subflux.ProviderID     `json:"provider"`
 	Status   subflux.ProviderStatus `json:"status"`
 }
 
-// ProviderEvent is the data payload for provider timeout deltas (E1): raise
-// when a provider trips into cooldown (Status carries the trip snapshot),
-// clear when it leaves it — expiry observed, success reset, or operator
-// reset. A cooldown nobody asks about expires silently; the client's
-// reconcile poll converges that case.
+// ProviderEvent is the data payload for provider status deltas. Entry carries
+// the provider's full merged status at publish time (health tracker and
+// credential gate together), so a later event never erases an earlier one's
+// half. TimeoutsEnabled mirrors ProvidersResponse.Enabled. A cooldown nobody
+// asks about expires silently; the client's reconcile poll converges that case.
 type ProviderEvent struct {
-	Entry *ProviderTimeoutEntry `json:"entry,omitempty"`
-	Op    ProviderOp            `json:"op"`
+	Entry           *ProviderTimeoutEntry `json:"entry,omitempty"`
+	Op              ProviderOp            `json:"op"`
+	TimeoutsEnabled bool                  `json:"timeouts_enabled"`
 }
 
 func (ProviderEvent) eventData() {}

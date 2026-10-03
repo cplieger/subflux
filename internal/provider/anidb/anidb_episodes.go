@@ -12,8 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/xmlx"
 )
 
@@ -49,19 +52,21 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 	return nil
 }
 
-// episodeID returns the AniDB episode ID for a series+episode pair.
-// Fetches and caches all episodes from the series on first access.
-//
-// Concurrent callers for the same seriesID coalesce via singleflight: only
-// one goroutine issues the HTTP request, defending AniDB's strict rate
-// limit from a library-scan thundering herd.
-//
-// A short-circuit on banUntil suppresses further API traffic when AniDB
-// previously returned an <error> XML body.
+// episodeID returns the AniDB episode ID for a series+episode pair, fetching
+// and caching the series' episodes on first access. Concurrent callers for one
+// series share a single request, which keeps a library scan within AniDB's
+// rate limit. A refused client key answers ahead of the cache, so a series
+// cached while the key worked also searches by title; a ban until banUntil
+// answers without a request.
 func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
 	cacheKey := keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(episodeNo))
 
 	m.mu.Lock()
+	if m.clientRejected != nil {
+		err := m.clientRejected
+		m.mu.Unlock()
+		return 0, err
+	}
 	if id, ok := m.episodeCache[cacheKey]; ok {
 		m.mu.Unlock()
 		return id, nil
@@ -104,9 +109,8 @@ type anidbEpisode struct {
 // with HTTP 200 + <error>Banned</error> (or similar); without this check
 // the response silently unmarshals into anidbAnime with zero episodes.
 //
-// Code is the optional `code` attribute. The episode path ignores it — every
-// error there is a reason to back off — while the credential check branches on
-// it to tell a refused client key from a ban.
+// Code is the optional `code` attribute: errClientRejected names the client
+// key, any other error is a reason to back off.
 type anidbError struct {
 	XMLName xml.Name `xml:"error"`
 	Message string   `xml:",chardata"`
@@ -138,7 +142,7 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	}
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return err
+		return httpx.RedactTransportError(err, "anidb episodes", httpx.Secret(m.clientKey))
 	}
 	defer resp.Body.Close()
 
@@ -167,13 +171,10 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 		return fmt.Errorf("anidb: episodes outside decode bounds: %w", err)
 	}
 
-	var errCheck anidbError
-	if err := xml.Unmarshal(data, &errCheck); err == nil && errCheck.Message != "" {
-		slog.Error("anidb: API returned error",
-			"series_id", seriesID, "error", errCheck.Message)
-		m.recordBan()
-		return fmt.Errorf("anidb API error: %s", errCheck.Message)
+	if err := m.apiError(data, seriesID); err != nil {
+		return err
 	}
+	m.acceptClient()
 
 	var anime anidbAnime
 	if err := xml.Unmarshal(data, &anime); err != nil {
@@ -195,6 +196,75 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 			"series_id", seriesID, "episodes", len(anime.Episodes))
 	}
 	return nil
+}
+
+// apiError returns the error an AniDB <error> envelope in data reports, or
+// nil when data is not one.
+func (m *Mapper) apiError(data []byte, seriesID int) error {
+	var errCheck anidbError
+	if err := xml.Unmarshal(data, &errCheck); err != nil || errCheck.Message == "" {
+		return nil
+	}
+	msg := m.upstreamText(errCheck.Message)
+	if errCheck.Code == errClientRejected {
+		return m.rejectClient(msg)
+	}
+	slog.Error("anidb: API returned error",
+		"series_id", seriesID, "error", msg)
+	m.recordBan()
+	return fmt.Errorf("anidb API error: %s", msg)
+}
+
+// upstreamText prepares AniDB's error text for an error or a log line. The
+// request carried the client key, so the text may echo it.
+func (m *Mapper) upstreamText(s string) string {
+	return logsafe.RedactedField(s, httpx.Secret(m.clientKey))
+}
+
+// rejectClient latches the client-key refusal, logging it the first time,
+// and returns it.
+func (m *Mapper) rejectClient(msg string) error {
+	m.mu.Lock()
+	first := m.clientRejected == nil
+	if first {
+		m.clientRejected = &subflux.AuthError{Msg: "AniDB refused the client key: " + msg}
+	}
+	m.clientAnswered = true
+	err := m.clientRejected
+	m.mu.Unlock()
+	if first {
+		slog.Error("anidb client key rejected; episode lookup disabled, searching by title",
+			"provider", subflux.ProviderNameAnimeTosho, "reason", msg)
+	}
+	return err
+}
+
+// acceptClient records that AniDB answered a request carrying the client key
+// with data rather than an error envelope.
+func (m *Mapper) acceptClient() {
+	m.mu.Lock()
+	m.clientAnswered = true
+	m.mu.Unlock()
+}
+
+// ClientKeyVerdict reports whether AniDB has said anything about the client
+// key, by refusing it or by answering a request carrying it with data, and the
+// refusal when it refused.
+func (m *Mapper) ClientKeyVerdict() (answered bool, refusal error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.clientAnswered, m.clientRejected
+}
+
+// ForgetClientKeyVerdict drops AniDB's answer about the client key and the
+// episode IDs cached under it, so the next episode lookup asks AniDB again
+// and latches anew if it refuses.
+func (m *Mapper) ForgetClientKeyVerdict() {
+	m.mu.Lock()
+	m.clientAnswered = false
+	m.clientRejected = nil
+	clear(m.episodeCache)
+	m.mu.Unlock()
 }
 
 // recordBan sets banUntil to suppress further API calls for banCooldown.

@@ -2,6 +2,7 @@ package scanning
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,18 +10,26 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
+// ItemScan is one item's scan result.
+type ItemScan struct {
+	// WriteFailure is set when the item's save learned that its folder
+	// refuses writes; the scan stops after this item.
+	WriteFailure *mediawrite.UnwritableError
+	Outcome      ScanOutcome
+	// Langs are the engine's per-language outcomes; the season tracker
+	// records evidence only for subflux.LangSearched entries.
+	Langs   []subflux.LangOutcome
+	Found   int  // targets saved
+	Queried bool // a provider was queried: the inter-item pacing signal
+}
+
 // ScanEpisode searches for subtitles for a single episode.
-// Returns the scan outcome, the typed per-language outcomes from the
-// engine — the season tracker records evidence only for entries whose Kind
-// is subflux.LangSearched (a skipped or backed-off language must never accrue a
-// false no-result streak) — and whether the search actually queried any
-// provider (the inter-item pacing signal: callers skip the scan delay for
-// items that generated no provider traffic).
-func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (ScanOutcome, []subflux.LangOutcome, bool) {
+func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) ItemScan {
 	label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 	slog.Debug("scan: processing episode",
 		"media", label, "imdb", series.ImdbID,
@@ -35,11 +44,12 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	req.ForceUpgrade = len(forceUpgrade) > 0 && forceUpgrade[0]
 
 	result, err := ls.Engine.SearchTargets(ctx, &req, ep.EpisodeFile.Path, targets)
-	if err != nil {
+	scan := ItemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
+	if !errors.As(err, &scan.WriteFailure) && err != nil {
 		slog.Warn("episode search failed", "media", label, "error", err)
 	}
-	queried := result.ProviderQueried()
 	paths := result.Paths()
+	scan.Found = len(paths)
 	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := mediaid.Build(&req)
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
@@ -50,35 +60,35 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 				slog.Warn("failed to refresh series", "series_id", series.ID, "error", err)
 			}
 		}
-		if len(paths) > 0 {
-			return ScanFound, result.Langs, queried
-		}
 	}
-	if result.TargetsSearched() == 0 {
-		if result.TargetsBackedOff() > 0 {
-			// Every language needing a search had all providers in adaptive
-			// backoff: no query ran, so this is neither skipped-as-covered
-			// nor searched-with-no-result.
-			return ScanBackedOff, result.Langs, queried
-		}
-		return ScanSkipped, result.Langs, queried
-	}
-	return ScanNoResult, result.Langs, queried
+	scan.Outcome = itemOutcome(&result)
+	return scan
 }
 
-// ScanMovie searches for subtitles for a single movie. The second return
-// reports whether any provider was actually queried (the inter-item pacing
-// signal; see ScanEpisode).
-func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) (ScanOutcome, bool) {
-	outcome, _, queried := scanMovieDetail(ctx, deps, ls, m, forceUpgrade...)
-	return outcome, queried
+func itemOutcome(result *subflux.SearchResult) ScanOutcome {
+	switch {
+	case len(result.Paths()) > 0:
+		return ScanFound
+	case result.WriteBlocked() > 0:
+		return ScanWriteBlocked
+	case result.TargetsFailed() > 0:
+		return ScanDownloadFailed
+	case result.TargetsSearched() > 0:
+		return ScanNoResult
+	case result.TargetsBackedOff() > 0:
+		// Every language needing a search had all providers in adaptive
+		// backoff: no query ran, so this is neither skipped-as-covered nor
+		// searched-with-no-result.
+		return ScanBackedOff
+	default:
+		return ScanSkipped
+	}
 }
 
-// scanMovieDetail is ScanMovie plus the number of targets that got a
-// subtitle downloaded (the engine saves one file per successful target), for
-// callers that report per-target found counts rather than a single outcome.
-// queried is the inter-item pacing signal (see ScanEpisode).
-func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) (outcome ScanOutcome, found int, queried bool) {
+// scanMovieDetail searches for subtitles for a single movie. Found counts
+// the targets saved (one file each), for callers that report per-target
+// found counts.
+func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) ItemScan {
 	label := fmt.Sprintf("%s (%d)", m.Title, m.Year)
 	slog.Debug("scan: processing movie",
 		"media", label, "imdb", m.ImdbID, "tmdb", m.TmdbID,
@@ -93,11 +103,12 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	req.ForceUpgrade = len(forceUpgrade) > 0 && forceUpgrade[0]
 
 	result, err := ls.Engine.SearchTargets(ctx, &req, m.MovieFile.Path, targets)
-	if err != nil {
+	scan := ItemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
+	if !errors.As(err, &scan.WriteFailure) && err != nil {
 		slog.Warn("movie search failed", "media", label, "error", err)
 	}
-	queried = result.ProviderQueried()
 	paths := result.Paths()
+	scan.Found = len(paths)
 	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := mediaid.Build(&req)
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
@@ -108,17 +119,9 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 				slog.Warn("failed to refresh movie", "movie_id", m.ID, "error", err)
 			}
 		}
-		if len(paths) > 0 {
-			return ScanFound, len(paths), queried
-		}
 	}
-	if result.TargetsSearched() == 0 {
-		if result.TargetsBackedOff() > 0 {
-			return ScanBackedOff, 0, queried
-		}
-		return ScanSkipped, 0, queried
-	}
-	return ScanNoResult, 0, queried
+	scan.Outcome = itemOutcome(&result)
+	return scan
 }
 
 // SceneOrPath returns sceneName if set, otherwise filePath.

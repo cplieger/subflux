@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"slices"
 	"time"
 
@@ -447,36 +446,18 @@ const (
 	reconcileSubPresent                        // video present, this subtitle present (or sub stat error)
 )
 
-// ReconcileState reconciles subtitle_state against the filesystem in three
-// branches, group-aware by quad (media_type, media_id, language, variant),
-// mirroring the corrected three-way semantics of the old store:
-//
-//   - VIDEO GONE: every row whose video file no longer exists is deleted along
-//     with its orphaned subtitle file, the language's backoff, and any
-//     scan_state for a media item left with no state. This fan-out is delegated
-//     to DeleteStateByPaths, which already prefix-scans
-//     ix_state_video, routes deletes through the deleteState chokepoint, clears
-//     backoff, and cleans orphaned coverage in bounded transactions.
-//   - SUBTITLE GONE, A SIBLING STILL PRESENT: when a row's subtitle file is gone
-//     but its video exists AND at least one other row for the SAME quad still
-//     has its subtitle on disk, only that one row is deleted. The remaining
-//     rows and any manual lock are PRESERVED, backoff is NOT cleared, and no row
-//     is reset.
-//   - ALL SUBTITLES FOR A QUAD GONE: when every row for a quad has lost its
-//     subtitle (video still present), the auto rows are reset in place (clear
-//     path/score/provider/release_name, bump media_imported to now) so the next
-//     scan re-searches, the manual rows are deleted, and the language's backoff
-//     is cleared. Counted once per quad in ResetCount.
-//     Grouping by quad keeps the branches variant-precise: deleting the last
-//     forced subtitle resets only the forced rows, never the standard ones.
-//
-// The read phase snapshots the rows under short View transactions and performs
-// all filesystem stats with no transaction open; the mutation phase runs in
-// bounded Update batches. Every operation is idempotent, so an
-// interrupted pass converges on re-run: a deleted row stays
-// gone, and a reset auto row has an empty sub_path that classifies as skip on
-// the next pass, so media_imported is not bumped again.
-func (d *DB) ReconcileState(ctx context.Context) (subflux.ReconcileResult, error) {
+// ReconcileState reconciles subtitle_state against the filesystem per quad, as
+// judges each file; a row whose file gone cannot judge is kept as is,
+// and so is every file whose root unavailable reports faulted once the pass has
+// judged them all. A row whose video is gone goes through DeleteStateByPaths. A
+// row whose subtitle is gone while another row of its quad keeps one is deleted
+// alone, keeping any lock and the backoff. A quad with every subtitle gone has
+// its auto rows reset for re-search, its manual rows deleted and its backoff
+// cleared. Stats run with no transaction open and mutations in bounded batches.
+func (d *DB) ReconcileState(ctx context.Context,
+	gone func(ctx context.Context, path string) (bool, error),
+	unavailable func(path string) (root string, unavailable bool),
+) (subflux.ReconcileResult, error) {
 	entries, err := d.loadReconcileEntries()
 	if err != nil {
 		return subflux.ReconcileResult{}, err
@@ -488,7 +469,11 @@ func (d *DB) ReconcileState(ctx context.Context) (subflux.ReconcileResult, error
 	slog.Info("reconcile: starting", "rows", len(entries))
 
 	// Classify every row against the filesystem with no transaction open.
-	videoGonePaths, subMissing, subPresent := d.classifyReconcileEntries(entries)
+	videoGonePaths, subMissing, subPresent := classifyReconcileEntries(ctx, entries, gone)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return subflux.ReconcileResult{}, ctxErr
+	}
+	videoGonePaths = dropUnavailable(videoGonePaths, subMissing, unavailable)
 
 	slog.Info("reconcile: classified",
 		"video_gone_paths", len(videoGonePaths),
@@ -555,19 +540,14 @@ func (d *DB) loadReconcileEntries() ([]reconcileEntry, error) {
 	return entries, nil
 }
 
-// classifyReconcileEntries classifies each snapshotted row against the
-// filesystem (via d.statFn, no transaction open) and groups the results,
-// reproducing the old Classify exactly:
-//
-//   - video gone -> its video path is collected (deduplicated, deterministic
-//     order) for DeleteStateByPaths;
-//   - this subtitle gone -> the entry is appended to subMissing[quad];
-//   - this subtitle present (or its stat errored) -> subPresent[quad] is set.
-//
-// A row whose video stat errors (other than not-exist), or whose video is
-// present but whose sub_path is empty, classifies as skip and contributes to
-// neither map, matching the old classifier.
-func (d *DB) classifyReconcileEntries(entries []reconcileEntry) (
+// classifyReconcileEntries classifies each snapshotted row through gone (no
+// transaction open) and groups the results: a gone video's path (deduplicated,
+// in order) for DeleteStateByPaths, a gone subtitle's entry under
+// subMissing[quad], and a present or undecided subtitle as subPresent[quad].
+// A skipped row contributes to neither map.
+func classifyReconcileEntries(ctx context.Context, entries []reconcileEntry,
+	gone func(context.Context, string) (bool, error),
+) (
 	videoGonePaths []string,
 	subMissing map[stateQuadInfo][]reconcileEntry,
 	subPresent map[stateQuadInfo]bool,
@@ -578,7 +558,7 @@ func (d *DB) classifyReconcileEntries(entries []reconcileEntry) (
 
 	for i := range entries {
 		e := entries[i]
-		switch d.classifyReconcileEntry(&e) {
+		switch classifyReconcileEntry(ctx, &e, gone) {
 		case reconcileDelete:
 			if _, ok := seenVideo[e.videoPath]; !ok {
 				seenVideo[e.videoPath] = struct{}{}
@@ -595,28 +575,46 @@ func (d *DB) classifyReconcileEntries(entries []reconcileEntry) (
 	return videoGonePaths, subMissing, subPresent
 }
 
-// classifyReconcileEntry is the pure per-row classifier, a direct port of the
-// old reconcile/classify.go ClassifyEntry: video gone -> delete; video present
-// but this subtitle gone -> sub-missing; otherwise (subtitle present, sub stat
-// error, or empty sub_path with a present video) -> present/skip. A video stat
-// error other than not-exist is treated as skip (do not delete on a transient
-// stat failure).
-func (d *DB) classifyReconcileEntry(e *reconcileEntry) reconcileAction {
+// dropUnavailable withdraws every queued action under a root unavailable
+// reports faulted, so a fault found late in the pass retracts what earlier rows
+// under that root queued; a quad is withdrawn whole. It returns the video paths
+// still queued.
+func dropUnavailable(
+	videoGonePaths []string,
+	subMissing map[stateQuadInfo][]reconcileEntry,
+	unavailable func(string) (string, bool),
+) []string {
+	held := func(path string) bool {
+		_, faulted := unavailable(path)
+		return faulted
+	}
+	for q, group := range subMissing {
+		if slices.ContainsFunc(group, func(e reconcileEntry) bool { return held(e.videoPath) || held(e.subPath) }) {
+			delete(subMissing, q)
+		}
+	}
+	return slices.DeleteFunc(videoGonePaths, held)
+}
+
+// classifyReconcileEntry is the pure per-row classifier: video gone -> delete;
+// video present but this subtitle gone -> sub-missing; otherwise present or
+// skip. Only a definite gone deletes or resets anything: an undecided video
+// (an unreadable root, a stat timeout) skips the row, and an undecided
+// subtitle counts as present.
+func classifyReconcileEntry(ctx context.Context, e *reconcileEntry, gone func(context.Context, string) (bool, error)) reconcileAction {
 	if e.videoPath == "" {
 		return reconcileSkip
 	}
-	if _, err := d.statFn(e.videoPath); errors.Is(err, os.ErrNotExist) {
-		return reconcileDelete
-	} else if err != nil {
+	if videoGone, err := gone(ctx, e.videoPath); err != nil {
 		return reconcileSkip
+	} else if videoGone {
+		return reconcileDelete
 	}
 	if e.subPath == "" {
 		return reconcileSkip
 	}
-	if _, err := d.statFn(e.subPath); errors.Is(err, os.ErrNotExist) {
+	if subGone, err := gone(ctx, e.subPath); err == nil && subGone {
 		return reconcileSubMissing
-	} else if err != nil {
-		return reconcileSubPresent
 	}
 	return reconcileSubPresent
 }

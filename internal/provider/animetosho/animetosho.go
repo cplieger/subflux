@@ -5,6 +5,7 @@ package animetosho
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -53,8 +54,34 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 // Provider implements the AnimeTosho subtitle API.
 type Provider struct {
 	client      *http.Client
-	anidbMapper *anidb.Mapper
+	anidbMapper episodeMapper
 }
+
+// episodeMapper is the AniDB lookup a search resolves its episode id through;
+// *anidb.Mapper.
+type episodeMapper interface {
+	Resolve(ctx context.Context, tvdbID, season, episode int) *anidb.EpisodeResult
+	CheckClientKey(ctx context.Context) error
+	ClientKeyVerdict() (answered bool, refusal error)
+	ForgetClientKeyVerdict()
+}
+
+var _ provider.SettingReporter = (*Provider)(nil)
+
+// SettingVerdict names the AniDB client key once AniDB refused it or answered
+// a request carrying it with data, with the refusal or nil for an acceptance.
+// After a refusal searches run by title only.
+func (p *Provider) SettingVerdict() (setting string, refusal error) {
+	answered, refusal := p.anidbMapper.ClientKeyVerdict()
+	if !answered {
+		return "", nil
+	}
+	return string(provider.KeyAniDBClientKey), refusal
+}
+
+// ForgetSettingVerdict drops AniDB's answer about the client key, so the next
+// episode lookup asks AniDB again.
+func (p *Provider) ForgetSettingVerdict() { p.anidbMapper.ForgetClientKeyVerdict() }
 
 // Name returns the provider identifier for AnimeTosho.
 func (p *Provider) Name() subflux.ProviderID { return providerName }
@@ -73,23 +100,8 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	}
 
 	if req.TvdbID > 0 {
-		result := p.anidbMapper.Resolve(ctx, req.TvdbID, req.Season, req.Episode)
-		if result != nil && result.AniDBEpisodeID > 0 {
-			slog.Debug("animetosho: using AniDB episode ID",
-				"tvdb_id", req.TvdbID, "anidb_ep_id", result.AniDBEpisodeID)
-			subs, err := p.searchByEpisodeID(ctx, result.AniDBEpisodeID, req)
-			if err == nil && len(subs) > 0 {
-				slog.Info("animetosho search complete (anidb)",
-					"results", len(subs), "media", logsafe.Field(req.MediaLabel()))
-				return subs, nil
-			}
-			if err != nil {
-				slog.Warn("animetosho: AniDB search failed, falling back to title",
-					"error", err)
-			} else {
-				slog.Debug("animetosho: AniDB search returned no results, falling back to title",
-					"anidb_ep_id", result.AniDBEpisodeID)
-			}
+		if subs, done, err := p.searchByAniDB(ctx, req); done {
+			return subs, err
 		}
 	}
 
@@ -102,6 +114,35 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	slog.Info("animetosho search complete",
 		"results", len(results), "media", logsafe.Field(req.MediaLabel()))
 	return results, nil
+}
+
+// searchByAniDB searches by the AniDB episode id when one resolves. done
+// reports an answer the title search must not replace: results, or a rate
+// limit that would refuse the title search too.
+func (p *Provider) searchByAniDB(ctx context.Context, req *subflux.SearchRequest) (subs []subflux.Subtitle, done bool, err error) {
+	result := p.anidbMapper.Resolve(ctx, req.TvdbID, req.Season, req.Episode)
+	if result == nil || result.AniDBEpisodeID <= 0 {
+		return nil, false, nil
+	}
+	slog.Debug("animetosho: using AniDB episode ID",
+		"tvdb_id", req.TvdbID, "anidb_ep_id", result.AniDBEpisodeID)
+	subs, err = p.searchByEpisodeID(ctx, result.AniDBEpisodeID, req)
+	if err == nil && len(subs) > 0 {
+		slog.Info("animetosho search complete (anidb)",
+			"results", len(subs), "media", logsafe.Field(req.MediaLabel()))
+		return subs, true, nil
+	}
+	if _, limited := errors.AsType[*subflux.RateLimitError](err); limited {
+		return nil, true, err
+	}
+	if err != nil {
+		slog.Warn("animetosho: AniDB search failed, falling back to title",
+			"error", err)
+	} else {
+		slog.Debug("animetosho: AniDB search returned no results, falling back to title",
+			"anidb_ep_id", result.AniDBEpisodeID)
+	}
+	return nil, false, nil
 }
 
 // Download fetches the subtitle content for the given search result.
@@ -155,7 +196,7 @@ func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *su
 	if err != nil {
 		return nil, err
 	}
-	return p.collectSubtitles(ctx, entries, req), nil
+	return p.collectSubtitles(ctx, entries, req)
 }
 
 func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
@@ -163,17 +204,14 @@ func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest
 	if err != nil {
 		return nil, fmt.Errorf("search entries: %w", err)
 	}
-	return p.collectSubtitles(ctx, entries, req), nil
+	return p.collectSubtitles(ctx, entries, req)
 }
 
-// collectSubtitles fetches entries concurrently, bounded at maxSearchEntries,
-// since AnimeTosho has no documented rate limit and entries are independent.
-func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) []subflux.Subtitle {
-	type entryResult struct {
-		title string
-		subs  []subflux.Subtitle
-	}
-
+// collectSubtitles fetches entries concurrently, bounded at maxSearchEntries.
+// A failed entry is skipped, except a rate limit: it stops the remaining
+// fetches and is returned without the partial results, because every later
+// call would be refused too.
+func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	results := make([]entryResult, len(entries))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxSearchEntries)
@@ -188,17 +226,38 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 			subs, err := p.fetchSubtitlesForEntry(
 				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode,
 			)
+			if _, limited := errors.AsType[*subflux.RateLimitError](err); limited {
+				return err
+			}
 			if err != nil {
-				slog.Warn("animetosho: failed to get subs for entry",
-					"entry_id", entry.ID, "error", err)
-				return nil // non-fatal: skip this entry
+				if gctx.Err() == nil {
+					slog.Warn("animetosho: failed to get subs for entry",
+						"entry_id", entry.ID, "error", err)
+				}
+				return nil
 			}
 			results[idx] = entryResult{subs: subs, title: entry.Title}
 			return nil
 		})
 	}
-	_ = g.Wait()
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("entry subtitles: %w", err)
+	}
 
+	out := mergeEntryResults(results, req)
+	slog.Debug("animetosho: collected subtitles from entries",
+		"entries_checked", len(entries), "results", len(out))
+	return out, nil
+}
+
+type entryResult struct {
+	title string
+	subs  []subflux.Subtitle
+}
+
+// mergeEntryResults names each subtitle after its entry's release, numbers
+// it for the requested episode and drops an id an earlier entry returned.
+func mergeEntryResults(results []entryResult, req *subflux.SearchRequest) []subflux.Subtitle {
 	var out []subflux.Subtitle
 	seen := make(map[string]bool)
 	for _, r := range results {
@@ -212,8 +271,6 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 			}
 		}
 	}
-	slog.Debug("animetosho: collected subtitles from entries",
-		"entries_checked", len(entries), "results", len(out))
 	return out
 }
 

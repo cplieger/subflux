@@ -578,3 +578,40 @@ func TestRetryProvider_search_clamps_release_names(t *testing.T) {
 		t.Errorf("long name len = %d, want clamped to %d", len(subs[1].ReleaseName), release.MaxNameLen)
 	}
 }
+
+// retryFakeReporter reports a refused optional setting until it is forgotten.
+type retryFakeReporter struct {
+	retryFakeProvider
+
+	reason error
+}
+
+func (f *retryFakeReporter) SettingVerdict() (string, error) {
+	if f.reason == nil {
+		return "", nil
+	}
+	return "anidb_client_key", f.reason
+}
+
+func (f *retryFakeReporter) ForgetSettingVerdict() { f.reason = nil }
+
+func TestRetryProvider_SettingReporter_delegates(t *testing.T) {
+	t.Parallel()
+	refused := errors.New("client version missing or invalid")
+	wrapped, ok := WrapRetry(&retryFakeReporter{name: "animetosho", reason: refused}, 3, time.Millisecond).(SettingReporter)
+	if !ok {
+		t.Fatal("wrapped provider does not implement SettingReporter")
+	}
+	if setting, reason := wrapped.SettingVerdict(); setting != "anidb_client_key" || !errors.Is(reason, refused) {
+		t.Errorf("SettingVerdict() = (%q, %v), want (anidb_client_key, the refusal)", setting, reason)
+	}
+	wrapped.ForgetSettingVerdict()
+	if setting, reason := wrapped.SettingVerdict(); setting != "" || reason != nil {
+		t.Errorf("SettingVerdict() after ForgetSettingVerdict = (%q, %v), want (\"\", nil)", setting, reason)
+	}
+	plain, _ := WrapRetry(&retryFakeProvider{name: "subdl"}, 3, time.Millisecond).(SettingReporter)
+	plain.ForgetSettingVerdict()
+	if setting, reason := plain.SettingVerdict(); setting != "" || reason != nil {
+		t.Errorf("SettingVerdict() without an inner reporter = (%q, %v), want (\"\", nil)", setting, reason)
+	}
+}

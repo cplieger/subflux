@@ -3,6 +3,7 @@
 import { apiAction } from "@cplieger/actions";
 import * as bus from "./bus.js";
 import * as theme from "./theme.js";
+import type { ThemeChoice } from "@cplieger/ui-primitives/theme";
 import { el, icon } from "./dom.js";
 import { me, PATH_LOGOUT } from "./wire/client.gen.js";
 import { openConfig } from "./config.js";
@@ -60,10 +61,9 @@ function wireUserButton(): void {
     return;
   }
 
-  // Rebuild menu content each time the popover opens (onOpen) so the theme
-  // label/icon reflect the live data-theme. Auto-mode (matchMedia) can flip
-  // data-theme while the menu is closed, leaving a stale label. haspopup:
-  // "menu" matches the panel's role="menu".
+  // Rebuild menu content each time the popover opens (onOpen): the rebuild
+  // ends by focusing the first item, which the menu contract owes on open.
+  // haspopup: "menu" matches the panel's role="menu".
   menuPopover = createMenuPopover(btn, panel, {
     haspopup: "menu",
     onOpen: buildMenuContent,
@@ -106,28 +106,18 @@ function buildMenuContent(): void {
   }
 
   // Theme toggle.
-  const themeLabel = resolveThemeLabel();
-  items.push(
-    menuItem(
-      themeLabel,
-      themeIcon(),
-      () => {
-        theme.cycle();
-        // Update the label after cycling.
-        const label = panel.querySelector(".um-theme-label");
-        if (label) {
-          label.textContent = resolveThemeLabel();
-        }
-        const ic = panel.querySelector(".um-theme-icon");
-        if (ic) {
-          ic.textContent = "";
-          ic.appendChild(icon(themeIcon()));
-        }
-      },
-      "um-theme-label",
-      "um-theme-icon",
-    ),
+  const themeItem = menuItem(
+    "",
+    THEME_ITEM[theme.choice()].icon,
+    () => {
+      theme.cycle();
+      describeThemeItem(themeItem);
+    },
+    "um-theme-label",
+    "um-theme-icon",
   );
+  describeThemeItem(themeItem);
+  items.push(themeItem);
 
   // Logout. Dedicated sign-out glyph: the close/X icon means
   // error/dismiss everywhere else in the app.
@@ -174,30 +164,24 @@ function menuItem(
   );
 }
 
-// The theme item is labeled with what clicking it switches TO (the next stop
-// in the library's light -> dark -> system cycle), keyed off the STORED
-// choice so "system" is representable (the resolved data-theme attribute can
-// never distinguish system-dark from pinned dark).
-function resolveThemeLabel(): string {
-  switch (theme.choice()) {
-    case "light":
-      return "Dark mode";
-    case "dark":
-      return "System theme";
-    default:
-      return "Light mode";
-  }
-}
+// The theme item names the CURRENT choice, keyed off the STORED choice so
+// "system" is representable (the resolved data-theme attribute cannot tell
+// system-dark from pinned dark); its tooltip names what a click switches to.
+const THEME_ITEM: Record<ThemeChoice, { name: string; icon: string; next: string }> = {
+  light: { name: "Light", icon: "sun", next: "dark" },
+  dark: { name: "Dark", icon: "moon", next: "system" },
+  system: { name: "System", icon: "monitor", next: "light" },
+};
 
-function themeIcon(): string {
-  switch (theme.choice()) {
-    case "light":
-      return "moon";
-    case "dark":
-      return "monitor";
-    default:
-      return "sun";
+function describeThemeItem(item: HTMLElement): void {
+  const current = THEME_ITEM[theme.choice()];
+  item.setAttribute("aria-label", `Theme: ${current.name}, activate to switch`);
+  item.setAttribute("data-tip", `Switch to ${current.next} theme`);
+  const label = item.querySelector(".um-theme-label");
+  if (label) {
+    label.textContent = `${current.name} theme`;
   }
+  item.querySelector(".um-theme-icon")?.replaceChildren(icon(current.icon));
 }
 
 /** Logout. Best-effort: the redirect below runs regardless of the server

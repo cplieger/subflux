@@ -8,7 +8,7 @@ export type AlertLevel = "error" | "warn" | "info";
 
 export type AlertOp = "raise" | "dismiss";
 
-export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "webauthn_unconfigured" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
+export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_not_discoverable" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "webauthn_unconfigured" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "media_unwritable" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
 
 export type EventType = "coverage" | "notify" | "scan:start" | "scan:done" | "epoch" | "activity" | "alert" | "provider" | "sync:done";
 
@@ -171,6 +171,11 @@ export interface ConnTestResponse {
  * "connection refused", and a vocabulary in front of those would hide it.
  */
   error?: string;
+  /**
+ * Message says what a passing provider check did to a credential disable
+ * recorded against that provider; empty when there was none.
+ */
+  message?: string;
   valid: boolean;
 }
 
@@ -378,14 +383,27 @@ export interface ManualLockEntry {
   count: number;
 }
 
+/** ManualProviderNotice says why one provider contributed no results. */
+export interface ManualProviderNotice {
+  provider: string;
+  /**
+ * Kind is "gated" when the provider gate skipped the provider and
+ * "error" when its search failed.
+ */
+  kind: string;
+  message: string;
+}
+
 /**
  * ManualSearchResponse is the typed response from RunSearch. It
  * deliberately carries no lock state: manual locks are invisible
  * infrastructure, not a user-facing concept, so the popup has nothing to
- * display about them.
+ * display about them. Providers lists each provider that returned nothing
+ * because it was skipped or failed.
  */
 export interface ManualSearchResponse {
   results: SearchResult[];
+  providers?: ManualProviderNotice[];
 }
 
 /** MeResponse is the JSON response for GET /api/auth/me. */
@@ -491,15 +509,16 @@ export interface PreviewStartResponse {
 }
 
 /**
- * ProviderEvent is the data payload for provider timeout deltas (E1): raise
- * when a provider trips into cooldown (Status carries the trip snapshot),
- * clear when it leaves it — expiry observed, success reset, or operator
- * reset. A cooldown nobody asks about expires silently; the client's
- * reconcile poll converges that case.
+ * ProviderEvent is the data payload for provider status deltas. Entry carries
+ * the provider's full merged status at publish time (health tracker and
+ * credential gate together), so a later event never erases an earlier one's
+ * half. TimeoutsEnabled mirrors ProvidersResponse.Enabled. A cooldown nobody
+ * asks about expires silently; the client's reconcile poll converges that case.
  */
 export interface ProviderEvent {
   entry?: ProviderTimeoutEntry;
   op: ProviderOp;
+  timeouts_enabled: boolean;
 }
 
 /**
@@ -526,17 +545,26 @@ export interface ProviderSchema {
   conn_test?: boolean;
 }
 
-/** ProviderStatus is the state of a single provider's timeout. */
+/**
+ * ProviderStatus is one provider's callability: the health tracker's timeout
+ * (TimedOut, CooldownRemaining, RecentFailures, Threshold, LastError) and the
+ * credential gate's disable, rate-limit pause and rejected optional settings.
+ */
 export interface ProviderStatus {
   last_error?: string;
+  disabled_reason?: string;
+  rejected_settings?: string[];
   cooldown_remaining?: number;
+  paused_for?: number;
   recent_failures: number;
   threshold: number;
+  auth_failures?: number;
   timed_out: boolean;
+  disabled: boolean;
 }
 
 /**
- * ProviderTimeoutEntry pairs a provider with its timeout status, the same
+ * ProviderTimeoutEntry pairs a provider with its status, the same
  * per-provider shape GET /api/providers/timeout serves in ProvidersResponse.
  */
 export interface ProviderTimeoutEntry {
@@ -872,9 +900,9 @@ export interface StructuredConfig {
  * SecretsPresent lists the dotted schema paths of secrets that hold a
  * non-empty value in the config file (e.g. "sonarr.api_key",
  * "providers.opensubtitles.settings.password"). GET-only metadata: the
- * values themselves stay redacted-empty, but the first-boot wizard needs
- * presence to distinguish "key saved" from "key missing" for its
- * satisfied/ping decisions. Ignored on save.
+ * values themselves stay redacted-empty, but the first-boot wizard and the
+ * settings form need presence to distinguish "key saved" from "key
+ * missing". Ignored on save.
  */
   secrets_present?: string[];
 }

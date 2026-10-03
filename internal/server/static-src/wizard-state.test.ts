@@ -271,10 +271,9 @@ describe("draft fingerprint + overlay", () => {
 // --- Draft secret sanitization (SEC: drafts persist across restarts) ---
 
 describe("buildDraftJSON secret sanitization", () => {
-  /** secretSchema exercises every secret-marker style the schema uses:
-   *  type "secret" alone (arr api_key), the Secret flag alone (defensive),
-   *  both together (provider registry style), and a secret nested inside a
-   *  field group. */
+  /** secretSchema exercises every secret-marker style isSecretField accepts:
+   *  type "secret" alone, the Secret flag alone, both together, and a secret
+   *  inside a nested field. */
   function secretSchema(): SchemaSection[] {
     return [
       {
@@ -304,7 +303,7 @@ describe("buildDraftJSON secret sanitization", () => {
           {
             key: "oidc",
             label: "OIDC",
-            type: "group",
+            type: "nested",
             fields: [{ key: "client_secret", label: "Client Secret", type: "secret" }],
           },
         ],

@@ -6,10 +6,10 @@
 // set. A regression here is silent: the dialog renders the wrong state and the
 // next save writes it back as a deliberate choice.
 import { describe, it, expect, vi } from "vitest";
-import { providerFieldValue, renderProvidersSection } from "./config-providers.js";
+import { providerFieldValue, providerHealth, renderProvidersSection } from "./config-providers.js";
 import { setCfgSections } from "./config-values.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
-import type { ProvidersResponse } from "./wire/types.gen.js";
+import type { ProviderStatus, ProvidersResponse } from "./wire/types.gen.js";
 
 // GET /api/providers/timeout, held open so a render pass can be superseded
 // while its health answer is still in flight.
@@ -218,7 +218,9 @@ const HEALTH_SCHEMA: SchemaSection = {
 function healthAnswer(timedOut: boolean): ProvidersResponse {
   return {
     enabled: true,
-    providers: { subdl: { recent_failures: 0, threshold: 3, timed_out: timedOut } },
+    providers: {
+      subdl: { recent_failures: 0, threshold: 3, timed_out: timedOut, disabled: false },
+    },
   };
 }
 
@@ -260,5 +262,66 @@ describe("renderProvidersSection: the health badge", () => {
 
     expect(live.querySelectorAll(".badge-health")).toHaveLength(1);
     expect(stale.querySelectorAll(".badge-health")).toHaveLength(0);
+  });
+});
+
+describe("renderProvidersSection: the credential gate on the badge", () => {
+  async function badgeFor(status: ProviderStatus): Promise<Element | null> {
+    setCfgSections({});
+    health.reset();
+    const sec = renderProvidersSection(HEALTH_SCHEMA);
+    document.body.replaceChildren(sec);
+    // Timeouts off: the gate's states are reported whatever that flag says.
+    health.settle[0]!({ enabled: false, providers: { subdl: status } } satisfies ProvidersResponse);
+    await flush();
+    return sec.querySelector(".badge-health");
+  }
+
+  it("names a credential disable as an error, with the reason in the tooltip", async () => {
+    const badge = await badgeFor({
+      recent_failures: 0,
+      threshold: 3,
+      timed_out: false,
+      disabled: true,
+      disabled_reason: "HTTP 401",
+    });
+    expect([
+      badge?.textContent,
+      badge?.getAttribute("data-status"),
+      badge?.getAttribute("data-tip"),
+    ]).toEqual(["disabled: credentials rejected", "err", "HTTP 401"]);
+  });
+
+  it("names a rejected optional setting as a warning", async () => {
+    const badge = await badgeFor({
+      recent_failures: 0,
+      threshold: 3,
+      timed_out: false,
+      disabled: false,
+      rejected_settings: ["anidb_client_key"],
+    });
+    expect([badge?.textContent, badge?.getAttribute("data-status")]).toEqual([
+      "setting rejected: anidb_client_key",
+      "warn",
+    ]);
+  });
+});
+
+describe("providerHealth", () => {
+  it("says until when a rate-limited provider is paused", () => {
+    const now = new Date(2026, 0, 1, 14, 0).getTime();
+    const ninetyMinutesNs = 90 * 60 * 1e9;
+    expect(
+      providerHealth(
+        {
+          recent_failures: 0,
+          threshold: 3,
+          timed_out: false,
+          disabled: false,
+          paused_for: ninetyMinutesNs,
+        },
+        now,
+      ),
+    ).toEqual({ status: "warn", text: "paused until 15:30" });
   });
 });

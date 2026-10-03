@@ -40,21 +40,21 @@ type CredentialChecker interface {
 	CheckCredentials(ctx context.Context) error
 }
 
+// SettingReporter is implemented by a provider that keeps working whatever the
+// upstream answers about one OPTIONAL setting. SettingVerdict names the setting
+// and the upstream's refusal, nil for an acceptance, or returns ("", nil) until
+// the upstream answers; ForgetSettingVerdict drops the answer, so the next call
+// asks the upstream again.
+type SettingReporter interface {
+	SettingVerdict() (setting string, refusal error)
+	ForgetSettingVerdict()
+}
+
 // ShowSubtitleCounter is the optional show-level count a provider may support:
 // how many subtitles exist for a show+language without naming an episode. ONE
 // method, and it is declared here rather than beside Provider because it is not
 // part of the provider contract — only OpenSubtitles implements it, and the
-// registry discovers that by type assertion.
+// search engine discovers that by type assertion.
 type ShowSubtitleCounter interface {
 	CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error)
-}
-
-// ResolveShowCounter is called at the composition root to inject the resolved counter into LiveState.
-func ResolveShowCounter(providers []Provider) ShowSubtitleCounter {
-	for _, p := range providers {
-		if c, ok := p.(ShowSubtitleCounter); ok {
-			return c
-		}
-	}
-	return nil
 }

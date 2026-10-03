@@ -132,6 +132,22 @@ func TestCheckCredentials_posts_the_pair_to_the_test_endpoint(t *testing.T) {
 	}
 }
 
+// A refusal's message is upstream text answering a request that carried the
+// passkey, so it is redacted, including a spelling the single-line
+// normalization turns back into the passkey.
+func TestCheckCredentials_an_echoed_passkey_reaches_no_error(t *testing.T) {
+	t.Parallel()
+	p := stubbedProvider(http.StatusOK, `{"status":5,"message":"bad pair placeholder pass, placeholder\npass"}`, nil)
+	p.passkey = "placeholder pass"
+	err := p.CheckCredentials(t.Context())
+	if _, refused := errors.AsType[*subflux.AuthError](err); !refused {
+		t.Fatalf("CheckCredentials() = %v, want *subflux.AuthError", err)
+	}
+	if strings.Contains(err.Error(), "placeholder") || strings.Contains(err.Error(), "\n") {
+		t.Errorf("CheckCredentials() = %q, want one line with no passkey", err.Error())
+	}
+}
+
 // A transport failure wraps the request URL, and every hdbits error path
 // redacts the passkey for that reason. The check is the newest path to the same
 // client, so it needs the same redaction.

@@ -5,15 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/mediapresence"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -75,6 +78,7 @@ func newFileHandler(store FileStore, cfg *fakePathGuard) *Handler {
 		},
 		StateFunc: func() *LiveState { return &LiveState{Cfg: cfg} },
 		Events:    events.New(0, nil),
+		Presence:  testsupport.MediaPresence("/"),
 	})
 }
 
@@ -650,6 +654,7 @@ func TestHandleDeleteFile_manual_lock_revert(t *testing.T) {
 		manualOnDisk   bool // the recorded manual path still exists
 		manualRecorded bool // the store knows of a manual path at all
 		manualErr      error
+		manualStatErr  error // what a stat of the recorded manual path answers
 		wantClears     int
 		wantCleared    bool // the "lock cleared" confirmation is expected
 	}{
@@ -668,6 +673,14 @@ func TestHandleDeleteFile_manual_lock_revert(t *testing.T) {
 		{
 			name: "store_error_leaves_the_lock_alone", manualRecorded: true,
 			manualErr: errMock, wantClears: 0,
+		},
+		{
+			name: "unreadable_manual_file_keeps_the_lock", manualRecorded: true,
+			manualStatErr: syscall.EACCES, wantClears: 0,
+		},
+		{
+			name: "manual_file_with_an_io_error_keeps_the_lock", manualRecorded: true,
+			manualStatErr: syscall.EIO, wantClears: 0,
 		},
 	}
 	for _, tt := range tests {
@@ -695,6 +708,9 @@ func TestHandleDeleteFile_manual_lock_revert(t *testing.T) {
 				store.manualPaths = []string{manualPath}
 			}
 			h := newFileHandler(store, &fakePathGuard{})
+			if tt.manualStatErr != nil {
+				h.deps.Presence = failingPresence(t, dir, manualPath, tt.manualStatErr)
+			}
 
 			req := httptest.NewRequest(http.MethodDelete, "/api/files",
 				strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
@@ -716,6 +732,25 @@ func TestHandleDeleteFile_manual_lock_revert(t *testing.T) {
 			}
 		})
 	}
+}
+
+// failingPresence is a checker over root whose stat of path fails with errno.
+func failingPresence(t *testing.T, root, path string, errno error) *mediapresence.Checker {
+	t.Helper()
+	c, err := mediapresence.New(mediapresence.Config{
+		Metrics: testsupport.NopPresenceMetrics{}, Alerts: testsupport.NopAlerts{},
+		Stat: func(p string) (fs.FileInfo, error) {
+			if p == path {
+				return nil, &fs.PathError{Op: "stat", Path: p, Err: errno}
+			}
+			return os.Stat(p)
+		},
+	})
+	if err != nil {
+		t.Fatalf("Setup: mediapresence.New: %v", err)
+	}
+	c.Bind([]string{root})
+	return c
 }
 
 // TestHandleDeleteFile_success_reports_no_cleanup_failure pins the two

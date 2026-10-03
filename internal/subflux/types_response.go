@@ -18,6 +18,13 @@ const (
 	// probably nothing, so we didn't look". Never recorded in the season
 	// early-termination tracker and counted in its own stats bucket.
 	ScanBackedOff ScanOutcome = "backed_off"
+	// ScanDownloadFailed means candidates were found and none was saved.
+	// Neither a found nor a no-result: it never feeds the season tracker.
+	ScanDownloadFailed ScanOutcome = "download_failed"
+	// ScanWriteBlocked means nothing was saved because the item's folder
+	// refuses writes. A fact about the folder, so nothing is recorded
+	// against the item.
+	ScanWriteBlocked ScanOutcome = "write_blocked"
 )
 
 // --- Sync job outcome ---

@@ -48,13 +48,12 @@ type MetricsReader interface {
 }
 
 // queryEngine is the read-and-reset surface the introspection endpoints use:
-// simulate a score for POST /api/score, report provider-timeout state, and
-// clear it. Three of the engine's eight methods — these handlers never search,
-// never download and never post-process, so the other five stay out of reach.
+// simulate a score for POST /api/score, report provider state, and clear it.
+// These handlers never search, download or post-process.
 type queryEngine interface {
 	SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult
-	ProviderTimeouts() (status map[subflux.ProviderID]subflux.ProviderStatus, enabled bool)
-	ResetTimeouts()
+	ProviderStatus() (status map[subflux.ProviderID]subflux.ProviderStatus, timeoutsEnabled bool)
+	ResetProviderState(ctx context.Context)
 }
 
 // queryCfg is the configuration surface the introspection endpoints render:

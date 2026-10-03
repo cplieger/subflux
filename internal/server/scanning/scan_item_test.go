@@ -246,7 +246,7 @@ func TestMovieSearchRequest(t *testing.T) {
 
 // --- Outcome classification of one scanned item ---
 //
-// ScanEpisode and ScanMovie translate one engine SearchResult into the four
+// ScanEpisode and scanMovieDetail translate one engine SearchResult into the
 // scan outcomes the stats, the season tracker and the pacing signal all key
 // on, and decide whether the item's coverage badge needs republishing. The
 // cases below drive the engine's answer directly, because that answer IS the
@@ -345,8 +345,9 @@ func TestScanEpisode_classifies_the_engine_result(t *testing.T) {
 			ls := &LiveState{Cfg: &fakeScanCfg{languages: []string{"fr"}}, Engine: engine}
 			deps := &Deps{Events: ev, Activity: activity.New(10), Alerts: nopAlerts{}}
 
-			got, langs, queried := ScanEpisode(t.Context(), deps, ls,
+			scan := ScanEpisode(t.Context(), deps, ls,
 				scanTestSeries(), scanTestEpisode())
+			got, langs, queried := scan.Outcome, scan.Langs, scan.Queried
 
 			if got != tc.want {
 				t.Errorf("ScanEpisode(%s) outcome = %q, want %q", tc.name, got, tc.want)
@@ -366,7 +367,7 @@ func TestScanEpisode_classifies_the_engine_result(t *testing.T) {
 	}
 }
 
-func TestScanMovie_classifies_the_engine_result(t *testing.T) {
+func TestScanMovieDetail_classifies_the_engine_result(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name         string
@@ -423,16 +424,16 @@ func TestScanMovie_classifies_the_engine_result(t *testing.T) {
 			ls := &LiveState{Cfg: &fakeScanCfg{languages: []string{"fr"}}, Engine: engine}
 			deps := &Deps{Events: ev, Activity: activity.New(10), Alerts: nopAlerts{}}
 
-			got, queried := ScanMovie(t.Context(), deps, ls, scanTestMovie())
+			scan := scanMovieDetail(t.Context(), deps, ls, scanTestMovie())
 
-			if got != tc.want {
-				t.Errorf("ScanMovie(%s) outcome = %q, want %q", tc.name, got, tc.want)
+			if scan.Outcome != tc.want {
+				t.Errorf("scanMovieDetail(%s) outcome = %q, want %q", tc.name, scan.Outcome, tc.want)
 			}
-			if queried != tc.wantQueried {
-				t.Errorf("ScanMovie(%s) queried = %t, want %t", tc.name, queried, tc.wantQueried)
+			if scan.Queried != tc.wantQueried {
+				t.Errorf("scanMovieDetail(%s) queried = %t, want %t", tc.name, scan.Queried, tc.wantQueried)
 			}
 			if n := len(ev.coverageEvents()); n != tc.wantCoverage {
-				t.Errorf("ScanMovie(%s) published %d coverage updates, want %d",
+				t.Errorf("scanMovieDetail(%s) published %d coverage updates, want %d",
 					tc.name, n, tc.wantCoverage)
 			}
 		})
@@ -484,9 +485,33 @@ func TestScanItem_successful_search_logs_no_warning(t *testing.T) {
 	deps := &Deps{Events: &recEvents{}, Activity: activity.New(10), Alerts: nopAlerts{}}
 
 	ScanEpisode(t.Context(), deps, ls, scanTestSeries(), scanTestEpisode())
-	ScanMovie(t.Context(), deps, ls, scanTestMovie())
+	scanMovieDetail(t.Context(), deps, ls, scanTestMovie())
 
 	if strings.Contains(buf.String(), "level=WARN") {
 		t.Errorf("a successful scan logged a warning; log was:\n%s", buf.String())
+	}
+}
+
+func TestItemOutcome_classifies_a_search_result(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		langs []subflux.LangOutcome
+		want  ScanOutcome
+	}{
+		{name: "saved", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, Paths: []string{"/m/a.srt"}}}, want: ScanFound},
+		{name: "folder unwritable", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, WriteBlocked: 1}}, want: ScanWriteBlocked},
+		{name: "a download failed", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1}}, want: ScanDownloadFailed},
+		{name: "searched with nothing", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 1}}, want: ScanNoResult},
+		{name: "backed off", langs: []subflux.LangOutcome{{Kind: subflux.LangBackedOff}}, want: ScanBackedOff},
+		{name: "nothing to search", langs: []subflux.LangOutcome{{Kind: subflux.LangSkipped, Skipped: 1}}, want: ScanSkipped},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := itemOutcome(&subflux.SearchResult{Langs: tc.langs}); got != tc.want {
+				t.Errorf("itemOutcome(%s) = %q, want %q", tc.name, got, tc.want)
+			}
+		})
 	}
 }

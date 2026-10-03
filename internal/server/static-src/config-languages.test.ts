@@ -1,40 +1,19 @@
 // config-languages.test.ts — the settings drawer's language builder.
 //
-// The pair of exports is a codec: buildLanguagesSection() renders the
-// `language_rules` section into a form, serializeLanguagesFromForm() reads that
-// form back into the value the structured PUT sends
-// (config.ts:480 assigns it straight into the saved section). So the assertion
-// that carries the most weight is the round trip — if render and serialise
-// disagree, a settings save silently rewrites the operator's language config,
-// and nothing else in the app would notice.
-//
-// Where the round trip is deliberately LOSSY, that is asserted too, because the
-// loss is a save-path behaviour and not an implementation detail.
+// buildLanguagesSection() renders the language rules and
+// serializeLanguagesFromForm() reads them back into the structured PUT, so a
+// disagreement between the two silently rewrites the operator's config on save.
 import { describe, it, expect, beforeEach } from "vitest";
 import * as store from "./store.js";
+import { setCfgSections } from "./config-values.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
 import type { LanguageRules, ParsedConfig } from "./wire/types.gen.js";
 
-/** A ParsedConfig carrying only the section this module reads. */
-function parsedConfig(lr: LanguageRules): ParsedConfig {
-  return {
-    adaptive: {},
-    search: {},
-    providers: {},
-    language_rules: lr,
-    languages: ["en"],
-    scores: {} as ParsedConfig["scores"],
-    post_processing: {} as ParsedConfig["post_processing"],
-    configured: true,
-    sonarr_configured: false,
-    radarr_configured: false,
-  };
-}
-
-/** Render the section from `lr` into the document — serializeLanguagesFromForm
- *  reads by getElementById, so the form has to be attached. */
+/** Render the section from `lr`, stored as the structured `languages` section,
+ *  into the document — serializeLanguagesFromForm reads by getElementById, so
+ *  the form has to be attached. `null` stores no languages section at all. */
 function mount(lr: LanguageRules | null): HTMLElement {
-  store.set("config", lr === null ? null : parsedConfig(lr));
+  setCfgSections(lr === null ? {} : { languages: lr });
   const host = document.createElement("div");
   host.appendChild(buildLanguagesSection());
   document.body.replaceChildren(host);
@@ -55,6 +34,7 @@ function byLabel(host: HTMLElement, label: string): HTMLButtonElement[] {
 
 beforeEach(() => {
   store.set("config", null);
+  setCfgSections({});
   document.body.replaceChildren();
 });
 
@@ -112,10 +92,30 @@ describe("language builder round trip", () => {
     expect(serializeLanguagesFromForm()).toStrictEqual({ default: [{ code: "en" }] });
   });
 
-  it("renders a single en default when the parsed config is absent entirely", () => {
+  it("renders a single en default when the stored config has no languages section", () => {
     mount(null);
 
     expect(serializeLanguagesFromForm()).toStrictEqual({ default: [{ code: "en" }] });
+  });
+
+  it("renders the stored section when the parsed config does not describe it", () => {
+    store.set("config", {
+      adaptive: {},
+      search: {},
+      providers: {},
+      language_rules: { default: [{ code: "de" }] },
+      languages: ["de"],
+      scores: {} as ParsedConfig["scores"],
+      post_processing: {} as ParsedConfig["post_processing"],
+      configured: true,
+      sonarr_configured: false,
+      radarr_configured: false,
+    });
+    mount({ default: [{ code: "en" }, { code: "fr" }] });
+
+    expect(serializeLanguagesFromForm()).toStrictEqual({
+      default: [{ code: "en" }, { code: "fr" }],
+    });
   });
 
   it("keeps a rule that asks for no subtitles as an empty list", () => {
@@ -128,25 +128,66 @@ describe("language builder round trip", () => {
   });
 });
 
-describe("language builder losses (drawer save path)", () => {
-  it("drops variant and min_score from a DEFAULT target", () => {
-    // The builder renders no variant or min-score control for defaults
-    // (buildSubTarget's isDefault arm), so a config file carrying either on a
-    // default target loses it the next time the drawer saves — the config
-    // format and GET /api/config/parsed both carry the fields. Asserted so the
-    // loss is visible rather than latent.
-    mount({ default: [{ code: "en", variant: "forced", min_score: 90 }] });
+describe("language builder: fields with no control", () => {
+  it("saves a stored languages section with variants, variant and min_score unchanged", () => {
+    const lr: LanguageRules = {
+      rules: [
+        {
+          audio: "ja",
+          subtitles: [
+            { code: "en", variants: ["standard", "forced"], min_score: 60 },
+            { code: "fr", variant: "hi", providers: ["subdl"] },
+          ],
+        },
+      ],
+      default: [
+        { code: "en", variant: "forced", min_score: 90 },
+        { code: "de", variants: ["standard", "hi"], exclude: ["gestdown"] },
+      ],
+    };
 
-    expect(serializeLanguagesFromForm().default).toStrictEqual([{ code: "en" }]);
+    mount(lr);
+
+    expect(serializeLanguagesFromForm()).toStrictEqual(lr);
   });
 
-  it("drops the variants list from a rule target", () => {
-    // `variants` (plural, a multi-variant target) has no control anywhere in
-    // the builder, so it is lost from rules and defaults alike.
-    mount({ rules: [{ audio: "en", subtitles: [{ code: "fr", variants: ["standard", "hi"] }] }] });
+  it("keeps a default target's variant and min_score when its language is changed", () => {
+    const host = mount({ default: [{ code: "en", variant: "forced", min_score: 90 }] });
+    const sel = host.querySelector<HTMLSelectElement>("#lang-defaults .lang-select");
+    if (!sel) {
+      throw new Error("default language select not rendered");
+    }
+    sel.value = "fr";
+
+    expect(serializeLanguagesFromForm().default).toStrictEqual([
+      { code: "fr", variant: "forced", min_score: 90 },
+    ]);
+  });
+
+  it("replaces a rule target's variants list with the variant picked in its select", () => {
+    // The loader refuses a target carrying both variant and variants.
+    const host = mount({
+      rules: [{ audio: "en", subtitles: [{ code: "fr", variants: ["standard", "hi"] }] }],
+    });
+    const sel = host.querySelector<HTMLSelectElement>(".lang-rule .variant-select");
+    if (!sel) {
+      throw new Error("variant select not rendered");
+    }
+    sel.value = "forced";
 
     expect(serializeLanguagesFromForm().rules).toStrictEqual([
-      { audio: "en", subtitles: [{ code: "fr" }] },
+      { audio: "en", subtitles: [{ code: "fr", variant: "forced" }] },
+    ]);
+  });
+
+  it("adds a target with nothing carried from another row", () => {
+    const host = mount({ default: [{ code: "en", variant: "forced", min_score: 90 }] });
+
+    buttonWithText(host, "+ Add subtitle").click();
+
+    expect(serializeLanguagesFromForm().default).toStrictEqual([
+      { code: "en", variant: "forced", min_score: 90 },
+      { code: "en" },
     ]);
   });
 
@@ -161,6 +202,167 @@ describe("language builder losses (drawer save path)", () => {
     expect(serializeLanguagesFromForm().rules).toStrictEqual([
       { audio: "en", subtitles: [{ code: "fr" }] },
     ]);
+  });
+});
+
+describe("language builder: stored shorthand and environment values", () => {
+  /** Stores `effective` as the parsed config beside the stored section. */
+  function mountParsed(stored: LanguageRules, effective: LanguageRules): HTMLElement {
+    store.set("config", {
+      adaptive: {},
+      search: {},
+      providers: {},
+      language_rules: effective,
+      languages: [],
+      scores: {} as ParsedConfig["scores"],
+      post_processing: {} as ParsedConfig["post_processing"],
+      configured: true,
+      sonarr_configured: false,
+      radarr_configured: false,
+    });
+    return mount(stored);
+  }
+
+  function shown(host: HTMLElement, selector: string): string[] {
+    return [...host.querySelectorAll<HTMLSelectElement>(selector)].map((s) => s.value);
+  }
+
+  const shorthand: LanguageRules = {
+    rules: [
+      { audio: "ja", subtitles: [{ code: "en", variants: ["standard", "forced"], min_score: 60 }] },
+    ],
+    default: [{ code: "fr", variants: ["standard", "hi"] }],
+  };
+  const shorthandLoaded: LanguageRules = {
+    rules: [
+      {
+        audio: "ja",
+        subtitles: [
+          { code: "en", variant: "standard", min_score: 60 },
+          { code: "en", variant: "forced", min_score: 60 },
+        ],
+      },
+    ],
+    default: [
+      { code: "fr", variant: "standard" },
+      { code: "fr", variant: "hi" },
+    ],
+  };
+
+  it("shows one row per variant a stored variants list loads as", () => {
+    const host = mountParsed(shorthand, shorthandLoaded);
+
+    expect(shown(host, ".lang-rule .variant-select")).toStrictEqual(["standard", "forced"]);
+    expect(shown(host, "#lang-defaults .lang-select")).toStrictEqual(["fr", "fr"]);
+  });
+
+  it("saves an untouched variants list as the stored shorthand", () => {
+    mountParsed(shorthand, shorthandLoaded);
+
+    expect(serializeLanguagesFromForm()).toStrictEqual(shorthand);
+  });
+
+  it("writes each variant out on its own once one of its rows is edited", () => {
+    const host = mountParsed(shorthand, shorthandLoaded);
+    const variant = host.querySelectorAll<HTMLSelectElement>(".lang-rule .variant-select")[1];
+    const defaultCode = host.querySelectorAll<HTMLSelectElement>("#lang-defaults .lang-select")[1];
+    if (!variant || !defaultCode) {
+      throw new Error("expanded rows not rendered");
+    }
+    variant.value = "hi";
+    defaultCode.value = "de";
+
+    expect(serializeLanguagesFromForm()).toStrictEqual({
+      rules: [
+        {
+          audio: "ja",
+          subtitles: [
+            { code: "en", min_score: 60 },
+            { code: "en", min_score: 60, variant: "hi" },
+          ],
+        },
+      ],
+      default: [{ code: "fr" }, { code: "de", variant: "hi" }],
+    });
+  });
+
+  it("shows the expanded value of an environment reference and saves the reference", () => {
+    const stored: LanguageRules = {
+      rules: [{ audio: "${SUBFLUX_AUDIO}", subtitles: [{ code: "${SUBFLUX_SUB}" }] }],
+      default: [{ code: "${SUBFLUX_SUB}", min_score: 70 }],
+    };
+    const host = mountParsed(stored, {
+      rules: [{ audio: "ja", subtitles: [{ code: "en" }] }],
+      default: [{ code: "en", min_score: 70 }],
+    });
+
+    expect(shown(host, ".lang-rule .lang-select")).toStrictEqual(["ja", "en"]);
+    expect(shown(host, "#lang-defaults .lang-select")).toStrictEqual(["en"]);
+    expect(serializeLanguagesFromForm()).toStrictEqual(stored);
+  });
+
+  it("saves the picked value in place of an environment reference the reader changed", () => {
+    const host = mountParsed(
+      { default: [{ code: "${SUBFLUX_SUB}", min_score: 70 }] },
+      { default: [{ code: "en", min_score: 70 }] },
+    );
+    const sel = host.querySelector<HTMLSelectElement>("#lang-defaults .lang-select");
+    if (!sel) {
+      throw new Error("default language select not rendered");
+    }
+    sel.value = "fr";
+
+    expect(serializeLanguagesFromForm().default).toStrictEqual([{ code: "fr", min_score: 70 }]);
+  });
+
+  describe("a min score given as an environment reference", () => {
+    // The stored section holds the raw scalar, so a numeric field carries the
+    // reference as a string beside the effective number.
+    const ref = "${SUBFLUX_MIN_SCORE}";
+    const stored = {
+      rules: [{ audio: "ja", subtitles: [{ code: "en", min_score: ref }] }],
+      default: [{ code: "fr", min_score: ref }],
+    } as unknown as LanguageRules;
+    const effective: LanguageRules = {
+      rules: [{ audio: "ja", subtitles: [{ code: "en", min_score: 70 }] }],
+      default: [{ code: "fr", min_score: 70 }],
+    };
+
+    it("shows the expanded score and saves the reference when untouched", () => {
+      const host = mountParsed(stored, effective);
+
+      expect(host.querySelector<HTMLInputElement>(".lang-rule .lang-min-score")?.value).toBe("70");
+      expect(serializeLanguagesFromForm()).toStrictEqual(stored);
+    });
+
+    it("keeps the reference when another field of the same row is edited", () => {
+      const host = mountParsed(stored, effective);
+      const ruleSub = host.querySelector<HTMLSelectElement>(".lang-rule .lang-sub .lang-select");
+      const defaultCode = host.querySelector<HTMLSelectElement>("#lang-defaults .lang-select");
+      if (!ruleSub || !defaultCode) {
+        throw new Error("target rows not rendered");
+      }
+      ruleSub.value = "de";
+      defaultCode.value = "it";
+
+      expect(serializeLanguagesFromForm()).toStrictEqual({
+        rules: [{ audio: "ja", subtitles: [{ code: "de", min_score: ref }] }],
+        default: [{ code: "it", min_score: ref }],
+      });
+    });
+
+    it("saves the typed score once the reader changes it", () => {
+      const host = mountParsed(stored, effective);
+      const ms = host.querySelector<HTMLInputElement>(".lang-rule .lang-min-score");
+      if (!ms) {
+        throw new Error("min score input not rendered");
+      }
+      ms.value = "85";
+
+      expect(serializeLanguagesFromForm().rules).toStrictEqual([
+        { audio: "ja", subtitles: [{ code: "en", min_score: 85 }] },
+      ]);
+    });
   });
 });
 

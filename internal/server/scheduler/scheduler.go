@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -24,12 +25,24 @@ const StartupDelay = 30 * time.Second
 // are purged from the database.
 const AuthCleanupInterval = 15 * time.Minute
 
+// MediaRetryInterval replaces scan_interval after a pass an unwritable media
+// folder refused or stopped.
+const MediaRetryInterval = 15 * time.Minute
+
 // Store is the two rows RunDBMaintenance touches: the reconcile pass and the
 // aggregate counts it logs afterwards. Two of the 36 methods the store offers,
 // which is why this is declared here and not taken as a wide type.
 type Store interface {
-	ReconcileState(ctx context.Context) (subflux.ReconcileResult, error)
+	ReconcileState(ctx context.Context, gone func(context.Context, string) (bool, error),
+		unavailable func(string) (string, bool)) (subflux.ReconcileResult, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
+}
+
+// Presence decides which files reconcile may treat as gone;
+// *mediapresence.Checker satisfies it.
+type Presence interface {
+	Gone(ctx context.Context, path string) (bool, error)
+	Unavailable(path string) (root string, unavailable bool)
 }
 
 // ReconcileMetrics is the narrow observability interface for reconcile passes.
@@ -66,6 +79,8 @@ type Deps struct {
 	// scheduled scans register too (stoppable by admins).
 	Stops               *activity.StopRegistry
 	ShowSkipCache       *showskip.Cache
+	Media               scanning.MediaGuard
+	Presence            Presence
 	StateFunc           func() *LiveState
 	ScanningFlag        *atomic.Bool
 	DeleteSubtitleFiles func(paths []string, source string)
@@ -80,64 +95,73 @@ type Deps struct {
 // scanning.LiveState. A separate declaration here would have to be assignable to
 // scanning's surface anyway, so it could only drift.
 type LiveState struct {
-	Cfg       scanning.ScanCfg
-	Engine    scanning.ScanEngine
-	Sonarr    scanning.ScanSonarrClient
-	Radarr    scanning.ScanRadarrClient
-	Providers []provider.Provider
+	Cfg    scanning.ScanCfg
+	Engine scanning.ScanEngine
+	// ShowCounter is nil when no provider offers the show-level count.
+	ShowCounter scanning.ShowCounter
+	Sonarr      scanning.ScanSonarrClient
+	Radarr      scanning.ScanRadarrClient
+	Providers   []provider.Provider
 }
 
-// Run runs the periodic scan and DB maintenance tickers until ctx is cancelled.
+// Run runs the periodic scan and DB maintenance until ctx is cancelled: the
+// first pass after StartupDelay, then each pass scan_interval after the last
+// one ends, or MediaRetryInterval after one a media folder refused.
 func Run(ctx context.Context, deps *Deps) {
 	ls := deps.StateFunc()
-	scanInterval := ls.Cfg.Search().ScanInterval
 	slog.Info("scheduler started",
-		"scan_interval", scanInterval.String(),
+		"scan_interval", ls.Cfg.Search().ScanInterval.String(),
 		"upgrade_enabled", ls.Cfg.Search().UpgradeEnabled)
 
-	startDelay := time.NewTimer(StartupDelay)
-	defer startDelay.Stop()
-	select {
-	case <-startDelay.C:
-	case <-ctx.Done():
-		return
-	}
-
-	RunDBMaintenance(ctx, deps)
-	if ctx.Err() != nil {
-		return
-	}
-	GuardedScan(ctx, deps)
-
-	scanTimer := time.NewTimer(scanInterval)
-	defer scanTimer.Stop()
-
+	timer := time.NewTimer(StartupDelay)
+	defer timer.Stop()
+	retry := false
 	for {
 		select {
-		case <-scanTimer.C:
-			RunDBMaintenance(ctx, deps)
-			if ctx.Err() != nil {
-				return
-			}
-			GuardedScan(ctx, deps)
-			nextInterval := deps.StateFunc().Cfg.Search().ScanInterval
-			scanTimer.Reset(nextInterval)
-			slog.Info("next scheduled scan", "in", nextInterval.String())
+		case <-timer.C:
 		case <-ctx.Done():
 			return
 		}
+		var next time.Duration
+		next, retry = runCycle(ctx, deps, retry)
+		if ctx.Err() != nil {
+			return
+		}
+		timer.Reset(next)
+		slog.Info("next scheduled scan", "in", next.String(), "media_retry", retry)
 	}
 }
 
-// GuardedScan acquires the scanning flag before running a full scan.
-func GuardedScan(ctx context.Context, deps *Deps) {
+// runCycle runs one scheduled pass. mediaRetry reports that the previous
+// pass was refused or stopped by an unwritable media folder: the roots are
+// write-tested first, and while they still refuse, DB maintenance and the
+// scan are skipped. retry reports the same of this pass.
+func runCycle(ctx context.Context, deps *Deps, mediaRetry bool) (next time.Duration, retry bool) {
+	if mediaRetry {
+		if err := deps.Media.Preflight(ctx, mediawrite.PreflightRequest{Roots: true, Raise: true}); err != nil {
+			return MediaRetryInterval, true
+		}
+	}
+	RunDBMaintenance(ctx, deps)
+	if ctx.Err() != nil {
+		return 0, false
+	}
+	if res := GuardedScan(ctx, deps); res.MediaUnwritable {
+		return MediaRetryInterval, true
+	}
+	return deps.StateFunc().Cfg.Search().ScanInterval, false
+}
+
+// GuardedScan acquires the scanning flag before running a full scan. The
+// zero result means the scan was skipped because one is already running.
+func GuardedScan(ctx context.Context, deps *Deps) scanning.FullScanResult {
 	if !deps.ScanningFlag.CompareAndSwap(false, true) {
 		slog.Debug("scheduler: scan skipped, already in progress")
-		return
+		return scanning.FullScanResult{}
 	}
 	defer deps.ScanningFlag.Store(false)
 	_, run := PrepareFullScan(deps, activity.SourceScheduled)
-	run(ctx)
+	return run(ctx)
 }
 
 // FullScanAction and FullScanDetail are the activity strings every full
@@ -155,7 +179,7 @@ const (
 // returned run func executes the scan and applies its terminal outcome; the
 // caller owns the ScanningFlag guard and decides whether to run it inline
 // (scheduler tick) or in a background goroutine (HTTP handler).
-func PrepareFullScan(deps *Deps, source activity.Source) (actID string, run func(ctx context.Context)) {
+func PrepareFullScan(deps *Deps, source activity.Source) (actID string, run func(ctx context.Context) scanning.FullScanResult) {
 	actID, _ = deps.Activity.StartScan(FullScanAction, FullScanDetail, source,
 		activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
 	deps.Events.PublishScanStart(&events.ScanEvent{
@@ -163,21 +187,22 @@ func PrepareFullScan(deps *Deps, source activity.Source) (actID string, run func
 	})
 	stopCh := make(chan struct{})
 	unregister := deps.Stops.RegisterStop(actID, func() { close(stopCh) })
-	run = func(ctx context.Context) {
+	run = func(ctx context.Context) scanning.FullScanResult {
 		// Panic fallback only: FinishScanActivity releases the registration
 		// explicitly BEFORE the terminal transition on every normal return
 		// (idempotent), so a done entry never reports cancellable. The
 		// defer covers a panicking scan body.
 		defer unregister()
-		outcome := runFullScan(ctx, stopCh, deps, actID)
+		res := runFullScan(ctx, stopCh, deps, actID)
 		scanning.FinishScanActivity(unregister, deps.Activity, deps.Events,
-			actID, FullScanAction, FullScanDetail, source, outcome)
+			actID, FullScanAction, FullScanDetail, source, res.Outcome)
+		return res
 	}
 	return actID, run
 }
 
 // runFullScan assembles the scanning package's deps and executes the scan.
-func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID string) activity.Outcome {
+func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID string) scanning.FullScanResult {
 	ls := deps.StateFunc()
 	if deps.ShowSkipCache != nil {
 		deps.ShowSkipCache.Prune()
@@ -190,6 +215,7 @@ func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID st
 		Activity:      deps.Activity,
 		Alerts:        deps.Alerts,
 		ShowSkipCache: deps.ShowSkipCache,
+		Media:         deps.Media,
 		ClearCaches:   provider.ClearCaches,
 	}
 	scanLS := &scanning.LiveState{
@@ -198,7 +224,7 @@ func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID st
 		Sonarr:      ls.Sonarr,
 		Radarr:      ls.Radarr,
 		Providers:   ls.Providers,
-		ShowCounter: provider.ResolveShowCounter(ls.Providers),
+		ShowCounter: ls.ShowCounter,
 	}
 	return scanning.RunFullScan(ctx, stop, scanDeps, scanLS, actID)
 }
@@ -207,7 +233,7 @@ func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID st
 func RunDBMaintenance(ctx context.Context, deps *Deps) {
 	start := time.Now()
 	slog.Debug("db maintenance starting")
-	result, err := deps.DB.ReconcileState(ctx)
+	result, err := deps.DB.ReconcileState(ctx, deps.Presence.Gone, deps.Presence.Unavailable)
 	if err != nil {
 		slog.Warn("db maintenance: reconcile failed", "error", err)
 		// Surface a persistent alert on disk-full or repeated write failure

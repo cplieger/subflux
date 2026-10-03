@@ -3,19 +3,19 @@ package scanning
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// mockShowCounter implements the local showCounter seam, and carries the three
-// provider.Provider methods too so TestResolveShowCounter_picks_first can hand
-// it to provider.ResolveShowCounter as a provider.ShowSubtitleCounter.
+// mockShowCounter implements ShowCounter with canned per show+language counts.
 type mockShowCounter struct {
 	counts map[string]int
 	err    error
@@ -29,15 +29,6 @@ func (m *mockShowCounter) CountShowSubtitles(_ context.Context, q subflux.ShowSu
 		return 0, m.err
 	}
 	return m.counts[imdbID+"-"+lang], nil
-}
-
-func (m *mockShowCounter) Name() subflux.ProviderID { return "opensubtitles" }
-func (m *mockShowCounter) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	return nil, nil
-}
-
-func (m *mockShowCounter) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
-	return nil, nil
 }
 
 func TestNewSeasonTracker_with_counter(t *testing.T) {
@@ -238,15 +229,36 @@ func TestSeasonTracker_zero_season_ep_count_uses_minimum(t *testing.T) {
 	}
 }
 
-func TestResolveShowCounter_picks_first(t *testing.T) {
+func TestShowLevelSkip_an_uncallable_counter_is_not_cached(t *testing.T) {
 	t.Parallel()
-	first := &mockShowCounter{counts: map[string]int{"tt1-fr": 0}}
-	second := &mockShowCounter{counts: map[string]int{"tt1-fr": 99}}
-	counter := provider.ResolveShowCounter([]provider.Provider{first, second})
-	st := newSeasonTracker(counter, showskip.New(1*time.Hour), seedDeps{})
-	count, _ := st.counter.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{ImdbID: "tt1", Language: "fr"})
-	if count != 0 {
-		t.Fatalf("expected count 0 from first provider, got %d", count)
+	for name, err := range map[string]error{
+		"gated":        fmt.Errorf("%w: opensubtitles: credentials rejected; next attempt in 5m", search.ErrProviderGated),
+		"auth":         &subflux.AuthError{Msg: "401"},
+		"rate limited": fmt.Errorf("count: %w", &subflux.RateLimitError{Msg: "429"}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cache := showskip.New(time.Hour)
+			st := newSeasonTracker(&mockShowCounter{err: err}, cache, seedDeps{})
+			if st.showLevelSkip(t.Context(), "tt1", 10, "en") {
+				t.Error("showLevelSkip() = true, want false")
+			}
+			if _, cached := cache.Get(showSkipCacheKey("tt1", "en")); cached {
+				t.Error("an uncallable counter's answer was cached")
+			}
+		})
+	}
+}
+
+func TestShowLevelSkip_a_plain_count_failure_caches_not_skip(t *testing.T) {
+	t.Parallel()
+	cache := showskip.New(time.Hour)
+	st := newSeasonTracker(&mockShowCounter{err: errors.New("HTTP 502")}, cache, seedDeps{})
+	if st.showLevelSkip(t.Context(), "tt1", 10, "en") {
+		t.Error("showLevelSkip() = true, want false")
+	}
+	if skip, cached := cache.Get(showSkipCacheKey("tt1", "en")); !cached || skip {
+		t.Errorf("cache = (%v, cached %v), want false cached", skip, cached)
 	}
 }
 
@@ -283,5 +295,50 @@ func TestShouldSkipShow_no_spurious_errgroup_warn(t *testing.T) {
 	if strings.Contains(buf.String(), warnMsg) {
 		t.Errorf("shouldSkipShow emitted a spurious errgroup warning %q; log was:\n%s",
 			warnMsg, buf.String())
+	}
+}
+
+func TestRecordEpisodeOutcomes_counts_only_evidence(t *testing.T) {
+	t.Parallel()
+	series := &arrapi.Series{ImdbID: "tt4396196", TvdbID: 81189}
+	tests := []struct {
+		name    string
+		outcome subflux.LangOutcome
+		want    int
+	}{
+		{name: "answered with nothing", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Answered: 1}, want: 1},
+		{name: "a download failed", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Answered: 1, Failed: 1}},
+		{name: "no provider answered", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangSearched, Searched: 1}},
+		{name: "found", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Answered: 1, Paths: []string{"/m/s.en.srt"}}},
+		{name: "backed off", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangBackedOff}},
+		{name: "a target write-blocked", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangSearched, Searched: 2, Answered: 1, WriteBlocked: 1}},
+		{name: "the folder already unwritable", outcome: subflux.LangOutcome{Lang: "en", Kind: subflux.LangWriteBlocked, WriteBlocked: 1}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			st := newSeasonTracker(nil, showskip.New(time.Hour), seedDeps{})
+			recordEpisodeOutcomes(t.Context(), st, series, 1, []subflux.LangOutcome{tc.outcome}, 10)
+			got := 0
+			if s := st.seasons[seasonKey{ImdbID: "tt4396196", Season: 1, Lang: "en"}]; s != nil {
+				got = s.noResults
+			}
+			if got != tc.want {
+				t.Errorf("no-result streak after %s = %d, want %d", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRecordEpisodeOutcomes_failed_downloads_never_end_a_season(t *testing.T) {
+	t.Parallel()
+	st := newSeasonTracker(nil, showskip.New(time.Hour), seedDeps{})
+	series := &arrapi.Series{ImdbID: "tt4396196", TvdbID: 81189}
+	failed := []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Answered: 1, Failed: 1}}
+	for range 10 {
+		recordEpisodeOutcomes(t.Context(), st, series, 1, failed, 4)
+	}
+	if st.shouldSkipSeason("tt4396196", 1, "en") {
+		t.Error("season early-terminated after failed downloads, want it kept open")
 	}
 }

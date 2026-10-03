@@ -256,6 +256,28 @@ func TestAlertLog_RecordPersistent_dismissedAllowsNew(t *testing.T) {
 	}
 }
 
+func TestAlertLog_HasUndismissed_tracks_the_persistent_alert_of_a_source(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+	al.Record("media", "transient only")
+	if al.HasUndismissed("media") {
+		t.Fatal("HasUndismissed(media) = true for a transient alert, want false")
+	}
+
+	al.RecordPersistent("media", "folder bad")
+	if !al.HasUndismissed("media") {
+		t.Fatal("HasUndismissed(media) = false after RecordPersistent, want true")
+	}
+	if al.HasUndismissed("other") {
+		t.Error("HasUndismissed(other) = true, want false")
+	}
+
+	al.DismissBySource("media")
+	if al.HasUndismissed("media") {
+		t.Error("HasUndismissed(media) = true after DismissBySource, want false")
+	}
+}
+
 func TestAlertLog_Dismiss_nonexistentReturnsFalse(t *testing.T) {
 	t.Parallel()
 	al := NewAlertLog(10)

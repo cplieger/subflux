@@ -170,13 +170,35 @@ function appendConnTest(header: HTMLElement, fields: HTMLElement, schema: Schema
   mountConnTest(header, schema.key, { inputs, banner: configBanner });
 }
 
+/** A rendered field and the key its DOM id carries: a nested field's leaves are
+ *  addressed by their dotted path ("oidc.issuer_url"), every other field by its
+ *  own key. */
+interface RenderedField {
+  readonly path: string;
+  readonly field: SchemaField;
+}
+
+function renderedFields(schema: SchemaSection): RenderedField[] {
+  const out: RenderedField[] = [];
+  for (const field of schema.fields ?? []) {
+    if (field.type === "nested") {
+      for (const leaf of field.fields ?? []) {
+        out.push({ path: `${field.key}.${leaf.key}`, field: leaf });
+      }
+    } else {
+      out.push({ path: field.key, field });
+    }
+  }
+  return out;
+}
+
 // wireShowWhen sets up show_when visibility toggling for fields.
 function wireShowWhen(
   schema: SchemaSection,
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of schema.fields ?? []) {
+  for (const { path, field } of renderedFields(schema)) {
     if (!field.show_when) {
       continue;
     }
@@ -187,7 +209,7 @@ function wireShowWhen(
     const depId = fieldId(schema.key, depKey);
     const depInput = (container.querySelector(`#${CSS.escape(depId)}`) ??
       container.parentElement?.querySelector(`#${CSS.escape(depId)}`)) as HTMLInputElement | null;
-    const target = fieldEls[field.key];
+    const target = fieldEls[path];
     if (!depInput || !target) {
       continue;
     }
@@ -207,7 +229,7 @@ function wireRequires(
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of schema.fields ?? []) {
+  for (const { path, field } of renderedFields(schema)) {
     if (!field.requires) {
       continue;
     }
@@ -218,7 +240,7 @@ function wireRequires(
     const depId = fieldId(schema.key, depKey);
     const depInput = (container.querySelector(`#${CSS.escape(depId)}`) ??
       container.parentElement?.querySelector(`#${CSS.escape(depId)}`)) as HTMLInputElement | null;
-    const targetEl = fieldEls[field.key];
+    const targetEl = fieldEls[path];
     if (!depInput || !targetEl) {
       continue;
     }
@@ -302,20 +324,32 @@ function renderFieldsInto(
       }
     }
 
-    const id = fieldId(schema.key, field.key);
-    const value = resolveFieldValue(schema.key, field, pc);
-    const fieldEl = renderField(id, field, value);
-    fieldEls[field.key] = fieldEl;
+    const rendered: [string, HTMLElement][] =
+      field.type === "nested"
+        ? (field.fields ?? []).map((leaf) => {
+            const path = `${field.key}.${leaf.key}`;
+            const value = cfgSubValue(schema.key, field.key, leaf.key) || (leaf.default ?? "");
+            return [path, renderField(fieldId(schema.key, path), leaf, value)];
+          })
+        : [
+            [
+              field.key,
+              renderField(
+                fieldId(schema.key, field.key),
+                field,
+                resolveFieldValue(schema.key, field, pc),
+              ),
+            ],
+          ];
 
     // Append to group content container if in a group.
-    if (field.group) {
-      const groupEl = container.querySelector(`#${CSS.escape(`cfg-group-${field.group}`)}`);
-      if (groupEl) {
-        groupEl.appendChild(fieldEl);
-        continue;
-      }
+    const groupEl = field.group
+      ? container.querySelector(`#${CSS.escape(`cfg-group-${field.group}`)}`)
+      : null;
+    for (const [path, fieldEl] of rendered) {
+      fieldEls[path] = fieldEl;
+      (groupEl ?? container).appendChild(fieldEl);
     }
-    container.appendChild(fieldEl);
   }
 
   wireShowWhen(schema, fieldEls, container);

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
@@ -69,6 +69,7 @@ type ArrPinger interface {
 type Deps struct {
 	Registry      SchemaRegistry
 	Alerts        AlertLog
+	ProviderAuth  ProviderAuthClearer
 	LoadConfig    ConfigLoader
 	SchemaFunc    subflux.SchemaFunc
 	NewSonarr     func(baseURL, apiKey string) (ArrPinger, error)
@@ -97,6 +98,7 @@ type StateView struct {
 type Handler struct {
 	registry      SchemaRegistry
 	alerts        AlertLog
+	providerAuth  ProviderAuthClearer
 	loadConfig    ConfigLoader
 	schemaFunc    subflux.SchemaFunc
 	newSonarr     func(baseURL, apiKey string) (ArrPinger, error)
@@ -131,6 +133,7 @@ func New(d *Deps) *Handler {
 		defaultConfig: d.DefaultConfig,
 		registry:      d.Registry,
 		alerts:        d.Alerts,
+		providerAuth:  d.ProviderAuth,
 		newSonarr:     d.NewSonarr,
 		newRadarr:     d.NewRadarr,
 		hotReload:     d.HotReload,
@@ -162,7 +165,7 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "failed to read body")
+		rejectSave(w, r, subflux.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(data)) > maxBodySize {
@@ -293,6 +296,13 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 
 // --- Internal helpers ---
 
+// rejectSave answers a refused config save with 400 and logs why, so a save
+// the browser reports as failed also leaves its reason in the server log.
+func rejectSave(w http.ResponseWriter, r *http.Request, code subflux.ErrorCode, msg string) {
+	slog.Warn("config save rejected", "code", code, "error", msg)
+	httpapi.BadRequestC(w, r, code, msg)
+}
+
 // pingArrIfChanged pings an arr instance only when its URL or API key
 // differs from the current live config. An unconfigured server has no live
 // endpoint, so oldArr is zero and every incoming URL counts as a change.
@@ -310,11 +320,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 		return err
 	}
 	defer closeArrPinger(pinger)
-	if err := pinger.Ping(ctx); err != nil {
-		slog.Warn(name+" connectivity check failed", "error", err)
-		return err
-	}
-	return nil
+	return pinger.Ping(ctx)
 }
 
 // newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/xmlx"
@@ -48,7 +49,7 @@ func (m *Mapper) CheckClientKey(ctx context.Context) error {
 	}
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return err
+		return httpx.RedactTransportError(err, "anidb credential check", httpx.Secret(m.clientKey))
 	}
 	defer resp.Body.Close()
 	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
@@ -71,10 +72,9 @@ func (m *Mapper) CheckClientKey(ctx context.Context) error {
 	if err := xml.Unmarshal(data, &errCheck); err != nil || errCheck.Message == "" {
 		return nil
 	}
+	msg := m.upstreamText(errCheck.Message)
 	if errCheck.Code == errClientRejected {
-		return &subflux.AuthError{
-			Msg: "AniDB refused the client key: " + errCheck.Message,
-		}
+		return &subflux.AuthError{Msg: "AniDB refused the client key: " + msg}
 	}
-	return fmt.Errorf("anidb API error: %s", errCheck.Message)
+	return fmt.Errorf("anidb API error: %s", msg)
 }

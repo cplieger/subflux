@@ -122,12 +122,12 @@ func (n *changeNotify) fire() {
 }
 
 // queueLocked records one transition. Caller must hold the tracker's lock.
-func (it *Tracker) queueLocked(n *changeNotify, id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+func (it *Tracker) queueLocked(n *changeNotify, id subflux.ProviderID, status *subflux.ProviderStatus, raised bool) {
 	if it.onChange == nil {
 		return
 	}
 	n.fn = it.onChange
-	n.changes = append(n.changes, providerChange{id: id, status: status, raised: raised})
+	n.changes = append(n.changes, providerChange{id: id, status: *status, raised: raised})
 }
 
 // IsTimedOut reports whether the provider is currently in cooldown. Reaching
@@ -147,7 +147,7 @@ func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 		delete(it.tripped, provider)
 		delete(it.failures, provider)
 		delete(it.lastError, provider)
-		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
+		it.queueLocked(&n, provider, &subflux.ProviderStatus{Threshold: it.threshold}, false)
 		slog.Info("provider timeout expired", "provider", provider)
 		return false
 	}
@@ -163,7 +163,7 @@ func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	if _, wasTripped := it.tripped[provider]; wasTripped {
-		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
+		it.queueLocked(&n, provider, &subflux.ProviderStatus{Threshold: it.threshold}, false)
 	}
 	delete(it.failures, provider)
 	delete(it.tripped, provider)
@@ -209,7 +209,7 @@ func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	if len(pruned) >= it.threshold {
 		if _, already := it.tripped[provider]; !already {
 			it.tripped[provider] = now
-			it.queueLocked(&n, provider, subflux.ProviderStatus{
+			it.queueLocked(&n, provider, &subflux.ProviderStatus{
 				TimedOut:          true,
 				CooldownRemaining: it.cooldown,
 				RecentFailures:    len(pruned),
@@ -233,7 +233,7 @@ func (it *Tracker) Reset() {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	for provider := range it.tripped {
-		it.queueLocked(&n, provider, subflux.ProviderStatus{Threshold: it.threshold}, false)
+		it.queueLocked(&n, provider, &subflux.ProviderStatus{Threshold: it.threshold}, false)
 	}
 	clear(it.failures)
 	clear(it.tripped)

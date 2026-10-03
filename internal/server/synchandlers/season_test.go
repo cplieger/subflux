@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // The season enumeration parity suite (D2): the server-side selection must
@@ -273,7 +274,7 @@ func newSeasonHTTPHarness(t *testing.T, runner AudioJobRunner) *seasonHTTPHarnes
 	store, sonarr, cfg, _ := seasonFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	log := activity.New(50)
-	exec := &AudioExecutor{Store: store, Proc: fakeProc{}, Runner: runner}
+	exec := &AudioExecutor{Store: store, Proc: fakeProc{}, Media: testsupport.MediaWriter(), Runner: runner}
 	d := syncjobs.New(syncjobs.Deps{
 		Exec:        exec.Execute,
 		Log:         log,
@@ -293,6 +294,7 @@ func newSeasonHTTPHarness(t *testing.T, runner AudioJobRunner) *seasonHTTPHarnes
 		Store:        store,
 		Files:        store,
 		SubtitleProc: fakeProc{},
+		Media:        testsupport.MediaWriter(),
 		Jobs:         d,
 		Resolve: &resolve.Resolver{
 			Store: store,
