@@ -225,6 +225,17 @@ method (*Error).Unwrap
 # contract of search.MediaWriter.WriteFile, beside the cause that keeps the
 # errno reachable. mediawrite_test.go pins errors.Is for ErrUnwritable and EROFS.
 method (*UnwritableError).Unwrap
+# mediapresence.UnavailableError is matched by errors.AsType in
+# polling/poller_import.go and rendered through the error interface in the hold
+# log; its Unwrap exposes ErrUnavailable, which mediapresence_test.go pins with
+# errors.Is. timeoutError is the same protocol for the checker's own deadline.
+method (*UnavailableError).Error
+method (*UnavailableError).Unwrap
+method (*timeoutError).Error
+method (*timeoutError).Unwrap
+# testsupport.MediaPresence builds a no-op-reporting checker for the server,
+# polling, scheduler and filehandlers test suites; test-only by design.
+function MediaPresence is used in test only
 # search.saveError.Unwrap lets downloadBestCandidate find the *UnwritableError
 # and atomicfile.ErrFileTooLarge through the save wrapper, so an unwritable
 # folder is not read as a plain save failure and an over-cap file falls to the
