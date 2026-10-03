@@ -804,7 +804,7 @@ describe("status: status button severity", () => {
   it("a timed-out provider reports warning with no alerts at all", async () => {
     await h.runPollWith({
       providers: providersRes({
-        opensubtitles: { timed_out: true, recent_failures: 3, threshold: 5 },
+        opensubtitles: { timed_out: true, disabled: false, recent_failures: 3, threshold: 5 },
       }),
     });
     expect(statusBtnEl().dataset["status"]).toBe("warn");
@@ -1031,11 +1031,46 @@ describe("status: popup content", () => {
     await h.runPollWith({
       stats: statsOf({ downloads: 1 }),
       providers: providersRes({
-        a: { timed_out: true, recent_failures: 2, threshold: 5 },
-        b: { timed_out: false, recent_failures: 0, threshold: 5 },
+        a: { timed_out: true, disabled: false, recent_failures: 2, threshold: 5 },
+        b: { timed_out: false, disabled: false, recent_failures: 0, threshold: 5 },
       }),
     });
     expect(header()?.textContent).toBe("Downloads: 1 \u00B7 1/2 providers");
+  });
+
+  it("subtracts a credential-disabled provider even with the timeout tier off", async () => {
+    h.store.set("config", configWithProviders({ a: true, b: true }));
+    await h.runPollWith({
+      stats: statsOf({ downloads: 1 }),
+      providers: {
+        enabled: false,
+        providers: {
+          a: { timed_out: false, disabled: true, recent_failures: 0, threshold: 5 },
+          b: { timed_out: true, disabled: false, recent_failures: 5, threshold: 5 },
+        },
+      },
+    });
+    expect(header()?.textContent).toBe("Downloads: 1 \u00B7 1/2 providers");
+  });
+
+  it("lists a credential-disabled provider with its reason whatever the timeout flag says", async () => {
+    await h.runPollWith({
+      providers: {
+        enabled: false,
+        providers: {
+          hdbits: {
+            timed_out: false,
+            disabled: true,
+            disabled_reason: "HTTP 401",
+            recent_failures: 0,
+            threshold: 5,
+          },
+        },
+      },
+    });
+    expect(panel().querySelector(".pop-item")?.textContent).toBe(
+      "hdbits: disabled: credentials rejected (HTTP 401)",
+    );
   });
 
   it("renders no header and an all-clear row when there is nothing to report", async () => {
@@ -1074,11 +1109,12 @@ describe("status: popup content", () => {
       providers: providersRes({
         subdl: {
           timed_out: true,
+          disabled: false,
           recent_failures: 4,
           threshold: 5,
           last_error: "429 too many requests",
         },
-        gestdown: { timed_out: false, recent_failures: 0, threshold: 5 },
+        gestdown: { timed_out: false, disabled: false, recent_failures: 0, threshold: 5 },
       }),
     });
     expect(panel().querySelectorAll(".pop-item").length).toBe(1);
@@ -1091,7 +1127,9 @@ describe("status: popup content", () => {
     await h.runPollWith({
       providers: {
         enabled: false,
-        providers: { subdl: { timed_out: true, recent_failures: 4, threshold: 5 } },
+        providers: {
+          subdl: { timed_out: true, disabled: false, recent_failures: 4, threshold: 5 },
+        },
       },
     });
     expect(mutedRow()?.textContent).toBe("All clear");
@@ -1099,7 +1137,9 @@ describe("status: popup content", () => {
 
   it("falls back to a failure count when the provider reported no error text", async () => {
     await h.runPollWith({
-      providers: providersRes({ subdl: { timed_out: true, recent_failures: 4, threshold: 5 } }),
+      providers: providersRes({
+        subdl: { timed_out: true, disabled: false, recent_failures: 4, threshold: 5 },
+      }),
     });
     expect(panel().querySelector(".pop-item")?.textContent).toBe("subdl: 4 failures");
   });
@@ -1634,9 +1674,10 @@ describe("status: event-fed store", () => {
   it("a provider raise turns the chip event-fresh; a clear restores it", () => {
     h.status.applyProviderEvent({
       op: "raise",
+      timeouts_enabled: true,
       entry: {
         provider: "opensubtitles",
-        status: { timed_out: true, recent_failures: 3, threshold: 5 },
+        status: { timed_out: true, disabled: false, recent_failures: 3, threshold: 5 },
       },
     });
     expect(statusBtnEl().dataset["status"]).toBe("warn");
@@ -1647,25 +1688,56 @@ describe("status: event-fed store", () => {
     // serves for a healthy provider.
     h.status.applyProviderEvent({
       op: "clear",
+      timeouts_enabled: true,
       entry: {
         provider: "opensubtitles",
-        status: { timed_out: false, recent_failures: 0, threshold: 5 },
+        status: { timed_out: false, disabled: false, recent_failures: 0, threshold: 5 },
       },
     });
     expect(statusBtnEl().dataset["status"]).toBe("idle");
   });
 
+  it("a provider event with timeouts off keeps the timeout tier off and still shows a disabled provider", () => {
+    h.status.applyProviderEvent({
+      op: "raise",
+      timeouts_enabled: false,
+      entry: {
+        provider: "subdl",
+        status: { timed_out: true, disabled: false, recent_failures: 5, threshold: 5 },
+      },
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+
+    h.status.applyProviderEvent({
+      op: "raise",
+      timeouts_enabled: false,
+      entry: {
+        provider: "hdbits",
+        status: { timed_out: false, disabled: true, recent_failures: 0, threshold: 5 },
+      },
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+  });
+
   it("a replayed provider raise mutates nothing the second time", () => {
     h.status.applyProviderEvent({
       op: "raise",
-      entry: { provider: "subdl", status: { timed_out: true, recent_failures: 4, threshold: 5 } },
+      timeouts_enabled: true,
+      entry: {
+        provider: "subdl",
+        status: { timed_out: true, disabled: false, recent_failures: 4, threshold: 5 },
+      },
     });
     const iconNode = statusIconEl().firstElementChild;
     expect(iconNode).not.toBeNull();
 
     h.status.applyProviderEvent({
       op: "raise",
-      entry: { provider: "subdl", status: { timed_out: true, recent_failures: 4, threshold: 5 } },
+      timeouts_enabled: true,
+      entry: {
+        provider: "subdl",
+        status: { timed_out: true, disabled: false, recent_failures: 4, threshold: 5 },
+      },
     });
     expect(statusIconEl().firstElementChild).toBe(iconNode);
   });

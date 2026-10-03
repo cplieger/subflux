@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // stubProvider implements provider.Provider for provider-listing tests.
@@ -167,6 +169,39 @@ func TestHandleProviderTimeout_not_configured_returns_disabled(t *testing.T) {
 	if result["enabled"] != false {
 		t.Errorf("enabled = %v, want false when timeout not configured", result["enabled"])
 	}
+	if _, ok := result["providers"].(map[string]any); !ok {
+		t.Errorf("providers = %v, want a map even when timeouts are off", result["providers"])
+	}
+}
+
+// liveGate binds and activates opensubtitles so the gate reports it.
+func liveGate(t *testing.T) *providergate.Binding {
+	t.Helper()
+	g, err := providergate.Open(t.Context(), providergate.Config{Metrics: testsupport.NopGateMetrics{}})
+	if err != nil {
+		t.Fatalf("providergate.Open: %v", err)
+	}
+	b := g.Bind(map[subflux.ProviderID]map[string]any{"opensubtitles": {"api_key": "placeholder-api-key"}})
+	g.Activate(b)
+	return b
+}
+
+func TestHandleProviderTimeout_reports_gate_state_with_timeouts_off(t *testing.T) {
+	t.Parallel()
+	gate := liveGate(t)
+	gate.Observe(t.Context(), "opensubtitles", providergate.OpDownload, &subflux.RateLimitError{Msg: "download limit exceeded (406)"})
+	h := newGatedEngineHandler(&fakeQueryCfg{}, gate)
+
+	rec := httptest.NewRecorder()
+	h.HandleProviderTimeout(rec, httptest.NewRequest(http.MethodGet, "/api/providers/timeout", nil))
+
+	var result subflux.ProvidersResponse
+	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Enabled || result.Providers["opensubtitles"].PausedFor <= 0 {
+		t.Errorf("HandleProviderTimeout() = %+v, want timeouts off and the opensubtitles pause reported", result)
+	}
 }
 
 func TestHandleProviderTimeout_enabled_returns_providers(t *testing.T) {
@@ -213,25 +248,22 @@ func TestHandleProviderTimeoutReset_rejects_non_post(t *testing.T) {
 	}
 }
 
-func TestHandleProviderTimeoutReset_not_configured_returns_disabled(t *testing.T) {
+func TestHandleProviderTimeoutReset_clears_gate_state_even_after_a_hang_up(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&fakeQueryCfg{})
+	gate := liveGate(t)
+	gate.Observe(t.Context(), "opensubtitles", providergate.OpDownload, &subflux.RateLimitError{Msg: "download limit exceeded (406)"})
+	h := newGatedEngineHandler(&fakeQueryCfg{}, gate)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/providers/timeout/reset", nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
 	rec := httptest.NewRecorder()
-	h.HandleProviderTimeoutReset(rec, req)
+	h.HandleProviderTimeoutReset(rec, httptest.NewRequest(http.MethodPost, "/api/providers/timeout/reset", nil).WithContext(ctx))
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleProviderTimeoutReset() status = %d, want %d",
-			rec.Code, http.StatusOK)
+		t.Fatalf("HandleProviderTimeoutReset() status = %d, want %d", rec.Code, http.StatusOK)
 	}
-
-	var result map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if result["enabled"] != false {
-		t.Errorf("enabled = %v, want false when timeout not configured", result["enabled"])
+	if ok, reason := gate.Admit("opensubtitles", providergate.OpDownload); !ok {
+		t.Errorf("after reset, Admit(opensubtitles, download) = false (%q), want true", reason)
 	}
 }
 

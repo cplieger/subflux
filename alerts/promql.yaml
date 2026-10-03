@@ -100,3 +100,57 @@ groups:
           description: >
             No successful subflux backup recorded in over 48h. Check the backup
             task and the /config volume.
+      # A provider that rejects its credentials is stopped after three
+      # attempts so it is not hammered into a forced password reset, and it
+      # stays stopped until someone fixes it. The second arm covers an
+      # optional setting the provider refused while the provider keeps
+      # working, such as AnimeTosho's AniDB client key.
+      - alert: SubfluxProviderCredentialsRejected
+        expr: >
+          max by (provider) (subflux_provider_disabled) == 1
+          or max by (provider) (subflux_provider_setting_rejected) == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux: {{ $labels.provider }} rejected its credentials"
+          description: >
+            The provider rejected a credential and subflux stopped using it. After
+            three attempts that is the whole provider, otherwise only the rejected
+            optional setting. Fix it in the settings dialog and save, or use the
+            provider's Test button. A disabled provider never re-enables on its
+            own. A rejected optional setting also clears when the upstream accepts
+            it on a later lookup.
+      # The rule reads a gauge and not the write-error counter. While a folder is
+      # unwritable no subtitle work happens there, so an increase() rule would
+      # resolve while the share is still broken. The gauge stays at 1 until every
+      # folder marked under the root passes a write test or a save.
+      - alert: SubfluxMediaUnwritable
+        expr: max by (root) (subflux_media_root_unwritable) == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux cannot write subtitle files in a folder under {{ $labels.root }}"
+          description: >
+            A write test or a subtitle save failed in a folder under this media
+            root, and that folder has not accepted a write since. Scans and
+            downloads for files in it are paused, so no subtitles are being saved
+            there. The share may be mounted read-only, full, or refusing subflux's
+            user. The web UI alert and the subflux log name the folder and the
+            error.
+      # The gauge stays at 1 until the path that failed reads again, which the
+      # recheck tries every 5 minutes.
+      - alert: SubfluxMediaUnavailable
+        expr: max by (root) (subflux_media_root_unavailable) == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux cannot read the media under {{ $labels.root }}"
+          description: >
+            A file under this media root could not be checked: the root is
+            missing or empty, or the filesystem refused or timed out. Nothing
+            under it is treated as deleted, and new imports there wait until it
+            can be read again. The share is probably unmounted or hung. The web
+            UI alert and the subflux log name the path and the error.

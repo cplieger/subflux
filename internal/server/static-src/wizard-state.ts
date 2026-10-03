@@ -405,10 +405,8 @@ export function parseDraft(raw: string | null, fingerprint: string): WizardDraft
 
 // --- Draft secret sanitization (drafts persist across browser restarts) ---
 
-/** isSecretField reports whether a schema field is a secret. The schema
- *  marks secrets two ways: app sections type the field "secret" (the arr
- *  api_key), provider settings additionally set the Secret flag — either
- *  marker counts. */
+/** isSecretField reports whether a schema field is a secret, by its type or
+ *  its flag. */
 function isSecretField(f: SchemaField): boolean {
   return f.secret === true || f.type === "secret";
 }

@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/subflux"
-	"golang.org/x/sync/errgroup"
 )
 
 // ParseSearchQuery extracts search parameters from the request URL. The
@@ -128,48 +129,42 @@ func BuildSearchResults(scored []subflux.ScoredResult, refs []subflux.Downloaded
 // ManualSearchResponse is the typed response from RunSearch. It
 // deliberately carries no lock state: manual locks are invisible
 // infrastructure, not a user-facing concept, so the popup has nothing to
-// display about them.
+// display about them. Providers lists each provider that returned nothing
+// because it was skipped or failed.
 type ManualSearchResponse struct {
-	Results []SearchResult `json:"results"`
+	Results   []SearchResult         `json:"results"`
+	Providers []ManualProviderNotice `json:"providers,omitempty"`
 }
 
-// RunSearch queries every configured provider and returns the scored manual-search response.
+// ManualProviderNotice says why one provider contributed no results.
+type ManualProviderNotice struct {
+	Provider subflux.ProviderID `json:"provider"`
+	// Kind is "gated" when the provider gate skipped the provider and
+	// "error" when its search failed.
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
+}
+
+// Manual provider notice kinds.
+const (
+	NoticeGated = "gated"
+	NoticeError = "error"
+)
+
+const maxNoticeBytes = 256
+
+// RunSearch queries every configured provider through the engine and returns
+// the scored manual-search response.
 func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *subflux.SearchRequest, lang string, mediaType subflux.MediaType, filePath string,
 ) ManualSearchResponse {
 	mediaID := mediaid.Build(req)
 	TryComputeHash(ctx, ls, req, filePath)
 
-	// Each provider gets its own timeout so a slow provider doesn't block
-	// others; the value is shared with the CLI search path via
+	// The per-provider timeout is shared with the CLI search path via
 	// subflux.DefaultManualProviderTimeout to prevent silent divergence.
-	type provResult struct {
-		subs []subflux.Subtitle
-	}
-	results := make([]provResult, len(ls.Providers))
-	g, gctx := errgroup.WithContext(ctx)
-	for i, p := range ls.Providers {
-		g.Go(func() error {
-			pctx, cancel := context.WithTimeout(gctx, subflux.DefaultManualProviderTimeout)
-			defer cancel()
-			subs, err := p.Search(pctx, req)
-			if err != nil {
-				slog.Warn("manual search: provider failed",
-					"provider", p.Name(), "error", logsafe.Field(err.Error()))
-				return nil
-			}
-			results[i] = provResult{subs: subs}
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		slog.Warn("manual search: provider error", "error", err)
-	}
-
-	var allResults []subflux.Subtitle
-	for _, r := range results {
-		allResults = append(allResults, r.subs...)
-	}
+	allResults, swept := ls.Engine.SweepProviders(ctx, req, subflux.DefaultManualProviderTimeout)
+	notices := providerNotices(swept)
 
 	var scored []subflux.ScoredResult
 	if len(allResults) > 0 {
@@ -196,6 +191,23 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	}
 
 	return ManualSearchResponse{
-		Results: BuildSearchResults(scored, refs, ls.Scorer),
+		Results:   BuildSearchResults(scored, refs, ls.Scorer),
+		Providers: notices,
 	}
+}
+
+// providerNotices turns the engine's per-provider sweep notices into the
+// response's, logging each failed provider.
+func providerNotices(swept []search.SweepNotice) []ManualProviderNotice {
+	out := make([]ManualProviderNotice, 0, len(swept))
+	for _, n := range swept {
+		if n.Gated {
+			out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: NoticeGated, Message: n.Reason})
+			continue
+		}
+		msg := runesafe.SanitizeSingleLineBounded(n.Err.Error(), maxNoticeBytes)
+		slog.Warn("manual search: provider failed", "provider", n.Provider, "error", msg)
+		out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: NoticeError, Message: msg})
+	}
+	return out
 }

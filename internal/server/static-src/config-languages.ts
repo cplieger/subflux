@@ -6,9 +6,16 @@ import { langSelect } from "./utils.js";
 import { SUBTITLE_VARIANTS, DEFAULT_VARIANT } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { join } from "@cplieger/keyenc";
+import {
+  cfgLanguageRules,
+  type RawTarget,
+  type StoredLanguages,
+  type StoredRule,
+  type StoredTarget,
+} from "./config-values.js";
 // Language config shapes come from the generated wire types (registered in
 // internal/wirespec); the former hand-mirrored interfaces are gone.
-import type { AudioRule, LanguageRules, SubtitleTarget } from "./wire/types.gen.js";
+import type { LanguageRules, SubtitleTarget } from "./wire/types.gen.js";
 
 // --- Shared helper (duplicated from config.ts to avoid circular import) ---
 
@@ -67,6 +74,139 @@ function renderedGearStates(): Map<string, boolean> {
  *  expressed nothing about a row that did not exist a moment ago. */
 const NO_GEARS: ReadonlyMap<string, boolean> = new Map();
 
+/** Rows expanded from one stored `variants` target, which a save writes back as
+ *  that target while every one of them is present and untouched. */
+interface VariantGroup {
+  readonly stored: RawTarget;
+  readonly size: number;
+}
+
+/** The stored target a rendered row stands for. */
+interface TargetSource {
+  readonly stored: RawTarget;
+  readonly group: VariantGroup | null;
+}
+
+/** A row's source plus the form's reading of it as built: a field still equal
+ *  to `pristine` is written back from `stored`, so an unrendered field or a
+ *  `${VAR}` value survives the save. */
+interface RowOrigin extends TargetSource {
+  readonly pristine: SubtitleTarget;
+}
+
+interface PlannedTarget {
+  readonly shown: SubtitleTarget;
+  readonly source?: TargetSource;
+}
+
+interface PlannedRule {
+  readonly audio: string;
+  readonly storedAudio?: string;
+  readonly subtitles: readonly PlannedTarget[];
+}
+
+interface LanguagesPlan {
+  readonly rules: readonly PlannedRule[];
+  readonly defaults: readonly PlannedTarget[];
+}
+
+const rowOrigin = new WeakMap<Element, RowOrigin>();
+const ruleOrigin = new WeakMap<Element, { readonly stored: string; readonly pristine: string }>();
+
+/** Rows show the parsed config, which expands `variants` and `${VAR}` values,
+ *  when it lines up target for target with the stored section; otherwise they
+ *  show the stored section. */
+function languagesPlan(): LanguagesPlan {
+  const stored = cfgLanguageRules();
+  const effective = store.get("config")?.language_rules;
+  return (effective && pairSection(stored, effective)) ?? selfPlan(stored);
+}
+
+function selfPlan(lr: StoredLanguages): LanguagesPlan {
+  const self = (ts: readonly StoredTarget[]): PlannedTarget[] =>
+    ts.map((t) => ({ shown: t.typed, source: { stored: t.raw, group: null } }));
+  return {
+    rules: (lr.rules ?? []).map((r) => ({
+      audio: r.audio,
+      storedAudio: r.audio,
+      subtitles: self(r.subtitles),
+    })),
+    defaults: self(lr.default ?? [asStored({ code: "en" })]),
+  };
+}
+
+/** A target with no stored form of its own stands for itself. */
+function asStored(t: SubtitleTarget): StoredTarget {
+  return { raw: { ...t }, typed: t };
+}
+
+function pairSection(stored: StoredLanguages, effective: LanguageRules): LanguagesPlan | null {
+  const effRules = effective.rules ?? [];
+  const storedRules: readonly StoredRule[] =
+    stored.rules ?? effRules.map((r) => ({ audio: r.audio, subtitles: r.subtitles.map(asStored) }));
+  if (storedRules.length !== effRules.length) {
+    return null;
+  }
+  const rules: PlannedRule[] = [];
+  for (const [i, s] of storedRules.entries()) {
+    const e = effRules[i];
+    const subtitles = e && sameSource(s.audio, e.audio) && pairTargets(s.subtitles, e.subtitles);
+    if (!e || !subtitles) {
+      return null;
+    }
+    rules.push({ audio: e.audio, storedAudio: s.audio, subtitles });
+  }
+  if (stored.default === undefined && effective.default === undefined) {
+    return { rules, defaults: selfPlan({}).defaults };
+  }
+  const defaults = pairTargets(
+    stored.default ?? (effective.default ?? []).map(asStored),
+    effective.default ?? [],
+  );
+  return defaults ? { rules, defaults } : null;
+}
+
+/** Pairs each effective target with the stored target it was loaded from: a
+ *  stored target with `variants` loads as one target per listed variant. */
+function pairTargets(
+  stored: readonly StoredTarget[],
+  effective: readonly SubtitleTarget[],
+): PlannedTarget[] | null {
+  const out: PlannedTarget[] = [];
+  for (const { raw, typed: s } of stored) {
+    const variants = s.variants ?? [];
+    const group = variants.length > 0 ? { stored: raw, size: variants.length } : null;
+    for (const v of group ? variants : [s.variant]) {
+      const e = effective[out.length];
+      if (!e || !sameSource(s.code, e.code) || !sameSource(variantOf(v), variantOf(e.variant))) {
+        return null;
+      }
+      out.push({ shown: e, source: { stored: group ? withVariant(raw, v) : raw, group } });
+    }
+  }
+  return out.length === effective.length ? out : null;
+}
+
+function variantOf(v: string | undefined): string {
+  return v === undefined || v === "" ? DEFAULT_VARIANT : v;
+}
+
+/** A stored value matches its loaded one, or names an environment variable
+ *  the loader expanded. */
+function sameSource(stored: string, loaded: string): boolean {
+  return stored === loaded || stored.includes("${");
+}
+
+/** One expanded member of a stored `variants` target. */
+function withVariant(s: RawTarget, v: string | undefined): RawTarget {
+  const t: Record<string, unknown> = { ...s };
+  delete t["variants"];
+  if (variantOf(v) !== DEFAULT_VARIANT) {
+    t["variant"] = variantOf(v);
+  }
+  return t;
+}
+
 // --- Exported functions ---
 
 function variantSelect(id: string | null, value: string | undefined): HTMLSelectElement {
@@ -87,11 +227,7 @@ function variantSelect(id: string | null, value: string | undefined): HTMLSelect
 export function buildLanguagesSection(): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
 
-  // Use parsed config if available, otherwise empty defaults.
-  const cfgVal = store.get("config");
-  const lr: LanguageRules = cfgVal?.language_rules ?? {};
-  const rules: AudioRule[] = lr.rules ?? [];
-  const defaults: SubtitleTarget[] = lr.default ?? [{ code: "en" }];
+  const plan = languagesPlan();
   const gears = renderedGearStates();
 
   // --- Defaults ---
@@ -100,7 +236,7 @@ export function buildLanguagesSection(): HTMLElement {
     id: "lang-defaults",
     className: "lang-subs",
   });
-  for (const d of defaults) {
+  for (const d of plan.defaults) {
     defaultsContainer.appendChild(buildSubTarget(d, DEFAULTS_SCOPE, gears));
   }
   sec.appendChild(defaultsContainer);
@@ -111,7 +247,9 @@ export function buildLanguagesSection(): HTMLElement {
         type: "button",
         className: "ghost",
         onclick: () =>
-          defaultsContainer.appendChild(buildSubTarget({ code: "en" }, DEFAULTS_SCOPE, NO_GEARS)),
+          defaultsContainer.appendChild(
+            buildSubTarget({ shown: { code: "en" } }, DEFAULTS_SCOPE, NO_GEARS),
+          ),
       },
       "+ Add subtitle",
     ),
@@ -128,7 +266,7 @@ export function buildLanguagesSection(): HTMLElement {
     ),
   );
   const rulesContainer = el("div", { id: "lang-rules" });
-  for (const rule of rules) {
+  for (const rule of plan.rules) {
     rulesContainer.appendChild(buildRuleBlock(rule, gears));
   }
   sec.appendChild(rulesContainer);
@@ -140,13 +278,7 @@ export function buildLanguagesSection(): HTMLElement {
         className: "ghost",
         onclick: () =>
           rulesContainer.appendChild(
-            buildRuleBlock(
-              {
-                audio: "en",
-                subtitles: [{ code: "fr" }],
-              },
-              NO_GEARS,
-            ),
+            buildRuleBlock({ audio: "en", subtitles: [{ shown: { code: "fr" } }] }, NO_GEARS),
           ),
       },
       "+ Add rule",
@@ -157,10 +289,11 @@ export function buildLanguagesSection(): HTMLElement {
 }
 
 function buildSubTarget(
-  sub: SubtitleTarget,
+  planned: PlannedTarget,
   scope: TargetScope,
   gears: ReadonlyMap<string, boolean>,
 ): HTMLElement {
+  const sub = planned.shown;
   const isDefault = scope.kind === "default";
   // Block wrapper: the flex controls row and the collapsible advanced region are
   // siblings inside it (not the region nested in the flex row), so the region
@@ -254,16 +387,24 @@ function buildSubTarget(
   // inert on the region, and an animated height 0 <-> auto.
   createDisclosure(toggleBtn, adv, { open: gears.get(key) ?? hasAdvanced });
 
+  const pristine = subTargetFromForm(wrapper, isDefault);
+  if (planned.source && pristine) {
+    rowOrigin.set(wrapper, { ...planned.source, pristine });
+  }
   return wrapper;
 }
 
-function buildRuleBlock(rule: AudioRule, gears: ReadonlyMap<string, boolean>): HTMLElement {
+function buildRuleBlock(rule: PlannedRule, gears: ReadonlyMap<string, boolean>): HTMLElement {
   const block = el("div", { className: "lang-rule" });
   const scope: TargetScope = { kind: "rule", audio: rule.audio };
 
   block.appendChild(el("span", { className: "lang-label" }, "Audio:"));
   const header = el("div", { className: "lang-row" });
-  header.appendChild(langSelect(null, rule.audio, "Audio language"));
+  const audioSel = langSelect(null, rule.audio, "Audio language");
+  header.appendChild(audioSel);
+  if (rule.storedAudio !== undefined) {
+    ruleOrigin.set(block, { stored: rule.storedAudio, pristine: audioSel.value });
+  }
   header.appendChild(
     el(
       "button",
@@ -292,7 +433,8 @@ function buildRuleBlock(rule: AudioRule, gears: ReadonlyMap<string, boolean>): H
       {
         type: "button",
         className: "ghost",
-        onclick: () => subsContainer.appendChild(buildSubTarget({ code: "en" }, scope, NO_GEARS)),
+        onclick: () =>
+          subsContainer.appendChild(buildSubTarget({ shown: { code: "en" } }, scope, NO_GEARS)),
       },
       "+ Add subtitle",
     ),
@@ -301,31 +443,34 @@ function buildRuleBlock(rule: AudioRule, gears: ReadonlyMap<string, boolean>): H
   return block;
 }
 
+/** The languages section a save writes; a stored target goes back as the file
+ *  held it wherever the reader left it as built. */
+export interface SavedLanguages {
+  rules?: { audio: string; subtitles: RawTarget[] }[];
+  default?: RawTarget[];
+}
+
 // serializeLanguagesFromForm reads the language builder DOM back into the
 // languages section value for the structured save. Shape mirrors what the
 // old YAML emitter produced: rules (each audio + subtitles, [] when a rule
 // has no targets) and default, both omitted entirely when their container
 // is empty.
-export function serializeLanguagesFromForm(): LanguageRules {
-  const languages: LanguageRules = {};
+export function serializeLanguagesFromForm(): SavedLanguages {
+  const languages: SavedLanguages = {};
 
   // Rules.
   const rulesEl = document.getElementById("lang-rules");
   if (rulesEl && rulesEl.children.length > 0) {
-    const rules: AudioRule[] = [];
+    const rules: { audio: string; subtitles: RawTarget[] }[] = [];
     for (const block of Array.from(rulesEl.children)) {
       const audioSel = block.querySelector<HTMLSelectElement>(".lang-row .lang-select");
       if (!audioSel) {
         continue;
       }
-      const subtitles: SubtitleTarget[] = [];
-      for (const row of Array.from(block.querySelectorAll(".lang-subs > .lang-sub"))) {
-        const st = subTargetFromForm(row as HTMLElement, false);
-        if (st) {
-          subtitles.push(st);
-        }
-      }
-      rules.push({ audio: audioSel.value, subtitles });
+      const origin = ruleOrigin.get(block);
+      const audio = origin?.pristine === audioSel.value ? origin.stored : audioSel.value;
+      const rows = Array.from(block.querySelectorAll(".lang-subs > .lang-sub"));
+      rules.push({ audio, subtitles: targetsFromForm(rows, false) });
     }
     languages.rules = rules;
   }
@@ -333,20 +478,76 @@ export function serializeLanguagesFromForm(): LanguageRules {
   // Defaults.
   const defaultsEl = document.getElementById("lang-defaults");
   if (defaultsEl && defaultsEl.children.length > 0) {
-    const defaults: SubtitleTarget[] = [];
-    for (const row of Array.from(defaultsEl.children)) {
-      const st = subTargetFromForm(row as HTMLElement, true);
-      if (st) {
-        defaults.push(st);
-      }
-    }
-    languages.default = defaults;
+    languages.default = targetsFromForm(Array.from(defaultsEl.children), true);
   }
 
   return languages;
 }
 
-function subTargetFromForm(row: HTMLElement, isDefault: boolean): SubtitleTarget | null {
+function targetsFromForm(rows: readonly Element[], isDefault: boolean): RawTarget[] {
+  const out: RawTarget[] = [];
+  let i = 0;
+  for (let row = rows[0]; row; row = rows[i]) {
+    const origin = rowOrigin.get(row);
+    const group = origin?.group;
+    if (group && groupUntouched(rows.slice(i, i + group.size), group, isDefault)) {
+      out.push(group.stored);
+      i += group.size;
+      continue;
+    }
+    const st = subTargetFromForm(row, isDefault);
+    if (st) {
+      out.push(origin ? keepUntouched(st, origin) : { ...st });
+    }
+    i++;
+  }
+  return out;
+}
+
+function groupUntouched(
+  rows: readonly Element[],
+  group: VariantGroup,
+  isDefault: boolean,
+): boolean {
+  return (
+    rows.length === group.size &&
+    rows.every((row) => {
+      const origin = rowOrigin.get(row);
+      return (
+        origin?.group === group && sameValue(subTargetFromForm(row, isDefault), origin.pristine)
+      );
+    })
+  );
+}
+
+/** `current` with each field the reader left as built taken from the stored
+ *  target instead, fields the row has no control for included. */
+function keepUntouched(current: SubtitleTarget, origin: RowOrigin): RawTarget {
+  const now: Record<string, unknown> = { ...current };
+  const built: Record<string, unknown> = { ...origin.pristine };
+  const stored = origin.stored;
+  const out: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(now), ...Object.keys(built), ...Object.keys(stored)])) {
+    const v = sameValue(now[k], built[k]) ? stored[k] : now[k];
+    if (v !== undefined) {
+      out[k] = v;
+    }
+  }
+  if (out["variant"] !== undefined && out["variants"] !== undefined) {
+    // The loader refuses a target carrying both, so the picked variant wins.
+    delete out["variants"];
+  }
+  if (out["variant"] === DEFAULT_VARIANT) {
+    delete out["variant"];
+  }
+  return out;
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function subTargetFromForm(row: Element, isDefault: boolean): SubtitleTarget | null {
   const langSel = row.querySelector<HTMLSelectElement>(".lang-select");
   if (!langSel) {
     return null;

@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/syncworker"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // HTTP-surface tests for the S7 FileRef contract on the sync verbs: the
@@ -98,7 +99,7 @@ func newSyncHarnessWith(t *testing.T, store *syncFakeStore, proc SubtitleProcess
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	log := activity.New(50)
-	exec := &AudioExecutor{Store: store, Proc: proc, Runner: runner}
+	exec := &AudioExecutor{Store: store, Proc: proc, Media: testsupport.MediaWriter(), Runner: runner}
 	d := syncjobs.New(syncjobs.Deps{
 		Exec:        exec.Execute,
 		Log:         log,
@@ -118,6 +119,7 @@ func newSyncHarnessWith(t *testing.T, store *syncFakeStore, proc SubtitleProcess
 	h := New(Deps{
 		Store:        store,
 		SubtitleProc: proc,
+		Media:        testsupport.MediaWriter(),
 		Jobs:         d,
 		Resolve: &resolve.Resolver{
 			Store: store,

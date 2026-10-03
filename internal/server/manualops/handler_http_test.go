@@ -90,11 +90,12 @@ type harnessStore interface {
 func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []provider.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
-	engine := search.New(nil,
+	engine := search.New(providers,
 		search.WithStore(db), search.WithConfig(cfg),
 		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+		search.WithTracks(embedded.Detector{}),
+		search.WithProviderGate(testsupport.ProviderGateBinding()), search.WithMediaWriter(testsupport.MediaWriter()))
 	wg := &sync.WaitGroup{}
 	resolver := &resolve.Resolver{
 		Store: db,
@@ -107,6 +108,7 @@ func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []provider.Pro
 		Activity:  fakeActivity{},
 		Alerts:    activity.NewAlertLog(100),
 		Events:    fakeEvents{},
+		Media:     testsupport.MediaWriter(),
 		BGTracker: wg,
 		// context.Background(): no *testing.T in scope, and ServerCtx is the server's long-lived context, not a request or test one.
 		ServerCtx: func() context.Context { return context.Background() },
@@ -764,7 +766,8 @@ func TestHandleManualSearch_defaults_the_release_name_from_the_resolved_video(t 
 func TestRunManualDownload_reports_a_shutdown_interruption(t *testing.T) {
 	// No t.Parallel: this test swaps the global slog default logger.
 	buf := captureLogs(t)
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{}, nil)
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
+		[]provider.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
 	serverCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 	h.deps.ServerCtx = func() context.Context { return serverCtx }
@@ -775,7 +778,7 @@ func TestRunManualDownload_reports_a_shutdown_interruption(t *testing.T) {
 	}
 	req.SetVideoPath("/media/movie.mkv")
 
-	h.runManualDownload(&LiveState{Cfg: fakeManualCfg{}}, &dlFailingProvider{}, req, "act-1")
+	h.runManualDownload(h.deps.StateFunc(), req, "act-1")
 
 	const want = "manual download interrupted by shutdown"
 	if !strings.Contains(buf.String(), want) {

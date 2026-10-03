@@ -12,6 +12,7 @@ import (
 
 	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/scanning"
@@ -301,10 +302,19 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// The roots are write-tested before any activity exists, so a refused
+	// scan answers 409 with the reason instead of a 202 that fails at once.
+	if err := s.media.Preflight(r.Context(), mediawrite.PreflightRequest{Roots: true, Raise: true}); err != nil {
+		s.scanning.Store(false)
+		if r.Context().Err() == nil {
+			httpapi.ConflictC(w, r, subflux.CodeMediaUnwritable, err.Error())
+		}
+		return
+	}
 	actID, run := scheduler.PrepareFullScan(s.schedulerDeps(), activity.SourceManual)
 	s.bgWg.Go(func() {
 		defer s.scanning.Store(false)
-		run(s.lifetime)
+		_ = run(s.lifetime)
 	})
 	httpapi.WriteJSONStatus(w, http.StatusAccepted,
 		scanning.ScanAccepted{ActivityID: actID, Status: "scan started"})

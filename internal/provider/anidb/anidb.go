@@ -38,16 +38,22 @@ const (
 
 // Mapper resolves TVDB IDs to AniDB episode IDs.
 type Mapper struct {
-	mappingTime  time.Time
-	banUntil     time.Time
-	sf           singleflight.Group
-	mappingSF    singleflight.Group
-	client       *http.Client
-	parsedList   *animeList
-	episodeCache map[string]int
-	rateCh       chan struct{}
-	clientKey    string
-	mu           sync.Mutex
+	mappingTime time.Time
+	banUntil    time.Time
+	// clientRejected is set once AniDB refuses the client key, and every later
+	// lookup answers it without a request until ForgetClientKeyVerdict.
+	clientRejected error
+	sf             singleflight.Group
+	mappingSF      singleflight.Group
+	client         *http.Client
+	parsedList     *animeList
+	episodeCache   map[string]int
+	rateCh         chan struct{}
+	clientKey      string
+	mu             sync.Mutex
+	// clientAnswered is set by a refusal or by an answer that is not an error
+	// envelope; a ban says nothing about the key and leaves it unset.
+	clientAnswered bool
 }
 
 // NewMapper creates an AniDB mapper. clientKey is optional; if empty,

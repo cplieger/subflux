@@ -212,10 +212,10 @@ func (eb *EventBus) PublishAlert(op AlertOp, a *activity.Alert) {
 	eb.Publish(Event{Type: AlertDelta, Data: AlertEvent{Op: op, Alert: a}})
 }
 
-// PublishProvider publishes a provider timeout delta: raise when a provider
-// trips into cooldown, clear when it leaves it.
-func (eb *EventBus) PublishProvider(op ProviderOp, entry *ProviderTimeoutEntry) {
-	eb.Publish(Event{Type: ProviderDelta, Data: ProviderEvent{Op: op, Entry: entry}})
+// PublishProvider publishes a provider status delta. The event is
+// dereferenced into the payload and never retained.
+func (eb *EventBus) PublishProvider(ev *ProviderEvent) {
+	eb.Publish(Event{Type: ProviderDelta, Data: *ev})
 }
 
 // PublishSyncDone publishes one sync job's terminal result. The event is

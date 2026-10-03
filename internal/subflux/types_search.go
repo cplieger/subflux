@@ -176,6 +176,9 @@ const (
 	// adaptive backoff, so no query ran. Distinct from both other kinds; it
 	// must never feed no-result evidence into the season tracker.
 	LangBackedOff LangOutcomeKind = "backed_off"
+	// LangWriteBlocked: the language needed a search but the item's folder
+	// refuses writes, so no query ran.
+	LangWriteBlocked LangOutcomeKind = "write_blocked"
 )
 
 // LangOutcome is the typed per-language result of a SearchTargets call. It
@@ -196,6 +199,15 @@ type LangOutcome struct {
 	// targets processed against results and stays positive even when the
 	// sweep issued no query (every eligible provider timed out).
 	Queried int
+	// Answered counts the providers that answered the sweep without error.
+	// Zero on a searched group means the sweep observed nothing.
+	Answered int
+	// Failed counts variant targets that had candidates and saved none.
+	Failed int
+	// WriteBlocked counts variant targets skipped or stopped because their
+	// folder refuses writes. Not a failure of the item: no evidence, no
+	// backoff and no resume stamp.
+	WriteBlocked int
 }
 
 // Found reports whether at least one subtitle was downloaded for the language.
@@ -204,8 +216,22 @@ func (o *LangOutcome) Found() bool { return len(o.Paths) > 0 }
 // SearchResult holds the outcome of a SearchTargets call: one typed entry
 // per language group plus the coverage-inventory flag.
 type SearchResult struct {
+	// WriteFailure is the first folder fault a save in this call learned (a
+	// *mediawrite.UnwritableError; read it with errors.As). Nil when targets
+	// were only skipped for an already-known fault.
+	WriteFailure    error
 	Langs           []LangOutcome // one entry per language group, in target order
 	CoverageChanged bool          // true if RecordSubtitleFiles detected changes on disk
+}
+
+// WriteBlocked returns the number of variant targets skipped or stopped for
+// an unwritable folder, across all language groups.
+func (r *SearchResult) WriteBlocked() int {
+	n := 0
+	for i := range r.Langs {
+		n += r.Langs[i].WriteBlocked
+	}
+	return n
 }
 
 // Paths returns every subtitle file downloaded across all language groups.
@@ -223,6 +249,16 @@ func (r *SearchResult) TargetsSearched() int {
 	n := 0
 	for i := range r.Langs {
 		n += r.Langs[i].Searched
+	}
+	return n
+}
+
+// TargetsFailed returns the number of variant targets that had candidates
+// and saved none, across all language groups.
+func (r *SearchResult) TargetsFailed() int {
+	n := 0
+	for i := range r.Langs {
+		n += r.Langs[i].Failed
 	}
 	return n
 }

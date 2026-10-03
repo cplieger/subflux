@@ -22,11 +22,18 @@ func FilterByIdentity(results []subflux.Subtitle, req *subflux.SearchRequest) (k
 }
 
 // IdentityOK reports whether a subtitle passes the identity check for the given
-// request. Hash-matched subtitles always pass. Subtitles with season/episode
-// metadata are validated against the request's expected episode and title.
+// request. Hash-matched subtitles always pass. A release name that names only
+// other episodes fails whatever the subtitle's metadata says, because some
+// providers copy the request's season and episode onto every result. Subtitles
+// with season/episode metadata are validated against the request's expected
+// episode and title.
 func IdentityOK(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
 	if sub.MatchedBy == subflux.MatchByHash {
 		return true
+	}
+	if req.MediaType == subflux.MediaTypeEpisode && sub.ReleaseName != "" &&
+		releaseContradictsEpisode(sub.ReleaseName, req) {
+		return false
 	}
 
 	if sub.Season > 0 || sub.Episode > 0 {

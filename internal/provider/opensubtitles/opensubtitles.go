@@ -184,8 +184,8 @@ func mergeNumberingResults(perScheme []numberingResult) ([]subflux.Subtitle, err
 
 // CountShowSubtitles returns the total subtitle count for a show (by IMDB ID)
 // in one language, without season/episode — used for show-level pre-checks
-// that skip an entire series with too few subtitles. Implements the optional
-// provider.ResolveShowCounter interface.
+// that skip an entire series with too few subtitles. It satisfies
+// provider.ShowSubtitleCounter.
 func (p *Provider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	imdbID, lang := q.ImdbID, q.Language
 	sanitized := classify.SanitizeImdbID(imdbID)

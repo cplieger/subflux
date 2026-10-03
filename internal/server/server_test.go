@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
+	"github.com/cplieger/subflux/internal/testsupport"
 	"github.com/cplieger/webhttp/v3"
 )
 
@@ -200,6 +201,7 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
 		lifetime: t.Context(),
 	}
 	ls := &liveState{cfg: testConfig(t)}
@@ -251,6 +253,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
 		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: testConfig(t)})
@@ -302,6 +305,7 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
 		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: testConfig(t)})
@@ -330,6 +334,7 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
 		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: testConfig(t)})

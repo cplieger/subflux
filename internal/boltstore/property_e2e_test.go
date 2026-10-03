@@ -3,7 +3,6 @@ package boltstore
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -78,12 +77,16 @@ var pubBackoffParams = subflux.BackoffParams{
 	Multiplier:   2,
 }
 
-// statEnv is the mutable filesystem oracle the ReconcileState op drives. The
-// store's statFn closes over it; an op flips which paths are "gone" before a
+// statEnv is the mutable filesystem oracle the ReconcileState op drives
+// through its gone method; an op flips which paths are "gone" before a
 // reconcile so the three-way branches (video gone / subtitle gone / present)
 // are all exercised. It is only ever mutated from the single property goroutine.
 type statEnv struct {
 	gone map[string]bool
+}
+
+func (e *statEnv) goneOracle(_ context.Context, path string) (bool, error) {
+	return e.gone[path], nil
 }
 
 // pubAutoPath / pubManualPath build the subtitle paths SaveDownload stores, so
@@ -116,16 +119,6 @@ func TestPublicStore_indexEqualsRescan(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		db := openPropDB(rt)
 		env := &statEnv{gone: map[string]bool{}}
-		// The reconcile oracle: a path is present unless the current op marked
-		// it gone. classifyReconcileEntry only inspects os.ErrNotExist, so a
-		// present path returns (nil, nil).
-		db.statFn = func(path string) (os.FileInfo, error) {
-			if env.gone[path] {
-				return nil, os.ErrNotExist
-			}
-			return nil, nil
-		}
-
 		n := rapid.IntRange(0, 60).Draw(rt, "ops")
 		for range n {
 			applyPublicOp(rt, db, ctx, env)
@@ -272,7 +265,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 			}
 		}
 		env.gone = gone
-		if _, err := db.ReconcileState(ctx); err != nil {
+		if _, err := db.ReconcileState(ctx, env.goneOracle, noFault); err != nil {
 			rt.Fatalf("ReconcileState: %v", err)
 		}
 		env.gone = map[string]bool{} // reset so later non-reconcile ops are unaffected

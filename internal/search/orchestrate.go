@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -21,12 +22,13 @@ import (
 // same language code are queried together to halve API calls (e.g. fr
 // standard + fr forced). Each target's results are filtered by variant,
 // scored, and downloaded independently. Returns the typed per-language
-// outcome consumed by the season tracker and scan stats.
+// outcome consumed by the season tracker and scan stats, and the folder fault
+// a save in the group learned.
 func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest,
 	targets []subflux.SubtitleTarget, videoPath string, mediaType subflux.MediaType, mediaID string,
 	existing *existingSubs, searchCfg *subflux.SearchConfig,
 	upgradeCutoff time.Time,
-) subflux.LangOutcome {
+) (subflux.LangOutcome, *mediawrite.UnwritableError) {
 	lang := targets[0].Code
 	label := logsafe.Field(req.MediaLabel())
 	out := subflux.LangOutcome{Lang: lang}
@@ -39,7 +41,13 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	if !anyNeedsSearch {
 		out.Kind = subflux.LangSkipped
 		out.Skipped = len(targets)
-		return out
+		return out, nil
+	}
+	if folder, blocked := e.media.Blocked(videoPath); blocked {
+		slog.Debug("media folder not writable, skipping search",
+			"media", label, "lang", lang, "folder", folder)
+		writeBlockedGroup(&out, states)
+		return out, nil
 	}
 
 	unionProvs := e.unionProviders(states)
@@ -53,7 +61,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 		// no-result evidence into the season tracker and overstated the scan
 		// summary every cycle a 7-day backoff overlapped a 24h scan.
 		out.Kind = subflux.LangBackedOff
-		return out
+		return out, nil
 	}
 	out.Kind = subflux.LangSearched
 
@@ -65,6 +73,61 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	// inter-item pacing delay on real provider traffic, not on Kind.
 	out.Queried = outcome.attempted()
 
+	keepIdentityMatches(&outcome, req)
+	out.Answered = len(outcome.succeeded())
+
+	anyNoResult := false
+	var writeFailure *mediawrite.UnwritableError
+	for i := range states {
+		if !states[i].needsSearch {
+			out.Skipped++
+			continue
+		}
+		out.Searched++
+
+		path, res, wf := e.processTargetVariant(ctx, req, &states[i],
+			&outcome, videoPath, mediaType, mediaID, lang, label)
+		if writeFailure == nil {
+			writeFailure = wf
+		}
+		switch res {
+		case targetSaved:
+			out.Paths = append(out.Paths, path)
+		case targetNoResult:
+			anyNoResult = true
+		case targetDownloadFailed:
+			out.Failed++
+		case targetWriteBlocked:
+			out.WriteBlocked++
+		case targetNone:
+		}
+	}
+
+	// ONE provider query ran for the whole language group, so adaptive
+	// backoff is recorded at most once per group: recording per variant
+	// would advance the backoff ladder two steps per scan for a two-variant
+	// language. A failed download in the group means a provider HAD a
+	// candidate, and the retry it needs must not be backed off; an
+	// unwritable folder says nothing about the providers.
+	if anyNoResult && out.Failed == 0 && out.WriteBlocked == 0 {
+		e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
+			label, outcome.succeeded())
+	}
+	return out, writeFailure
+}
+
+func writeBlockedGroup(out *subflux.LangOutcome, states []targetState) {
+	for i := range states {
+		if states[i].needsSearch {
+			out.WriteBlocked++
+		} else {
+			out.Skipped++
+		}
+	}
+	out.Kind = subflux.LangWriteBlocked
+}
+
+func keepIdentityMatches(outcome *searchOutcome, req *subflux.SearchRequest) {
 	kept, dropped := scoring.FilterByIdentity(outcome.results, req)
 	if dropped > 0 {
 		if len(kept) == 0 {
@@ -76,45 +139,37 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 		}
 	}
 	outcome.results = kept
-
-	anyNoResult := false
-	for i := range states {
-		if !states[i].needsSearch {
-			out.Skipped++
-			continue
-		}
-		out.Searched++
-
-		path, noResult := e.processTargetVariant(ctx, req, &states[i],
-			&outcome, videoPath, mediaType, mediaID, lang, label)
-		if path != "" {
-			out.Paths = append(out.Paths, path)
-		}
-		if noResult {
-			anyNoResult = true
-		}
-	}
-
-	// ONE provider query ran for the whole language group, so adaptive
-	// backoff is recorded at most once per group: recording per variant
-	// would advance the backoff ladder two steps per scan for a two-variant
-	// language. recordProviderNoResults with an empty succeeded set is a
-	// no-op, matching the per-variant guards above.
-	if anyNoResult {
-		e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
-			label, outcome.succeeded())
-	}
-	return out
 }
 
-// processTargetVariant returns the saved path (empty if no suitable
-// subtitle was found) and whether this variant hit a genuine no-result
-// (non-upgrade, providers answered, nothing usable) — the caller records
-// adaptive backoff once per language group.
+type targetResult int
+
+const (
+	// targetNone: nothing to record, because no provider answered or an
+	// upgrade found nothing better.
+	targetNone targetResult = iota
+	// targetSaved: a subtitle was written.
+	targetSaved
+	// targetNoResult: providers answered and, after the variant, provider and
+	// score filters, not one candidate was left. The only result that is
+	// evidence of absence.
+	targetNoResult
+	// targetDownloadFailed: candidates existed and none was saved, whatever
+	// the reason (gated, refused, rate limited, a provider error, bad
+	// content, a write the target's path refused). Upgrades included.
+	targetDownloadFailed
+	// targetWriteBlocked: the target's folder refuses writes, so nothing was
+	// tried or the save stopped there. A fact about the folder, recorded
+	// against nothing.
+	targetWriteBlocked
+)
+
+// processTargetVariant searches one variant target in the language group's
+// shared results; see targetResult for what each outcome means. The path is
+// set only for targetSaved, the folder fault only when a save learned one.
 func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRequest,
 	state *targetState, outcome *searchOutcome,
 	videoPath string, mediaType subflux.MediaType, mediaID, lang, label string,
-) (path string, noResult bool) {
+) (path string, res targetResult, writeFailure *mediawrite.UnwritableError) {
 	filtered, variantFallback := filterByVariant(
 		outcome.results, state.variant,
 	)
@@ -133,9 +188,9 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 				"media", label, "media_id", mediaID,
 				"lang", lang, "variant", state.variant,
 				"searched", outcome.succeeded())
-			return "", true
+			return "", targetNoResult, nil
 		}
-		return "", false
+		return "", targetNone, nil
 	}
 
 	video := videoInfoFromRequest(req)
@@ -147,7 +202,10 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 	}
 	aboveMin := filterByScore(scored, minScore)
 	if len(aboveMin) == 0 {
-		return "", logNoResults(state, scored, lang, label, minScore)
+		if logNoResults(state, scored, lang, label, minScore) {
+			return "", targetNoResult, nil
+		}
+		return "", targetNone, nil
 	}
 
 	if state.isUpgrade {
@@ -160,5 +218,5 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 	}
 
 	return e.downloadBestCandidate(ctx, req, aboveMin,
-		videoPath, mediaType, mediaID, lang, state.variant, label), false
+		videoPath, mediaType, mediaID, lang, state.variant, label)
 }

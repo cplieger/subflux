@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/testsupport"
@@ -23,6 +24,11 @@ import (
 // exercise the actual scoring/timeout pipeline rather than a canned fake
 // (mirrors the production wiring).
 func newEngineHandler(cfg *fakeQueryCfg) *Handler {
+	return newGatedEngineHandler(cfg, testsupport.ProviderGateBinding())
+}
+
+// newGatedEngineHandler builds the handler over a real engine bound to gate.
+func newGatedEngineHandler(cfg *fakeQueryCfg, gate *providergate.Binding) *Handler {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -31,7 +37,8 @@ func newEngineHandler(cfg *fakeQueryCfg) *Handler {
 		search.WithMetrics(obs.New()),
 		search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+		search.WithTracks(embedded.Detector{}),
+		search.WithProviderGate(gate), search.WithMediaWriter(testsupport.MediaWriter()))
 	return New(Deps{
 		QueryDB: &mockQueryStore{},
 		State: func() *LiveState {

@@ -14,6 +14,7 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/syncworker"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // TestExecute_cancelDuringPreHookRead_settlesCancelled pins the queued-DELETE
@@ -36,7 +37,7 @@ func TestExecute_cancelDuringPreHookRead_settlesCancelled(t *testing.T) {
 	}
 
 	store := &syncFakeStore{offsets: map[string]int64{}}
-	exec := &AudioExecutor{Store: store, Proc: fakeProc{}, Runner: &fakeRunner{out: syncworker.RunOutcome{
+	exec := &AudioExecutor{Store: store, Proc: fakeProc{}, Media: testsupport.MediaWriter(), Runner: &fakeRunner{out: syncworker.RunOutcome{
 		Outcome: syncworker.OutcomeResult,
 		Result:  subsync.SyncResult{Method: subsync.MethodNone, Confidence: 0.1},
 	}}}

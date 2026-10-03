@@ -339,13 +339,13 @@ func TestReconcileConvergence(t *testing.T) {
 	dbA := openTempAt(t, filepath.Join(dirA, "store"))
 	setup(dbA, dirA)
 	// Mark all subtitle files gone, videos present.
-	dbA.statFn = func(path string) (os.FileInfo, error) {
+	statA := func(path string) (os.FileInfo, error) {
 		if filepath.Ext(path) == ".mkv" {
 			return os.Stat(filepath.Join(dirA, filepath.Base(path)))
 		}
 		return nil, os.ErrNotExist // subtitle is gone
 	}
-	resA, err := dbA.ReconcileState(ctx)
+	resA, err := dbA.ReconcileState(ctx, statGone(statA), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState(A): %v", err)
 	}
@@ -357,7 +357,7 @@ func TestReconcileConvergence(t *testing.T) {
 	setup(dbB, dirB)
 
 	// First half: v1 subs gone.
-	dbB.statFn = func(path string) (os.FileInfo, error) {
+	statB1 := func(path string) (os.FileInfo, error) {
 		if filepath.Ext(path) == ".mkv" {
 			return os.Stat(filepath.Join(dirB, filepath.Base(path)))
 		}
@@ -367,19 +367,19 @@ func TestReconcileConvergence(t *testing.T) {
 		}
 		return os.Stat(filepath.Join(dirB, base))
 	}
-	_, err = dbB.ReconcileState(ctx)
+	_, err = dbB.ReconcileState(ctx, statGone(statB1), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState(B half1): %v", err)
 	}
 
 	// Second half: v2 subs gone too.
-	dbB.statFn = func(path string) (os.FileInfo, error) {
+	statB2 := func(path string) (os.FileInfo, error) {
 		if filepath.Ext(path) == ".mkv" {
 			return os.Stat(filepath.Join(dirB, filepath.Base(path)))
 		}
 		return nil, os.ErrNotExist
 	}
-	resB, err := dbB.ReconcileState(ctx)
+	resB, err := dbB.ReconcileState(ctx, statGone(statB2), noFault)
 	if err != nil {
 		t.Fatalf("ReconcileState(B half2): %v", err)
 	}
@@ -478,7 +478,7 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 
 	// The stat function: videos are always present; subtitle files are present
 	// only if they've been "written" by SaveDownload.
-	db.statFn = func(path string) (os.FileInfo, error) {
+	stat := func(path string) (os.FileInfo, error) {
 		// Videos always exist.
 		for _, v := range videos {
 			if path == v {
@@ -558,7 +558,7 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 			}
 		}()
 		for range iterations / 5 {
-			_, _ = db.ReconcileState(ctx)
+			_, _ = db.ReconcileState(ctx, statGone(stat), noFault)
 		}
 	})
 

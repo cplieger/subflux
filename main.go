@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/auth/v6/ratelimit"
 	"github.com/cplieger/health"
@@ -29,13 +29,16 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/embedded"
+	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/mediapresence"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server"
+	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/subflux/internal/wiring"
@@ -232,8 +235,12 @@ func runServer() int {
 
 		reg := newProviderRegistry()
 		syncExec := newSyncExec()
-		srv := server.New(db, reg,
-			append(serverOptions(reg, syncExec), server.WithPort(config.ServerPort))...)
+		opts, optsErr := serverOptions(ctx, db, reg, syncExec)
+		if optsErr != nil {
+			slog.Error("failed to assemble server", "error", optsErr)
+			return 1
+		}
+		srv := server.New(db, reg, append(opts, server.WithPort(config.ServerPort))...)
 
 		// Auth setup. WebAuthn/OIDC are built by activation on the first
 		// successful config save, never here.
@@ -296,8 +303,12 @@ func runConfiguredServer(cfg *config.Config) int {
 	// config saves cannot drift.
 	reg := newProviderRegistry()
 	syncExec := newSyncExec()
-	srv := server.New(db, reg,
-		append(serverOptions(reg, syncExec), server.WithConfig(cfg))...)
+	opts, optsErr := serverOptions(ctx, db, reg, syncExec)
+	if optsErr != nil {
+		slog.Error("failed to assemble server", "error", optsErr)
+		return 1
+	}
+	srv := server.New(db, reg, append(opts, server.WithConfig(cfg))...)
 
 	// Auth setup.
 	rateLimiter := ratelimit.New(ctx, ratelimit.DefaultConfig())
@@ -494,20 +505,46 @@ func ensureConfigFile(path string, def []byte) error {
 // server assemblies (configured cold boot and unconfigured mode); the callers
 // append only their mode-specific option (WithConfig / WithPort). One builder
 // means the two assemblies cannot drift apart again.
-func serverOptions(reg *provider.Registry, syncExec *syncworker.Client) []server.Option {
+func serverOptions(ctx context.Context, db *boltstore.DB, reg *provider.Registry,
+	syncExec *syncworker.Client,
+) ([]server.Option, error) {
+	m := obs.New()
+	alerts := activity.NewAlertLog(100)
+	hasher, err := auth.NewHasher(auth.DefaultArgon2Params())
+	if err != nil {
+		return nil, fmt.Errorf("provider gate hasher: %w", err)
+	}
+	gate, err := providergate.Open(ctx, providergate.Config{Store: db, Hasher: hasher, Metrics: m})
+	if err != nil {
+		return nil, fmt.Errorf("provider gate: %w", err)
+	}
+	mw, err := mediawrite.New(mediawrite.Config{
+		MaxBytes: httpwire.MaxDownloadBytes, Metrics: m, Alerts: alerts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("media writer: %w", err)
+	}
+	presence, err := mediapresence.New(mediapresence.Config{Metrics: m, Alerts: alerts})
+	if err != nil {
+		return nil, fmt.Errorf("media presence: %w", err)
+	}
 	return []server.Option{
 		server.WithDefaultConfig(defaultConfig),
 		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
-		server.WithWire(newWireFunc(reg, syncExec)),
+		server.WithAlertLog(alerts),
+		server.WithProviderGate(gate),
+		server.WithMediaWriter(mw),
+		server.WithMediaPresence(presence),
+		server.WithWire(newWireFunc(reg, syncExec, gate, mw)),
 		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
 		server.WithSubtitleProc(syncing.SubtitleProcessor{}),
 		// The SAME client as the typed job runner: dispatched sync jobs and
 		// automatic syncs contend on its one execution slot.
 		server.WithSyncRunner(syncExec),
-		server.WithMetrics(obs.New()),
+		server.WithMetrics(m),
 		server.WithLogSetup(setupLogging),
-	}
+	}, nil
 }
 
 // newSonarrFactory returns a function that creates Sonarr API clients, used by
@@ -544,28 +581,14 @@ func newConfigLoader() confighandlers.ConfigLoader {
 	}
 }
 
-// newWireFunc returns the wiring.Func that creates the search engine, scorer,
-// and loaded providers from config. This is the composition root: the only
-// place that imports concrete implementation packages for wiring. syncExec
+// newWireFunc returns the wiring.Func the server calls on every activation: a
+// closure over wiring.Build with the production track detector. syncExec
 // carries the process-isolation executor (P13) into every engine the wire
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
-func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg *config.Config, db search.Store, m search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
-		providers, err := reg.LoadAll(ctx, cfg.Providers())
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		providers = provider.WrapRetryAll(providers, provider.DownloadRetryAttempts, provider.DownloadRetryInitBackoff)
-		scores := cfg.Scores()
-		sc := scorer.New(&scores)
-		engine := search.New(providers,
-			search.WithStore(db), search.WithConfig(cfg),
-			search.WithMetrics(m), search.WithScorer(sc),
-			search.WithSyncer(syncing.Syncer{MinConfidence: cfg.Sync().SyncMinConfidence, LangMapper: classify.Alpha2FromAlpha3, Exec: syncExec}),
-			search.WithSyncExec(syncExec),
-			search.WithTracks(embedded.Detector{}))
-		return engine, sc, providers, nil
+func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec, gate *providergate.Gate, mw *mediawrite.Writer) wiring.Func {
+	return func(ctx context.Context, cfg *config.Config, db search.Store, m search.Metrics) (wiring.Result, error) {
+		return wiring.Build(ctx, cfg, db, m, reg, gate, wiring.Extras{SyncExec: syncExec, Tracks: embedded.Detector{}, Media: mw})
 	}
 }
 

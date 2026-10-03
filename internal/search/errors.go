@@ -10,4 +10,7 @@ var (
 	// to tell an empty download from a corrupt one tests for
 	// subtitlefile.ErrEmpty rather than a second sentinel here.
 	ErrInvalidContent = errors.New("provider returned invalid data")
+	// ErrProviderGated reports a call the provider gate refused, so no request
+	// was made. The wrapping error carries the gate's reason.
+	ErrProviderGated = errors.New("provider gated")
 )

@@ -24,7 +24,7 @@ type fakeStore struct {
 	reconcile    subflux.ReconcileResult
 }
 
-func (f *fakeStore) ReconcileState(context.Context) (subflux.ReconcileResult, error) {
+func (f *fakeStore) ReconcileState(context.Context, func(context.Context, string) (bool, error), func(string) (string, bool)) (subflux.ReconcileResult, error) {
 	return f.reconcile, f.reconcileErr
 }
 
@@ -54,6 +54,7 @@ func TestRunDBMaintenance_forwardsReconciledDeletionsAndMetrics(t *testing.T) {
 	var gotSource string
 	deps := &scheduler.Deps{
 		DB:               store,
+		Presence:         testsupport.MediaPresence(),
 		ReconcileMetrics: metrics,
 		DeleteSubtitleFiles: func(paths []string, source string) {
 			gotPaths, gotSource = paths, source
@@ -84,6 +85,7 @@ func TestRunDBMaintenance_reconcileError_escalatesToStoreWriteRecorder(t *testin
 	var got []error
 	deps := &scheduler.Deps{
 		DB:                    store,
+		Presence:              testsupport.MediaPresence(),
 		RecordStoreWriteError: func(err error) { got = append(got, err) },
 		DeleteSubtitleFiles:   func([]string, string) {},
 		// ReconcileMetrics left nil: also exercises the nil-safe metrics path.
@@ -104,6 +106,7 @@ func TestRunDBMaintenance_successfulReconcile_doesNotEscalate(t *testing.T) {
 	called := false
 	deps := &scheduler.Deps{
 		DB:                    store,
+		Presence:              testsupport.MediaPresence(),
 		RecordStoreWriteError: func(error) { called = true },
 		DeleteSubtitleFiles:   func([]string, string) {},
 	}
@@ -148,12 +151,14 @@ func prepDeps(log *activity.Log, stops *activity.StopRegistry, bus *events.Event
 	var flag atomic.Bool
 	return &scheduler.Deps{
 		DB:       &fakeStore{NopStore: &testsupport.NopStore{}},
+		Presence: testsupport.MediaPresence(),
 		ScanDB:   &testsupport.NopStore{},
 		Metrics:  nopMetrics{},
 		Events:   bus,
 		Activity: log,
 		Alerts:   activity.NewAlertLog(10),
 		Stops:    stops,
+		Media:    testsupport.MediaWriter(),
 		StateFunc: func() *scheduler.LiveState {
 			return &scheduler.LiveState{Cfg: &fakeScanCfg{}}
 		},

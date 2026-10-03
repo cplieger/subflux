@@ -21,7 +21,13 @@ import { apiAction, bindLoadingState, retryNetwork, RETRY_STANDARD } from "@cpli
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
 import { YAML_TIMEOUT_MS } from "./constants.js";
-import { setCfgSections, cfgSectionEntries, cfgValue } from "./config-values.js";
+import {
+  setCfgSections,
+  cfgSectionEntries,
+  cfgUnrendered,
+  cfgValue,
+  cfgSecretPresent,
+} from "./config-values.js";
 import { configBanner, configBannerHost } from "./config-banner.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
@@ -93,7 +99,7 @@ async function loadConfig(): Promise<void> {
     ]);
     // Don't throw on structured-config failure; render with schema defaults
     // so the user can fix a broken or unreadable config via the UI.
-    setCfgSections(structured?.sections ?? {});
+    setCfgSections(structured?.sections ?? {}, structured?.secrets_present ?? []);
     if (parsed) {
       store.batch(() => {
         store.set("config", parsed);
@@ -440,8 +446,8 @@ function focusKey(ctl: HTMLElement): string | null {
 }
 
 // Shared validation display for required fields.
-function updateFieldValidation(inp: HTMLInputElement, field: SchemaField): void {
-  const empty = (inp.value || "").trim() === "" && !(field.secret && inp.placeholder === "****");
+function updateFieldValidation(inp: HTMLInputElement, field: SchemaField, path: string): void {
+  const empty = (inp.value || "").trim() === "" && !(field.secret && cfgSecretPresent(path));
   inp.classList.toggle("cfg-required", empty);
   const fieldRow = inp.closest(".cfg-field");
   if (!fieldRow) {
@@ -492,8 +498,8 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
         if (!inp) {
           return false;
         }
-        // Secret fields with a placeholder have a redacted value on the server.
-        if (f.secret && inp.placeholder === "****") {
+        // A stored secret renders empty: the structured GET redacts it.
+        if (f.secret && cfgSecretPresent(`${schema.key}.${f.key}`)) {
           return true;
         }
         return inp.value.trim() !== "";
@@ -522,7 +528,7 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
         continue;
       }
 
-      updateFieldValidation(inp, field);
+      updateFieldValidation(inp, field, `${schema.key}.${field.key}`);
 
       // Re-run the full marking pass on input so satisfying a
       // required_group via one member clears the styling on its sibling
@@ -587,7 +593,9 @@ export function buildSectionsFromForm(schemaSections: SchemaSection[]): Record<s
 
 function genFields(schema: SchemaSection): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const rendered = new Set((schema.fields ?? []).map((f) => f.key));
   if (schema.enable_key) {
+    rendered.add(schema.enable_key);
     const t = document.getElementById(
       fieldId(schema.key, schema.enable_key),
     ) as HTMLInputElement | null;
@@ -597,37 +605,72 @@ function genFields(schema: SchemaSection): Record<string, unknown> {
     if (field.key === schema.enable_key) {
       continue;
     }
-    const id = fieldId(schema.key, field.key);
-    const f = document.getElementById(id) as HTMLInputElement | null;
-    if (!f) {
+    if (field.type === "nested") {
+      const nested = genNested(schema.key, field);
+      if (nested !== null) {
+        out[field.key] = nested;
+      }
       continue;
     }
-    if (field.type === "bool") {
-      out[field.key] = f.checked;
-    } else if (field.key === "exclude_arr_tags") {
-      out[field.key] = f.value
-        .split(",")
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-    } else if (field.type === "secret") {
-      // Always sent, "" when empty: the server merges the stored secret
-      // for empty values (schema-driven).
-      out[field.key] = f.value;
-    } else if (f.value === "") {
-      // Empty optional scalars are omitted — the old emitter's bare
-      // `key:` decoded to a YAML null, which the server treats the same.
-      continue;
-    } else if (field.type === "number") {
-      const n = Number(f.value);
-      // Non-numeric text rides through as a string so the server rejects
-      // it with config_invalid, like the old raw-YAML emit did.
-      out[field.key] = Number.isFinite(n) ? n : f.value;
-    } else {
-      // text/select/duration values stay strings ("30s", "info", ...).
-      out[field.key] = f.value;
+    const value = fieldValue(fieldId(schema.key, field.key), field);
+    if (value !== undefined) {
+      out[field.key] = value;
     }
   }
-  return out;
+  return { ...cfgUnrendered([schema.key], rendered), ...out };
+}
+
+/** An absent block reads to the server as config the user removed, so a block
+ *  whose stored secret is its only value is still sent, or saving would drop
+ *  that secret. */
+function genNested(sectionKey: string, field: SchemaField): Record<string, unknown> | null {
+  const leaves = field.fields ?? [];
+  const out = cfgUnrendered([sectionKey, field.key], new Set(leaves.map((l) => l.key)));
+  let keep = Object.keys(out).length > 0;
+  for (const leaf of leaves) {
+    const path = `${field.key}.${leaf.key}`;
+    const value = fieldValue(fieldId(sectionKey, path), leaf);
+    if (value === undefined) {
+      continue;
+    }
+    out[leaf.key] = value;
+    keep ||= value !== "" || cfgSecretPresent(`${sectionKey}.${path}`);
+  }
+  return keep ? out : null;
+}
+
+function fieldValue(id: string, field: SchemaField): unknown {
+  const f = document.getElementById(id) as HTMLInputElement | null;
+  if (!f) {
+    return undefined;
+  }
+  if (field.type === "bool") {
+    return f.checked;
+  }
+  if (field.key === "exclude_arr_tags") {
+    return f.value
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+  }
+  if (field.type === "secret") {
+    // Always sent, "" when empty: the server merges the stored secret
+    // for empty values (schema-driven).
+    return f.value;
+  }
+  if (f.value === "") {
+    // Empty optional scalars are omitted: the server gives an absent key
+    // its default, exactly as it does a YAML null.
+    return undefined;
+  }
+  if (field.type === "number") {
+    const n = Number(f.value);
+    // Non-numeric text rides through as a string so the server rejects
+    // it with config_invalid.
+    return Number.isFinite(n) ? n : f.value;
+  }
+  // text/select/duration values stay strings ("30s", "info", ...).
+  return f.value;
 }
 
 function genScoring(schema: SchemaSection): Record<string, unknown> {

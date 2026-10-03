@@ -387,7 +387,7 @@ func TestCheckAPIStatus_success_returns_items(t *testing.T) {
 	}
 	resp := &apiResponse{Status: true, Subtitles: items}
 
-	got, err := checkAPIStatus(resp, "Movie (2024)")
+	got, err := (&Provider{}).checkAPIStatus(resp, "Movie (2024)")
 	if err != nil {
 		t.Fatalf("checkAPIStatus(status=true) unexpected error: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestCheckAPIStatus_success_empty_items(t *testing.T) {
 
 	resp := &apiResponse{Status: true, Subtitles: nil}
 
-	got, err := checkAPIStatus(resp, "Movie (2024)")
+	got, err := (&Provider{}).checkAPIStatus(resp, "Movie (2024)")
 	if err != nil {
 		t.Fatalf("checkAPIStatus(status=true, no items) unexpected error: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestCheckAPIStatus_cant_find_returns_nil_no_error(t *testing.T) {
 			t.Parallel()
 			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
 
-			got, err := checkAPIStatus(resp, "Test Movie")
+			got, err := (&Provider{}).checkAPIStatus(resp, "Test Movie")
 			if err != nil {
 				t.Errorf("checkAPIStatus(%q) unexpected error: %v", tt.errMsg, err)
 			}
@@ -455,7 +455,7 @@ func TestCheckAPIStatus_other_error_returns_error(t *testing.T) {
 			t.Parallel()
 			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
 
-			got, err := checkAPIStatus(resp, "Test Movie")
+			got, err := (&Provider{}).checkAPIStatus(resp, "Test Movie")
 			if err == nil {
 				t.Fatalf("checkAPIStatus(%q) expected error", tt.errMsg)
 			}
@@ -481,7 +481,7 @@ func TestCheckAPIStatus_status_false_empty_error_returns_nil_no_error(t *testing
 	// warning and treated as no-results rather than an error.
 	resp := &apiResponse{Status: false, Error: ""}
 
-	got, err := checkAPIStatus(resp, "Test Movie")
+	got, err := (&Provider{}).checkAPIStatus(resp, "Test Movie")
 	if err != nil {
 		t.Errorf("checkAPIStatus(empty error) unexpected error: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestCheckAPIStatus_status_true_overrides_error_field(t *testing.T) {
 		Subtitles: []subtitleItem{{Name: "sub.srt", Language: "EN"}},
 	}
 
-	got, err := checkAPIStatus(resp, "Test Movie")
+	got, err := (&Provider{}).checkAPIStatus(resp, "Test Movie")
 	if err != nil {
 		t.Fatalf("checkAPIStatus(status=true + error) unexpected error: %v", err)
 	}

@@ -15,7 +15,7 @@ const wire = vi.hoisted(() => ({
   searchResult: { ok: true, status: 200, data: { results: [] } } as {
     ok: boolean;
     status: number;
-    data?: { results: unknown[] } | null;
+    data?: { results: unknown[]; providers?: unknown[] } | null;
     error?: string;
     code?: string;
   },
@@ -1037,6 +1037,46 @@ describe("renderPopupResults", () => {
     await openEpisodePopup();
 
     expect(document.querySelector(".result-provider .icon-check")).toBeNull();
+  });
+
+  it("names a provider the gate skipped, with its reason, under the results", async () => {
+    wire.searchResult = {
+      ok: true,
+      status: 200,
+      data: {
+        results: [result()],
+        providers: [{ provider: "hdbits", kind: "gated", message: "rate limited until 15:04" }],
+      },
+    };
+
+    await openEpisodePopup();
+
+    expect([...document.querySelectorAll(".result-notice")].map((n) => n.textContent)).toEqual([
+      "hdbits skipped: rate limited until 15:04",
+    ]);
+  });
+
+  it("names a provider whose search failed when nothing was found", async () => {
+    wire.searchResult = {
+      ok: true,
+      status: 200,
+      data: {
+        results: [],
+        providers: [{ provider: "subdl", kind: "error", message: "upstream answered 500" }],
+      },
+    };
+
+    await openEpisodePopup();
+
+    expect(results().textContent).toBe("No results found.subdl failed: upstream answered 500");
+  });
+
+  it("adds no notice line when every provider answered", async () => {
+    wire.searchResult = { ok: true, status: 200, data: { results: [result()], providers: [] } };
+
+    await openEpisodePopup();
+
+    expect(document.querySelector(".result-notice")).toBeNull();
   });
 
   it("renders the column headings", async () => {

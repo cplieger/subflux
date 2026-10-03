@@ -2,6 +2,7 @@ package queryhandlers
 
 import (
 	"cmp"
+	"context"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -292,32 +293,25 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleProviderTimeout handles GET /api/providers/timeout.
+// HandleProviderTimeout handles GET /api/providers/timeout. Enabled says
+// whether provider timeouts are configured; the map carries every provider's
+// state either way.
 func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
 	}
-	ls := h.state()
-	status, enabled := ls.Engine.ProviderTimeouts()
-	if !enabled {
-		httpapi.WriteJSON(w, providerTimeoutResponse{})
-		return
-	}
-	httpapi.WriteJSON(w, providerTimeoutResponse{Enabled: true, Providers: status})
+	status, enabled := h.state().Engine.ProviderStatus()
+	httpapi.WriteJSON(w, providerTimeoutResponse{Enabled: enabled, Providers: status})
 }
 
-// HandleProviderTimeoutReset handles POST /api/providers/timeout/reset.
+// HandleProviderTimeoutReset handles POST /api/providers/timeout/reset: it
+// clears every provider timeout, credential disable, pause and rejected
+// setting, and finishes even when the client hangs up.
 func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequirePOST(w, r) {
 		return
 	}
-	ls := h.state()
-	_, enabled := ls.Engine.ProviderTimeouts()
-	if !enabled {
-		httpapi.WriteJSON(w, providerTimeoutResponse{})
-		return
-	}
-	ls.Engine.ResetTimeouts()
+	h.state().Engine.ResetProviderState(context.WithoutCancel(r.Context()))
 	httpapi.Ok(w)
 }
 

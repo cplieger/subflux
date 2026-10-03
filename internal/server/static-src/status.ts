@@ -146,14 +146,14 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
       parts.push(`Missing: ${stats.missing_subs}`);
     }
   }
-  if (providers.enabled) {
+  const down = unavailableProviders(providers).length;
+  if (providers.enabled || down > 0) {
     const cfg = store.get("config");
     const totalEnabled = cfg
       ? Object.entries(cfg.providers).filter(([, enabled]) => enabled).length
       : 0;
-    const timedOut = Object.entries(providers.providers).filter(([, p]) => p.timed_out).length;
     if (totalEnabled > 0) {
-      parts.push(`${totalEnabled - timedOut}/${totalEnabled} providers`);
+      parts.push(`${totalEnabled - down}/${totalEnabled} providers`);
     }
   }
   if (parts.length === 0) {
@@ -164,14 +164,14 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
 
 // --- ActivityEntry & alerts polling ---
 
-/** Compute timed-out provider names. */
-function timedOutProviders(providers: ProvidersResponse): string[] {
+/** Names of the providers no search can reach: disabled for rejected
+ *  credentials whatever `enabled` says, plus the timed-out ones while the
+ *  timeout tier is on. */
+function unavailableProviders(providers: ProvidersResponse): string[] {
   const ongoing: string[] = [];
-  if (providers.enabled) {
-    for (const [name, status] of Object.entries(providers.providers)) {
-      if (status.timed_out) {
-        ongoing.push(name);
-      }
+  for (const [name, status] of Object.entries(providers.providers)) {
+    if (status.disabled || (providers.enabled && status.timed_out)) {
+      ongoing.push(name);
     }
   }
   return ongoing;
@@ -370,13 +370,21 @@ let knownAlerts = new Map<number, Alert>();
 let knownProviders: ProvidersResponse = { enabled: false, providers: {} };
 let knownStats: Stats | null = null;
 
-/** Shallow equality over two decoder-shaped flat records. */
+/** Shallow equality over two decoder-shaped flat records; an array field
+ *  compares element by element. */
 function sameRecord<T extends object>(a: T, b: T): boolean {
   const keys = Object.keys(a) as (keyof T)[];
   if (keys.length !== Object.keys(b).length) {
     return false;
   }
-  return keys.every((k) => a[k] === b[k]);
+  return keys.every((k) => sameField(a[k], b[k]));
+}
+
+function sameField(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return a === b;
 }
 
 /** Apply an activity delta, idempotently. */
@@ -422,21 +430,21 @@ export function applyAlertEvent(ev: AlertEvent): void {
   renderStatus();
 }
 
-/** Apply a provider timeout delta, idempotently. Both ops upsert the
- *  carried status snapshot; any provider event proves the health tracker
- *  is live, so `enabled` flips true. A cooldown expiring unqueried emits
- *  no event; the reconcile tick's full fetch owns that convergence. */
+/** Apply a provider status delta, idempotently. Both ops upsert the
+ *  carried status, which is the provider's full status, and `enabled`
+ *  follows the event's own timeouts flag. A cooldown expiring unqueried
+ *  emits no event; the reconcile tick's full fetch owns that convergence. */
 export function applyProviderEvent(ev: ProviderEvent): void {
   const entry = ev.entry;
   if (!entry) {
     return;
   }
   const prev = knownProviders.providers[entry.provider];
-  if (knownProviders.enabled && prev && sameRecord(prev, entry.status)) {
+  if (knownProviders.enabled === ev.timeouts_enabled && prev && sameRecord(prev, entry.status)) {
     return;
   }
   knownProviders = {
-    enabled: true,
+    enabled: ev.timeouts_enabled,
     providers: { ...knownProviders.providers, [entry.provider]: entry.status },
   };
   renderStatus();
@@ -449,7 +457,7 @@ function renderStatus(): void {
   const btn = $.statusBtn;
   const activities = [...knownActivities.values()];
   const alerts = [...knownAlerts.values()];
-  const ongoing = timedOutProviders(knownProviders);
+  const ongoing = unavailableProviders(knownProviders);
 
   publishRunningScans(activities);
   reconcileStoppingOverlay(activities);
@@ -836,7 +844,9 @@ function buildPopupItems(
       if (!p) {
         continue;
       }
-      const err = p.last_error ?? `${p.recent_failures} failures`;
+      const err = p.disabled
+        ? `disabled: credentials rejected${p.disabled_reason ? ` (${p.disabled_reason})` : ""}`
+        : (p.last_error ?? `${p.recent_failures} failures`);
       items.push({
         key: `prov-${name}`,
         build: () =>

@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // errStore is a PollerStore whose DeleteStateByPaths always fails, used to
@@ -34,7 +35,7 @@ func tempVideo(t *testing.T) string {
 }
 
 // importPoller builds a Poller (with mock deps) and a LiveState wired to the
-// given search engine, for processPollImport tests.
+// given search engine, for single-import tests.
 func importPoller(engine importSearcher) (*Poller, *LiveState) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
@@ -53,7 +54,7 @@ func movieImportResult() (*ImportResult, error) {
 
 // --- file-existence / path-validation gate ---
 
-func TestProcessPollImport_file_gone(t *testing.T) {
+func TestImport_file_gone(t *testing.T) {
 	store := &mockStore{}
 	deps := Deps{
 		PollCache:  newTestPollCache(),
@@ -62,6 +63,8 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
@@ -70,7 +73,7 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 
-	p.processPollImport(t.Context(), ls, "/nonexistent/video.mkv",
+	importOne(t.Context(), p, ls, "/nonexistent/video.mkv",
 		func() (*ImportResult, error) {
 			t.Fatal("buildFn should not be called when file is gone")
 			return nil, nil
@@ -87,12 +90,12 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 }
 
 // A failed DeleteStateByPaths cleanup (video file gone) must be WARN-logged.
-func TestProcessPollImport_warns_when_cleanup_errors(t *testing.T) {
+func TestImport_warns_when_cleanup_errors(t *testing.T) {
 	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(errStore{}), stateFunc: func() *LiveState { return ls }}
-	p.processPollImport(t.Context(), ls, "/nonexistent/cleanup-err.mkv",
+	importOne(t.Context(), p, ls, "/nonexistent/cleanup-err.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") == 0 {
@@ -101,12 +104,12 @@ func TestProcessPollImport_warns_when_cleanup_errors(t *testing.T) {
 }
 
 // A successful cleanup must not emit the cleanup-failed WARN.
-func TestProcessPollImport_silent_when_cleanup_ok(t *testing.T) {
+func TestImport_silent_when_cleanup_ok(t *testing.T) {
 	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.processPollImport(t.Context(), ls, "/nonexistent/cleanup-ok.mkv",
+	importOne(t.Context(), p, ls, "/nonexistent/cleanup-ok.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") > 0 {
@@ -116,7 +119,7 @@ func TestProcessPollImport_silent_when_cleanup_ok(t *testing.T) {
 
 // --- search + arr-notify path ---
 
-func TestProcessPollImport_search_success(t *testing.T) {
+func TestImport_search_success(t *testing.T) {
 	tmp := t.TempDir()
 	videoPath := filepath.Join(tmp, "video.mkv")
 	if err := os.WriteFile(videoPath, []byte("fake"), 0o644); err != nil {
@@ -133,6 +136,8 @@ func TestProcessPollImport_search_success(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     evts,
 		StatsCache: statsCache,
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
@@ -143,7 +148,7 @@ func TestProcessPollImport_search_success(t *testing.T) {
 	}
 
 	req := &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, Title: "Test"}
-	p.processPollImport(t.Context(), ls, videoPath,
+	importOne(t.Context(), p, ls, videoPath,
 		func() (*ImportResult, error) {
 			return &ImportResult{
 				Req:       req,
@@ -168,12 +173,12 @@ func TestProcessPollImport_search_success(t *testing.T) {
 }
 
 // refreshFn (arr rescan notify) runs only when subtitle paths were downloaded.
-func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
+func TestImport_calls_refreshFn_when_paths_present(t *testing.T) {
 	video := tempVideo(t)
 	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	calls := 0
-	p.processPollImport(t.Context(), ls, video,
+	importOne(t.Context(), p, ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { calls++; return nil })
 	if calls != 1 {
@@ -182,12 +187,12 @@ func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 }
 
 // A coverage-only change with no downloaded paths must not notify arr.
-func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
+func TestImport_skips_refreshFn_when_no_paths(t *testing.T) {
 	video := tempVideo(t)
 	engine := &mockEngine{result: subflux.SearchResult{CoverageChanged: true}}
 	p, ls := importPoller(engine)
 	calls := 0
-	p.processPollImport(t.Context(), ls, video,
+	importOne(t.Context(), p, ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { calls++; return nil })
 	if calls != 0 {
@@ -196,12 +201,12 @@ func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 }
 
 // A failed arr refresh notification must be WARN-logged.
-func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
+func TestImport_warns_when_refresh_errors(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
 	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
-	p.processPollImport(t.Context(), ls, video,
+	importOne(t.Context(), p, ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return errors.New("notify boom") })
 	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") == 0 {
@@ -210,12 +215,12 @@ func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 }
 
 // A successful arr refresh must not emit the notify-failed WARN.
-func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
+func TestImport_silent_when_refresh_ok(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
 	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
-	p.processPollImport(t.Context(), ls, video,
+	importOne(t.Context(), p, ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return nil })
 	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") > 0 {
@@ -226,7 +231,7 @@ func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 // A search that downloaded nothing and changed no coverage announces
 // nothing: the browser would refresh a row that did not change, and the stats
 // cache would be dropped for no reason.
-func TestProcessPollImport_no_change_publishes_nothing(t *testing.T) {
+func TestImport_no_change_publishes_nothing(t *testing.T) {
 	video := tempVideo(t)
 	deps := fullDeps(&mockStore{})
 	evts, cache := &mockEvents{}, &mockStatsCache{}
@@ -237,7 +242,7 @@ func TestProcessPollImport_no_change_publishes_nothing(t *testing.T) {
 	}
 	p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
-	p.processPollImport(t.Context(), ls, video, movieImportResult, nil)
+	importOne(t.Context(), p, ls, video, movieImportResult, nil)
 
 	if len(evts.published) != 0 {
 		t.Errorf("published %+v, want no coverage event for an empty search result", evts.published)
@@ -247,12 +252,45 @@ func TestProcessPollImport_no_change_publishes_nothing(t *testing.T) {
 	}
 }
 
-// --- processSonarrImport / processRadarrImport wiring + exclude-tag gating ---
+// shutdownEngine cancels the poller's context mid-search and fails with it.
+type shutdownEngine struct{ cancel context.CancelFunc }
 
-// processSonarrImport fetches series+episode by the entry's IDs, applies
+func (e shutdownEngine) SearchTargets(ctx context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
+	e.cancel()
+	return subflux.SearchResult{}, ctx.Err()
+}
+
+// A search cut short by the poller stopping is not a search failure: it logs
+// no ERROR and raises no alert.
+func TestImport_a_search_cut_by_shutdown_reports_nothing(t *testing.T) {
+	sink := capture.Default(t)
+	video := tempVideo(t)
+	deps := fullDeps(&mockStore{})
+	alerts := &mockAlerts{}
+	deps.Alerts = alerts
+	ctx, cancel := context.WithCancel(t.Context())
+	ls := &LiveState{
+		Cfg:    &mockCfg{interval: time.Second, langs: []string{"en"}},
+		Engine: shutdownEngine{cancel: cancel},
+	}
+	p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
+
+	importOne(ctx, p, ls, video, movieImportResult, nil)
+
+	if n := sink.CountLevel(slog.LevelError, "poll: subtitle search failed"); n != 0 {
+		t.Errorf("search-failed ERROR records = %d, want 0 for a shutdown", n)
+	}
+	if len(alerts.warns) != 0 {
+		t.Errorf("alerts = %v, want none for a shutdown", alerts.warns)
+	}
+}
+
+// --- resolveSonarrImport / resolveRadarrImport wiring + exclude-tag gating ---
+
+// resolveSonarrImport fetches series+episode by the entry's IDs, applies
 // exclude-tag gating, and only reaches the search phase (recording a "sonarr"
 // import metric) for a non-excluded item.
-func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
+func TestImport_sonarr_excludeTag_gates_search(t *testing.T) {
 	tests := []struct {
 		name       string
 		excludeIDs map[int]struct{}
@@ -278,7 +316,8 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 			entry := arrapi.HistoryRecord{SeriesID: 10, EpisodeID: 20, Data: map[string]string{"importedPath": video}}
-			p.processSonarrImport(t.Context(), ls, &entry, tt.excludeIDs)
+			pi := p.resolveSonarrImport(t.Context(), ls, &entry, tt.excludeIDs)
+			p.runImport(t.Context(), ls, &pi)
 
 			if !slices.Equal(metrics.imports, tt.want) {
 				t.Errorf("metrics.imports = %v, want %v", metrics.imports, tt.want)
@@ -287,10 +326,10 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 	}
 }
 
-// processRadarrImport fetches the movie by the entry's ID, applies exclude-tag
+// resolveRadarrImport fetches the movie by the entry's ID, applies exclude-tag
 // gating, and only reaches the search phase (recording a "radarr" import
 // metric) for a non-excluded item.
-func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
+func TestImport_radarr_excludeTag_gates_search(t *testing.T) {
 	tests := []struct {
 		name       string
 		excludeIDs map[int]struct{}
@@ -315,7 +354,8 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 			entry := arrapi.HistoryRecord{MovieID: 30, Data: map[string]string{"importedPath": video}}
-			p.processRadarrImport(t.Context(), ls, &entry, tt.excludeIDs)
+			pi := p.resolveRadarrImport(t.Context(), ls, &entry, tt.excludeIDs)
+			p.runImport(t.Context(), ls, &pi)
 
 			if !slices.Equal(metrics.imports, tt.want) {
 				t.Errorf("metrics.imports = %v, want %v", metrics.imports, tt.want)

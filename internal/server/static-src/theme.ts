@@ -31,8 +31,7 @@ export function cycle(): void {
   ensureController().cycle();
 }
 
-// choice returns the STORED preference ("light" | "dark" | "system") — the
-// user menu labels the cycle button with what clicking it switches TO.
+// choice returns the STORED preference ("light" | "dark" | "system").
 export function choice(): ThemeChoice {
   return ensureController().get();
 }

@@ -51,7 +51,7 @@ func TestExtractSegment(t *testing.T) {
 func newValidationHandler() *Handler {
 	return NewHandler(HandlerDeps{
 		StateFunc: func() (*HandlerState, *LiveState) { return &HandlerState{}, &LiveState{} },
-		ScanDeps:  func() *Deps { return &Deps{} },
+		ScanDeps:  func() *Deps { return &Deps{Media: &fakeMedia{}} },
 		BGTracker: &sync.WaitGroup{},
 	})
 }

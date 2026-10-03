@@ -193,6 +193,6 @@ func (*NopStore) DeleteStateByPaths(context.Context, []string) (subflux.CleanupR
 func (*NopStore) CleanupDrift(context.Context, subflux.ConfigDrift) error { return nil }
 
 // ReconcileState performs the three-way filesystem reconciliation pass.
-func (*NopStore) ReconcileState(context.Context) (subflux.ReconcileResult, error) {
+func (*NopStore) ReconcileState(context.Context, func(context.Context, string) (bool, error), func(string) (string, bool)) (subflux.ReconcileResult, error) {
 	return subflux.ReconcileResult{}, nil
 }

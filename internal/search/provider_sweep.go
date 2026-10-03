@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -12,16 +13,19 @@ import (
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
 // --- Provider sweep ---
 
-// searchProvider records failures/successes in the timeout tracker when
-// trackTimeout is true.
+// searchProvider queries one admitted provider for the automated sweep and
+// reports the outcome to the provider gate and the health tracker. A refused
+// credential or a rate limit is the gate's alone, so one fault never trips
+// both.
 func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
-	req *subflux.SearchRequest, trackTimeout bool,
+	req *subflux.SearchRequest,
 ) ([]subflux.Subtitle, subflux.ProviderID, error) {
 	start := time.Now()
 	subs, err := p.Search(ctx, req)
@@ -32,21 +36,20 @@ func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
 	if e.metrics != nil {
 		e.metrics.RecordSearch(name, dur, err)
 	}
+	e.observe(ctx, p, providergate.OpSearch, err)
 
 	if err != nil {
 		slog.Warn("provider search failed",
 			"provider", name,
 			"duration_ms", dur.Milliseconds(),
 			"error", err)
-		if trackTimeout {
+		if !gateOwned(err) {
 			e.timeout.RecordFailure(name, err)
 		}
 		return nil, name, err
 	}
 
-	if trackTimeout {
-		e.timeout.RecordSuccess(name)
-	}
+	e.timeout.RecordSuccess(name)
 
 	slog.Debug("provider search complete",
 		"provider", name,
@@ -54,6 +57,38 @@ func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
 		"duration_ms", dur.Milliseconds())
 
 	return subs, name, nil
+}
+
+// admit asks the gate whether p may be called for op now and, when it may,
+// brings p's answer about its optional setting in line with the gate before
+// the call.
+func (e *Engine) admit(p provider.Provider, op providergate.Op) (ok bool, reason string) {
+	if ok, reason = e.providerGate.Admit(p.Name(), op); ok {
+		if sr, isReporter := p.(provider.SettingReporter); isReporter {
+			e.providerGate.PrepareSetting(p.Name(), sr)
+		}
+	}
+	return ok, reason
+}
+
+// observe reports one provider call to the gate, then what the provider says
+// the upstream answered about its optional setting. The write outlives the
+// caller's cancellation, so a recorded failure is never lost to a hang-up.
+func (e *Engine) observe(ctx context.Context, p provider.Provider, op providergate.Op, err error) {
+	e.providerGate.Observe(context.WithoutCancel(ctx), p.Name(), op, err)
+	if sr, ok := p.(provider.SettingReporter); ok {
+		e.providerGate.ObserveSetting(p.Name(), sr)
+	}
+}
+
+// gateOwned reports whether err is a refused credential or a rate limit, the
+// two answers the provider gate owns.
+func gateOwned(err error) bool {
+	if _, ok := errors.AsType[*subflux.AuthError](err); ok {
+		return true
+	}
+	_, ok := errors.AsType[*subflux.RateLimitError](err)
+	return ok
 }
 
 // searchProvidersFiltered coalesces concurrent calls with identical request
@@ -142,18 +177,26 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 	g := new(errgroup.Group)
 	g.SetLimit(e.providerConcurrency())
 
+	skip := func(name subflux.ProviderID, outcome providerOutcome) {
+		mu.Lock()
+		provResults = append(provResults, providerResult{name: name, outcome: outcome})
+		mu.Unlock()
+	}
 	for _, p := range providers {
-		if e.timeout.IsTimedOut(p.Name()) {
-			mu.Lock()
-			provResults = append(provResults, providerResult{
-				name: p.Name(), outcome: providerTimeout,
-			})
-			mu.Unlock()
-			continue
-		}
-
+		// Go blocks until a slot is free, and an admission claims a probe
+		// slot that expires, so both checks run only once the call can start.
 		g.Go(func() error {
-			subs, name, err := e.searchProvider(ctx, p, req, true)
+			if e.timeout.IsTimedOut(p.Name()) {
+				skip(p.Name(), providerTimeout)
+				return nil
+			}
+			if ok, reason := e.admit(p, providergate.OpSearch); !ok {
+				slog.Debug("provider gated, skipping",
+					"provider", p.Name(), "reason", reason, "media", logsafe.Field(req.MediaLabel()))
+				skip(p.Name(), providerGated)
+				return nil
+			}
+			subs, name, err := e.searchProvider(ctx, p, req)
 			collect(subs, name, err)
 			return nil
 		})
@@ -172,16 +215,23 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 	}
 }
 
+// downloadFromProvider fetches one subtitle through the provider gate. A
+// refusal is ErrProviderGated carrying the gate's reason, and no request is
+// made.
 func (e *Engine) downloadFromProvider(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	p, ok := e.providersByName[sub.Provider]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrProviderNotFound, sub.Provider)
+	}
+	if ok, reason := e.admit(p, providergate.OpDownload); !ok {
+		return nil, fmt.Errorf("%w: %s: %s", ErrProviderGated, p.Name(), reason)
 	}
 	start := time.Now()
 	data, err := p.Download(ctx, sub)
 	if e.metrics != nil {
 		e.metrics.RecordDownload(p.Name(), err)
 	}
+	e.observe(ctx, p, providergate.OpDownload, err)
 	if err != nil {
 		return nil, err
 	}

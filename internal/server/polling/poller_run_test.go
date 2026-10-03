@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // --- Mock implementations ---
@@ -162,6 +163,8 @@ func TestPollOnce_sonarr_nil_radarr_nil(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
@@ -183,6 +186,8 @@ func TestPollOnce_sonarr_no_events(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
@@ -208,6 +213,8 @@ func TestPollOnce_returns_zero_when_no_events(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Radarr: radarr}
@@ -242,15 +249,17 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 		Alerts:     &mockAlerts{},
 		Events:     &mockEvents{},
 		StatsCache: &mockStatsCache{},
+		Media:      testsupport.MediaWriter(),
+		Presence:   testsupport.MediaPresence("/"),
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(deps, func() *LiveState { return ls })
 
 	// Both entries' paths are missing on disk and will skip out of
-	// processPollImport; the count we care about is the entries-observed
-	// count from the HistorySince response, not the imports-applied
-	// count. Adaptive burst keys off the former.
+	// resolveImport; the count we care about is the new entries the
+	// HistorySince response carried, not the imports-applied count.
+	// Adaptive burst keys off the former.
 	if n := p.PollOnce(t.Context()); n != 2 {
 		t.Errorf("PollOnce with 2 sonarr entries: got %d, want 2", n)
 	}
@@ -513,10 +522,12 @@ func TestDetect_fetches_while_batch_queued(t *testing.T) {
 		t.Fatalf("first detect = %d, want 1", got)
 	}
 	// Batch 1 is queued, NOT executed. Detection must still run: the mock
-	// returns the same entry regardless of since, so a second detect
-	// observing it proves the fetch happened while work was pending.
-	if got := p.detectSonarr(t.Context(), ls); got != 1 {
-		t.Fatalf("second detect while batch queued = %d, want 1 (detection must not block on execution)", got)
+	// returns the same entry regardless of since, so a second queued batch
+	// proves the fetch happened while work was pending. The entry is not new
+	// the second time, so it counts as no activity.
+	if got := p.detectSonarr(t.Context(), ls); got != 0 || len(p.work) != 2 {
+		t.Fatalf("second detect while batch queued = %d new, %d queued batches; want 0 and 2 (detection must not block on execution)",
+			got, len(p.work))
 	}
 }
 

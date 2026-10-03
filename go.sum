@@ -2,8 +2,8 @@ github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBq
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
 github.com/cplieger/arrapi/v2 v2.1.0 h1:fNP5dIqyD/6zgKbj/ujpCY/PEfPINScY0mTdsTGMd4g=
 github.com/cplieger/arrapi/v2 v2.1.0/go.mod h1:OYgYksuBRcroa59yFV+2PsdIlur9qY9miNZrpP/03ys=
-github.com/cplieger/atomicfile/v3 v3.1.0 h1:jcDzYnT6nvhIqbo3w9g0Wnkeca8r0ofs0hy6+xQmwo4=
-github.com/cplieger/atomicfile/v3 v3.1.0/go.mod h1:jhxOw5RQn5pYB0eAo5SLRPXKYChRxT/bW/TnTcLZa78=
+github.com/cplieger/atomicfile/v4 v4.0.0 h1:7aZN3rFHFGPLCboxo2ZWymRpV5qGlOxQW59v5o1N1BY=
+github.com/cplieger/atomicfile/v4 v4.0.0/go.mod h1:DZYrfbJDbS/gL4QWu4Uh3ddaWNoUYrW9zg3qiMZpaY0=
 github.com/cplieger/auth/v6 v6.0.1 h1:LndlTRp3VybDEKWTYu0MTXPgORnmAL69lpTlVgWakFg=
 github.com/cplieger/auth/v6 v6.0.1/go.mod h1:4fMnHApkD2D7cu7bXu5lmKpSterN8T7VZTo399Q6u90=
 github.com/cplieger/envx/v2 v2.0.3 h1:5FPj605yQWeYxGsKd1ZDisLfrOPIFRuLq6le2dNoYdQ=

@@ -21,11 +21,13 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/wiring"
 )
 
 // --- Fixtures ---
@@ -81,23 +83,45 @@ type closableArrClient struct {
 
 func (c *closableArrClient) Close() { c.closed++ }
 
-// okWire is a wiring.Func that always succeeds with one stub provider.
-func okWire(_ context.Context, _ *config.Config, _ search.Store, _ search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
-	return nil, nil, []provider.Provider{&stubProvider{name: "mock"}}, nil
+// okWire is a wiring.Func that always succeeds with one stub provider, bound
+// to gate.
+func okWire(gate *providergate.Gate) wiring.Func {
+	return func(context.Context, *config.Config, search.Store, search.Metrics) (wiring.Result, error) {
+		return wiring.Result{Providers: []provider.Provider{&stubProvider{name: "mock"}}, Binding: gate.Bind(nil)}, nil
+	}
+}
+
+// failWire is a wiring.Func that always fails.
+func failWire(context.Context, *config.Config, search.Store, search.Metrics) (wiring.Result, error) {
+	return wiring.Result{}, errMock
+}
+
+// attachTestGate gives s a memory-only credential gate and the provider
+// publisher New would have built, and returns the gate.
+func attachTestGate(t *testing.T, s *Server) *providergate.Gate {
+	t.Helper()
+	gate, err := providergate.Open(t.Context(), providergate.Config{Metrics: testsupport.NopGateMetrics{}})
+	if err != nil {
+		t.Fatalf("providergate.Open: %v", err)
+	}
+	s.gate = gate
+	s.publishProvider = NewProviderPublisher(s.events, s.providerStatusFor)
+	return gate
 }
 
 // newActivationTestServer builds the minimal Server the activation path
-// touches: snapshot, wiring, arr factories, metrics, events, alerts, and a
-// worker-launch counter injected into the latch seam.
+// touches: snapshot, wiring, arr factories, metrics, events, alerts, the media
+// writer, and a worker-launch counter injected into the latch seam.
 func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 	t.Helper()
 	launches := 0
 	s = &Server{
-		db:      &qhMockStore{},
-		metrics: obs.New(),
-		events:  events.New(0, nil),
-		alerts:  activity.NewAlertLog(100),
-		wire:    okWire,
+		db:       &qhMockStore{},
+		metrics:  obs.New(),
+		events:   events.New(0, nil),
+		alerts:   activity.NewAlertLog(100),
+		media:    testsupport.MediaWriter(),
+		presence: testsupport.MediaPresence(),
 		newSonarr: func(_, _ string, _ *arrsvc.ReadGate) (SonarrClient, error) {
 			return &closableArrClient{}, nil
 		},
@@ -108,6 +132,7 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 		lifetime:      t.Context(),
 	}
 	s.live.Store(&liveState{})
+	s.wire = okWire(attachTestGate(t, s))
 	return s, &launches
 }
 
@@ -265,12 +290,8 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 		cfg         activationCfg
 	}{
 		{
-			name: "wire failure",
-			breakServer: func(s *Server) {
-				s.wire = func(context.Context, *config.Config, search.Store, search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
-					return nil, nil, nil, errMock
-				}
-			},
+			name:        "wire failure",
+			breakServer: func(s *Server) { s.wire = failWire },
 		},
 		{
 			name: "sonarr construction failure",
@@ -356,9 +377,8 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	s.wire = func(context.Context, *config.Config, search.Store, search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
-		return nil, nil, nil, errMock
-	}
+	working := s.wire
+	s.wire = failWire
 	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err == nil {
 		t.Fatal("hotReload with failing wire: error = nil, want error")
 	}
@@ -366,7 +386,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 		t.Fatalf("worker launches after failed activation = %d, want 0", *launches)
 	}
 
-	s.wire = okWire
+	s.wire = working
 	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err != nil {
 		t.Fatalf("hotReload after fixing wire: error = %v", err)
 	}
@@ -562,7 +582,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s.db = &qhMockStore{}
 	s.metrics = obs.New()
 	s.events = events.New(0, nil)
-	s.wire = okWire
+	s.wire = okWire(attachTestGate(t, s))
 	s.newSonarr = func(_, _ string, _ *arrsvc.ReadGate) (SonarrClient, error) { return dummyArrClient{}, nil }
 	s.newRadarr = func(_, _ string, _ *arrsvc.ReadGate) (RadarrClient, error) { return dummyArrClient{}, nil }
 	s.launchWorkers = func() {}

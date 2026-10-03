@@ -215,3 +215,65 @@ func TestIdentityTitleOK_release_name_fallback_dropped(t *testing.T) {
 		t.Errorf("IdentityTitleOK(title-matched, mismatching release) = %v, want false", got)
 	}
 }
+
+func TestIdentityOK_release_name_episode_marker(t *testing.T) {
+	t.Parallel()
+	s01e01 := subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, Title: "Unforgotten", Season: 1, Episode: 1}
+	tests := []struct {
+		name string
+		sub  subflux.Subtitle
+		req  subflux.SearchRequest
+		want bool
+	}{
+		{
+			name: "request-copied numbers cannot rescue another episode's release",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01E06.720p.HDTV.x264-ORGANiC", Season: 1, Episode: 1, MatchedBy: subflux.MatchByIMDB},
+			req:  s01e01, want: false,
+		},
+		{
+			name: "another episode without metadata",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01E06.720p.HDTV.x264-ORGANiC"},
+			req:  s01e01, want: false,
+		},
+		{
+			name: "the requested episode",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01E01.720p.HDTV.x264-ORGANiC", Season: 1, Episode: 1, MatchedBy: subflux.MatchByIMDB},
+			req:  s01e01, want: true,
+		},
+		{
+			name: "a season pack claims no episode",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01.720p.HDTV.x264-ORGANiC", Season: 1, Episode: 1, MatchedBy: subflux.MatchByIMDB},
+			req:  s01e01, want: true,
+		},
+		{
+			name: "a range covering the episode",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01E01E02.720p.HDTV.x264-ORGANiC", Season: 1, Episode: 1, MatchedBy: subflux.MatchByIMDB},
+			req:  s01e01, want: true,
+		},
+		{
+			name: "a hash match on a contradicting name",
+			sub:  subflux.Subtitle{ReleaseName: "Unforgotten.S01E06.720p.HDTV.x264-ORGANiC", MatchedBy: subflux.MatchByHash},
+			req:  s01e01, want: true,
+		},
+		{
+			name: "absolute numbering matches",
+			sub:  subflux.Subtitle{ReleaseName: "Show.S01E13.1080p.WEB-DL", Season: 2, Episode: 1, MatchedBy: subflux.MatchByIMDB},
+			req:  subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, Title: "Show", Season: 2, Episode: 1, AbsoluteEpisode: 13},
+			want: true,
+		},
+		{
+			name: "a movie request ignores episode markers",
+			sub:  subflux.Subtitle{ReleaseName: "Movie.S01E06.2019.1080p"},
+			req:  subflux.SearchRequest{MediaType: subflux.MediaTypeMovie},
+			want: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IdentityOK(&tc.sub, &tc.req); got != tc.want {
+				t.Errorf("IdentityOK(%q) = %v, want %v", tc.sub.ReleaseName, got, tc.want)
+			}
+		})
+	}
+}

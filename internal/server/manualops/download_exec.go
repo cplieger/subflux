@@ -8,10 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/atomicfile/v3"
-	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/mediaid"
-	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
@@ -20,12 +18,12 @@ import (
 // DownloadTimeout bounds a single manual download's run.
 const DownloadTimeout = 5 * time.Minute
 
-// RunDownload performs the download, post-processing, and save. actID is
-// the download's activity entry: on success its detail is updated with the
-// saved subtitle path, which is how the remote CLI's poll loop learns where
-// the file landed. Returns true on success.
+// RunDownload performs the download, post-processing, and the save through
+// media. actID is the download's activity entry: on success its detail is
+// updated with the saved subtitle path, which is how the remote CLI's poll
+// loop learns where the file landed. Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	prov provider.Provider, req *DownloadRequest, actID string,
+	media MediaWriter, req *DownloadRequest, actID string,
 ) bool {
 	sub := subflux.Subtitle{
 		Provider:    req.Provider,
@@ -37,7 +35,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		HearingImp:  req.HearingImp,
 		Forced:      req.Forced,
 	}
-	data, err := prov.Download(ctx, &sub)
+	data, err := ls.Engine.Download(ctx, &sub)
 	if err != nil {
 		slog.Error("manual download failed",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
@@ -77,8 +75,18 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	// reservation so no remote call runs under the gate.
 	title := LookupMediaTitle(ctx, ls, mediaType, req.ArrID)
 
-	subPath, ok := commitNumberedSubtitle(ctx, deps, db, req, historyMediaID, title, variant, data)
-	if !ok {
+	subPath, werr := commitNumberedSubtitle(ctx, deps, db, media, req, historyMediaID, title, variant, data)
+	if werr != nil {
+		detail := fmt.Sprintf("Could not save the subtitle at %s: %v", subPath, werr)
+		if uerr, ok := errors.AsType[*mediawrite.UnwritableError](werr); ok {
+			detail = fmt.Sprintf("Could not save the subtitle in %s: %v", uerr.Folder, uerr.Err)
+		}
+		deps.Activity.Progress(actID, 0, 0, detail)
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  "Write failed for manual subtitle download",
+			UI:     "Write failed for subtitle download",
+		})
 		return false
 	}
 
@@ -110,18 +118,15 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 }
 
 // commitNumberedSubtitle allocates the quad's next ordinal, writes the
-// subtitle bytes to the numbered path, and records the download in
-// history, all under the quad's downloadPathGate reservation. Holding the
-// gate across allocation, atomic write, AND history insertion is the
-// point: ordinal discovery (NextManualNumber reads the recorded paths)
-// always sees the previous holder's committed row, so two concurrent
-// downloads for the same quad can never claim the same number and
-// overwrite each other's file. Only local disk and bbolt work runs under
-// the gate. Returns ok=false only when the file write failed; a
-// history-recording failure warns and keeps the saved file.
-func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore,
+// subtitle to the numbered path and records it in history, all under the
+// quad's downloadPathGate reservation: ordinal discovery reads the recorded
+// paths, so holding the gate across all three is what keeps two concurrent
+// downloads off one number. Only local disk and bbolt work runs under it.
+// The error is the write's, returned with the path it targeted; a history
+// failure warns and keeps the saved file.
+func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore, media MediaWriter,
 	req *DownloadRequest, historyMediaID, title string, variant subflux.Variant, data []byte,
-) (subPath string, ok bool) {
+) (subPath string, err error) {
 	unlock := downloadPathGate.lock(downloadQuadKey(req.MediaType, historyMediaID, req.Language, variant))
 	defer unlock()
 
@@ -134,19 +139,8 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	subPath = subtitlefile.ManualPath(req.VideoPath(), n,
 		subtitlefile.Tags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
-	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles
-	// with ReadBounded(MaxSyncSubSize == httpwire.MaxDownloadBytes), so a
-	// post-processed payload the read path would refuse must fail here,
-	// loudly, instead of landing on disk.
-	if _, err := atomicfile.WriteFile(ctx, subPath, data,
-		atomicfile.WithMaxBytes(httpwire.MaxDownloadBytes)); err != nil {
-		slog.Error("manual download: write failed", "path", subPath, "error", err)
-		NotifyError(deps, ErrorNotice{
-			Source: alertSourceManual,
-			Alert:  "Write failed for manual subtitle download",
-			UI:     "Write failed for subtitle download",
-		})
-		return "", false
+	if err := media.WriteFile(ctx, subPath, data); err != nil {
+		return subPath, err
 	}
 
 	slog.Info("manual download saved", "path", subPath, "number", n)
@@ -175,7 +169,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		slog.Warn("failed to record manual download", "error", err)
 		deps.Alerts.RecordWarn(alertSourceManual, "Download saved but history recording failed")
 	}
-	return subPath, true
+	return subPath, nil
 }
 
 // ResolveMediaIDs resolves the coverage and history media IDs for a manual download.

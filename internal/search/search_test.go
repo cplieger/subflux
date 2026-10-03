@@ -205,58 +205,57 @@ func TestEngine_timeout_noop_when_disabled(t *testing.T) {
 	}
 }
 
-// --- ProviderTimeouts ---
+// --- ProviderStatus ---
 
-func TestEngine_ProviderTimeouts_nil_timeout(t *testing.T) {
+func TestEngine_ProviderStatus_reports_timeouts_disabled(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: 0}}
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	status, ok := e.ProviderTimeouts()
-	if ok {
-		t.Error("ProviderTimeouts() ok = true, want false when timeout disabled")
+	status, enabled := e.ProviderStatus()
+	if enabled {
+		t.Error("ProviderStatus() timeoutsEnabled = true, want false when timeouts are disabled")
 	}
-	if status != nil {
-		t.Errorf("ProviderTimeouts() status = %v, want nil", status)
+	if status == nil || len(status) != 0 {
+		t.Errorf("ProviderStatus() status = %v, want an empty map", status)
 	}
 }
 
-func TestEngine_ProviderTimeouts_enabled(t *testing.T) {
+func TestEngine_ProviderStatus_reports_timeouts_enabled(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
+	e.timeout.RecordFailure("prov1", nil)
 
-	status, ok := e.ProviderTimeouts()
-	if !ok {
-		t.Error("ProviderTimeouts() ok = false, want true when timeout enabled")
+	status, enabled := e.ProviderStatus()
+	if !enabled {
+		t.Error("ProviderStatus() timeoutsEnabled = false, want true when timeouts are enabled")
 	}
-	if status == nil {
-		t.Error("ProviderTimeouts() status = nil, want non-nil")
+	if got := status["prov1"].RecentFailures; got != 1 {
+		t.Errorf("ProviderStatus()[prov1].RecentFailures = %d, want 1", got)
 	}
 }
 
-// --- ResetTimeouts ---
+// --- ResetProviderState ---
 
-func TestEngine_ResetTimeouts_nil_timeout_noop(t *testing.T) {
+func TestEngine_ResetProviderState_with_timeouts_disabled_does_not_panic(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: 0}}
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
-
-	// Should not panic when timeout is nil.
-	e.ResetTimeouts()
+	e.ResetProviderState(t.Context())
 }
 
-func TestEngine_ResetTimeouts_clears_state(t *testing.T) {
+func TestEngine_ResetProviderState_clears_timeouts(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	e.timeout.RecordFailure("prov1", nil)
-	e.ResetTimeouts()
+	e.ResetProviderState(t.Context())
 
-	status, _ := e.ProviderTimeouts()
+	status, _ := e.ProviderStatus()
 	if len(status) != 0 {
-		t.Errorf("ProviderTimeouts() after reset = %d entries, want 0", len(status))
+		t.Errorf("ProviderStatus() after reset = %d entries, want 0", len(status))
 	}
 }
 

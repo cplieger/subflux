@@ -3,10 +3,15 @@ package search
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
@@ -120,8 +125,8 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	}
 	subPath, saveHI, data := e.postProcessSub(data, best, videoPath, lang, variant)
 
-	if err := e.fileWriter.WriteFile(ctx, subPath, data); err != nil {
-		return "", err
+	if err := e.media.WriteFile(ctx, subPath, data); err != nil {
+		return "", &saveError{err: err}
 	}
 
 	e.persistDownload(ctx, req, best, subPath, videoPath, mediaType, mediaID, lang, syncOffsetMs, saveHI)
@@ -148,6 +153,9 @@ func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest
 		}
 	}
 
+	if e.metrics != nil {
+		e.metrics.RecordSubtitleSaved(best.sub.Provider)
+	}
 	slog.Info("subtitle saved",
 		"media", logsafe.Field(req.MediaLabel()), "media_type", mediaType,
 		"lang", lang, "provider", best.sub.Provider,
@@ -175,6 +183,13 @@ func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest
 	}
 }
 
+// saveError marks a failure of the subtitle write itself, as opposed to the
+// download or the content check before it.
+type saveError struct{ err error }
+
+func (e *saveError) Error() string { return "save subtitle: " + e.err.Error() }
+func (e *saveError) Unwrap() error { return e.err }
+
 // postProcessSub returns the effective HI flag after strip-HI logic, which
 // may differ from the input subtitle's HearingImp flag.
 func (e *Engine) postProcessSub(data []byte, best *scoredSub,
@@ -199,37 +214,83 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	return subPath, saveHI, processed
 }
 
+// downloadBestCandidate tries candidates in rank order until one is saved.
+// Up to DownloadMaxAttempts ordinary failures (an over-cap file included)
+// are spent; a gated candidate costs none, and a refused credential or rate
+// limit skips that provider's other candidates. An unwritable folder ends it
+// as targetWriteBlocked, with the fault when this save learned it; any other
+// write failure is the target path's, which no candidate can change, so it
+// ends as targetDownloadFailed. A stop ends it the same way, with nothing
+// logged, because no candidate failed.
 func (e *Engine) downloadBestCandidate(ctx context.Context, req *subflux.SearchRequest,
 	candidates []scoredSub, videoPath string, mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant, label string,
-) string {
+) (path string, res targetResult, writeFailure *mediawrite.UnwritableError) {
 	maxAttempts := e.cfg.Search().DownloadMaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = subflux.DefaultDownloadMaxAttempts
 	}
-	limit := min(len(candidates), maxAttempts)
-	for i := range limit {
+	attempts := 0
+	skipped := make(map[subflux.ProviderID]bool)
+	for i := range candidates {
 		if ctx.Err() != nil {
-			return ""
+			return "", targetDownloadFailed, nil
 		}
-		path, err := e.downloadAndSave(ctx, req, &candidates[i],
-			videoPath, mediaType, mediaID, lang, variant)
-		if err != nil {
+		if attempts == maxAttempts {
+			break
+		}
+		c := &candidates[i]
+		if skipped[c.sub.Provider] {
+			continue
+		}
+		if _, blocked := e.media.Blocked(videoPath); blocked {
+			return "", targetWriteBlocked, nil
+		}
+		path, err := e.downloadAndSave(ctx, req, c, videoPath, mediaType, mediaID, lang, variant)
+		var save *saveError
+		var unwritable *mediawrite.UnwritableError
+		switch {
+		case err == nil:
+			return path, targetSaved, nil
+		case ctx.Err() != nil:
+			return "", targetDownloadFailed, nil
+		case errors.As(err, &unwritable):
+			return "", targetWriteBlocked, unwritable
+		case errors.As(err, &save) && !errors.Is(err, atomicfile.ErrFileTooLarge):
+			slog.Debug("subtitle not saved, target retried next cycle",
+				"media", label, "lang", lang, "variant", variant, "error", err)
+			return "", targetDownloadFailed, nil
+		case errors.Is(err, ErrProviderGated):
+			skipped[c.sub.Provider] = true
+			slog.Debug("download candidate gated, trying next",
+				"media", label, "lang", lang, "variant", variant,
+				"provider", c.sub.Provider, "error", err)
+		case gateOwned(err):
+			skipped[c.sub.Provider] = true
+			slog.Warn("download refused by provider, skipping its candidates",
+				"media", label, "lang", lang, "variant", variant,
+				"provider", c.sub.Provider, "error", err)
+		default:
+			attempts++
 			slog.Warn("download attempt failed, trying next",
 				"media", label, "lang", lang,
 				"variant", variant,
-				"provider", candidates[i].sub.Provider,
-				"release", logsafe.Field(candidates[i].sub.ReleaseName),
-				"score", candidates[i].score,
-				"attempt", i+1, "remaining", limit-i-1,
+				"provider", c.sub.Provider,
+				"release", logsafe.Field(c.sub.ReleaseName),
+				"score", c.score,
+				"attempt", attempts, "remaining", min(maxAttempts-attempts, len(candidates)-i-1),
 				"error", err)
-			continue
 		}
-		return path
+	}
+	if attempts == 0 {
+		slog.Info("no download candidate could be tried",
+			"media", label, "lang", lang, "variant", variant,
+			"candidates", len(candidates), "providers_skipped", slices.Sorted(maps.Keys(skipped)))
+		return "", targetDownloadFailed, nil
 	}
 	slog.Error("all download attempts failed",
 		"media", label, "lang", lang,
 		"variant", variant,
 		"candidates", len(candidates),
-		"attempted", limit)
-	return ""
+		"attempted", attempts)
+	return "", targetDownloadFailed, nil
 }

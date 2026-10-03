@@ -100,6 +100,7 @@ type mockMetrics struct {
 	downloads     atomic.Int64
 	adaptiveSkips atomic.Int64
 	detectorErrs  atomic.Int64
+	saved         atomic.Int64
 }
 
 func (m *mockMetrics) RecordSearch(_ subflux.ProviderID, _ time.Duration, _ error) { m.searches.Add(1) }
@@ -108,11 +109,12 @@ func (m *mockMetrics) RecordDownload(_ subflux.ProviderID, _ error) { m.download
 
 func (m *mockMetrics) AdaptiveSkip() { m.adaptiveSkips.Add(1) }
 
-func (m *mockMetrics) RecordEmbeddedDetectorError()         { m.detectorErrs.Add(1) }
-func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration) {}
-func (m *mockMetrics) RecordImport(_ subflux.PollKey)       {}
-func (m *mockMetrics) TotalSearches() int64                 { return m.searches.Load() }
-func (m *mockMetrics) Handler() http.HandlerFunc            { return nil }
+func (m *mockMetrics) RecordEmbeddedDetectorError()           { m.detectorErrs.Add(1) }
+func (m *mockMetrics) RecordSubtitleSaved(subflux.ProviderID) { m.saved.Add(1) }
+func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration)   {}
+func (m *mockMetrics) RecordImport(_ subflux.PollKey)         {}
+func (m *mockMetrics) TotalSearches() int64                   { return m.searches.Load() }
+func (m *mockMetrics) Handler() http.HandlerFunc              { return nil }
 
 type mockProvider struct {
 	name        string
@@ -171,5 +173,6 @@ func newEngine(providers []provider.Provider, db Store, cfg Cfg,
 	m Metrics, sc Scorer, syncer SubtitleSyncer, tracks TrackDetector,
 ) *Engine {
 	return New(providers, WithStore(db), WithConfig(cfg),
-		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks))
+		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks),
+		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
 }

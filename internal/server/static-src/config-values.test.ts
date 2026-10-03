@@ -18,6 +18,8 @@ import {
   cfgScalar,
   cfgList,
   cfgProviderBlock,
+  cfgSecretPresent,
+  cfgLanguageRules,
 } from "./config-values.js";
 
 beforeEach(() => {
@@ -209,5 +211,79 @@ describe("cfgProviderBlock", () => {
     });
 
     expect(cfgProviderBlock("subdl")).toStrictEqual({});
+  });
+});
+
+describe("cfgSecretPresent", () => {
+  it("answers from the presence list the structured GET carries", () => {
+    setCfgSections({}, ["sonarr.api_key", "auth.oidc.client_secret"]);
+
+    expect(cfgSecretPresent("auth.oidc.client_secret")).toBe(true);
+    expect(cfgSecretPresent("radarr.api_key")).toBe(false);
+  });
+
+  it("forgets the previous list when the sections are replaced", () => {
+    setCfgSections({}, ["sonarr.api_key"]);
+    setCfgSections({});
+
+    expect(cfgSecretPresent("sonarr.api_key")).toBe(false);
+  });
+});
+
+describe("cfgLanguageRules", () => {
+  it("returns no lists when the languages section is absent", () => {
+    expect(cfgLanguageRules()).toStrictEqual({});
+  });
+
+  it("reads rules and defaults with every target field the config declares", () => {
+    const target = {
+      code: "en",
+      variant: "hi",
+      min_score: 70,
+      variants: ["standard"],
+      providers: ["opensubtitles"],
+      exclude: ["yifysubtitles"],
+    };
+    setCfgSections({
+      languages: {
+        rules: [{ audio: "ja", subtitles: [target] }],
+        default: [{ code: "en" }, { code: "fr" }],
+      },
+    });
+
+    expect(cfgLanguageRules()).toStrictEqual({
+      rules: [{ audio: "ja", subtitles: [{ raw: target, typed: target }] }],
+      default: [
+        { raw: { code: "en" }, typed: { code: "en" } },
+        { raw: { code: "fr" }, typed: { code: "fr" } },
+      ],
+    });
+  });
+
+  it("keeps a stored value the typed reading drops, such as an environment reference", () => {
+    setCfgSections({
+      languages: { default: [{ code: "en", min_score: "${SUBFLUX_MIN_SCORE}" }] },
+    });
+
+    expect(cfgLanguageRules().default).toStrictEqual([
+      { raw: { code: "en", min_score: "${SUBFLUX_MIN_SCORE}" }, typed: { code: "en" } },
+    ]);
+  });
+
+  it("drops entries of the wrong shape rather than coercing them", () => {
+    setCfgSections({
+      languages: {
+        rules: [
+          { audio: 3, subtitles: [] },
+          { audio: "en", subtitles: "fr" },
+        ],
+        default: [{ code: 7 }, "fr", null],
+      },
+    });
+
+    expect(cfgLanguageRules()).toStrictEqual({
+      rules: [{ audio: "en", subtitles: [] }],
+      default: [],
+    });
   });
 });

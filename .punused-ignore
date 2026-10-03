@@ -169,6 +169,10 @@ method UpdatePasskeyAfterLogin
 method (MatchMethod).String
 method (RegistryErrorKind).String
 method (SyncMethod).String
+# providergate.Binding asserts fmt.GoStringer beside fmt.Stringer
+# (binding.go), so %#v prints the provider count and never a bound setting.
+# fmt calls it; gate_test.go's %#v case pins that no secret reaches it.
+method (*Binding).GoString
 
 # --- fmt.Stringer invoked only at runtime -----------------------------------
 # No compile-time assertion; these are reached through fmt's Stringer handling,
@@ -217,6 +221,16 @@ method (*RegistryError).Error
 method (*RegistryError).Unwrap
 method (*memberReadError).Unwrap
 method (*Error).Unwrap
+# mediawrite.UnwritableError.Unwrap returns ErrUnwritable, the documented
+# contract of search.MediaWriter.WriteFile, beside the cause that keeps the
+# errno reachable. mediawrite_test.go pins errors.Is for ErrUnwritable and EROFS.
+method (*UnwritableError).Unwrap
+# search.saveError.Unwrap lets downloadBestCandidate find the *UnwritableError
+# and atomicfile.ErrFileTooLarge through the save wrapper, so an unwritable
+# folder is not read as a plain save failure and an over-cap file falls to the
+# next candidate.
+# search_download_write_test.go's ErrFileTooLarge and ErrUnwritable cases pin it.
+method (*saveError).Unwrap
 method (*ValidationError).Error
 method (*FieldDependencyError).Error
 
@@ -452,3 +466,19 @@ method (*gzipResponseWriter).Unwrap
 # single-consumer seam block above: that one is structurally forced by WHERE the
 # data and its guard must live, this one by HOW MANY callers there are.
 function SwapDefaultLogger
+
+# --- Required-collaborator fixtures shared across test packages (EU1001) ----
+# search.New requires a provider gate binding and a media writer, and server.New
+# a media writer, so these build the neutral form once instead of one copy per
+# package tracking the production Config. ProviderGateBinding is called from 4
+# test packages, MediaWriter from 7.
+function ProviderGateBinding
+function MediaWriter is used in test only
+
+# --- Credential-ladder fixtures shared by the provider redaction tests (EU1001)
+# The subdl and hdbits redaction tests drive a real provider through the real
+# gate ladder to a disable. These are the store the test reads the persisted
+# reason back from and the per-rung admit/observe loop, shared by both packages.
+function NewAuthRecordStore
+method (*AuthRecordStore).Record
+function DisableThroughLadder

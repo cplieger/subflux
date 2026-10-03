@@ -1,0 +1,217 @@
+{
+  "sections": {
+    "adaptive": {
+      "backoff_multiplier": 3,
+      "enabled": true,
+      "initial_delay": "3D",
+      "max_attempts": 6,
+      "max_delay": "60D"
+    },
+    "allowed_hosts": [
+      "subflux.example.com"
+    ],
+    "auth": {
+      "basic_enabled": true,
+      "check_breached_passwords": false,
+      "oidc": {
+        "client_id": "placeholder-oidc-client-id",
+        "client_secret": "",
+        "issuer_url": "https://auth.example.com/application/o/subflux/",
+        "redirect_uri": "https://subflux.example.com/api/auth/oidc/callback"
+      },
+      "oidc_auto_redirect": false,
+      "oidc_enabled": true,
+      "session_absolute_timeout": "5D",
+      "session_idle_timeout": "12h",
+      "webauthn_rp_id": "subflux.example.com"
+    },
+    "backup": {
+      "enabled": true,
+      "frequency": "12h",
+      "path": "/config/backups",
+      "retention": 4
+    },
+    "embedded_subtitles": {
+      "ignore_ass": true,
+      "ignore_pgs": true,
+      "ignore_vobsub": false
+    },
+    "languages": {
+      "default": [
+        {
+          "code": "en",
+          "min_score": 55,
+          "variant": "hi"
+        },
+        {
+          "code": "fr"
+        }
+      ],
+      "rules": [
+        {
+          "audio": "fr",
+          "subtitles": [
+            {
+              "code": "en",
+              "variant": "forced"
+            }
+          ]
+        },
+        {
+          "audio": "ja",
+          "subtitles": [
+            {
+              "code": "en",
+              "exclude": [
+                "yifysubtitles"
+              ],
+              "min_score": 70,
+              "providers": [
+                "opensubtitles",
+                "animetosho"
+              ]
+            },
+            {
+              "code": "fr",
+              "variants": [
+                "standard",
+                "forced"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "logging": {
+      "format": "text",
+      "level": "debug"
+    },
+    "media_roots": [
+      "/media/tv",
+      "/media/movies"
+    ],
+    "poll_interval": "45s",
+    "post_processing": {
+      "audio_sync_fallback": true,
+      "clean_whitespace": true,
+      "normalize_endings": false,
+      "normalize_utf8": true,
+      "remove_empty": false,
+      "strip_hi": true,
+      "strip_tags": false,
+      "sync_min_confidence": 0.4,
+      "sync_subtitles": true
+    },
+    "providers": {
+      "animetosho": {
+        "enabled": true,
+        "priority": 8,
+        "settings": {
+          "anidb_client_key": ""
+        }
+      },
+      "betaseries": {
+        "enabled": true,
+        "priority": 3,
+        "settings": {
+          "token": ""
+        }
+      },
+      "gestdown": {
+        "enabled": true,
+        "priority": 4
+      },
+      "hdbits": {
+        "enabled": true,
+        "priority": 1,
+        "settings": {
+          "passkey": "",
+          "username": "placeholder-hdbits-user"
+        }
+      },
+      "opensubtitles": {
+        "enabled": true,
+        "priority": 2,
+        "settings": {
+          "api_key": "",
+          "include_ai_translated": true,
+          "include_machine_translated": false,
+          "password": "",
+          "use_hash": false,
+          "username": "placeholder-os-user"
+        }
+      },
+      "subdl": {
+        "enabled": true,
+        "priority": 7,
+        "settings": {
+          "api_key": ""
+        }
+      },
+      "subsource": {
+        "enabled": true,
+        "priority": 5,
+        "settings": {
+          "api_key": ""
+        }
+      },
+      "yifysubtitles": {
+        "enabled": true,
+        "priority": 9
+      }
+    },
+    "radarr": {
+      "api_key": "",
+      "enabled": true,
+      "public_url": "https://radarr.example.com",
+      "url": "http://radarr:7878"
+    },
+    "scoring": {
+      "weights": {
+        "edition": 16,
+        "hash": 100,
+        "hdr": 9,
+        "release_group": 22,
+        "season_pack": 14,
+        "source": 27,
+        "streaming_service": 13,
+        "video_codec": 11
+      }
+    },
+    "search": {
+      "exclude_arr_tags": [
+        "no-subflux",
+        "skip-subs"
+      ],
+      "max_provider_concurrency": 3,
+      "min_score": 40,
+      "provider_timeout": "2h",
+      "scan_delay": "6s",
+      "scan_interval": "12h",
+      "upgrade_enabled": true,
+      "upgrade_window_days": 5
+    },
+    "sonarr": {
+      "api_key": "",
+      "enabled": true,
+      "public_url": "https://sonarr.example.com",
+      "url": "http://sonarr:8989"
+    },
+    "trusted_proxies": [
+      "10.0.0.0/8"
+    ]
+  },
+  "secrets_present": [
+    "sonarr.api_key",
+    "radarr.api_key",
+    "providers.animetosho.settings.anidb_client_key",
+    "providers.betaseries.settings.token",
+    "providers.hdbits.settings.passkey",
+    "providers.opensubtitles.settings.password",
+    "providers.opensubtitles.settings.api_key",
+    "providers.subdl.settings.api_key",
+    "providers.subsource.settings.api_key",
+    "auth.oidc.client_secret"
+  ]
+}
+

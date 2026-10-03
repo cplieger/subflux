@@ -36,6 +36,22 @@ Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-epi
 - **Adaptive backoff:** per-provider exponential backoff for no-result media, season-level early termination, and per-provider timeouts, so failing or empty providers don't get hammered.
 - **Manual override with locks:** manual downloads are saved as numbered siblings (`movie.fr.1.srt`) and lock the item from automation; locks clear automatically when the files are deleted or the video is replaced.
 
+### Rejected provider credentials
+
+When a provider rejects its credentials, such as a wrong password, passkey or API key, subflux stops calling it instead of retrying until the provider locks the account. The first rejection pauses the provider for 5 minutes and the second for 30 minutes. Each pause ends with one probe request, and the third rejection disables it.
+
+A disabled provider raises a persistent alert in the web UI, logs one ERROR line, and sets `subflux_provider_disabled{provider}` to 1. The disable survives a restart, and nothing re-enables the provider on its own. Three things do:
+
+- Save the provider with different credentials.
+- Press the provider's Test button in the settings dialog. A pass with the recorded credentials re-enables it. A pass with edited credentials asks you to save them.
+- Reset provider state with `subflux timeouts-reset`.
+
+Switching the provider off clears its alert, and switching it back on with the same credentials brings the disable back. A rate-limit answer is not a rejection. It pauses only the operation that hit it, a search or a download, until the provider's `Retry-After` or for 10 minutes.
+
+AnimeTosho's optional AniDB client key is judged on its own. If AniDB rejects the key, AnimeTosho turns off episode lookup and keeps searching by title, a persistent alert names the key, and `subflux_provider_setting_rejected{provider,setting}` reads 1. That lasts until you change or clear the key, a Test of the saved key passes, you reset provider state with `subflux timeouts-reset`, or AniDB accepts the key on a later lookup. A restart forgets the refusal: the alert and the gauge return after the first episode lookup that AniDB refuses again. A save of any settings, a passing Test and a reset each make AnimeTosho ask AniDB again on its next episode lookup.
+
+A scan that is already running when you save keeps the settings it started with, except that it stops calling any provider whose settings you changed. The next scan uses the new settings.
+
 ### The sync engine
 
 Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions: split-aware and framerate-aware alignment, audio sync via a re-tuned voice-activity detector cross-correlated with the subtitle's dialogue signal, and cross-language anchor matching (a French subtitle can sync against the English track embedded in the file). The strategies run concurrently and vote; the winner is applied only above a confidence threshold, so a sync that is not confident does not happen.
@@ -160,6 +176,9 @@ ruler; firing alerts deliver through your Alertmanager. They cover:
 | `SubfluxScanStalled` | no scheduled scan has completed in 26h while the process has been up that long | warning |
 | `SubfluxHTTP5xx` | more than 5 server errors in 10m | warning |
 | `SubfluxBackupStale` | no successful backup recorded in over 48h | warning |
+| `SubfluxProviderCredentialsRejected` | a provider rejected its credentials and was disabled, or rejected an optional setting, for 5m | warning |
+| `SubfluxMediaUnwritable` | subtitle files could not be written under a media root for 5m (`subflux_media_root_unwritable{root}` reads 1) | warning |
+| `SubfluxMediaUnavailable` | a media root could not be read for 5m (`subflux_media_root_unavailable{root}` reads 1) | warning |
 
 The two target rules pin `job="subflux"` because they read the synthetic `up`
 series, where a bare `up == 0` would fire on every unrelated target in your
@@ -169,6 +188,20 @@ more than one instance. Thresholds and the `severity` labels are starting points
 and `SubfluxScanStalled`'s window tracks `scan_interval` (24h by default), so
 move both together if you change it. Route by whatever labels your Alertmanager
 uses.
+
+These series tell a fetched subtitle from a saved one and carry the provider and media-folder state behind the last three rules:
+
+| Metric | Meaning |
+| --- | --- |
+| `subflux_downloads_total{provider}` | subtitle files fetched from a provider, saved or not |
+| `subflux_subtitles_saved_total{provider}` | subtitle files the automated search wrote next to the media |
+| `subflux_subtitle_write_errors_total` | failed subtitle writes and failed media folder write tests |
+| `subflux_media_root_unwritable{root}` | 1 while subtitles cannot be written in that media root or a folder below it |
+| `subflux_media_root_unavailable{root}` | 1 while that media root cannot be read, so nothing under it is treated as deleted |
+| `subflux_provider_disabled{provider}` | 1 while a provider is disabled because it rejected its credentials |
+| `subflux_provider_setting_rejected{provider,setting}` | 1 from the upstream's refusal of a provider's optional setting until the upstream accepts it, the setting changes, a Test passes, provider state is reset or subflux restarts (it returns at the next refusal) |
+| `subflux_provider_auth_failures_total{provider}` | credential rejections counted toward a disable |
+| `subflux_provider_rate_limited_total{provider,op}` | rate-limit answers that paused a provider's `search` or `download` |
 
 ## Healthcheck
 
@@ -188,7 +221,11 @@ Distroless `gcr.io/distroless/static-debian13:nonroot` (UID 65532, no shell). Pr
 
 ## Known limitations
 
-- The media volume must be writable. Subflux saves subtitle files next to the media, so mounting `/media` read-only silently prevents downloads from being saved.
+- The media volume must be writable. Subflux saves subtitle files next to the media, so mounting `/media` read-only prevents any subtitle from being saved.
+- When subtitles cannot be written in a media folder, subflux stops searching for and downloading subtitles there and shows an alert naming the folder and the error. It resumes on its own once a write test there succeeds. Meanwhile `subflux_media_root_unwritable{root}` reads 1 for that folder's root. It never changes file or folder permissions. New subtitle files get the permissions your share's umask and ACLs give them.
+- While such a folder stays unwritable, the other imports that the same Sonarr or Radarr reports in the same poll or later also wait, whatever folder they land in. None is lost. They are processed in order once the folder recovers, and the next full scan covers healthy folders meanwhile. The wait also ends once the waiting import no longer needs a subtitle there, for example when you tag its series with one of your `exclude_arr_tags` or delete its video. Subflux rechecks it at most 5 minutes plus one `poll_interval` after its last check.
+- If a configured media root is missing or cannot be written, full library scans do not start until it is fixed or removed from `media_roots`.
+- A video counts as deleted only when it is missing from a media root that is present, readable and not empty. An unmounted share usually looks like an empty root. If the root is missing or empty, or a file check fails or takes over 10 seconds, subflux keeps the subtitle state and manual locks. It also holds new imports there and shows an alert naming the path, then checks again every 5 minutes. List each mounted share as its own `media_roots` entry, so an unmounted one shows up as an empty root.
 - Cloudflare-protected providers (subf2m, AvistaZ, CinemaZ) are not implemented.
 - Long-running anime with colliding aired/absolute numbering has a rare false-positive window: results matched by a stable ID skip title validation, so an aired SxxEyy that collides with another episode's absolute number can slip through.
 

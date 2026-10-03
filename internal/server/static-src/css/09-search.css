@@ -62,6 +62,12 @@
   color: var(--muted);
 }
 
+.result-notice {
+  margin-block-start: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 /* Narrow search: collapse columns */
 @container (width < 500px) {
   .result-row {

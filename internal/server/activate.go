@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -57,6 +58,7 @@ func (m activationMode) String() string {
 type activationCandidate struct {
 	engine    *search.Engine
 	scorer    *scorer.Engine
+	binding   *providergate.Binding
 	sonarr    SonarrClient
 	radarr    RadarrClient
 	webauthn  *authwebauthn.RelyingParty
@@ -92,6 +94,9 @@ func (s *Server) activate(ctx context.Context, newCfg *config.Config, mode activ
 		return err
 	}
 
+	// The gate starts deciding by the new settings at the same moment the new
+	// engine becomes the one requests reach.
+	s.gate.Activate(cand.binding)
 	// Publish: the single existing atomic snapshot store.
 	s.live.Store(&liveState{
 		cfg:       newCfg,
@@ -123,11 +128,11 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mod
 		})
 	}
 
-	engine, sc, providers, err := s.wire(ctx, newCfg, s.db, s.metrics)
+	wired, err := s.wire(ctx, newCfg, s.db, s.metrics)
 	if err != nil {
 		return nil, fmt.Errorf("wire: %w", err)
 	}
-	cand.engine, cand.scorer, cand.providers = engine, sc, providers
+	cand.engine, cand.scorer, cand.providers, cand.binding = wired.Engine, wired.Scorer, wired.Providers, wired.Binding
 
 	// Arr clients are constructed HERE in both modes: activation owns their
 	// lifecycle (main.go builds none), so a failed construction rejects the
@@ -250,17 +255,20 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *conf
 
 	// Provider status events (E1): install the SSE publisher on the fresh
 	// engine's health tracker. Per activation because the tracker is rebuilt
-	// with the engine; an outgoing engine's in-flight scan may still fire its
-	// old hook briefly, which publishes to the same bus and is harmless.
+	// with the engine; an outgoing engine's hook still firing publishes the
+	// live engine's status, because the publisher reads it at publish time.
 	if cand.engine != nil {
-		cand.engine.SetProviderHealthHook(func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+		cand.engine.SetProviderHealthHook(func(id subflux.ProviderID, _ subflux.ProviderStatus, raised bool) {
 			op := events.ProviderClear
 			if raised {
 				op = events.ProviderRaise
 			}
-			s.events.PublishProvider(op, &events.ProviderTimeoutEntry{Provider: id, Status: status})
+			s.publishProvider(op, id)
 		})
 	}
+	s.gate.Reconcile(ctx)
+	s.media.Bind(newCfg.MediaRootDirs, newCfg.ValidatePath)
+	s.presence.Bind(newCfg.MediaRootDirs)
 
 	// Configured-mode flip + gauge.
 	s.configured.Store(true)
@@ -362,11 +370,13 @@ func (s *Server) awaitWorkerLaunch(ctx context.Context) {
 // launchWorkerSet starts the real background goroutines on the context handed
 // to Start. Reconcile is a scheduler-internal stage, not a worker.
 func (s *Server) launchWorkerSet(ctx context.Context) {
-	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics"})
+	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics", "media_recheck", "media_presence_recheck"})
 	s.bgWg.Go(func() { s.runScheduler(ctx) })
 	s.bgWg.Go(func() { s.runPoller(ctx) })
 	s.bgWg.Go(func() { s.storeOps.RunBackup(ctx) })
 	s.bgWg.Go(func() { s.storeOps.RunMetrics(ctx) })
+	s.bgWg.Go(func() { _ = s.media.Run(ctx) })
+	s.bgWg.Go(func() { _ = s.presence.Run(ctx) })
 }
 
 // --- OIDC lazy slot ---

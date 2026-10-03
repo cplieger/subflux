@@ -12,6 +12,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v6"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -31,8 +32,23 @@ type Deps struct {
 	Activity      ActivityTracker
 	Alerts        AlertRecorder
 	ShowSkipCache *showskip.Cache
+	Media         MediaGuard
 	// ClearCaches clears provider download caches after scan completion.
 	ClearCaches func(providers []provider.Provider)
+}
+
+// MediaPreflight write-tests the folders a scan will write into before any
+// provider work; *mediawrite.Writer satisfies it.
+type MediaPreflight interface {
+	Preflight(ctx context.Context, req mediawrite.PreflightRequest) error
+}
+
+// MediaGuard adds the folders already known to refuse writes, which a scan
+// consults before any provider work of its own; *mediawrite.Writer
+// satisfies it.
+type MediaGuard interface {
+	MediaPreflight
+	Blocked(path string) (folder string, blocked bool)
 }
 
 // ScanStore is the narrow store interface for scan state tracking.
@@ -120,19 +136,26 @@ func stopRequested(stop <-chan struct{}) bool {
 	}
 }
 
-// waitOrStop pauses for the inter-item scan delay, ending early when the
-// server context is cancelled (shutdown) or the stop signal fires
-// (graceful cancel). It returns the outcome that should terminate the scan,
-// or "" to continue with the next item.
-func waitOrStop(ctx context.Context, stop <-chan struct{}, d time.Duration) activity.Outcome {
-	if err := ctx.Err(); err != nil {
+// interruption is the outcome that ends a scan at an item boundary, or ""
+// to continue. Shutdown is checked first so a process exit never reads as a
+// user stop.
+func interruption(ctx context.Context, stop <-chan struct{}) activity.Outcome {
+	if ctx.Err() != nil {
 		return activity.OutcomeShutdown
 	}
 	if stopRequested(stop) {
 		return activity.OutcomeCancelled
 	}
-	if d <= 0 {
-		return ""
+	return ""
+}
+
+// waitOrStop pauses for the inter-item scan delay, ending early when the
+// server context is cancelled (shutdown) or the stop signal fires
+// (graceful cancel). It returns the outcome that should terminate the scan,
+// or "" to continue with the next item.
+func waitOrStop(ctx context.Context, stop <-chan struct{}, d time.Duration) activity.Outcome {
+	if o := interruption(ctx, stop); o != "" || d <= 0 {
+		return o
 	}
 	t := time.NewTimer(d)
 	defer t.Stop()
@@ -213,7 +236,7 @@ type LiveState struct {
 	Engine      ScanEngine
 	Sonarr      ScanSonarrClient
 	Radarr      ScanRadarrClient
-	ShowCounter showCounter
+	ShowCounter ShowCounter
 	Providers   []provider.Provider
 }
 
@@ -222,8 +245,10 @@ type ScanOutcome = subflux.ScanOutcome
 
 // ScanFound and its siblings are ScanOutcome aliases for subflux's scan outcomes.
 const (
-	ScanFound     = subflux.ScanFound
-	ScanSkipped   = subflux.ScanSkipped
-	ScanNoResult  = subflux.ScanNoResult
-	ScanBackedOff = subflux.ScanBackedOff
+	ScanFound          = subflux.ScanFound
+	ScanSkipped        = subflux.ScanSkipped
+	ScanNoResult       = subflux.ScanNoResult
+	ScanBackedOff      = subflux.ScanBackedOff
+	ScanDownloadFailed = subflux.ScanDownloadFailed
+	ScanWriteBlocked   = subflux.ScanWriteBlocked
 )

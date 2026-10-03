@@ -167,6 +167,8 @@ func (noopMetrics) RecordPanic()                                                
 func (noopMetrics) RecordDownload(_ subflux.ProviderID, _ error)                {}
 func (noopMetrics) AdaptiveSkip()                                               {}
 func (noopMetrics) RecordEmbeddedDetectorError()                                {}
+func (noopMetrics) RecordSubtitleSaved(subflux.ProviderID)                      {}
+func (noopMetrics) IncSubtitleWriteError()                                      {}
 func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                        {}
 func (noopMetrics) RecordImport(_ subflux.PollKey)                              {}
 func (noopMetrics) TotalSearches() int64                                        { return 0 }

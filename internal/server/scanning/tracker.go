@@ -2,11 +2,13 @@ package scanning
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/cplieger/keyenc"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
@@ -28,16 +30,15 @@ type seasonKey struct {
 	Season int
 }
 
-// showCounter is the show-level pre-check: one count per show+language, used to
-// decide whether an entire series is worth scanning. ONE method, and it is
-// redeclared here rather than imported from the provider package because one
-// method is cheaper to restate than to couple to.
-type showCounter interface {
+// ShowCounter is the show-level pre-check: one count per show+language, used to
+// decide whether an entire series is worth scanning. *search.Engine satisfies
+// it, gated like every provider call.
+type ShowCounter interface {
 	CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error)
 }
 
 type seasonTracker struct {
-	counter showCounter
+	counter ShowCounter
 	cache   *showskip.Cache
 	seasons map[seasonKey]*seasonState
 	seed    seedDeps
@@ -67,7 +68,7 @@ type seedDeps struct {
 	MaxAttempts int
 }
 
-func newSeasonTracker(counter showCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
+func newSeasonTracker(counter ShowCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
 	if seed.Now == nil {
 		seed.Now = time.Now
 	}
@@ -125,6 +126,13 @@ func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episo
 	}
 	count, err := st.counter.CountShowSubtitles(ctx, subflux.ShowSubtitleQuery{ImdbID: imdbID, Language: lang})
 	if err != nil {
+		if uncallable(err) {
+			// Not cached, so the series is checked again once the counter
+			// is callable.
+			slog.Debug("show subtitle count unavailable, not skipping",
+				"imdb", imdbID, "lang", lang, "error", err)
+			return false
+		}
 		slog.Warn("show subtitle count failed, not skipping",
 			"imdb", imdbID, "lang", lang, "error", err)
 		st.cache.Set(key, false)
@@ -144,6 +152,19 @@ func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episo
 	}
 	st.cache.Set(key, skip)
 	return skip
+}
+
+// uncallable reports whether err says the counter could not be asked at all:
+// the provider gate refused it, or it refused the credentials or rate limited.
+func uncallable(err error) bool {
+	if errors.Is(err, search.ErrProviderGated) {
+		return true
+	}
+	if _, ok := errors.AsType[*subflux.AuthError](err); ok {
+		return true
+	}
+	_, ok := errors.AsType[*subflux.RateLimitError](err)
+	return ok
 }
 
 // showSkipCacheKey builds the show-skip cache key for a series and language.

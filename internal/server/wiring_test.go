@@ -38,31 +38,3 @@ func TestRequireServiceable_CatchesMissingAuth(t *testing.T) {
 	}()
 	s.requireServiceable()
 }
-
-// TestIsNil_TypedNilInInterface is the case the guard would otherwise miss.
-//
-// Every field requireServiceable checks is an interface or a pointer, so a field
-// left at its zero value arrives as a nil *T boxed in a live interface. A bare
-// `v == nil` is FALSE for that, so a guard written the obvious way passes while
-// the bug it exists for is live — which is exactly how this class of guard was
-// first written wrong in the sibling app.
-func TestIsNil_TypedNilInInterface(t *testing.T) {
-	t.Parallel()
-
-	// `boxed != nil` here is a language guarantee, not something to assert:
-	// staticcheck can decide the comparison statically (SA4023), which makes
-	// asserting it a tautology rather than a demonstration. What is worth
-	// asserting is that isNil sees through the box.
-	var typedNil *Server
-	var boxed any = typedNil
-
-	if !isNil(boxed) {
-		t.Error("isNil(typed nil *Server in an interface) = false, want true")
-	}
-	if isNil(&Server{}) {
-		t.Error("isNil(non-nil *Server) = true, want false")
-	}
-	if !isNil(nil) {
-		t.Error("isNil(untyped nil) = false, want true")
-	}
-}

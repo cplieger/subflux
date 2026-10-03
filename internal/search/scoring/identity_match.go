@@ -66,6 +66,22 @@ func EpisodeNumberMatch(subSeason, subEpisode int, req *subflux.SearchRequest) b
 	return false
 }
 
+// releaseContradictsEpisode reports whether name claims at least one episode
+// and none of its claims is the requested one under any numbering scheme. A
+// season pack claims nothing and so never contradicts.
+func releaseContradictsEpisode(name string, req *subflux.SearchRequest) bool {
+	claims := epmarker.Claims(name)
+	if len(claims) == 0 {
+		return false
+	}
+	for _, m := range claims {
+		if EpisodeNumberMatch(m.Season, m.Episode, req) {
+			return false
+		}
+	}
+	return true
+}
+
 func matchesPair(subSeason, subEpisode, candSeason, candEpisode int) bool {
 	seasonOK := subSeason <= 0 || candSeason <= 0 || subSeason == candSeason
 	episodeOK := subEpisode <= 0 || candEpisode <= 0 || subEpisode == candEpisode

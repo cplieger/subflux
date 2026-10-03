@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/subflux/internal/server/syncjobs"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
@@ -30,6 +30,7 @@ type AudioJobRunner interface {
 type AudioExecutor struct {
 	Store  SyncStore
 	Proc   SubtitleProcessor
+	Media  MediaWriter
 	Runner AudioJobRunner
 }
 
@@ -115,18 +116,8 @@ func (e *AudioExecutor) apply(ctx context.Context, path string, result *subsync.
 		return fmt.Errorf("write SRT: %w", err)
 	}
 
-	// WithMaxBytes mirrors the read bound: the job's read caps at
-	// MaxSyncSubSize, so the staged write must refuse to cross it.
-	pf, err := atomicfile.NewPendingFile(ctx, path, atomicfile.WithMaxBytes(MaxSyncSubSize))
-	if err != nil {
-		return fmt.Errorf("save (prepare): %w", err)
-	}
-	defer func() { _ = pf.Cleanup() }()
-	if _, err := pf.Write(srtData); err != nil {
-		return fmt.Errorf("save (write): %w", err)
-	}
-	if _, err := pf.Commit(ctx); err != nil {
-		return fmt.Errorf("save (commit): %w", err)
+	if err := e.Media.WriteFile(ctx, path, srtData); err != nil {
+		return fmt.Errorf("save: %w", err)
 	}
 
 	if err := e.Store.SetSyncOffset(ctx, path, cumulative); err != nil {

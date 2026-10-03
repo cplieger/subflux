@@ -21,6 +21,7 @@ const (
 	providerSuccess providerOutcome = iota
 	providerError
 	providerTimeout
+	providerGated
 )
 
 func (o providerOutcome) String() string {
@@ -31,6 +32,8 @@ func (o providerOutcome) String() string {
 		return "error"
 	case providerTimeout:
 		return "timeout"
+	case providerGated:
+		return "gated"
 	default:
 		return "unknown"
 	}
@@ -48,13 +51,13 @@ type searchOutcome struct {
 }
 
 // attempted returns the number of providers the sweep actually queried
-// (success or error). Providers skipped by the health timeout never issued
-// a request, so they don't count: inter-item scan pacing keys on this via
-// subflux.LangOutcome.Queried.
+// (success or error). Providers skipped by the health timeout or refused by
+// the provider gate never issued a request, so they don't count: inter-item
+// scan pacing keys on this via subflux.LangOutcome.Queried.
 func (o *searchOutcome) attempted() int {
 	n := 0
 	for _, p := range o.providers {
-		if p.outcome != providerTimeout {
+		if p.outcome == providerSuccess || p.outcome == providerError {
 			n++
 		}
 	}

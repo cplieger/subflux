@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/atomicfile/v4"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/server/resolve"
@@ -51,9 +51,16 @@ type Deps struct {
 	Store        SyncStore
 	Files        SeasonFileStore
 	SubtitleProc SubtitleProcessor
+	Media        MediaWriter
 	Jobs         *syncjobs.Dispatcher
 	Resolve      *resolve.Resolver
 	SeasonState  func() *SeasonState
+}
+
+// MediaWriter writes a corrected subtitle back beside its video;
+// *mediawrite.Writer satisfies it.
+type MediaWriter interface {
+	WriteFile(ctx context.Context, path string, data []byte) error
 }
 
 // Handler holds all dependencies for the sync handler family.
@@ -61,13 +68,14 @@ type Handler struct {
 	store        SyncStore
 	files        SeasonFileStore
 	subtitleProc SubtitleProcessor
+	media        MediaWriter
 	jobs         *syncjobs.Dispatcher
 	resolve      *resolve.Resolver
 	seasonState  func() *SeasonState
 }
 
 // New creates a Handler with the given dependencies.
-func New(d Deps) *Handler {
+func New(d Deps) *Handler { //nolint:gocritic // hugeParam: callers pass by value
 	seasonState := d.SeasonState
 	if seasonState == nil {
 		seasonState = func() *SeasonState { return nil }
@@ -76,6 +84,7 @@ func New(d Deps) *Handler {
 		store:        d.Store,
 		files:        d.Files,
 		subtitleProc: d.SubtitleProc,
+		media:        d.Media,
 		jobs:         d.Jobs,
 		resolve:      d.Resolve,
 		seasonState:  seasonState,
@@ -301,11 +310,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// WithMaxBytes mirrors the read bound above: this handler refuses to
-	// persist a subtitle its own ReadBounded(MaxSyncSubSize) path would
-	// refuse to load on the next request.
-	if _, err := atomicfile.WriteFile(ctx, subtitlePath, srtData,
-		atomicfile.WithMaxBytes(MaxSyncSubSize)); err != nil {
+	if err := h.media.WriteFile(ctx, subtitlePath, srtData); err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "save", "path", subtitlePath)
 		return
 	}

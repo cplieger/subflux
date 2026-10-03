@@ -115,53 +115,45 @@ func (h *Handler) acquireScanSlot(ctx context.Context, actID string, stop <-chan
 	return ""
 }
 
-// runEpisodeScans scans each episode in order, reporting progress and
-// honouring shutdown (context) and the graceful stop signal between items —
-// the episode in flight always completes, INCLUDING the final one: after it
-// returns, shutdown and stop are checked once more so a stop landing during
-// the last in-flight episode terminates as cancelled, never as a false
-// success. It returns the number of episodes for which a subtitle was
-// found, the number searched, and a non-empty outcome when the scan must
+// runEpisodeScans scans each episode in order, honouring shutdown and the
+// stop signal between items and once more after the last, so a stop during
+// the final episode ends as cancelled, never as a false success. An
+// unwritable folder fails the scan after the episode that found it. Returns
+// the found and searched counts and a non-empty outcome when the scan must
 // not be reported as completed.
 func (h *Handler) runEpisodeScans(ctx context.Context, stop <-chan struct{},
 	op *opState, series *arrapi.Series, withFiles []*arrapi.Episode, actID string,
 	scanDelay time.Duration,
 ) (found, searched int, outcome activity.Outcome) {
 	for i, ep := range withFiles {
-		if ctx.Err() != nil {
-			return found, searched, activity.OutcomeShutdown
-		}
-		if stopRequested(stop) {
-			return found, searched, activity.OutcomeCancelled
+		if o := interruption(ctx, stop); o != "" {
+			return found, searched, o
 		}
 		h.deps.Activity.Progress(actID, i+1, len(withFiles),
 			fmt.Sprintf("%s S%02dE%02d (%d/%d)",
 				series.Title, ep.SeasonNumber, ep.EpisodeNumber,
 				i+1, len(withFiles)))
-		o, _, queried := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
+		scan := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
 		searched++
-		if o == ScanFound {
+		if scan.Outcome == ScanFound {
 			found++
+		}
+		if scan.WriteFailure != nil {
+			h.deps.Activity.Progress(actID, i+1, len(withFiles), "Stopped: "+scan.WriteFailure.Error())
+			return found, searched, activity.OutcomeFailed
 		}
 		// Pace only after episodes that actually queried providers (and
 		// never after the last): the delay spaces provider traffic, and a
 		// covered/locked/backed-off episode generates none.
-		if queried && i < len(withFiles)-1 {
+		if scan.Queried && i < len(withFiles)-1 {
 			if early := waitOrStop(ctx, stop, scanDelay); early != "" {
 				return found, searched, early
 			}
 		}
 	}
-	// The final episode has no next-iteration boundary check: shutdown
-	// FIRST (a process exit must never read as a user cancellation), stop
-	// SECOND, before the caller publishes success.
-	if ctx.Err() != nil {
-		return found, searched, activity.OutcomeShutdown
-	}
-	if stopRequested(stop) {
-		return found, searched, activity.OutcomeCancelled
-	}
-	return found, searched, ""
+	// The final episode has no next-iteration boundary check, so it is made
+	// here, before the caller publishes success.
+	return found, searched, interruption(ctx, stop)
 }
 
 // scanSingleEpisode scans a single episode of an already-resolved series.
@@ -207,18 +199,22 @@ func (h *Handler) scanSingleEpisode(ctx context.Context, stop <-chan struct{}, a
 	}
 	defer h.deps.ScanGuard.Release()
 
-	outcome, _, _ := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
+	scan := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
 	// For a single-item scope the in-flight item IS the whole scan: after it
 	// returns, check shutdown FIRST and stop SECOND before publishing
 	// success — a stop during the item must terminate as cancelled.
 	if ctx.Err() != nil {
 		return activity.OutcomeShutdown
 	}
+	if scan.WriteFailure != nil {
+		h.deps.Activity.Progress(actID, 0, 0, "Stopped: "+scan.WriteFailure.Error())
+		return activity.OutcomeFailed
+	}
 	if stopRequested(stop) {
 		slog.Info("episode scan stopped", "media", label)
 		return activity.OutcomeCancelled
 	}
-	slog.Info("episode scan complete", "media", label, "outcome", outcome)
+	slog.Info("episode scan complete", "media", label, "outcome", scan.Outcome)
 	return activity.OutcomeCompleted
 }
 
@@ -253,11 +249,16 @@ func (h *Handler) runMovieScan(ctx context.Context, stop <-chan struct{}, actID 
 	// Derive found from per-target outcomes: a movie with several language
 	// targets can download several subtitles in one scan, and reporting the
 	// single ScanFound outcome as 1/N understated that.
-	_, found, _ := scanMovieDetail(ctx, op.deps, op.ls, movie, true)
+	scan := scanMovieDetail(ctx, op.deps, op.ls, movie, true)
+	found := scan.Found
 	// Single-item scope: the item in flight is the whole scan — shutdown
 	// FIRST, stop SECOND, before publishing success.
 	if ctx.Err() != nil {
 		return activity.OutcomeShutdown
+	}
+	if scan.WriteFailure != nil {
+		h.deps.Activity.Progress(actID, 0, total, "Stopped: "+scan.WriteFailure.Error())
+		return activity.OutcomeFailed
 	}
 	if stopRequested(stop) {
 		slog.Info("movie scan stopped", "media", label)

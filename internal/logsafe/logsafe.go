@@ -25,7 +25,13 @@
 // logged near where it is read.
 package logsafe
 
-import "github.com/cplieger/runesafe/v2"
+import (
+	"cmp"
+	"slices"
+
+	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/runesafe/v2"
+)
 
 // MaxFieldBytes bounds one sanitized attribute.
 const MaxFieldBytes = 256
@@ -38,4 +44,29 @@ const MaxFieldBytes = 256
 // attributes is safe, and the cost is one call.
 func Field(s string) string {
 	return runesafe.SanitizeSingleLineBounded(s, MaxFieldBytes)
+}
+
+// RedactedField is Field for upstream text answering a request that carried
+// secrets, for an error value as well as a slog attribute. The order is
+// redact, normalize, redact, cap (httpx.RedactSecretString states the rule).
+// Pass every credential the request carried in one call so no cap runs
+// between them. Longer values go first: a shorter one inside a longer one
+// would break the longer match and leave the rest of it behind.
+func RedactedField(s string, secrets ...httpx.Secret) string {
+	ordered := slices.SortedStableFunc(slices.Values(secrets), func(a, b httpx.Secret) int {
+		return cmp.Compare(len(b), len(a))
+	})
+	text := runesafe.SanitizeSingleLine(redactAll(s, ordered))
+	text = redactAll(text, ordered)
+	if len(text) <= MaxFieldBytes {
+		return text
+	}
+	return runesafe.CapBytes(text, MaxFieldBytes) + "..."
+}
+
+func redactAll(s string, secrets []httpx.Secret) string {
+	for _, secret := range secrets {
+		s = httpx.RedactSecretString(s, secret)
+	}
+	return s
 }

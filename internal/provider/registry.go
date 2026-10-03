@@ -160,7 +160,7 @@ func (r *Registry) CheckCredentials(ctx context.Context, name subflux.ProviderID
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
 	}
-	p, err := f(ctx, NormalizeSettings(r.schemas[name], settings))
+	p, err := f(ctx, r.Normalize(name, settings))
 	if err != nil {
 		return &subflux.AuthError{Msg: err.Error()}
 	}
@@ -169,6 +169,13 @@ func (r *Registry) CheckCredentials(ctx context.Context, name subflux.ProviderID
 		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
 	}
 	return checker.CheckCredentials(ctx)
+}
+
+// Normalize fills the named provider's absent settings from their schema
+// defaults. It is the one normalization the factories, the credential check
+// and the provider gate all read, so the three compare the same values.
+func (r *Registry) Normalize(name subflux.ProviderID, raw map[string]any) map[string]any {
+	return NormalizeSettings(r.schemas[name], raw)
 }
 
 // ProviderNames returns all registered provider names in sorted order.
@@ -276,7 +283,7 @@ func (r *Registry) buildProviders(ctx context.Context, toLoad []subflux.Provider
 			// The registered schema declaration is the single source of
 			// setting defaults (P14): absent declared fields are filled from
 			// their schema Default before the factory ever sees the map.
-			settings := NormalizeSettings(r.schemas[name], providers[name].Settings)
+			settings := r.Normalize(name, providers[name].Settings)
 			p, err := r.factories[name](ctx, settings)
 			if err != nil {
 				results[i] = loadResult{name: name, err: err}

@@ -472,9 +472,10 @@ describe("events: SSE handlers (the replay table)", () => {
 
     const payload = {
       op: "raise",
+      timeouts_enabled: true,
       entry: {
         provider: "opensubtitles",
-        status: { recent_failures: 3, threshold: 5, timed_out: true },
+        status: { recent_failures: 3, threshold: 5, timed_out: true, disabled: false },
       },
     };
     server.current!.last().frame("provider", payload, id(10));

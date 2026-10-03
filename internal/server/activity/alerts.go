@@ -183,6 +183,22 @@ func (al *AlertLog) DismissBySource(source string) {
 	}
 }
 
+// HasUndismissed reports whether an undismissed persistent alert from source
+// is held, so a caller can refresh it without re-creating one the user
+// dismissed.
+func (al *AlertLog) HasUndismissed(source string) bool {
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+	for i := range al.alerts {
+		if al.alerts[i].Source == source &&
+			al.alerts[i].Kind == AlertPersistent &&
+			!al.alerts[i].Dismissed {
+			return true
+		}
+	}
+	return false
+}
+
 // VisibleAlerts returns a copy of non-dismissed, non-expired alerts.
 // It is the only read path: the log never hands out its internal slice, and
 // its mutex stays private (tests that need the raw state live in this package).

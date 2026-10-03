@@ -26,6 +26,7 @@ import (
 	authwebauthn "github.com/cplieger/auth/v6/webauthn"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/required"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -194,7 +195,6 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 		},
 		registry:      reg,
 		activity:      activity.New(50),
-		alerts:        activity.NewAlertLog(100),
 		ceremonies:    authhandlers.NewCeremonyStore(),
 		showSkipCache: showskip.New(1 * time.Hour),
 		ffmpegSem:     semaphore.NewWeighted(3),
@@ -210,14 +210,22 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	// chain and the /metrics mount. The single nil check that used to sit in
 	// initHandlers is what made a missing recorder look survivable — it
 	// postponed the panic to the first request instead of preventing it. Same
-	// shape as search.New's five required options.
-	if s.metrics == nil {
+	// shape as search.New's required options.
+	if required.Missing(s.metrics) {
 		panic("server.New: WithMetrics is required")
+	}
+	if s.gate == nil {
+		panic("server.New: WithProviderGate is required")
+	}
+	if s.alerts == nil {
+		panic("server.New: WithAlertLog is required")
 	}
 	s.events = events.New(events.DefaultMaxSSEClients, s.metrics)
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
 	}
+	s.publishProvider = NewProviderPublisher(s.events, s.providerStatusFor)
+	s.gate.SetOnChange(NewProviderGateHook(s.alerts, s.providerLabel, s.publishProvider))
 	// Status events (E1): the activity log and alert log publish deltas onto
 	// the SSE bus through hooks — set here, because neither registry can
 	// import the events bus. Activity upserts coalesce per entry through the

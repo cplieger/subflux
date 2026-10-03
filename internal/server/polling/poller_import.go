@@ -2,82 +2,169 @@ package polling
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
+	"path/filepath"
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/mediapresence"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// precheckImportPath verifies the imported video still exists on disk and that
-// its path passes config validation before any arr API calls are made. When the
-// file has disappeared between poll cycles it cleans up stale DB state via
-// DeleteStateByPaths. Returns false when the import should be skipped.
-func (p *Poller) precheckImportPath(ctx context.Context, ls *LiveState, path string) bool {
-	if _, err := os.Stat(path); err != nil {
+// precheckImportPath decides an import before any arr API call is made. Only a
+// video Presence reports definitely gone has its stale state deleted; a video
+// whose media root cannot be read is held on that root (heldOn), never
+// cleaned up. proceed is false for every outcome but a present, valid path.
+func (p *Poller) precheckImportPath(ctx context.Context, ls *LiveState, path string) (proceed bool, heldOn string) {
+	gone, err := p.deps.Presence.Gone(ctx, path)
+	if uerr, ok := errors.AsType[*mediapresence.UnavailableError](err); ok {
+		slog.Debug("poll: media root unavailable, holding the import", "path", path, "root", uerr.Root)
+		return false, uerr.Root
+	}
+	if ctx.Err() != nil {
+		return false, ""
+	}
+	if gone {
 		slog.Debug("poll: video file gone, skipping", "path", path)
 		if _, delErr := p.deps.Store.DeleteStateByPaths(ctx, []string{path}); delErr != nil {
 			slog.Warn("poll: cleanup failed", "path", path, "error", delErr)
 		}
-		return false
+		return false, ""
 	}
 
 	if err := ls.Cfg.ValidatePath(ctx, path); err != nil {
 		slog.Warn("poll: path validation failed", "path", path, "error", err)
-		return false
+		return false, ""
 	}
-	return true
+	return true, ""
 }
 
-// processPollImport is the shared logic for Sonarr/Radarr import events.
-// The second return reports whether the search actually queried any
-// provider: executeBatch keys the inter-entry pacing delay on it, so skip
-// paths (gone file, tag-excluded, metadata-fetch failures) and searches that
-// generated no provider traffic don't pay the delay.
-func (p *Poller) processPollImport(
+type importResult struct {
+	// heldOn is the folder that refused, when held and known.
+	heldOn string
+	// retryable: a transient arr failure; the watermark holds below the entry
+	// for at most maxImportRetries cycles.
+	retryable bool
+	// queried: the search queried a provider, which keys the inter-entry
+	// pacing delay, so skip paths and traffic-free searches don't pay it.
+	queried bool
+	// held: the entry's folder refuses writes; the batch stops here and the
+	// watermark stays below the entry until the folder recovers.
+	held bool
+}
+
+// pendingImport is one import resolved against its arr. result is nil for an
+// entry that is skipped, retryable marks a transient arr failure, and heldOn
+// names the unreadable media root an entry waits on.
+type pendingImport struct {
+	result    *ImportResult
+	refresh   func(ctx context.Context, id int) error
+	path      string
+	heldOn    string
+	retryable bool
+}
+
+// asksForSubtitles reports whether the import resolved at least one target.
+// An entry with none still searches: the engine records what the folder
+// already holds and writes nothing.
+func (pi *pendingImport) asksForSubtitles() bool {
+	return pi.result != nil && len(pi.result.Targets) > 0
+}
+
+func (p *Poller) resolveImport(
 	ctx context.Context, ls *LiveState, path string,
 	buildFn func() (*ImportResult, error),
 	refreshFn func(ctx context.Context, id int) error,
-) (retryable, queried bool) {
-	if !p.precheckImportPath(ctx, ls, path) {
-		return false, false
+) pendingImport {
+	pi := pendingImport{path: path, refresh: refreshFn}
+	proceed, heldOn := p.precheckImportPath(ctx, ls, path)
+	if !proceed {
+		pi.heldOn = heldOn
+		return pi
 	}
-
 	result, err := buildFn()
 	if err != nil {
 		// Transient arr failure (metadata fetch): the caller holds the poll
 		// watermark back (bounded by maxImportRetries) so the entry is
 		// re-fetched next cycle instead of dropped until the next full scan.
-		return true, false
+		pi.retryable = true
+		return pi
 	}
-	if result == nil {
-		// Deliberate skip (e.g. excluded by tag): processed, never retried.
-		return false, false
-	}
+	// A nil result is a deliberate skip (e.g. excluded by tag), never retried.
+	pi.result = result
+	return pi
+}
 
-	// Re-verify file exists after arr API calls (race window: 200-800ms).
-	if _, err := os.Stat(path); err != nil {
-		slog.Debug("poll: video file removed during metadata fetch", "path", path)
-		return retryable, false
+// runImport searches a resolved import. The folder is tested again because
+// another save can learn of a fault after the batch's write test passed.
+func (p *Poller) runImport(ctx context.Context, ls *LiveState, pi *pendingImport) importResult {
+	if pi.heldOn != "" {
+		return importResult{held: true, heldOn: pi.heldOn}
 	}
+	if pi.result == nil {
+		return importResult{retryable: pi.retryable}
+	}
+	// The video can vanish, or its share go away, after its entry resolved,
+	// while earlier entries of the batch searched.
+	gone, err := p.deps.Presence.Gone(ctx, pi.path)
+	if uerr, ok := errors.AsType[*mediapresence.UnavailableError](err); ok {
+		return importResult{held: true, heldOn: uerr.Root}
+	}
+	if ctx.Err() != nil {
+		return importResult{}
+	}
+	if gone {
+		slog.Debug("poll: video file removed after its import resolved", "path", pi.path)
+		return importResult{}
+	}
+	if pi.asksForSubtitles() {
+		if err := p.deps.Media.Preflight(ctx, mediawrite.PreflightRequest{Folders: []string{filepath.Dir(pi.path)}}); err != nil {
+			return importResult{held: true, heldOn: refusedFolder(err)}
+		}
+	}
+	return p.searchImport(ctx, ls, pi.path, pi.result, pi.refresh)
+}
 
+func refusedFolder(err error) string {
+	if uerr, ok := errors.AsType[*mediawrite.UnwritableError](err); ok {
+		return uerr.Folder
+	}
+	return ""
+}
+
+// searchImport searches one import and publishes what it saved. A search cut
+// short by the poller stopping reports nothing.
+func (p *Poller) searchImport(ctx context.Context, ls *LiveState, path string,
+	result *ImportResult, refreshFn func(ctx context.Context, id int) error,
+) importResult {
 	slog.Info("poll: import detected",
 		"media", result.Label, "path", path)
 	p.deps.Metrics.RecordImport(subflux.PollKey(result.Source))
 
 	searchResult, searchErr := ls.Engine.SearchTargets(ctx, result.Req, path, result.Targets)
-	queried = searchResult.ProviderQueried()
+	queried := searchResult.ProviderQueried()
+	// The media writer already logged and alerted the folder fault.
+	if folder := refusedFolder(searchErr); folder != "" {
+		return importResult{held: true, heldOn: folder, queried: queried}
+	}
+	if searchResult.WriteBlocked() > 0 {
+		folder, _ := p.deps.Media.Blocked(path)
+		return importResult{held: true, heldOn: folder, queried: queried}
+	}
 	if searchErr != nil {
-		slog.Error("poll: subtitle search failed",
-			"media", result.Label, "error", searchErr)
-		p.deps.Alerts.RecordWarn(string(result.Source),
-			fmt.Sprintf("Search failed for %s: %v", result.Label, searchErr))
-		return retryable, queried
+		if ctx.Err() == nil {
+			slog.Error("poll: subtitle search failed",
+				"media", result.Label, "error", searchErr)
+			p.deps.Alerts.RecordWarn(string(result.Source),
+				fmt.Sprintf("Search failed for %s: %v", result.Label, searchErr))
+		}
+		return importResult{queried: queried}
 	}
 	searchPaths := searchResult.Paths()
 	if len(searchPaths) > 0 || searchResult.CoverageChanged {
@@ -100,13 +187,13 @@ func (p *Poller) processPollImport(
 			}
 		}
 	}
-	return false, queried
+	return importResult{queried: queried}
 }
 
-func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
+func (p *Poller) resolveSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) pendingImport {
 	path := entry.ImportedPath()
 
-	return p.processPollImport(
+	return p.resolveImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
 			series, err := ls.Sonarr.SeriesByID(ctx, entry.SeriesID)
@@ -150,10 +237,10 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 	)
 }
 
-func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
+func (p *Poller) resolveRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) pendingImport {
 	path := entry.ImportedPath()
 
-	return p.processPollImport(
+	return p.resolveImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
 			movie, err := ls.Radarr.MovieByID(ctx, entry.MovieID)

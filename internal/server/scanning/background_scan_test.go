@@ -68,6 +68,9 @@ func (e *fakeEngine) SearchTargets(_ context.Context, req *subflux.SearchRequest
 	if e.release != nil {
 		<-e.release
 	}
+	if result.WriteFailure != nil {
+		return result, result.WriteFailure
+	}
 	return result, nil
 }
 
@@ -243,6 +246,7 @@ type scanRig struct {
 	bg     *sync.WaitGroup
 	sonarr *fakeSonarr
 	radarr *fakeRadarr
+	media  *fakeMedia
 	h      *Handler
 }
 
@@ -261,6 +265,7 @@ func newScanRig(t *testing.T) *scanRig {
 		bg:     &sync.WaitGroup{},
 		sonarr: &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Test Show"}, episodes: epsWithFiles(1)},
 		radarr: &fakeRadarr{movie: arrapi.Movie{ID: 7, Title: "Test Movie", Year: 2020, MovieFile: &arrapi.MovieFile{Path: "/media/m.mkv"}}},
+		media:  &fakeMedia{},
 	}
 	rig.act = &recProgress{Log: rig.log}
 	cfg := rig.cfg
@@ -276,7 +281,7 @@ func newScanRig(t *testing.T) *scanRig {
 			return st, &LiveState{Cfg: cfg, Engine: rig.engine}
 		},
 		CtxFunc:         func() context.Context { return rig.ctx },
-		ScanDeps:        func() *Deps { return &Deps{Events: rig.ev, Activity: rig.act, Alerts: nopAlerts{}} },
+		ScanDeps:        func() *Deps { return &Deps{Events: rig.ev, Activity: rig.act, Alerts: nopAlerts{}, Media: rig.media} },
 		Activity:        rig.act,
 		Stops:           rig.stops,
 		ScanGuard:       rig.guard,
@@ -722,7 +727,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	ev := &recEvents{}
 	log := activity.New(10)
 	cfg := &fakeScanCfg{}
-	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
+	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}, Media: &fakeMedia{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
 		return ScanItem{Movie: &arrapi.Movie{ID: id, Title: title, MovieFile: &arrapi.MovieFile{Path: "/m.mkv"}}}
@@ -737,7 +742,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	}
 	res := make(chan result, 1)
 	go func() {
-		resumed, outcome := processItems(t.Context(), stop, deps, ls,
+		resumed, outcome, _ := processItems(t.Context(), stop, deps, ls,
 			queue, nil, &stats, "act1", 0)
 		res <- result{resumed, outcome}
 	}()
@@ -765,7 +770,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 	newDeps := func(db *fakeScanStore, ev *recEvents, log *activity.Log) *Deps {
 		return &Deps{
 			DB: db, Metrics: nopScanMetrics{}, Events: ev, Activity: log,
-			Alerts: nopAlerts{}, ClearCaches: func([]provider.Provider) {},
+			Alerts: nopAlerts{}, Media: &fakeMedia{}, ClearCaches: func([]provider.Provider) {},
 		}
 	}
 
@@ -777,7 +782,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		ls := &LiveState{Cfg: &fakeScanCfg{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
-		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID)
+		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID).Outcome
 		if outcome != activity.OutcomeCompleted {
 			t.Errorf("outcome = %q, want completed", outcome)
 		}
@@ -796,7 +801,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		outcome := RunFullScan(ctx, make(chan struct{}), deps, ls, actID)
+		outcome := RunFullScan(ctx, make(chan struct{}), deps, ls, actID).Outcome
 		if outcome != activity.OutcomeShutdown {
 			t.Errorf("outcome = %q, want shutdown", outcome)
 		}
@@ -961,7 +966,7 @@ func newFullScanRig(t *testing.T, result subflux.SearchResult) *fullScanRig {
 	}
 	rig.deps = &Deps{
 		DB: rig.db, Metrics: rig.metrics, Events: &recEvents{}, Activity: rig.log,
-		Alerts: rig.alerts, ClearCaches: func([]provider.Provider) {},
+		Alerts: rig.alerts, Media: &fakeMedia{}, ClearCaches: func([]provider.Provider) {},
 	}
 	rig.ls = &LiveState{
 		Cfg: rig.cfg, Engine: &fakeEngine{result: result},
@@ -983,7 +988,7 @@ func TestRunFullScan_totals_span_episodes_and_movies(t *testing.T) {
 	t.Parallel()
 	rig := newFullScanRig(t, foundOneSubtitle("/media/x.fr.srt"))
 
-	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID); outcome != activity.OutcomeCompleted {
+	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID).Outcome; outcome != activity.OutcomeCompleted {
 		t.Fatalf("RunFullScan outcome = %q, want completed", outcome)
 	}
 
@@ -1018,7 +1023,7 @@ func TestRunFullScan_summary_reports_the_backed_off_total(t *testing.T) {
 		Langs: []subflux.LangOutcome{{Lang: "fr", Kind: subflux.LangBackedOff}},
 	})
 
-	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID); outcome != activity.OutcomeCompleted {
+	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID).Outcome; outcome != activity.OutcomeCompleted {
 		t.Fatalf("RunFullScan outcome = %q, want completed", outcome)
 	}
 
@@ -1223,7 +1228,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 	ev := &recEvents{}
 	log := activity.New(10)
 	cfg := &fakeScanCfg{}
-	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
+	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}, Media: &fakeMedia{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
 		return ScanItem{Movie: &arrapi.Movie{ID: id, Title: title, MovieFile: &arrapi.MovieFile{Path: "/m.mkv"}}}
@@ -1234,7 +1239,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 
 	res := make(chan activity.Outcome, 1)
 	go func() {
-		_, outcome := processItems(t.Context(), stop, deps, ls,
+		_, outcome, _ := processItems(t.Context(), stop, deps, ls,
 			queue, nil, &stats, "act1", 0)
 		res <- outcome
 	}()
@@ -1377,7 +1382,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			depsCalls++
-			return &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
+			return &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}, Media: &fakeMedia{}}
 		},
 		Activity:        log,
 		Stops:           stops,

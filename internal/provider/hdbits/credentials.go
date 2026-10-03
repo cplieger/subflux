@@ -34,6 +34,22 @@ const (
 	statusAuthFailed      = 5
 )
 
+// apiStatusError classifies one API verdict: nil for success, *subflux.AuthError
+// for a refused username and passkey, a plain error for anything else. message
+// is upstream text the caller has already redacted.
+func apiStatusError(status int, message string) error {
+	switch status {
+	case statusSuccess:
+		return nil
+	case statusAuthDataMissing, statusAuthFailed:
+		return &subflux.AuthError{
+			Msg: fmt.Sprintf("HDBits refused the username and passkey (status %d: %s)", status, message),
+		}
+	default:
+		return fmt.Errorf("HDBits answered status %d: %s", status, message)
+	}
+}
+
 // CheckCredentials reports whether HDBits accepts the configured username and
 // passkey. A refusal is *subflux.AuthError; every other failure means the check
 // did not complete.
@@ -67,15 +83,5 @@ func (p *Provider) CheckCredentials(ctx context.Context) error {
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxErrorBodyBytes)).Decode(&result); err != nil {
 		return httpx.RedactSecret(fmt.Errorf("decode credential check: %w", err), p.passkey)
 	}
-	switch result.Status {
-	case statusSuccess:
-		return nil
-	case statusAuthDataMissing, statusAuthFailed:
-		return &subflux.AuthError{
-			Msg: fmt.Sprintf("HDBits refused the username and passkey (status %d: %s)",
-				result.Status, result.Message),
-		}
-	default:
-		return fmt.Errorf("HDBits answered status %d: %s", result.Status, result.Message)
-	}
+	return apiStatusError(result.Status, p.redact(result.Message))
 }

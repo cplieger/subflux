@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -274,13 +275,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	}
 
 	cfg := fakeManualCfg{}
-	scores := cfg.Scores()
-	sc := scorer.New(&scores)
-	engine := search.New(nil,
-		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
-		search.WithMetrics(obs.New()), search.WithScorer(sc),
-		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+	engine := downloadEngine(cfg, srtProvider{})
 
 	rec := &recordingActivity{details: map[string]string{}}
 	warns := &recordingWarns{}
@@ -300,7 +295,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	req.SetVideoPath(videoPath)
 
 	store := &recStore{}
-	if ok := RunDownload(t.Context(), deps, ls, store, srtProvider{}, req, "act-9"); !ok {
+	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-9"); !ok {
 		t.Fatal("RunDownload() = false, want success")
 	}
 
@@ -365,13 +360,7 @@ func TestRunDownload_rejects_zero_byte_payload(t *testing.T) {
 	}
 
 	cfg := fakeManualCfg{}
-	scores := cfg.Scores()
-	sc := scorer.New(&scores)
-	engine := search.New(nil,
-		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
-		search.WithMetrics(obs.New()), search.WithScorer(sc),
-		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+	engine := downloadEngine(cfg, emptyProvider{})
 
 	warns := &recordingWarns{}
 	store := &ordinalStore{}
@@ -389,7 +378,7 @@ func TestRunDownload_rejects_zero_byte_payload(t *testing.T) {
 	}
 	req.SetVideoPath(videoPath)
 
-	if RunDownload(t.Context(), deps, ls, store, emptyProvider{}, req, "act-1") {
+	if RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-1") {
 		t.Error("RunDownload() = true: a zero-byte download reported success")
 	}
 
@@ -476,23 +465,29 @@ func (p *seqProvider) Download(context.Context, *subflux.Subtitle) ([]byte, erro
 	return fmt.Appendf(nil, "1\n00:00:01,000 --> 00:00:02,000\nPayload %d.\n\n", n), nil
 }
 
+// downloadEngine builds a real engine over testsupport fakes whose only
+// provider is p, so RunDownload's fetch reaches p through the gate.
+func downloadEngine(cfg fakeManualCfg, p provider.Provider) *search.Engine {
+	scores := cfg.Scores()
+	return search.New([]provider.Provider{p},
+		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
+		search.WithMetrics(obs.New()), search.WithScorer(scorer.New(&scores)),
+		search.WithSyncer(syncing.Syncer{}),
+		search.WithTracks(embedded.Detector{}),
+		search.WithProviderGate(testsupport.ProviderGateBinding()), search.WithMediaWriter(testsupport.MediaWriter()))
+}
+
 // ordinalHarness builds the RunDownload collaborators for the ordinal
-// tests: a real engine over testsupport fakes, no-op sinks, and a fake
-// video file in a temp dir.
-func ordinalHarness(t *testing.T) (*SearchDeps, *LiveState, string) {
+// tests: a real engine serving p, no-op sinks, and a fake video file in a
+// temp dir.
+func ordinalHarness(t *testing.T, p provider.Provider) (*SearchDeps, *LiveState, string) {
 	t.Helper()
 	videoPath := filepath.Join(t.TempDir(), "movie.mkv")
 	if err := os.WriteFile(videoPath, []byte("fake video"), 0o600); err != nil {
 		t.Fatalf("write fake video: %v", err)
 	}
 	cfg := fakeManualCfg{}
-	scores := cfg.Scores()
-	sc := scorer.New(&scores)
-	engine := search.New(nil,
-		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
-		search.WithMetrics(obs.New()), search.WithScorer(sc),
-		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.Detector{}))
+	engine := downloadEngine(cfg, p)
 	deps := &SearchDeps{
 		DB:       &testsupport.NopStore{},
 		Activity: fakeActivity{},
@@ -529,13 +524,13 @@ func readFileT(t *testing.T, path string) string {
 // paths or the second download reuses .1 and overwrites the first.
 func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 	t.Parallel()
-	deps, ls, videoPath := ordinalHarness(t)
-	store := &ordinalStore{}
 	prov := &seqProvider{}
+	deps, ls, videoPath := ordinalHarness(t, prov)
+	store := &ordinalStore{}
 
 	for i := 1; i <= 2; i++ {
 		req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
-		if ok := RunDownload(t.Context(), deps, ls, store, prov, req, "act"); !ok {
+		if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act"); !ok {
 			t.Fatalf("RunDownload(top pick %d) = false, want success", i)
 		}
 	}
@@ -564,15 +559,15 @@ func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 // sequence at .2 rather than restarting at .1 over the top pick's file.
 func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 	t.Parallel()
-	deps, ls, videoPath := ordinalHarness(t)
-	store := &ordinalStore{}
 	prov := &seqProvider{}
+	deps, ls, videoPath := ordinalHarness(t, prov)
+	store := &ordinalStore{}
 
-	if ok := RunDownload(t.Context(), deps, ls, store, prov,
+	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
 		downloadReq(videoPath, "sub-top", true), "act"); !ok {
 		t.Fatal("RunDownload(top pick) = false, want success")
 	}
-	if ok := RunDownload(t.Context(), deps, ls, store, prov,
+	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
 		downloadReq(videoPath, "sub-manual", false), "act"); !ok {
 		t.Fatal("RunDownload(manual) = false, want success")
 	}
@@ -606,7 +601,8 @@ func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 // first download's committed row (handshake), and both payloads survive.
 func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) {
 	t.Parallel()
-	deps, ls, videoPath := ordinalHarness(t)
+	prov := &seqProvider{}
+	deps, ls, videoPath := ordinalHarness(t, prov)
 
 	entered := make(chan int, 2)
 	release := make(chan struct{})
@@ -614,7 +610,6 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 		entered <- committed
 		<-release
 	}}
-	prov := &seqProvider{}
 
 	start := make(chan struct{})
 	var wg sync.WaitGroup
@@ -623,7 +618,7 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 		wg.Go(func() {
 			req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
 			<-start
-			results[i] = RunDownload(t.Context(), deps, ls, store, prov, req, "act")
+			results[i] = RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act")
 		})
 	}
 	close(start)

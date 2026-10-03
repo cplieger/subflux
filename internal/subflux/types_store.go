@@ -32,6 +32,22 @@ type ScanRecord struct {
 	Searched bool
 }
 
+// ProviderAuthRecord is one provider's persisted credential-failure state, the
+// provider_auth bucket value. Fingerprint is an Argon2id PHC hash of the
+// provider's canonical settings, never the settings themselves; LastError is
+// provider error text that was already redacted and sanitized. A zero
+// DisabledAt means the provider is not disabled.
+type ProviderAuthRecord struct {
+	LastFailureAt time.Time  `json:"last_failure_at"`
+	NextAttemptAt time.Time  `json:"next_attempt_at"`
+	DisabledAt    time.Time  `json:"disabled_at"`
+	Provider      ProviderID `json:"provider"`
+	Fingerprint   string     `json:"fingerprint"`
+	LastError     string     `json:"last_error"`
+	FailedOps     []string   `json:"failed_ops"`
+	Failures      int        `json:"failures"`
+}
+
 // --- Store types (canonical, moved from store package) ---
 
 // BackoffParams groups adaptive backoff configuration for RecordNoResult.
@@ -222,12 +238,18 @@ type ScanStats struct {
 	EpisodesFound     int // Episodes where a subtitle was downloaded.
 	EpisodesNoResult  int // Episodes searched but no subtitle found.
 	EpisodesBackedOff int // Episodes where every needed provider was in adaptive backoff (no query ran).
-	SeriesSkipped     int // Series skipped by show-level pre-check.
+	// Episodes with candidates of which none was saved.
+	EpisodesDownloadFailed int
+	// Episodes skipped or stopped because their folder refuses writes.
+	EpisodesWriteBlocked int
+	SeriesSkipped        int // Series skipped by show-level pre-check.
 
 	// Post-scan outcomes for movies.
-	MoviesSearched  int
-	MoviesSkipped   int
-	MoviesFound     int
-	MoviesNoResult  int
-	MoviesBackedOff int
+	MoviesSearched       int
+	MoviesSkipped        int
+	MoviesFound          int
+	MoviesNoResult       int
+	MoviesBackedOff      int
+	MoviesDownloadFailed int
+	MoviesWriteBlocked   int
 }

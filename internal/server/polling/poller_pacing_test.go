@@ -19,9 +19,9 @@ func queriedResult(n int) subflux.SearchResult {
 	}}}
 }
 
-// processPollImport reports queried=true only when the engine's search
+// An import reports queried=true only when the engine's search
 // actually issued provider queries; every skip path reports false.
-func TestProcessPollImport_queried_follows_engine(t *testing.T) {
+func TestImport_queried_follows_engine(t *testing.T) {
 	buildOK := func(req *subflux.SearchRequest) func() (*ImportResult, error) {
 		return func() (*ImportResult, error) {
 			return &ImportResult{Req: req, Source: PollSourceSonarr, Label: "x"}, nil
@@ -36,9 +36,8 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
 		req := &subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1"}
-		retryable, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
-		if retryable || !queried {
-			t.Errorf("processPollImport = (retryable %v, queried %v), want (false, true)", retryable, queried)
+		if got := importOne(t.Context(), p, ls, path, buildOK(req), nil); got != (importResult{queried: true}) {
+			t.Errorf("importOne() = %+v, want only queried", got)
 		}
 	})
 
@@ -52,8 +51,7 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
 		req := &subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1"}
-		_, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
-		if queried {
+		if importOne(t.Context(), p, ls, path, buildOK(req), nil).queried {
 			t.Errorf("queried = true for a skipped-group result, want false")
 		}
 	})
@@ -61,10 +59,9 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 	t.Run("gone file skips without querying", func(t *testing.T) {
 		ls := &LiveState{Cfg: &mockCfg{langs: []string{"en"}}, Engine: &mockEngine{}}
 		p := &Poller{deps: fullDeps(&mockStore{})}
-		retryable, queried := p.processPollImport(t.Context(), ls,
-			"/nonexistent/gone.mkv", buildOK(nil), nil)
-		if retryable || queried {
-			t.Errorf("gone file = (retryable %v, queried %v), want (false, false)", retryable, queried)
+		if got := importOne(t.Context(), p, ls,
+			"/nonexistent/gone.mkv", buildOK(nil), nil); got != (importResult{}) {
+			t.Errorf("gone file = %+v, want nothing set", got)
 		}
 	})
 }

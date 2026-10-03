@@ -3,10 +3,11 @@
 import { el } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { providerTimeouts } from "./wire/client.gen.js";
-import { cfgProviderBlock, scalarString } from "./config-values.js";
+import { cfgProviderBlock, cfgUnrendered, scalarString } from "./config-values.js";
 import { mountConnTest } from "./conn-test.js";
 import { configBanner } from "./config-banner.js";
 import type { ProviderSchema, SchemaField, SchemaSection } from "./api-types.js";
+import type { ProviderStatus } from "./wire/types.gen.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
 
 // --- Inline interfaces for provider API shapes ---
@@ -125,13 +126,15 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
         if (!head) {
           continue;
         }
+        const health = providerHealth(status, Date.now());
         const badge = el(
           "span",
           {
             className: "badge badge-health",
-            "data-status": status.timed_out ? "err" : "ok",
+            "data-status": health.status,
+            ...(health.tip ? { "data-tip": health.tip } : {}),
           },
-          status.timed_out ? (status.last_error ?? "timed out") : "healthy",
+          health.text,
         );
         // Anchored on the toggle rather than on lastElementChild: the head's
         // last element is whatever was appended most recently, so a positional
@@ -145,6 +148,36 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
     });
 
   return sec;
+}
+
+interface ProviderHealth {
+  status: "ok" | "warn" | "err";
+  text: string;
+  tip?: string;
+}
+
+/** providerHealth names the one state a provider card's badge shows, most
+ *  severe first. `paused_for` is nanoseconds, like every duration on the wire. */
+export function providerHealth(status: ProviderStatus, now: number): ProviderHealth {
+  if (status.disabled) {
+    return {
+      status: "err",
+      text: "disabled: credentials rejected",
+      ...(status.disabled_reason ? { tip: status.disabled_reason } : {}),
+    };
+  }
+  if (status.timed_out) {
+    return { status: "err", text: status.last_error ?? "timed out" };
+  }
+  if (status.paused_for !== undefined && status.paused_for > 0) {
+    const until = new Date(now + status.paused_for / 1e6);
+    const hhmm = `${String(until.getHours()).padStart(2, "0")}:${String(until.getMinutes()).padStart(2, "0")}`;
+    return { status: "warn", text: `paused until ${hhmm}` };
+  }
+  if (status.rejected_settings && status.rejected_settings.length > 0) {
+    return { status: "warn", text: `setting rejected: ${status.rejected_settings.join(", ")}` };
+  }
+  return { status: "ok", text: "healthy" };
 }
 
 // appendProviderConnTest adds the credential-check control to a provider card
@@ -192,8 +225,9 @@ function settingScalar(v: string): unknown {
 // settings always emitted per rendered field. Empty secret settings ride
 // as "" so the server merges the stored value (schema-driven).
 export function genProviders(schema: SchemaSection): Record<string, unknown> {
-  const providers: Record<string, unknown> = {};
-  for (const prov of schema.providers ?? []) {
+  const rendered = schema.providers ?? [];
+  const providers = cfgUnrendered([schema.key], new Set(rendered.map((p) => p.name)));
+  for (const prov of rendered) {
     const block: Record<string, unknown> = {};
     const enEl = document.getElementById(
       `cfg-prov-${prov.name}-enabled`,
@@ -206,23 +240,26 @@ export function genProviders(schema: SchemaSection): Record<string, unknown> {
       const pri = Number(priEl.value);
       block["priority"] = Number.isFinite(pri) ? pri : priEl.value;
     }
-    if (prov.settings && prov.settings.length > 0) {
-      const settings: Record<string, unknown> = {};
-      for (const sf of prov.settings) {
-        const fEl = document.getElementById(
-          `cfg-prov-${prov.name}-s-${sf.key}`,
-        ) as HTMLInputElement | null;
-        if (!fEl) {
-          continue;
-        }
-        if (fEl.type === "checkbox") {
-          settings[sf.key] = fEl.checked;
-        } else {
-          // Covers empty secrets too: "" tells the server to keep the
-          // stored secret value.
-          settings[sf.key] = settingScalar(fEl.value);
-        }
+    const settings = cfgUnrendered(
+      [schema.key, prov.name, "settings"],
+      new Set((prov.settings ?? []).map((sf) => sf.key)),
+    );
+    for (const sf of prov.settings ?? []) {
+      const fEl = document.getElementById(
+        `cfg-prov-${prov.name}-s-${sf.key}`,
+      ) as HTMLInputElement | null;
+      if (!fEl) {
+        continue;
       }
+      if (fEl.type === "checkbox") {
+        settings[sf.key] = fEl.checked;
+      } else {
+        // Covers empty secrets too: "" tells the server to keep the
+        // stored secret value.
+        settings[sf.key] = settingScalar(fEl.value);
+      }
+    }
+    if ((prov.settings ?? []).length > 0 || Object.keys(settings).length > 0) {
       block["settings"] = settings;
     }
     providers[prov.name] = block;

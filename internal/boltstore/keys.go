@@ -22,6 +22,7 @@ const (
 	bucketScanState      = "scan_state"      // scanStateKey -> scanRec
 	bucketSyncOffsets    = "sync_offsets"    // syncOffsetKey(path) -> be64(offset_ms)
 	bucketPollState      = "poll_state"      // pollStateKey -> RFC3339 timestamp
+	bucketProviderAuth   = "provider_auth"   // provider id -> ProviderAuthRecord
 	bucketMeta           = "meta"            // schema versions + O(1) counters
 
 	// Auth-domain primaries: names owned by the shared internal/store/buckets
@@ -57,7 +58,8 @@ var (
 	coreBuckets = [][]byte{
 		[]byte(bucketSearchAttempts), []byte(bucketSubtitleState),
 		[]byte(bucketSubtitleFiles), []byte(bucketScanState),
-		[]byte(bucketSyncOffsets), []byte(bucketPollState), []byte(bucketMeta),
+		[]byte(bucketSyncOffsets), []byte(bucketPollState), []byte(bucketProviderAuth),
+		[]byte(bucketMeta),
 		[]byte(bucketIxStateQuad),
 		[]byte(bucketIxStateImported), []byte(bucketIxStateVideo),
 		[]byte(bucketIxScanAt),

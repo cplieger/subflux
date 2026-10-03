@@ -32,14 +32,17 @@ func (s *Server) schedulerDeps() *scheduler.Deps {
 		RecordStoreWriteError: s.recordStoreWriteError,
 		Stops:                 &s.stops,
 		ShowSkipCache:         s.showSkipCache,
+		Media:                 s.media,
+		Presence:              s.presence,
 		StateFunc: func() *scheduler.LiveState {
 			ls := s.state()
 			return &scheduler.LiveState{
-				Cfg:       ls.cfg,
-				Engine:    ls.engine,
-				Sonarr:    ls.sonarr,
-				Radarr:    ls.radarr,
-				Providers: ls.providers,
+				Cfg:         ls.cfg,
+				Engine:      ls.engine,
+				ShowCounter: showCounterOf(ls),
+				Sonarr:      ls.sonarr,
+				Radarr:      ls.radarr,
+				Providers:   ls.providers,
 			}
 		},
 		ScanningFlag:        &s.scanning,

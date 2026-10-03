@@ -1,11 +1,20 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 func TestNewProviderRegistry_registers_all_providers(t *testing.T) {
@@ -247,5 +256,65 @@ func TestProviderSchemaDefaults_all_normalize(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// acceptingRegistry is the real registry with every credential check passing,
+// so the test-connection endpoint runs over the real schemas without reaching
+// a provider.
+type acceptingRegistry struct{ *provider.Registry }
+
+func (acceptingRegistry) CheckCredentials(context.Context, subflux.ProviderID, map[string]any) error {
+	return nil
+}
+
+// A Test press on unchanged OpenSubtitles settings re-enables the provider it
+// disabled. The form sends its three checkboxes as "true"/"false" while the
+// live binding holds the booleans a save wrote, and the two must agree.
+func TestTestConnection_unchanged_opensubtitles_settings_clear_a_disable(t *testing.T) {
+	t.Parallel()
+	reg := acceptingRegistry{newProviderRegistry()}
+	saved := reg.Normalize(subflux.ProviderNameOpenSubtitles, map[string]any{
+		"username": "placeholder-user", "password": "placeholder-password", "api_key": "placeholder-api-key",
+		"use_hash": true, "include_ai_translated": false, "include_machine_translated": false,
+	})
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	gate, err := providergate.Open(t.Context(), providergate.Config{
+		Metrics: testsupport.NopGateMetrics{}, Now: func() time.Time { return at },
+	})
+	if err != nil {
+		t.Fatalf("Setup: providergate.Open: %v", err)
+	}
+	b := gate.Bind(map[subflux.ProviderID]map[string]any{subflux.ProviderNameOpenSubtitles: saved})
+	gate.Activate(b)
+	for range providergate.MaxAuthFailures {
+		b.Observe(t.Context(), subflux.ProviderNameOpenSubtitles, providergate.OpSearch, &subflux.AuthError{Msg: "HTTP 401"})
+		at = at.Add(time.Hour)
+	}
+	if !gate.Status()[subflux.ProviderNameOpenSubtitles].Disabled {
+		t.Fatal("Setup: opensubtitles is not disabled after the ladder")
+	}
+
+	h := confighandlers.New(&confighandlers.Deps{
+		Registry:     reg,
+		ProviderAuth: gate,
+		ConfigPath:   func() string { return filepath.Join(t.TempDir(), "config.yaml") },
+	})
+	body := `{"kind":"opensubtitles","settings":{"username":"placeholder-user",` +
+		`"password":"placeholder-password","api_key":"placeholder-api-key",` +
+		`"use_hash":"true","include_ai_translated":"false","include_machine_translated":"false"}}`
+	rec := httptest.NewRecorder()
+	h.HandleTestConnection(rec, httptest.NewRequestWithContext(t.Context(),
+		http.MethodPost, "/api/config/test-connection", strings.NewReader(body)))
+
+	var got confighandlers.ConnTestResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("HandleTestConnection = %d %q: %v", rec.Code, rec.Body.String(), err)
+	}
+	if !got.Valid || got.Message != "credentials accepted; provider re-enabled" {
+		t.Errorf("HandleTestConnection(unchanged settings) = %+v, want valid and re-enabled", got)
+	}
+	if gate.Status()[subflux.ProviderNameOpenSubtitles].Disabled {
+		t.Error("opensubtitles is still disabled after a passing check with its saved settings")
 	}
 }

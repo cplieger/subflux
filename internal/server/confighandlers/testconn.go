@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -26,7 +27,16 @@ type ConnTestResponse struct {
 	// keep the client's own text: an operator needs to tell "HTTP 401" from
 	// "connection refused", and a vocabulary in front of those would hide it.
 	Error string `json:"error,omitempty"`
-	Valid bool   `json:"valid"`
+	// Message says what a passing provider check did to a credential disable
+	// recorded against that provider; empty when there was none.
+	Message string `json:"message,omitempty"`
+	Valid   bool   `json:"valid"`
+}
+
+// ProviderAuthClearer clears a provider's credential disable when a passing
+// check used the settings the disable was recorded under.
+type ProviderAuthClearer interface {
+	ClearIfMatches(ctx context.Context, id subflux.ProviderID, settings map[string]any) providergate.ClearResult
 }
 
 // connTestRequest is one section's own settings, keyed by its schema — what a
@@ -112,7 +122,15 @@ func (h *Handler) testProviderCredentials(w http.ResponseWriter, r *http.Request
 		httpapi.WriteJSON(w, ConnTestResponse{Error: describeCredentialFailure(err)})
 		return
 	}
-	httpapi.WriteJSON(w, ConnTestResponse{Valid: true})
+	// Detached so a client that walks away cannot leave the clear half done.
+	cleared := h.providerAuth.ClearIfMatches(context.WithoutCancel(r.Context()), name,
+		h.registry.Normalize(name, resolved))
+	httpapi.WriteJSON(w, ConnTestResponse{Valid: true, Message: clearMessage[cleared]})
+}
+
+var clearMessage = map[providergate.ClearResult]string{
+	providergate.Cleared:  "credentials accepted; provider re-enabled",
+	providergate.Mismatch: "credentials accepted; save to apply them and re-enable the provider",
 }
 
 // resolveProviderSecrets turns the submitted settings into the map a factory

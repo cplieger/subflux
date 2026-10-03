@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -87,7 +87,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 
 	if len(resp.Errors) > 0 {
 		slog.Warn("betaseries: API returned errors",
-			"errors", runesafe.SanitizeSingleLineBounded(fmt.Sprint(resp.Errors), 256),
+			"errors", logsafe.RedactedField(fmt.Sprint(resp.Errors), httpx.Secret(p.token)),
 			"tvdb_id", req.TvdbID,
 			"season", req.Season,
 			"episode", req.Episode)

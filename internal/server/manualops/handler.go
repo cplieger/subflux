@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/langcode"
 	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -28,6 +31,7 @@ type HandlerDeps struct {
 	Activity   ActivityTracker
 	Alerts     WarnRecorder
 	Events     EventPublisher
+	Media      MediaWriter
 	StateFunc  func() *LiveState
 	BGTracker  BGTracker
 	ServerCtx  func() context.Context
@@ -203,14 +207,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 
 	ls := h.deps.StateFunc()
 
-	var prov provider.Provider
-	for _, p := range ls.Providers {
-		if p.Name() == req.Provider {
-			prov = p
-			break
-		}
-	}
-	if prov == nil {
+	if !slices.ContainsFunc(ls.Providers, func(p provider.Provider) bool { return p.Name() == req.Provider }) {
 		httpapi.BadRequestC(w, r, subflux.CodeSearchProviderDisabled, "provider not found")
 		return
 	}
@@ -228,6 +225,17 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	req.SetVideoPath(videoPath)
 
+	// A folder known or found unwritable refuses the download before any
+	// provider request.
+	if err := h.deps.Media.Preflight(r.Context(), mediawrite.PreflightRequest{
+		Folders: []string{filepath.Dir(videoPath)}, Raise: true,
+	}); err != nil {
+		if r.Context().Err() == nil {
+			httpapi.ConflictC(w, r, subflux.CodeMediaUnwritable, err.Error())
+		}
+		return
+	}
+
 	slog.Info("manual download requested",
 		"provider", req.Provider, "subtitle_id", req.SubtitleID,
 		"file", videoPath, "lang", req.Language)
@@ -241,7 +249,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.deps.BGTracker.Go(func() {
-		h.runManualDownload(ls, prov, &req, actID)
+		h.runManualDownload(ls, &req, actID)
 	})
 }
 
@@ -251,9 +259,7 @@ type DownloadAccepted struct {
 	Status     string `json:"status"`
 }
 
-func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
-	req *DownloadRequest, actID string,
-) {
+func (h *Handler) runManualDownload(ls *LiveState, req *DownloadRequest, actID string) {
 	serverCtx := h.deps.ServerCtx()
 	ctx, cancel := context.WithTimeout(serverCtx, DownloadTimeout)
 	defer cancel()
@@ -272,7 +278,7 @@ func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
 		Events:   h.deps.Events,
 	}
 
-	success := RunDownload(ctx, deps, ls, h.deps.DBFunc(), prov, req, actID)
+	success := RunDownload(ctx, deps, ls, h.deps.DBFunc(), h.deps.Media, req, actID)
 	if success {
 		h.deps.Activity.End(actID)
 	} else {

@@ -271,7 +271,9 @@ type searchResult struct {
 }
 
 type searchResponse struct {
-	Data []searchResult `json:"data"`
+	Success *bool          `json:"success"`
+	Error   string         `json:"error,omitempty"`
+	Data    []searchResult `json:"data"`
 }
 
 type subtitleItem struct {
@@ -379,7 +381,42 @@ func (p *Provider) doSearch(ctx context.Context, params url.Values) ([]searchRes
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
 	}
+	if result.Success != nil && !*result.Success {
+		return nil, p.apiFailure(result.Error)
+	}
 	return result.Data, nil
+}
+
+// API failure vocabularies for a success:false answer arriving as HTTP 200,
+// matched case-insensitively.
+var (
+	keyRefusalPatterns = []string{"api key", "api_key", "unauthorized", "not authorized"}
+	notFoundPatterns   = []string{"not found", "no subtitles", "no results"}
+)
+
+// apiFailure classifies a success:false answer: a refused key is
+// *subflux.AuthError, a not-found answer is no error (no results), anything
+// else a plain error. The text is redacted of the API key and bounded.
+func (p *Provider) apiFailure(msg string) error {
+	text := logsafe.RedactedField(msg, httpx.Secret(p.apiKey))
+	lower := strings.ToLower(text)
+	switch {
+	case containsAny(lower, keyRefusalPatterns):
+		return &subflux.AuthError{Msg: "SubSource refused the API key: " + text}
+	case containsAny(lower, notFoundPatterns):
+		return nil
+	default:
+		return fmt.Errorf("subsource API: %q", text)
+	}
+}
+
+func containsAny(s string, patterns []string) bool {
+	for _, p := range patterns {
+		if strings.Contains(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // matchTitle finds the first search result whose title contains the query
@@ -430,11 +467,7 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 	}
 
 	if !result.Success {
-		// API-level failure arriving as HTTP 200 (mirrors subdl's
-		// status=false path).
-		slog.Warn("subsource: API returned success=false",
-			"title_id", titleID, "lang", isoLang, "error", result.Error)
-		return nil, nil
+		return nil, p.apiFailure(result.Error)
 	}
 
 	return buildSubtitles(result.Data, isoLang, req.Season, req.Episode), nil

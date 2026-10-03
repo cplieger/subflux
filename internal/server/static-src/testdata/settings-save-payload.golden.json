@@ -1,0 +1,202 @@
+{
+  "sonarr": {
+    "enabled": true,
+    "url": "http://sonarr:8989",
+    "api_key": "",
+    "public_url": "https://sonarr.example.com"
+  },
+  "radarr": {
+    "enabled": true,
+    "url": "http://radarr:7878",
+    "api_key": "",
+    "public_url": "https://radarr.example.com"
+  },
+  "media_roots": [
+    "/media/tv",
+    "/media/movies"
+  ],
+  "trusted_proxies": [
+    "10.0.0.0/8"
+  ],
+  "allowed_hosts": [
+    "subflux.example.com"
+  ],
+  "poll_interval": "45s",
+  "languages": {
+    "rules": [
+      {
+        "audio": "fr",
+        "subtitles": [
+          {
+            "code": "en",
+            "variant": "forced"
+          }
+        ]
+      },
+      {
+        "audio": "ja",
+        "subtitles": [
+          {
+            "code": "en",
+            "min_score": 70,
+            "providers": [
+              "opensubtitles",
+              "animetosho"
+            ],
+            "exclude": [
+              "yifysubtitles"
+            ]
+          },
+          {
+            "code": "fr",
+            "variants": [
+              "standard",
+              "forced"
+            ]
+          }
+        ]
+      }
+    ],
+    "default": [
+      {
+        "code": "en",
+        "min_score": 55,
+        "variant": "hi"
+      },
+      {
+        "code": "fr"
+      }
+    ]
+  },
+  "embedded_subtitles": {
+    "ignore_pgs": true,
+    "ignore_vobsub": false,
+    "ignore_ass": true
+  },
+  "providers": {
+    "animetosho": {
+      "enabled": false,
+      "priority": 8,
+      "settings": {
+        "anidb_client_key": ""
+      }
+    },
+    "betaseries": {
+      "enabled": false,
+      "priority": 3,
+      "settings": {
+        "token": ""
+      }
+    },
+    "gestdown": {
+      "enabled": false,
+      "priority": 4
+    },
+    "hdbits": {
+      "enabled": false,
+      "priority": 1,
+      "settings": {
+        "username": "placeholder-hdbits-user",
+        "passkey": ""
+      }
+    },
+    "opensubtitles": {
+      "enabled": false,
+      "priority": 2,
+      "settings": {
+        "username": "placeholder-os-user",
+        "password": "",
+        "api_key": "",
+        "use_hash": false,
+        "include_ai_translated": true,
+        "include_machine_translated": false
+      }
+    },
+    "subdl": {
+      "enabled": false,
+      "priority": 7,
+      "settings": {
+        "api_key": ""
+      }
+    },
+    "subsource": {
+      "enabled": false,
+      "priority": 5,
+      "settings": {
+        "api_key": ""
+      }
+    },
+    "yifysubtitles": {
+      "enabled": false,
+      "priority": 9
+    }
+  },
+  "search": {
+    "max_provider_concurrency": 3,
+    "scan_interval": "12h",
+    "scan_delay": "6s",
+    "provider_timeout": "2h",
+    "min_score": 40,
+    "exclude_arr_tags": [
+      "no-subflux",
+      "skip-subs"
+    ],
+    "upgrade_enabled": true,
+    "upgrade_window_days": 5
+  },
+  "adaptive": {
+    "enabled": true,
+    "initial_delay": "3D",
+    "max_delay": "60D",
+    "backoff_multiplier": 3,
+    "max_attempts": 6
+  },
+  "post_processing": {
+    "sync_min_confidence": 0.4,
+    "sync_subtitles": true,
+    "audio_sync_fallback": true,
+    "strip_hi": true,
+    "strip_tags": false,
+    "normalize_utf8": true,
+    "normalize_endings": false,
+    "clean_whitespace": true,
+    "remove_empty": false
+  },
+  "auth": {
+    "basic_enabled": true,
+    "oidc_enabled": true,
+    "oidc": {
+      "issuer_url": "https://auth.example.com/application/o/subflux/",
+      "client_id": "placeholder-oidc-client-id",
+      "client_secret": "",
+      "redirect_uri": "https://subflux.example.com/api/auth/oidc/callback"
+    },
+    "oidc_auto_redirect": false,
+    "session_idle_timeout": "12h",
+    "session_absolute_timeout": "5D",
+    "check_breached_passwords": false,
+    "webauthn_rp_id": "subflux.example.com"
+  },
+  "scoring": {
+    "weights": {
+      "hash": 100,
+      "source": 27,
+      "release_group": 22,
+      "streaming_service": 13,
+      "video_codec": 11,
+      "hdr": 9,
+      "edition": 16,
+      "season_pack": 14
+    }
+  },
+  "backup": {
+    "enabled": true,
+    "frequency": "12h",
+    "retention": 4,
+    "path": "/config/backups"
+  },
+  "logging": {
+    "level": "debug",
+    "format": "text"
+  }
+}

@@ -133,6 +133,7 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[mediahandlers.SeasonGroup](),
 		wiregen.TypeRef[mediahandlers.EpisodeItem](),
 		wiregen.TypeRef[manualops.ManualSearchResponse](),
+		wiregen.TypeRef[manualops.ManualProviderNotice](),
 		wiregen.TypeRef[manualops.SearchResult](),
 		wiregen.TypeRef[manualops.DownloadAccepted](),
 		wiregen.TypeRef[manualops.DownloadRequest](),
