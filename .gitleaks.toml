@@ -42,6 +42,9 @@ useDefault = true
 #   the adjacent literal (`Key: "normalize_utf8"`), which is a form identifier
 #   the web UI renders, not a value that authenticates anything.
 #
+#   static-src/testdata/settings-*.json are that same schema and a settings
+#   payload rendered to JSON for the frontend tests (`"key": "normalize_utf8"`).
+#
 # `targetRules` is load-bearing, so never simplify this to a bare `paths` list.
 # Scoping to the one low-precision heuristic rule keeps every provider rule
 # (github-pat, aws-access-token, private-key blocks) live over these same
@@ -54,4 +57,5 @@ targetRules = ["generic-api-key"]
 paths = [
   '''_test\.go$''',
   '''(^|/)internal/config/schema/sections_providers\.go$''',
+  '''(^|/)internal/server/static-src/testdata/settings-[^/]+\.json$''',
 ]
