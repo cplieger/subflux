@@ -144,6 +144,10 @@ export default [
         "error",
         { allowNumber: true, allowBoolean: true, allowNullish: false },
       ],
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: true },
+      ],
       // Console policy.
       "no-console": ["warn", { allow: ["warn", "error"] }],
       // Equality: enforce strict ===.
