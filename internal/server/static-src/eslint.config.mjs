@@ -128,6 +128,10 @@ export default [
         "error",
         { checksVoidReturn: { attributes: false } },
       ],
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: true },
+      ],
       // Prefer literal numeric/string template parts (catches accidental coercion).
       "@typescript-eslint/restrict-template-expressions": [
         "error",
