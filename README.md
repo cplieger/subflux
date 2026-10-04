@@ -106,7 +106,7 @@ Create the admin account right after the first start. Until one exists, the firs
 
 Logins use passwords, passkeys or OIDC, and an admin can create API keys for the command line. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
-The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/security.md) covers reverse proxies, passkeys and what the image contains.
+The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
 
 ## Troubleshooting
 
@@ -128,7 +128,7 @@ subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Eight Prom
 
 - [Configuration](docs/configuration.md) lists every setting and command, for anyone writing `config.yaml` by hand.
 - [How subflux works](docs/how-it-works.md) covers scoring, timing, credential handling and the limits.
-- [Security](docs/security.md) covers reverse proxies, passkeys and what the image contains.
+- [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
 - [Monitoring and alerts](docs/monitoring.md) lists the metrics and the alert rules.
 - [Database maintenance](docs/database-maintenance.md) covers recovering and compacting the database.
 

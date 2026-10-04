@@ -72,7 +72,7 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `auth.check_breached_passwords` | `true` | Refuse passwords found in known breaches |
 | `auth.oidc_enabled`, `auth.oidc` | `false` | Single sign-on through OIDC, with `issuer_url`, `client_id`, `client_secret` and `redirect_uri` |
 | `auth.oidc_auto_redirect` | `false` | Send the login page straight to the OIDC provider |
-| `auth.webauthn_rp_id` | _(unset)_ | The passkey domain. subflux fills it in on the first settings save. See [Security](security.md) |
+| `auth.webauthn_rp_id` | _(unset)_ | The passkey domain. subflux fills it in on the first settings save. See [Security](hardening.md) |
 | `auth.session_idle_timeout` | `24h` | Sign a session out after this long without use |
 | `auth.session_absolute_timeout` | `168h` | Sign a session out after this long in any case |
 | `auth.disable_auth` | `false` | Turn login off and treat every request as an admin |
