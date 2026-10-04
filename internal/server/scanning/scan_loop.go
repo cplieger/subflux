@@ -149,13 +149,13 @@ func completeFullScan(ctx context.Context, deps *Deps, ls *LiveState, stats *sub
 		stats.EpisodesSearched+stats.MoviesSearched,
 		dur.String())
 	if backedOff := stats.EpisodesBackedOff + stats.MoviesBackedOff; backedOff > 0 {
-		summary += fmt.Sprintf(" (%d backed off)", backedOff)
+		summary += fmt.Sprintf(", %d backed off", backedOff)
 	}
 	if failed := stats.EpisodesDownloadFailed + stats.MoviesDownloadFailed; failed > 0 {
-		summary += fmt.Sprintf(" (%d download failed)", failed)
+		summary += fmt.Sprintf(", %d download failed", failed)
 	}
 	if blocked := stats.EpisodesWriteBlocked + stats.MoviesWriteBlocked; blocked > 0 {
-		summary += fmt.Sprintf(" (%d in unwritable folders)", blocked)
+		summary += fmt.Sprintf(", %d in unwritable folders", blocked)
 	}
 	deps.Alerts.RecordInfo(summary)
 	slog.Info("scan results: episodes",

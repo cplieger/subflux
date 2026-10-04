@@ -384,7 +384,7 @@ func (c *Checker) faultLocked(root, owner string, err error) []func() {
 		return nil
 	}
 	c.faults[root] = &fault{err: err, path: owner}
-	msg := fmt.Sprintf("Media root %s cannot be read (%s: %v). Nothing under it is treated as deleted, "+
+	msg := fmt.Sprintf("Media root %s cannot be read. Reading %s failed with %v. Nothing under it is treated as deleted, "+
 		"and new imports there wait, until it can be read again. Check that the share is mounted.",
 		root, owner, err)
 	return []func(){

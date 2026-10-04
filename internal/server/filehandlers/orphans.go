@@ -373,11 +373,11 @@ func (h *Handler) deleteOrphan(ctx context.Context, w http.ResponseWriter, r *ht
 	switch res {
 	case redeemUnknown:
 		httpapi.NotFoundC(w, r, "orphan_handle_unknown",
-			"unknown orphan handle; reload the file list")
+			"unknown orphan handle. Reload the file list")
 		return
 	case redeemExpired:
 		httpapi.JSONErrorWithCode(w, r, http.StatusGone, "orphan_handle_expired",
-			"orphan handle expired; reload the file list")
+			"orphan handle expired. Reload the file list")
 		return
 	case redeemOK:
 	}
@@ -398,7 +398,7 @@ func (h *Handler) deleteOrphan(ctx context.Context, w http.ResponseWriter, r *ht
 		slog.Warn("orphan delete: metadata changed since listing, refusing",
 			"recorded_size", entry.size, "current_size", fi.Size())
 		httpapi.ConflictC(w, r, "orphan_changed",
-			"file changed since listing; reload the file list")
+			"file changed since listing. Reload the file list")
 		return
 	}
 

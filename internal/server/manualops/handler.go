@@ -166,7 +166,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isValidLockVariant(key.Variant) {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid variant: want standard, hi or forced")
 		return
 	}
 

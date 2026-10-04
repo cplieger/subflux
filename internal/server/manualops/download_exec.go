@@ -53,7 +53,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		alert := fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider)
+		alert := fmt.Sprintf("Downloaded file from %s is not a valid subtitle. The archive format may be unsupported.", req.Provider)
 		if errors.Is(err, subtitlefile.ErrEmpty) {
 			alert = fmt.Sprintf("%s returned an empty file for this subtitle", req.Provider)
 		}

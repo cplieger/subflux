@@ -18,7 +18,7 @@
         "key": "api_key",
         "label": "API Key",
         "type": "secret",
-        "help": "From Settings \u003e General in Sonarr",
+        "help": "In Sonarr, open Settings, then General",
         "secret": true,
         "required": true
       },
@@ -26,7 +26,7 @@
         "key": "public_url",
         "label": "Public URL",
         "type": "text",
-        "help": "Browser-accessible URL for web UI links (falls back to URL if empty)",
+        "help": "Browser-accessible URL for web UI links. If empty, URL is used.",
         "placeholder": "https://sonarr.example.com"
       }
     ],
@@ -51,7 +51,7 @@
         "key": "api_key",
         "label": "API Key",
         "type": "secret",
-        "help": "From Settings \u003e General in Radarr",
+        "help": "In Radarr, open Settings, then General",
         "secret": true,
         "required": true
       },
@@ -59,7 +59,7 @@
         "key": "public_url",
         "label": "Public URL",
         "type": "text",
-        "help": "Browser-accessible URL for web UI links (falls back to URL if empty)",
+        "help": "Browser-accessible URL for web UI links. If empty, URL is used.",
         "placeholder": "https://radarr.example.com"
       }
     ],
@@ -90,7 +90,7 @@
         "key": "cidr",
         "label": "Proxy CIDR",
         "type": "text",
-        "help": "Proxy IP range in CIDR notation; a single proxy is a /32 (e.g. 192.168.1.5/32)",
+        "help": "Proxy IP range in CIDR notation. A single proxy is a /32, for example 192.168.1.5/32.",
         "placeholder": "10.0.0.0/8"
       }
     ]
@@ -99,13 +99,13 @@
     "key": "allowed_hosts",
     "title": "Allowed Hosts",
     "type": "list",
-    "help": "Exact hostnames or IPs subflux answers for. When set, a request whose Host header is not listed is rejected with 403, blocking DNS-rebinding attacks against the browser session. Requests from localhost (e.g. the container healthcheck) always pass. Leave empty to accept any Host.",
+    "help": "Exact hostnames or IPs subflux answers for. When set, a request whose Host header is not listed is rejected with 403, blocking DNS-rebinding attacks against the browser session. Requests from localhost, such as the container healthcheck, always pass. Leave empty to accept any Host.",
     "fields": [
       {
         "key": "host",
         "label": "Hostname or IP",
         "type": "text",
-        "help": "Bare hostname or IP, no scheme, path, or port (e.g. subflux.example.com or 192.168.1.5)",
+        "help": "Bare hostname or IP without a scheme, path or port, for example subflux.example.com or 192.168.1.5",
         "placeholder": "subflux.example.com"
       }
     ]
@@ -143,21 +143,21 @@
         "label": "Ignore PGS",
         "type": "bool",
         "default": "true",
-        "help": "Treat PGS bitmap subs (Blu-ray) as not usable: still tracked in coverage, but external subtitles are searched."
+        "help": "Treat Blu-ray PGS bitmap subtitles as not usable. They stay in coverage, but external subtitles are searched."
       },
       {
         "key": "ignore_vobsub",
         "label": "Ignore VobSub",
         "type": "bool",
         "default": "true",
-        "help": "Treat VobSub bitmap subs (DVD) as not usable: still tracked in coverage, but external subtitles are searched."
+        "help": "Treat DVD VobSub bitmap subtitles as not usable. They stay in coverage, but external subtitles are searched."
       },
       {
         "key": "ignore_ass",
         "label": "Ignore ASS",
         "type": "bool",
         "default": "false",
-        "help": "Treat ASS/SSA styled subs (anime) as not usable: still tracked in coverage, but external subtitles are searched."
+        "help": "Treat ASS/SSA styled subtitles, common in anime, as not usable. They stay in coverage, but external subtitles are searched."
       }
     ]
   },
@@ -174,7 +174,7 @@
             "key": "anidb_client_key",
             "label": "AniDB Client Key",
             "type": "secret",
-            "help": "Optional; enables AniDB episode ID search",
+            "help": "Optional. Enables AniDB episode ID search",
             "secret": true
           }
         ],
@@ -247,7 +247,7 @@
             "label": "Use Hash",
             "type": "bool",
             "default": "true",
-            "help": "Match by file hash (fast, exact)"
+            "help": "Match by file hash, which is fast and exact"
           },
           {
             "key": "include_ai_translated",
@@ -261,7 +261,7 @@
             "label": "Include Machine Translated",
             "type": "bool",
             "default": "false",
-            "help": "Include older machine-translated uploads (Google Translate era)"
+            "help": "Include older machine-translated uploads from the Google Translate era"
           }
         ],
         "conn_test": true
@@ -319,7 +319,7 @@
         "label": "Scan Delay",
         "type": "duration",
         "default": "5s",
-        "help": "Delay after items that queried providers during scans, to avoid hammering them (minimum 5s; items needing no provider work skip it)",
+        "help": "Delay after each item that queried providers during a scan, so providers are not overloaded (minimum 5s). Items that need no provider work skip the delay.",
         "placeholder": "5s",
         "min": "5s"
       },
@@ -328,7 +328,7 @@
         "label": "Provider Timeout",
         "type": "duration",
         "default": "1h",
-        "help": "Cooldown after a provider fails repeatedly (minimum 1h, 0 to disable)",
+        "help": "Cooldown after a provider fails repeatedly (minimum 1h). Set 0 to disable.",
         "placeholder": "1h",
         "min": "1h"
       },
@@ -337,7 +337,7 @@
         "label": "Min Score",
         "type": "number",
         "default": "0",
-        "help": "Global minimum score threshold (0 = accept any match)",
+        "help": "Global minimum score threshold. 0 accepts any match.",
         "placeholder": "0",
         "min": "0",
         "max": "100"
@@ -407,7 +407,7 @@
         "label": "Max Attempts",
         "type": "number",
         "default": "0",
-        "help": "Stop retrying after this many attempts (0 = retry forever)",
+        "help": "Stop retrying after this many attempts. 0 retries forever.",
         "placeholder": "0",
         "min": "0"
       }
@@ -452,14 +452,14 @@
         "label": "Normalize UTF-8",
         "type": "bool",
         "default": "true",
-        "help": "Convert subtitle encoding to UTF-8 (handles UTF-16, Windows-1252)"
+        "help": "Convert subtitle encoding to UTF-8, including from UTF-16 and Windows-1252"
       },
       {
         "key": "normalize_endings",
         "label": "Normalize Endings",
         "type": "bool",
         "default": "true",
-        "help": "Convert line endings to CRLF (SRT standard)"
+        "help": "Convert line endings to CRLF, the SRT standard"
       },
       {
         "key": "clean_whitespace",
@@ -557,7 +557,7 @@
         "key": "webauthn_rp_id",
         "label": "WebAuthn RP ID",
         "type": "text",
-        "help": "The registrable domain your passkeys are scoped to. Filled in automatically from the address you first save from; changing it strands existing passkeys. Clearing it keeps the stored value.",
+        "help": "The registrable domain your passkeys are scoped to. Filled in automatically from the address you first save from. Changing it strands existing passkeys. Clearing it keeps the stored value.",
         "placeholder": "example.com"
       }
     ]
@@ -573,56 +573,56 @@
         "label": "Hash",
         "type": "number",
         "default": "100",
-        "help": "File hash match (authoritative, bypasses other weights)"
+        "help": "File hash match. It is authoritative and bypasses the other weights."
       },
       {
         "key": "source",
         "label": "Source",
         "type": "number",
         "default": "28",
-        "help": "BluRay, WEB-DL, HDTV, DVDRip, etc."
+        "help": "Release source, for example BluRay, WEB-DL, HDTV or DVDRip"
       },
       {
         "key": "release_group",
         "label": "Release Group",
         "type": "number",
         "default": "23",
-        "help": "Scene group name (e.g. SPARKS, FGT)"
+        "help": "Scene group name, for example SPARKS or FGT"
       },
       {
         "key": "streaming_service",
         "label": "Streaming Service",
         "type": "number",
         "default": "14",
-        "help": "AMZN, NF, DSNP, ATVP, etc."
+        "help": "Streaming service, for example AMZN, NF, DSNP or ATVP"
       },
       {
         "key": "video_codec",
         "label": "Video Codec",
         "type": "number",
         "default": "10",
-        "help": "x264, x265, AV1, etc."
+        "help": "Video codec, for example x264, x265 or AV1"
       },
       {
         "key": "hdr",
         "label": "HDR",
         "type": "number",
         "default": "8",
-        "help": "HDR10, Dolby Vision, HDR10+, etc."
+        "help": "HDR format, for example HDR10, Dolby Vision or HDR10+"
       },
       {
         "key": "edition",
         "label": "Edition",
         "type": "number",
         "default": "15",
-        "help": "Director's Cut, Extended, Theatrical (movies only)"
+        "help": "Movie edition, for example Director's Cut, Extended or Theatrical. Movies only."
       },
       {
         "key": "season_pack",
         "label": "Season Pack",
         "type": "number",
         "default": "15",
-        "help": "Bonus for season packs (consistent subs across episodes)"
+        "help": "Bonus for season packs, which keep subtitles consistent across episodes"
       }
     ]
   },
@@ -646,7 +646,7 @@
         "label": "Retention",
         "type": "number",
         "default": "7",
-        "help": "How many backup files to keep; older ones are pruned.",
+        "help": "How many backup files to keep. Older ones are pruned.",
         "min": "1"
       },
       {
@@ -693,7 +693,7 @@
         "label": "Format",
         "type": "select",
         "default": "json",
-        "help": "JSON for log aggregation (Loki/Alloy), text for terminal debugging",
+        "help": "JSON for log aggregation such as Loki or Alloy, text for terminal debugging",
         "options": [
           {
             "value": "json",

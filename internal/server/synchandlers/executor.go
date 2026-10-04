@@ -121,8 +121,8 @@ func (e *AudioExecutor) apply(ctx context.Context, path string, result *subsync.
 	}
 
 	if err := e.Store.SetSyncOffset(ctx, path, cumulative); err != nil {
-		return fmt.Errorf("file saved but offset tracking failed at %dms cumulative "+
-			"(re-open the sync dialog to verify): %w", cumulative, err)
+		return fmt.Errorf("file saved but offset tracking failed at %dms cumulative. %w. "+
+			"Reopen the sync dialog to verify", cumulative, err)
 	}
 	return nil
 }

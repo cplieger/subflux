@@ -1245,7 +1245,7 @@ async function renderSeasonBatch(
     aggregate.textContent =
       jobs === null
         ? "Could not load the batch state. Close and reopen to retry."
-        : "This batch is gone (a server restart drops it). Start a new sync.";
+        : "This batch is gone. A server restart drops batches. Start a new sync.";
     installSeasonView(dlg, header, body, el("div", { className: "dlg-foot" }, closeBtn));
     return;
   }

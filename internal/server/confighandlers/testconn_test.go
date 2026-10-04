@@ -369,7 +369,7 @@ func TestDescribeArrFailure(t *testing.T) {
 		{
 			name: "404 names the base path",
 			err:  &arrapi.StatusError{Code: http.StatusNotFound},
-			want: "HTTP 404: no arr API at this URL; check for a missing or extra base path",
+			want: "the server at this URL answered HTTP 404 but has no arr API. Check for a missing or extra base path",
 		},
 		{
 			name: "any other status is reported without a claim about the cause",
@@ -745,7 +745,7 @@ func TestHandleTestConnection_provider_check_clears_a_matching_disable(t *testin
 		t.Parallel()
 		gate := disabledGate(t, nil, recorded)
 		got := check(t, gate, matching)
-		if !got.Valid || got.Message != "credentials accepted; provider re-enabled" {
+		if !got.Valid || got.Message != "credentials accepted. Provider re-enabled" {
 			t.Errorf("HandleTestConnection(recorded settings) = %+v, want valid and re-enabled", got)
 		}
 		if gate.Status()["opensubtitles"].Disabled {
@@ -756,7 +756,7 @@ func TestHandleTestConnection_provider_check_clears_a_matching_disable(t *testin
 		t.Parallel()
 		gate := disabledGate(t, nil, recorded)
 		got := check(t, gate, `{"kind":"opensubtitles","settings":{"username":"u","password":"p2","api_key":"k"}}`)
-		if !got.Valid || got.Message != "credentials accepted; save to apply them and re-enable the provider" {
+		if !got.Valid || got.Message != "credentials accepted. Save to apply them and re-enable the provider" {
 			t.Errorf("HandleTestConnection(other settings) = %+v, want valid and asked to save", got)
 		}
 		if !gate.Status()["opensubtitles"].Disabled {
@@ -768,7 +768,7 @@ func TestHandleTestConnection_provider_check_clears_a_matching_disable(t *testin
 		store := &gateStore{}
 		disabledGate(t, store, recorded)
 		got := check(t, openGate(t, store), matching)
-		if got.Message != "credentials accepted; provider re-enabled" || store.count() != 0 {
+		if got.Message != "credentials accepted. Provider re-enabled" || store.count() != 0 {
 			t.Errorf("HandleTestConnection(unconfigured) = %+v with %d stored record(s), want re-enabled and none",
 				got, store.count())
 		}

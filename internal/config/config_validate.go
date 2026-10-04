@@ -29,7 +29,7 @@ var (
 	ErrNoArr = errors.New("at least one of sonarr or radarr must be configured")
 
 	// ErrNoDefaultLang indicates the languages.default section is empty.
-	ErrNoDefaultLang = errors.New("languages.default must contain at least one subtitle target; every item must have a fallback set of subtitles to look for")
+	ErrNoDefaultLang = errors.New("languages.default must contain at least one subtitle target. Every item must have a fallback set of subtitles to look for")
 
 	// ErrDuplicateAudioRule indicates a duplicate audio language rule was found.
 	ErrDuplicateAudioRule = errors.New("duplicate audio language rule")
@@ -159,7 +159,7 @@ func validate(ctx context.Context, cfg *Config) error {
 	}
 	warnIllegalWebAuthnRPID(cfg.Auth.WebAuthnRPID)
 	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
-		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true (otherwise no one could log in); a CLI override can re-enable it"))
+		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it"))
 	}
 	if len(cfg.MediaRootDirs) == 0 {
 		slog.Warn("media_roots not configured, path-based operations (preview, sync, manual download, subtitle deletion) will be refused")

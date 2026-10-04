@@ -205,7 +205,7 @@ func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
 	defer h.saveMu.Unlock()
 
 	if h.configured() {
-		httpapi.ConflictC(w, r, subflux.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "server is already configured. Reset is only available in unconfigured mode")
 		return
 	}
 	if len(h.defaultConfig) == 0 {

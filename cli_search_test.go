@@ -402,7 +402,7 @@ func TestCLISearch_download_id_absent_exit1(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("cliSearchRemote(entry gone) = %d, want 1\noutput:\n%s", code, buf.String())
 	}
-	if !bytes.Contains(buf.Bytes(), []byte("Download outcome unknown (activity entry gone)")) {
+	if !bytes.Contains(buf.Bytes(), []byte("Download outcome unknown because the activity entry is gone")) {
 		t.Errorf("output missing unknown-outcome report\noutput:\n%s", buf.String())
 	}
 }

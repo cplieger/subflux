@@ -60,7 +60,7 @@ func serverURL() (string, bool) {
 	u = strings.TrimRight(strings.TrimSpace(u), "/")
 	parsed, err := url.Parse(u)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		fmt.Fprintf(os.Stderr, "Error: invalid SUBFLUX_URL %q (must be http:// or https://)\n", u)
+		fmt.Fprintf(os.Stderr, "Error: invalid SUBFLUX_URL %q. It must start with http:// or https://\n", u)
 		return "", false
 	}
 	return u, true
@@ -409,7 +409,7 @@ func runCLISearchRemote(p cliparse.Params) int {
 // disambiguation required.
 func cliSearchRemote(p cliparse.Params, rc *searchRunConfig) int {
 	if p.String("imdb") == "" && p.String("tmdb") == "" && p.String("title") == "" {
-		fmt.Fprintln(os.Stderr, "Error: no search criteria provided (need --imdb, --tmdb, or --title)")
+		fmt.Fprintln(os.Stderr, "Error: no search criteria provided. Pass --imdb, --tmdb or --title.")
 		return 2
 	}
 	lang := p.String(cmdLang)
@@ -467,7 +467,7 @@ func resolveSearchItems(p cliparse.Params, rc *searchRunConfig) (items []cliReso
 		return nil, 1
 	}
 	if len(resolved.Candidates) > 0 {
-		fmt.Fprintln(rc.out, "Multiple matches; narrow the query with --imdb/--tmdb or --type:")
+		fmt.Fprintln(rc.out, "Multiple matches. Narrow the query with --imdb, --tmdb or --type:")
 		for i := range resolved.Candidates {
 			c := &resolved.Candidates[i]
 			fmt.Fprintf(rc.out, "  %-6s %s  [id %d]\n", c.MediaType, titleWithYear(c.Title, c.Year), c.MediaID)
@@ -475,7 +475,7 @@ func resolveSearchItems(p cliparse.Params, rc *searchRunConfig) (items []cliReso
 		return nil, 2
 	}
 	if len(resolved.Items) == 0 {
-		fmt.Fprintln(os.Stderr, "not found in Sonarr or Radarr; add the media first")
+		fmt.Fprintln(os.Stderr, "not found in Sonarr or Radarr. Add the media first.")
 		return nil, 1
 	}
 	return resolved.Items, 0
@@ -689,7 +689,7 @@ func pollDownloadOutcome(rc *searchRunConfig, activityID string) int {
 			return code
 		}
 		if time.Now().After(deadline) {
-			fmt.Fprintf(rc.out, "  Download timed out after %s (may still finish server-side; check the activity feed)\n",
+			fmt.Fprintf(rc.out, "  Download timed out after %s. It may still finish on the server, so check the activity feed.\n",
 				rc.pollTimeout)
 			return 1
 		}
@@ -713,13 +713,13 @@ func reportDownloadEntry(w io.Writer, entries []cliActivityEntry, activityID str
 	}
 	switch {
 	case entry == nil:
-		fmt.Fprintln(w, "  Download outcome unknown (activity entry gone)")
+		fmt.Fprintln(w, "  Download outcome unknown because the activity entry is gone")
 		return 1, true
 	case entry.Done && entry.Failed:
-		fmt.Fprintf(w, "  Download failed (%s)\n", entry.Detail)
+		fmt.Fprintf(w, "  Download failed. %s\n", entry.Detail)
 		return 1, true
 	case entry.Done && entry.Cancelled:
-		fmt.Fprintf(w, "  Download cancelled (%s)\n", entry.Detail)
+		fmt.Fprintf(w, "  Download cancelled. %s\n", entry.Detail)
 		return 1, true
 	case entry.Done:
 		fmt.Fprintf(w, "  Saved: %s\n", entry.Detail)

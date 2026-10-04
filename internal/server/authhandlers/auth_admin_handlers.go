@@ -185,7 +185,7 @@ func lastAdminDeletionBlock(users []auth.User, userID int64) string {
 		return "cannot delete the last admin account"
 	}
 	if target.PasswordHash != "" && localAdmins <= 1 {
-		return "cannot delete the last local (break-glass) admin account"
+		return "cannot delete the last local admin account, which is the break-glass account"
 	}
 	return ""
 }

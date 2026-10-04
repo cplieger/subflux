@@ -263,7 +263,7 @@ const LOGIN_ERROR_MAP: readonly {
     msg: (res) => {
       const retry = res.headers?.get("Retry-After");
       if (retry) {
-        return `Too many login attempts; try again in ${retry} seconds.`;
+        return `Too many login attempts. Try again in ${retry} seconds.`;
       }
       return "Too many login attempts. Please wait and try again.";
     },

@@ -35,7 +35,7 @@ func parseAllowedHosts(entries []string) (*webhttp.HostPolicy, error) {
 	policy, invalid := webhttp.ParseHostList(entries,
 		webhttp.WithLoopbackExempt(true),
 		webhttp.WithHostAllowlistError("host_not_allowed",
-			"host not allowed; add it to allowed_hosts in the server settings"))
+			"host not allowed. Add it to allowed_hosts in the server settings"))
 	if len(invalid) > 0 {
 		return policy, configFieldErr("allowed_hosts",
 			fmt.Sprintf("invalid allowed_hosts entries [%s]: each must be a bare hostname "+

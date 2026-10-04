@@ -23,13 +23,13 @@ func arrFields(name, defaultURL string) []subflux.SchemaField {
 		},
 		{
 			Key: "api_key", Label: "API Key", Type: fieldSecret,
-			Help:     "From Settings > General in " + name,
+			Help:     "In " + name + ", open Settings, then General",
 			Required: true,
 		},
 		{
 			Key: "public_url", Label: "Public URL", Type: fieldText,
 			Placeholder: "https://" + strings.ToLower(name) + ".example.com",
-			Help:        "Browser-accessible URL for web UI links (falls back to URL if empty)",
+			Help:        "Browser-accessible URL for web UI links. If empty, URL is used.",
 		},
 	}
 }
@@ -139,7 +139,7 @@ func authSection() subflux.SchemaSection {
 				Label:       "WebAuthn RP ID",
 				Type:        fieldText,
 				Placeholder: "example.com",
-				Help:        "The registrable domain your passkeys are scoped to. Filled in automatically from the address you first save from; changing it strands existing passkeys. Clearing it keeps the stored value.",
+				Help:        "The registrable domain your passkeys are scoped to. Filled in automatically from the address you first save from. Changing it strands existing passkeys. Clearing it keeps the stored value.",
 			},
 		},
 	}
@@ -163,7 +163,7 @@ func loggingSection() subflux.SchemaSection {
 			{
 				Key: "format", Label: "Format", Type: fieldSelect,
 				Default: defaults.LogFormat,
-				Help:    "JSON for log aggregation (Loki/Alloy), text for terminal debugging",
+				Help:    "JSON for log aggregation such as Loki or Alloy, text for terminal debugging",
 				Options: []subflux.SchemaOption{
 					{Value: "json", Label: "json"},
 					{Value: "text", Label: "text"},
@@ -197,7 +197,7 @@ func trustedProxiesSection() subflux.SchemaSection {
 			{
 				Key: "cidr", Label: "Proxy CIDR", Type: fieldText,
 				Placeholder: "10.0.0.0/8",
-				Help:        "Proxy IP range in CIDR notation; a single proxy is a /32 (e.g. 192.168.1.5/32)",
+				Help:        "Proxy IP range in CIDR notation. A single proxy is a /32, for example 192.168.1.5/32.",
 			},
 		},
 	}
@@ -208,13 +208,13 @@ func allowedHostsSection() subflux.SchemaSection {
 		Key: "allowed_hosts", Title: "Allowed Hosts", Type: fieldList,
 		Help: "Exact hostnames or IPs subflux answers for. When set, a request whose Host header is " +
 			"not listed is rejected with 403, blocking DNS-rebinding attacks against the browser " +
-			"session. Requests from localhost (e.g. the container healthcheck) always pass. Leave " +
+			"session. Requests from localhost, such as the container healthcheck, always pass. Leave " +
 			"empty to accept any Host.",
 		Fields: []subflux.SchemaField{
 			{
 				Key: "host", Label: "Hostname or IP", Type: fieldText,
 				Placeholder: "subflux.example.com",
-				Help:        "Bare hostname or IP, no scheme, path, or port (e.g. subflux.example.com or 192.168.1.5)",
+				Help:        "Bare hostname or IP without a scheme, path or port, for example subflux.example.com or 192.168.1.5",
 			},
 		},
 	}
@@ -245,7 +245,7 @@ func backupSection() subflux.SchemaSection {
 				Key: "retention", Label: "Retention", Type: fieldNumber,
 				Default: strconv.Itoa(defaults.DefaultBackupRetention),
 				Min:     "1",
-				Help:    "How many backup files to keep; older ones are pruned.",
+				Help:    "How many backup files to keep. Older ones are pruned.",
 			},
 			{
 				Key: "path", Label: "Backup Directory", Type: fieldText,

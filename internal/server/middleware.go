@@ -27,7 +27,7 @@ type sessionAuthenticator interface {
 func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.configured.Load() {
-			httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable, "not configured; save a valid configuration first")
+			httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable, "not configured. Save a valid configuration first")
 			return
 		}
 		next(w, r)

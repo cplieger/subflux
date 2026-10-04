@@ -150,8 +150,8 @@ func TestParseAndValidate_suggests_close_flag(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ParseAndValidate([--hostt]) = nil, want an unknown-flag error")
 	}
-	if !strings.Contains(err.Error(), "did you mean --host?") {
-		t.Errorf("ParseAndValidate([--hostt]) error = %q, want a \"did you mean --host?\" suggestion", err.Error())
+	if !strings.Contains(err.Error(), "Did you mean --host?") {
+		t.Errorf("ParseAndValidate([--hostt]) error = %q, want a \"Did you mean --host?\" suggestion", err.Error())
 	}
 }
 
@@ -406,10 +406,10 @@ func TestSuggestion(t *testing.T) {
 		flags []Flag
 		want  string
 	}{
-		{"near miss", "hostt", []Flag{{Name: "host"}}, " (did you mean --host?)"},
-		{"tie picks first", "zoo", []Flag{{Name: "foo"}, {Name: "goo"}}, " (did you mean --foo?)"},
-		{"picks closest", "zoo", []Flag{{Name: "zoa"}, {Name: "zaa"}}, " (did you mean --zoa?)"},
-		{"distance two accepted", "ho", []Flag{{Name: "host"}}, " (did you mean --host?)"},
+		{"near miss", "hostt", []Flag{{Name: "host"}}, ". Did you mean --host?"},
+		{"tie picks first", "zoo", []Flag{{Name: "foo"}, {Name: "goo"}}, ". Did you mean --foo?"},
+		{"picks closest", "zoo", []Flag{{Name: "zoa"}, {Name: "zaa"}}, ". Did you mean --zoa?"},
+		{"distance two accepted", "ho", []Flag{{Name: "host"}}, ". Did you mean --host?"},
 		{"none within distance two", "zzzzzz", []Flag{{Name: "host"}}, ""},
 	}
 	for _, c := range cases {

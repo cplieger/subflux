@@ -261,7 +261,7 @@ describe("arr step", () => {
     step.collect();
 
     expect(step.validate()).toBe(
-      "Sonarr API Key is required (or clear the Sonarr URL if you don't use Sonarr)",
+      "Sonarr API Key is required. If you do not use Sonarr, clear the Sonarr URL.",
     );
   });
 
@@ -382,7 +382,9 @@ describe("media roots step", () => {
     step.render(host);
     input("wiz-media-root-0").value = "media/tv";
 
-    expect(step.validate()).toBe("Media root paths must be absolute (start with /): media/tv");
+    expect(step.validate()).toBe(
+      "Media root path media/tv is not absolute. Paths must start with /",
+    );
   });
 
   it("accepts an absolute path", async () => {

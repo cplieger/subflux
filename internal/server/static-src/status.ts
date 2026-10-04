@@ -845,7 +845,7 @@ function buildPopupItems(
         continue;
       }
       const err = p.disabled
-        ? `disabled: credentials rejected${p.disabled_reason ? ` (${p.disabled_reason})` : ""}`
+        ? `disabled because the credentials were rejected${p.disabled_reason ? `. ${p.disabled_reason}` : ""}`
         : (p.last_error ?? `${p.recent_failures} failures`);
       items.push({
         key: `prov-${name}`,

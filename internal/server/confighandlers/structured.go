@@ -367,7 +367,7 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 	if err := h.hotReload(r.Context(), newCfg); err != nil {
 		slog.Error("hot reload failed, config not saved", "error", err)
 		h.alerts.RecordPersistent("config",
-			"Config rejected (hot reload failed): "+err.Error())
+			"Config rejected because hot reload failed. "+err.Error())
 		httpapi.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), subflux.CodeConfigReloadFailed)
 		return
 	}
@@ -379,13 +379,13 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 	if err := atomicWriteConfig(r.Context(), h.configPath(), data); err != nil {
 		slog.Error("config applied but not persisted", "error", err)
 		h.alerts.RecordPersistent("config",
-			"Config applied but NOT saved to disk (a restart will revert it): "+err.Error())
+			"Config applied but not saved to disk, so a restart will revert it. "+err.Error())
 		// A merged payload over the write cap (secret merge can grow a body
 		// past the request pre-check) is the client's to fix: report it as
 		// the same 413/code the oversized-body pre-checks use, not a 500.
 		if errors.Is(err, atomicfile.ErrFileTooLarge) {
 			httpapi.PayloadTooLargeC(w, r, subflux.CodeConfigTooLarge,
-				"merged config exceeds the maximum size; applied but not saved to disk (a restart will revert it)")
+				"merged config exceeds the maximum size. It was applied but not saved to disk, so a restart will revert it")
 			return
 		}
 		httpapi.InternalErrorC(w, r, fmt.Errorf("config applied but not persisted: %w", err),

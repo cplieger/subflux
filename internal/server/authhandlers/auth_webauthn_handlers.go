@@ -32,19 +32,19 @@ func originRefusalMessage(e *authwebauthn.OriginError) string {
 		}
 		return fmt.Sprintf("this page's origin %q is not a usable browser origin", e.Origin)
 	case authwebauthn.RejectTrailingDot:
-		return fmt.Sprintf("this page's address ends in a dot; reach subflux at %q", strings.TrimSuffix(e.Origin, "."))
+		return fmt.Sprintf("this page's address ends in a dot. Reach subflux at %q", strings.TrimSuffix(e.Origin, "."))
 	case authwebauthn.RejectEmptyLabel, authwebauthn.RejectNonASCII:
 		return fmt.Sprintf("this page's origin %q cannot be scoped to a relying-party ID", e.Origin)
 	case authwebauthn.RejectNoOrigin:
 		return "no origin was presented for this passkey ceremony"
 	case authwebauthn.RejectInsecureScheme:
-		return fmt.Sprintf("this page's origin %q is served over plain HTTP; passkeys need HTTPS, or http://localhost", e.Origin)
+		return fmt.Sprintf("this page's origin %q is served over plain HTTP. Passkeys need HTTPS or http://localhost", e.Origin)
 	case authwebauthn.RejectIPHost:
-		return fmt.Sprintf("this page's origin %q is an IP address, which can never have a passkey; use a domain name", e.Origin)
+		return fmt.Sprintf("this page's origin %q is an IP address, which can never have a passkey. Use a domain name", e.Origin)
 	case authwebauthn.RejectHostNotCovered:
 		msg := fmt.Sprintf("this page's origin %q is not covered by the configured relying-party ID %q", e.Origin, e.RPID)
 		if derived, ok := suggestedRPID(e.Origin); ok {
-			msg += fmt.Sprintf("; set auth.webauthn_rp_id to %q under Settings → Authentication", derived)
+			msg += fmt.Sprintf(". Set auth.webauthn_rp_id to %q in the Authentication section of Settings", derived)
 		}
 		return msg
 	case authwebauthn.RejectNotAllowlisted:

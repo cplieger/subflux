@@ -194,7 +194,7 @@ func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request)
 	}
 	if !req.DryRun && isASSSubtitlePath(subPath) {
 		httpapi.BadRequestC(w, r, subflux.CodeSyncUnsupportedFormat,
-			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
+			"audio sync cannot be applied to ASS/SSA subtitles, because writeback is SRT-only and would discard styling. Use dry_run to inspect the offset")
 		return req, nil, paths, false
 	}
 	return req, ref, syncAudioPaths{subtitle: subPath, video: videoPath}, true
@@ -220,7 +220,7 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, syncjobs.ErrCapacity):
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited,
-			"sync queue is full; wait for a running sync to finish")
+			"sync queue is full. Wait for a running sync to finish")
 		return
 	case errors.Is(err, syncjobs.ErrShuttingDown):
 		httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable,
@@ -326,7 +326,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 			"offset_ms", req.OffsetMs,
 			"error", err)
 		httpapi.JSONErrorWithCode(w, r, http.StatusInternalServerError, subflux.CodeInternalError,
-			"offset applied but tracking failed; re-open sync dialog to verify")
+			"offset applied but tracking failed. Reopen the sync dialog to verify")
 		return
 	}
 

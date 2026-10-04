@@ -378,7 +378,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 	if cfg := s.state().cfg; cfg != nil && cfg.AuthDisabled() {
 		slog.Warn("AUTHENTICATION DISABLED via auth.disable_auth config; all requests treated as admin")
 		s.alerts.RecordPersistent("security",
-			"Authentication is DISABLED (auth.disable_auth): all requests are treated as admin. Remove this setting to restore login.")
+			"Authentication is DISABLED by auth.disable_auth, so all requests are treated as admin. Remove this setting to restore login.")
 	}
 
 	s.serveAndWait(ctx, addr, mux, onReady)

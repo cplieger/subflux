@@ -49,7 +49,7 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	}
 	parsed, err := ParseDuration(s)
 	if err != nil {
-		return fmt.Errorf("line %d: invalid duration (value withheld)", value.Line)
+		return fmt.Errorf("line %d: invalid duration, value withheld", value.Line)
 	}
 	d.D = parsed
 	return nil

@@ -78,7 +78,7 @@ func (ref *FileRef) Validate() error {
 		return errors.New("media_id and language are required")
 	}
 	if ref.Source != string(subflux.SourceExternal) {
-		return errors.New("source must be external (embedded tracks are not file-addressable)")
+		return errors.New("source must be external, because embedded tracks are not file-addressable")
 	}
 	if ref.Ordinal < 0 {
 		return errors.New("ordinal must be non-negative")
@@ -104,7 +104,7 @@ func (ref *MediaRef) Validate() error {
 		return errors.New("invalid media_type")
 	}
 	if ref.MediaID <= 0 {
-		return errors.New("media_id (arr id) is required")
+		return errors.New("media_id, the arr ID, is required")
 	}
 	if ref.MediaType == subflux.MediaTypeEpisode && (ref.Season < 0 || ref.Episode <= 0) {
 		return errors.New("season and episode are required for episodes")
@@ -370,7 +370,7 @@ func MediaRefFromQuery(q url.Values) (*MediaRef, error) {
 	ref := &MediaRef{MediaType: subflux.MediaType(q.Get("media_type"))}
 	var err error
 	if ref.MediaID, err = strconv.Atoi(q.Get("media_id")); err != nil {
-		return nil, errors.New("media_id (arr id) must be an integer")
+		return nil, errors.New("media_id, the arr ID, must be an integer")
 	}
 	if s := q.Get("season"); s != "" {
 		if ref.Season, err = strconv.Atoi(s); err != nil {

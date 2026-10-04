@@ -239,7 +239,7 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type, media_id and language are required, or orphan_handle")
 		return
 	}
 	if !req.MediaType.Valid() {

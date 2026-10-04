@@ -33,8 +33,8 @@ const (
 
 // Admit refusal reasons with no variable part.
 const (
-	reasonSettingsChanged = "settings changed; waiting for the new settings to load"
-	reasonDisabled        = "credentials rejected; disabled until the settings change or a Test passes"
+	reasonSettingsChanged = "the settings changed and the new settings are still loading"
+	reasonDisabled        = "the credentials were rejected, so the provider is disabled until the settings change or a Test passes"
 	reasonProbing         = "credential check in progress"
 )
 
@@ -133,7 +133,7 @@ func (b *Binding) Admit(id subflux.ProviderID, op Op) (ok bool, reason string) {
 		case !rec.rec.DisabledAt.IsZero():
 			return false, reasonDisabled
 		case now.Before(rec.rec.NextAttemptAt):
-			return false, "credentials rejected; next attempt in " + formatWait(rec.rec.NextAttemptAt.Sub(now))
+			return false, "the credentials were rejected, so the next attempt is in " + formatWait(rec.rec.NextAttemptAt.Sub(now))
 		case now.Before(rec.probeUntil):
 			return false, reasonProbing
 		}

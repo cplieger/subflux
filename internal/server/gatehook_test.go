@@ -423,7 +423,7 @@ func TestNewProviderGateHook(t *testing.T) {
 		{
 			name:        "disabled raises the provider alert",
 			ev:          providergate.Event{Provider: "animetosho", Kind: providergate.Disabled, Reason: "HTTP 401"},
-			wantAlerts:  map[string]string{"provider:animetosho": "AnimeTosho rejected its credentials and was disabled after 3 attempts (HTTP 401). Fix the credentials in Settings, then Providers and save, or press Test."},
+			wantAlerts:  map[string]string{"provider:animetosho": "AnimeTosho rejected its credentials and was disabled after 3 attempts. The reason was HTTP 401. Fix the credentials in Settings, then Providers and save, or press Test."},
 			wantPublish: events.ProviderRaise,
 		},
 		{
@@ -443,7 +443,7 @@ func TestNewProviderGateHook(t *testing.T) {
 		{
 			name:        "a rejected setting raises its own alert",
 			ev:          providergate.Event{Provider: "animetosho", Kind: providergate.SettingRejected, Setting: "anidb_client_key"},
-			wantAlerts:  map[string]string{"provider:animetosho:anidb_client_key": "AnimeTosho's AniDB client key was rejected; episode lookup is off and AnimeTosho searches by title. Fix or clear the key in Settings, then Providers."},
+			wantAlerts:  map[string]string{"provider:animetosho:anidb_client_key": "AnimeTosho's AniDB client key was rejected, so episode lookup is off and AnimeTosho searches by title. Fix or clear the key in Settings, then Providers."},
 			wantPublish: events.ProviderRaise,
 		},
 		{

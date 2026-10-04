@@ -25,7 +25,7 @@ func (s *Server) recordStoreWriteError(err error) {
 		slog.Error("store write failed: disk full or I/O error — persistent alert raised",
 			"error", err)
 		s.alerts.RecordPersistent("store",
-			"Database write failed (disk full or I/O error): "+err.Error()+
+			"Database write failed with a disk full or I/O error. "+err.Error()+
 				". Free disk space or check filesystem permissions to resume normal operation.")
 		return
 	}

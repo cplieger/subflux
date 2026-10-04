@@ -689,7 +689,7 @@ async function registerOfferPasskey(): Promise<boolean> {
     case "timeout":
       showError(
         "wizardError",
-        "Passkey registration timed out. It may have completed \u2014 reload and check your passkey list before trying again.",
+        "Passkey registration timed out. It may have completed. Reload and check your passkey list before trying again.",
       );
       return false;
     case "not-discoverable":

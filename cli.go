@@ -56,7 +56,7 @@ func adminSocketRequest(body []byte) (data []byte, status int, err error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf(
-			"server admin socket unreachable at %s; is the server running in this container? (%w)",
+			"server admin socket at %s is unreachable. %w. Is the server running in this container?",
 			config.AdminSocketPath, err,
 		)
 	}
@@ -222,7 +222,7 @@ func doEnablePasswordLogin() error {
 		atomicfile.WithMode(0o600)); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, "Password login re-enabled (auth.basic_enabled: true). Restart subflux to apply.")
+	fmt.Fprintln(os.Stderr, "Password login re-enabled by setting auth.basic_enabled to true. Restart subflux to apply.")
 	return nil
 }
 

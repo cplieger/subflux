@@ -19,17 +19,17 @@ func embeddedSection() subflux.SchemaSection {
 			{
 				Key: "ignore_pgs", Label: "Ignore PGS", Type: fieldBool,
 				Default: strconv.FormatBool(defaults.EmbeddedIgnorePGS),
-				Help:    "Treat PGS bitmap subs (Blu-ray) as not usable: still tracked in coverage, but external subtitles are searched.",
+				Help:    "Treat Blu-ray PGS bitmap subtitles as not usable. They stay in coverage, but external subtitles are searched.",
 			},
 			{
 				Key: "ignore_vobsub", Label: "Ignore VobSub", Type: fieldBool,
 				Default: strconv.FormatBool(defaults.EmbeddedIgnoreVobSub),
-				Help:    "Treat VobSub bitmap subs (DVD) as not usable: still tracked in coverage, but external subtitles are searched.",
+				Help:    "Treat DVD VobSub bitmap subtitles as not usable. They stay in coverage, but external subtitles are searched.",
 			},
 			{
 				Key: "ignore_ass", Label: "Ignore ASS", Type: fieldBool,
 				Default: strconv.FormatBool(defaults.EmbeddedIgnoreASS),
-				Help:    "Treat ASS/SSA styled subs (anime) as not usable: still tracked in coverage, but external subtitles are searched.",
+				Help:    "Treat ASS/SSA styled subtitles, common in anime, as not usable. They stay in coverage, but external subtitles are searched.",
 			},
 		},
 	}

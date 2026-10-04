@@ -787,7 +787,7 @@ describe("runPopupSearch: how failures are shown", () => {
 
     await openEpisodePopup();
 
-    expect(results().textContent).toBe("This provider is in cooldown; try again in a few minutes.");
+    expect(results().textContent).toBe("This provider is in cooldown. Try again in a few minutes.");
   });
 
   it("marks an unmapped failure as an error", async () => {
@@ -912,7 +912,7 @@ describe("renderPopupResults", () => {
 
     await openEpisodePopup();
 
-    expect(req(".result-count").textContent).toBe("Showing 30 of 31 results (best matches first)");
+    expect(req(".result-count").textContent).toBe("Showing 30 of 31 results, best matches first");
   });
 
   it("renders at most thirty rows", async () => {
@@ -960,7 +960,7 @@ describe("renderPopupResults", () => {
     expect([
       downloadButton().getAttribute("aria-label"),
       downloadButton().getAttribute("data-tip"),
-    ]).toEqual(["Download (auto)", "Top match: downloads as auto subtitle"]);
+    ]).toEqual(["Download (auto)", "This is the top match. It downloads as an auto subtitle"]);
   });
 
   it("warns that a lower match downloads as manual", async () => {
@@ -975,7 +975,7 @@ describe("renderPopupResults", () => {
     const second = [...document.querySelectorAll(".result-dl button")][1];
     expect([second?.getAttribute("aria-label"), second?.getAttribute("data-tip")]).toEqual([
       "Download (manual)",
-      "Not top match: downloads as manual (pauses automation)",
+      "This is not the top match. It downloads as a manual subtitle, which pauses automation",
     ]);
   });
 

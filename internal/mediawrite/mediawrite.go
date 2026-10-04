@@ -505,7 +505,7 @@ func (w *Writer) aggregateMessageLocked(root string) string {
 	if firstBad == nil {
 		return ""
 	}
-	return fmt.Sprintf("%d folders under %s cannot be written; the first was %s: %v. %s",
+	return fmt.Sprintf("%d folders under %s cannot be written. The first was %s, which failed with %v. %s",
 		n, root, first, firstBad.err, remedy(false))
 }
 

@@ -1069,7 +1069,7 @@ describe("status: popup content", () => {
       },
     });
     expect(panel().querySelector(".pop-item")?.textContent).toBe(
-      "hdbits: disabled: credentials rejected (HTTP 401)",
+      "hdbits: disabled because the credentials were rejected. HTTP 401",
     );
   });
 
