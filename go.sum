@@ -16,8 +16,8 @@ github.com/cplieger/httpx/v5 v5.0.3 h1:bMtqn9nQXCD/0AdS2eEsl4K7QjYdANyM3ZyksDxKS
 github.com/cplieger/httpx/v5 v5.0.3/go.mod h1:3LKMRNjhTYJM9lwDfGpyjtpL4umH6wSMpeD2vanUYlk=
 github.com/cplieger/jsonx/v2 v2.0.1 h1:RBOyIVhmJi7DvGEnz8lldzuBTwWTOHYZxpBmWAsuhSA=
 github.com/cplieger/jsonx/v2 v2.0.1/go.mod h1:P6XfEtjkHlmqkmfVCcvs7TTSzEpTx+yKEHDcDXL9BBk=
-github.com/cplieger/keyenc v1.0.8 h1:qQGKaLBcFySAmjALux1gyuVDZAUXhLn2HEBj2xjo1Vs=
-github.com/cplieger/keyenc v1.0.8/go.mod h1:7T7DG6yK2b+DJWmQxXfbMADV5h3fWLFTnbXpAWVaKa4=
+github.com/cplieger/keyenc v1.0.9 h1:4XgfVc8i7h81Ik2GGhs62FXrYUfHHHWmMmcvSv2WY00=
+github.com/cplieger/keyenc v1.0.9/go.mod h1:7T7DG6yK2b+DJWmQxXfbMADV5h3fWLFTnbXpAWVaKa4=
 github.com/cplieger/langtag/v2 v2.0.2 h1:hgalQcWYHbO4w/8JfjLXCNGN7ZBQaukgumWPLzBJqEw=
 github.com/cplieger/langtag/v2 v2.0.2/go.mod h1:lmWq8nccvTMYvG2Eqx/olupr3gZuS6WEqVwiueS8oCM=
 github.com/cplieger/metrics/v4 v4.0.2 h1:G7iaUPOmT8eDDzKwTjPuD2dTRk87eOuijSTN3QM5moA=
