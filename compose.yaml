@@ -4,12 +4,14 @@ services:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
-    # Override with PUID/PGID in .env; defaults to 1000:1000.
-    user: "${PUID:-1000}:${PGID:-1000}"  # match your host user
+    # Run "sudo install -d -o 1000 -g 1000 /opt/appdata/subflux" before the first start,
+    # or the container restarts in a loop. If .env sets PUID and PGID, use those numbers.
+    user: "${PUID:-1000}:${PGID:-1000}"
 
     ports:
       - "8374:8374"
 
     volumes:
-      - "/opt/appdata/subflux:/config"
+      - "/opt/appdata/subflux:/config"  # settings and saved state
+      # Put the path Sonarr and Radarr show for your media on the right, writable by the user above.
       - "/path/to/media:/media"

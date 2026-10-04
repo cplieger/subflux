@@ -3,253 +3,144 @@
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/size.json)](https://github.com/cplieger/subflux/pkgs/container/subflux) [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://github.com/cplieger/subflux/pkgs/container/subflux) [![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)](https://github.com/cplieger/subflux/blob/main/Dockerfile) [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/mutation.json)](https://github.com/cplieger/subflux/issues?q=label%3Agremlins-tracker) [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/subflux/releases)
 
 <!-- hub-overview BEGIN -->
-A fast, small subtitle search, download, and sync engine for Sonarr and Radarr. A Go-based Bazarr alternative that ships as a ~14 MB container.
+subflux finds, downloads and times subtitles for the shows and movies in your Sonarr and Radarr library, and saves them next to each video. It works only through Sonarr and Radarr and does not scan folders on its own.
 
 ## ⚠️ Alpha software
 
-Subflux is pre-1.0 and under active development. It is functional and runs a 52,000-episode library in production today, but rough edges remain. **Any update can introduce a breaking change.** The config format, the on-disk state, the API, and behavior can all change between releases. Pin a specific image tag instead of `latest`, and check the release notes before upgrading.
+subflux is under active development and has not reached version 1.0. Any update can change the config format, the saved state, the API or the behavior. Pin a specific image tag instead of `latest`, and read the release notes before you upgrade.
 
 ## What it does
 
-Subflux finds, scores, downloads, and time-syncs subtitles for your Sonarr/Radarr library. It watches the \*arr import history (default 30 s poll) so new downloads get subtitles within moments of importing, and runs scheduled full-library scans (default 24 h) to fill gaps and upgrade what's already there. Every result passes an identity check and a release-quality score; the best one is downloaded, synced against the video's own timing, cleaned up, and saved next to the media file. A web UI shows per-show coverage at a glance and lets you search, pick, and visually sync subtitles by hand when you want control.
+subflux gets subtitles in your languages onto your whole library:
+
+- Checks Sonarr and Radarr every 30 seconds and fetches subtitles for each new download.
+- Scans the library once a day to fill gaps and upgrade recent subtitles.
+- Fixes each download's timing to match a subtitle track in the video, or optionally its audio.
+- Shows coverage on a web page, where you can search, pick and re-time subtitles by hand.
+
+## Who it is for
+
+subflux is built for people who run Sonarr, Radarr or both on a Docker host and want subtitles without picking them by hand. It picks languages from each file's audio track and can fetch forced and hearing-impaired versions. A 52,000-episode library runs in 1 GB of memory.
+
+You need a Sonarr or Radarr instance with its API key, and your media mounted writable at the paths they use. subflux searches eight sites. Gestdown, AnimeTosho and YIFY Subtitles need no account. OpenSubtitles, SubDL, SubSource, BetaSeries and HDBits need an account or an API key.
+
+Consider [Bazarr](https://github.com/morpheus65535/bazarr) if you want a native install on Windows, macOS or a Raspberry Pi, or a site such as Titlovi or Napiprojekt. It supports 184 subtitle languages and Whisper speech-to-text.
+
+subflux is free software under the AGPL-3.0-or-later license.
 <!-- hub-overview END -->
-
-## Why subflux
-
-Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-episode library (a CPython allocator fragmentation problem, architectural rather than fixable). The answer was a rewrite with resource discipline as a design goal rather than an optimization pass:
-
-- **~14 MB compressed image, ffmpeg included.** Distroless base, one static Go binary, no Python, no runtime dependencies.
-- **The library that broke Bazarr runs in a 1 GB container limit.** Arr responses are batch-fetched then iterated (the largest payload, 4,360 movies, decodes to 24 MB); goroutine pools are bounded; media probing streams instead of buffering.
-- **A purpose-built ffmpeg** (~5 MB, plus ~2 MB ffprobe): decoders for every mainstream video and audio codec plus the common subtitle formats (SRT/ASS, MOV text, WebVTT, PGS, DVD, DVB), a single x264 encoder for the 360p preview, statically linked, no network support compiled in. It does track detection, subtitle/audio extraction, and the sync editor's live preview.
-- **One file of state.** Pure-Go bbolt (no SQLite, no CGO): crash-durable on commit, hot-backed-up on schedule, and reconciled against the filesystem so it heals itself after manual file changes.
-- amd64 + arm64 images, cosign-signed, with SBOM attestations.
-
-## Features
-
-### Search and scoring
-
-- **Eight online providers** (OpenSubtitles, Gestdown, SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits) behind one interface, plus always-on embedded-track detection (local ffprobe inspection, not a provider).
-- **Two-phase scoring:** a hard identity gate (IMDB/TVDB/TMDB id, season/episode, title validation) before a 0-100 release-quality score used for ranking and upgrades. Upgrades replace an existing subtitle only when a strictly better release shows up.
-- **Language rules keyed on the audio track:** map detected audio languages to subtitle targets (Japanese audio can want different subs than English audio), with `standard`/`forced`/`hi` variants and per-target provider or min-score overrides.
-- **Anime-aware numbering:** searches run with aired, scene (TheXEM), and absolute (TVDB) numbering and merge the results, so long-running shows with weird episode orders still match.
-- **Embedded-subtitle awareness:** coverage counts text and bitmap tracks already in the container (SRT/ASS, PGS, VobSub, DVB), with per-codec ignore settings (top-level `embedded_subtitles` config section) so an unwanted PGS track doesn't stop the search for a text alternative.
-- **Adaptive backoff:** per-provider exponential backoff for no-result media, season-level early termination, and per-provider timeouts, so failing or empty providers don't get hammered.
-- **Manual override with locks:** manual downloads are saved as numbered siblings (`movie.fr.1.srt`) and lock the item from automation; locks clear automatically when the files are deleted or the video is replaced.
-
-### Rejected provider credentials
-
-When a provider rejects its credentials, such as a wrong password, passkey or API key, subflux stops calling it instead of retrying until the provider locks the account. The first rejection pauses the provider for 5 minutes and the second for 30 minutes. Each pause ends with one probe request, and the third rejection disables it.
-
-A disabled provider raises a persistent alert in the web UI, logs one ERROR line, and sets `subflux_provider_disabled{provider}` to 1. The disable survives a restart, and nothing re-enables the provider on its own. Three things do:
-
-- Save the provider with different credentials.
-- Press the provider's Test button in the settings dialog. A pass with the recorded credentials re-enables it. A pass with edited credentials asks you to save them.
-- Reset provider state with `subflux timeouts-reset`.
-
-Switching the provider off clears its alert, and switching it back on with the same credentials brings the disable back. A rate-limit answer is not a rejection. It pauses only the operation that hit it, a search or a download, until the provider's `Retry-After` or for 10 minutes.
-
-AnimeTosho's optional AniDB client key is judged on its own. If AniDB rejects the key, AnimeTosho turns off episode lookup and keeps searching by title, a persistent alert names the key, and `subflux_provider_setting_rejected{provider,setting}` reads 1. That lasts until you change or clear the key, a Test of the saved key passes, you reset provider state with `subflux timeouts-reset`, or AniDB accepts the key on a later lookup. A restart forgets the refusal: the alert and the gauge return after the first episode lookup that AniDB refuses again. A save of any settings, a passing Test and a reset each make AnimeTosho ask AniDB again on its next episode lookup.
-
-A scan that is already running when you save keeps the settings it started with, except that it stops calling any provider whose settings you changed. The next scan uses the new settings.
-
-### The sync engine
-
-Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions: split-aware and framerate-aware alignment, audio sync via a re-tuned voice-activity detector cross-correlated with the subtitle's dialogue signal, and cross-language anchor matching (a French subtitle can sync against the English track embedded in the file). The strategies run concurrently and vote; the winner is applied only above a confidence threshold, so a sync that is not confident does not happen.
-
-Hash-matched and same-release downloads skip sync (their timing is already right), and forced subtitles skip it (too few cues to align reliably). Every saved file is post-processed: encoding normalization to UTF-8, hearing-impaired annotation removal, tag stripping, and whitespace cleanup. Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in); audio sync and manual offset adjustment are always available from the sync dialog.
-
-### The web UI
-
-A single-page app served by the same binary: framework-free TypeScript compiled to ~380 KB of first-party JS, loaded as native ES modules, updating live over SSE.
-
-- **Coverage table:** every series and movie against your language rules, with per-target have/total badges, embedded-track counts, a missing-only filter, and text search.
-- **Visual sync editor:** subflux transcodes the actual video to a 360p stream on the fly (fMP4 over MSE, using the bundled ffmpeg) and renders the subtitle as a live caption track. Scrub the offset with a timecode control and the captions reload in place, so you verify timing with your own eyes; or run any sync strategy (embedded reference, external file, audio VAD) and preview its computed result before a byte is written.
-- **Manual search:** query all providers for any item, see each result's score breakdown and tier, and grab a specific pick. Downloading anything other than the top pick locks the item from automation until you release it.
-- **Schema-driven settings:** the entire config renders from a server-generated schema with tooltips; saves are validated, hot-reload the engine without a restart, and never echo secrets back to the browser.
-- **History:** every download and search attempt, filterable by type, language, and provider.
-
-First run lands in unconfigured mode: the settings dialog auto-opens and the instance serves nothing else until a valid config is saved.
-
-### Auth, API, and operations
-
-- **Multi-user auth (optional):** local passwords (Argon2id), passkeys/WebAuthn, OIDC with PKCE, per-user API keys, and login rate limiting.
-- **API and CLI:** the UI drives a JSON API you can use too; the CLI's read and trigger subcommands run against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`. The account bootstrap commands (`reset-password`, `generate-api-key`) use a private Unix socket, so run them inside the container.
-- **Operations:** Prometheus metrics at `/metrics`, structured `slog` logging (UTC), a distroless file-marker healthcheck, graceful shutdown, scheduled bbolt hot backups with a staleness metric, database reconciliation before each scan, and scan resume after a restart.
 
 ## Quick start
 
-Images are published to both `ghcr.io/cplieger/subflux` and `docker.io/cplieger/subflux`; use whichever registry you prefer.
+The image is on GitHub Container Registry and Docker Hub, for `amd64` and `arm64`. This is the [`compose.yaml`](compose.yaml) in this repository.
 
 ```yaml
-# compose.yaml
 services:
   subflux:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
-    # Override with PUID/PGID in .env; defaults to 1000:1000.
-    user: "${PUID:-1000}:${PGID:-1000}"  # match your host user
+    # Run "sudo install -d -o 1000 -g 1000 /opt/appdata/subflux" before the first start,
+    # or the container restarts in a loop. If .env sets PUID and PGID, use those numbers.
+    user: "${PUID:-1000}:${PGID:-1000}"
+
     ports:
       - "8374:8374"
+
     volumes:
-      - "/opt/appdata/subflux:/config"  # config.yaml + bbolt state
-      - "/path/to/media:/media"         # must NOT be read-only; subflux writes subtitle files
+      - "/opt/appdata/subflux:/config"  # settings and saved state
+      # Put the path Sonarr and Radarr show for your media on the right, writable by the user above.
+      - "/path/to/media:/media"
 ```
 
-### First run
+1. Create the settings folder for user 1000 with `sudo install -d -o 1000 -g 1000 /opt/appdata/subflux`. If your `.env` sets `PUID` and `PGID`, use those numbers.
+2. Replace `/path/to/media` with your media folder, and `/media` with the root folder Sonarr and Radarr show under Settings > Media Management. If they use two root folders, add one line for each.
+3. Run `docker compose up -d`.
+4. From another device on your network, open the host's address on port 8374 in a browser, for example `http://192.0.2.10:8374`.
+5. Create the admin account.
+6. In the setup wizard, enter Sonarr's address as you open it from another device, not `localhost`, and the API key from Sonarr's Settings > General page. Do the same for Radarr.
+7. Enter the right-hand paths from step 2 as media roots, pick your subtitle sites and languages, then click **Finish**.
 
-Open `http://localhost:8374`. Every first boot runs ONE guided flow: create the admin account, then walk the setup wizard (Sonarr/Radarr, media roots, providers, languages, and tunable defaults), then an optional passkey enrollment. The wizard adapts to what it finds:
-
-- **From scratch:** subflux wrote a placeholder config on first boot, so the wizard walks every step with sensible defaults prefilled.
-- **Pre-authored `config.yaml`:** every step the file already answers is prefilled and collapsed (saved secrets show as present without exposing values); a fully valid config fast-forwards straight to a review screen with a "Finish" button. Collapsed steps stay reviewable and editable before finishing.
-
-The Sonarr and Radarr step carries a **Test connection** button that checks the URL and API key from the server side and reports the answer at the field. It is optional — leave it alone and Next moves on — but using it catches a wrong URL or a rejected key on the first step rather than at the final save. The same button is on both sections of the settings dialog afterwards; where a key is already saved, testing uses the stored one, so there is nothing to retype. The check runs from subflux rather than from your browser on purpose: `url` is subflux's own address for the service (the default is a Docker service name, which is why `public_url` exists separately for browser links), so subflux is the only party that can answer whether the scanner will reach it.
-
-Reloading the page mid-setup returns you to the step you were on rather than dropping you into the app.
-
-Finishing saves the config and activates everything in place (providers, arr clients, background scans, and auth capabilities) with no restart. The same holds for later edits in the settings dialog: saving a valid config hot-activates it, including WebAuthn/OIDC and logging changes.
+Run `docker logs subflux`. You should see `HTTP server listening`. If you see `failed to write default config`, the settings folder from step 1 is missing or belongs to another user.
 
 ## Configuration reference
 
-All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. To pre-author the file instead, copy the annotated [`config.example.yaml`](config.example.yaml). The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created in the web UI, or with `subflux generate-api-key` inside the container) to authenticate them when auth is enabled.
+Every setting is in the web page's Settings dialog and is saved to `/config/config.yaml`. A save applies at once, with no restart. To write the file yourself, start from the annotated [`config.example.yaml`](config.example.yaml).
 
-### Environment variables in config.yaml
-
-String values in `config.yaml` can reference environment variables with the braced `${VAR}` form, so secrets stay in the container environment while the file holds the structure:
-
-```yaml
-some_api_key: ${SUBFLUX_SOME_KEY}
-```
-
-Expansion is allowlisted: `SUBFLUX_*` names plus the common deployment vars `CONFIG_ROOT`, `MEDIA_FOLDER`, `PUID`, `PGID`, `TZ`, `LAN_IP`, and `HOSTNAME`. Any other name, and the unbraced `$VAR` form, stays literal. Referencing an allowlisted var that is unset logs a startup warning naming the variable and keeps the literal `${VAR}` text (a set-but-empty var substitutes the empty string). Expansion runs after YAML parsing, on string values only, so an environment value can never alter the document structure.
-
-### Running behind a reverse proxy
-
-When subflux runs behind a reverse proxy (nginx, Caddy, Traefik, HAProxy, ...), the network peer subflux sees is the proxy, not the browser. Set `trusted_proxies` to the proxy's IP or CIDR so the real client IP, resolved from a trusted `X-Forwarded-For` header, is used for the audit log, the login rate limiter, the session `IPAddress`, and the request access log, instead of the proxy's address:
-
-```yaml
-trusted_proxies:
-  - 10.0.0.0/8
-  - 192.168.0.0/16
-```
-
-Entries are CIDR ranges; write a single proxy as a `/32` (IPv4) or `/128` (IPv6). Only when the direct peer is one of these ranges is `X-Forwarded-For` consulted (walked right-to-left, spoof-safe); invalid CIDRs are rejected at config load. Leave `trusted_proxies` empty (the default) when subflux is directly exposed: the socket peer is used and `X-Forwarded-For` is ignored.
-
-### Blocking DNS rebinding
-
-`allowed_hosts` lists the exact hostnames or IPs subflux answers for. A request whose `Host` header is not on the list is rejected with 403 before it reaches any route:
-
-```yaml
-allowed_hosts:
-  - subflux.example.com
-  - 192.0.2.5
-```
-
-This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebinding attack makes a malicious page's hostname resolve to subflux's address, so the browser's same-origin request carries the attacker's name in both `Origin` and `Host`; they agree, so the CSRF check admits it. Only an exact-match `Host` check breaks that chain. Requests from localhost (the container healthcheck) always pass regardless of the list. Leave `allowed_hosts` empty (the default) to accept any `Host`, matching prior behavior.
-
-### Passkeys and domain scope
-
-A passkey is scoped to a registrable domain, not to a host and not to a path. subflux derives that domain from the address you first save your settings from, so `subflux.example.com` yields `example.com`, and the browser then offers the credential on every host under `example.com`. A password manager cannot narrow that: the scope is a property of the credential itself. If other applications share the domain, know that before enabling passkeys.
-
-A subpath deployment (`example.com/subflux`) gets domain-wide scope for the same reason: a relying-party ID has no path component, so there is no way to scope a passkey to a path.
-
-An IP-address deployment can never use passkeys. An IP literal is not a legal relying-party ID, so subflux does not derive one and the passkey controls stay disabled with the reason shown. The same holds for a single-label hostname (`nas`) and for a host that is itself a public suffix (`duckdns.org`); a host under one (`mybox.duckdns.org`) works, scoped to exactly that host.
-
-TLS is a hard prerequisite, with one exception: `localhost` over plain HTTP, which the WebAuthn specification treats as a trustworthy origin.
-
-`auth.webauthn_rp_id` holds the domain, and normally you never set it. subflux fills it in on the first settings save, derived from the address you saved from, and shows it under Settings → Authentication, where you can narrow it to a single host if you prefer. Changing it after passkeys exist strands them, and the settings dialog asks before it lets you. Clearing the field neither turns passkeys off nor loses the value: a save that carries no value keeps the one already stored, and the dialog asks nothing about it.
-
-One save is refused: a change to the field when the address you are saving from is not covered by the new value, because a passkey could never be tested from where you sit. Save the change from a browser at a host inside the domain you want. A save that leaves the value alone is never refused, whatever address you are on.
-
-The sign-in page shows its passkey button only when this server can complete a passkey login: a relying-party ID is configured and at least one stored passkey can answer one. On a new install, or after changing the relying-party ID, sign in with your password and add a passkey from the Security dialog; the button comes back with it.
-
-## Alerting
-
-subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate the
-rules in [`alerts/promql.yaml`](alerts/promql.yaml) with Prometheus or the Mimir
-ruler; firing alerts deliver through your Alertmanager. They cover:
-
-| Alert | Fires when | Severity |
+| Key | Default | Description |
 | --- | --- | --- |
-| `SubfluxTargetDown` | no successful scrape for 15m, so every other rule here is blind | warning |
-| `SubfluxTargetAbsent` | there is no `up` series at all, so subflux is not a configured target any more | warning |
-| `SubfluxScanStalled` | no scheduled scan has completed in 26h while the process has been up that long | warning |
-| `SubfluxHTTP5xx` | more than 5 server errors in 10m | warning |
-| `SubfluxBackupStale` | no successful backup recorded in over 48h | warning |
-| `SubfluxProviderCredentialsRejected` | a provider rejected its credentials and was disabled, or rejected an optional setting, for 5m | warning |
-| `SubfluxMediaUnwritable` | subtitle files could not be written under a media root for 5m (`subflux_media_root_unwritable{root}` reads 1) | warning |
-| `SubfluxMediaUnavailable` | a media root could not be read for 5m (`subflux_media_root_unavailable{root}` reads 1) | warning |
+| `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
+| `sonarr.api_key`, `radarr.api_key` | required | The API key from that app's Settings > General page |
+| `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
+| `languages` | required | The subtitle languages to fetch for each audio language, plus a fallback list |
+| `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
+| `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
+| `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |
+| `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
+| `search.exclude_arr_tags` | `no-subflux` | Sonarr or Radarr tags whose shows and movies subflux skips |
+| `post_processing.audio_sync_fallback` | `false` | Re-time against the audio when the video has no subtitle track to compare with |
+| `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` |
+| `trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited |
+| `allowed_hosts` | `[]` | The host names subflux answers for. Leave empty to accept any |
+| `logging.level` | `info` | `debug`, `info`, `warn` or `error` |
 
-The two target rules pin `job="subflux"` because they read the synthetic `up`
-series, where a bare `up == 0` would fire on every unrelated target in your
-Prometheus; set that matcher to whatever your scrape config calls subflux. The
-rules reading subflux's own metrics carry no job matcher, so add one if you run
-more than one instance. Thresholds and the `severity` labels are starting points,
-and `SubfluxScanStalled`'s window tracks `scan_interval` (24h by default), so
-move both together if you change it. Route by whatever labels your Alertmanager
-uses.
+Every other setting, the command line and environment references in `config.yaml` are in [Configuration](docs/configuration.md).
 
-These series tell a fetched subtitle from a saved one and carry the provider and media-folder state behind the last three rules:
+| Variable | Description | Default |
+| --- | --- | --- |
+| `PUID`, `PGID` | The user and group the container runs as, read by `compose.yaml` | `1000` |
+| `SUBFLUX_URL` | The server address the `subflux` command line talks to | `http://127.0.0.1:8374` |
+| `SUBFLUX_API_KEY` | An API key for the command line, created on the web page | _(unset)_ |
 
-| Metric | Meaning |
+| Mount | Description |
 | --- | --- |
-| `subflux_downloads_total{provider}` | subtitle files fetched from a provider, saved or not |
-| `subflux_subtitles_saved_total{provider}` | subtitle files the automated search wrote next to the media |
-| `subflux_subtitle_write_errors_total` | failed subtitle writes and failed media folder write tests |
-| `subflux_media_root_unwritable{root}` | 1 while subtitles cannot be written in that media root or a folder below it |
-| `subflux_media_root_unavailable{root}` | 1 while that media root cannot be read, so nothing under it is treated as deleted |
-| `subflux_provider_disabled{provider}` | 1 while a provider is disabled because it rejected its credentials |
-| `subflux_provider_setting_rejected{provider,setting}` | 1 from the upstream's refusal of a provider's optional setting until the upstream accepts it, the setting changes, a Test passes, provider state is reset or subflux restarts (it returns at the next refusal) |
-| `subflux_provider_auth_failures_total{provider}` | credential rejections counted toward a disable |
-| `subflux_provider_rate_limited_total{provider,op}` | rate-limit answers that paused a provider's `search` or `download` |
+| `/config` | `config.yaml` and the `subflux.bolt` database |
+| `/media` | Your media, where subflux writes subtitle files next to each video |
 
-## Healthcheck
-
-The container probe runs `subflux health`, which reports healthy while the
-marker file `/tmp/.healthy` exists. Subflux creates it once the HTTP server is
-listening, in unconfigured mode as well as configured mode, and removes it on
-shutdown. So unhealthy means the process is gone or never finished starting, not
-that a scan failed or a provider is down: a bad provider key leaves the
-container healthy and serving the web UI so you can correct it. Docker checks
-every 30s after a 15s grace period and restarts the container after 3
-consecutive failures. `GET /api/health` is a separate, narrower signal for a
-load balancer, answering whether the server is ready to serve requests.
+| Port | Description |
+| --- | --- |
+| `8374` | The web page, the API and `/metrics` |
 
 ## Security
 
-Distroless `gcr.io/distroless/static-debian13:nonroot` (UID 65532, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.
+Create the admin account right after the first start. Until one exists, the first visitor to the page creates it. Keep port 8374 on your own network, or put a reverse proxy with HTTPS in front of it and set `trusted_proxies` and `allowed_hosts`. `/metrics` and `/api/health` answer without a login.
 
-## Known limitations
+Logins use passwords, passkeys or OIDC, and an admin can create API keys for the command line. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
-- The media volume must be writable. Subflux saves subtitle files next to the media, so mounting `/media` read-only prevents any subtitle from being saved.
-- When subtitles cannot be written in a media folder, subflux stops searching for and downloading subtitles there and shows an alert naming the folder and the error. It resumes on its own once a write test there succeeds. Meanwhile `subflux_media_root_unwritable{root}` reads 1 for that folder's root. It never changes file or folder permissions. New subtitle files get the permissions your share's umask and ACLs give them.
-- While such a folder stays unwritable, the other imports that the same Sonarr or Radarr reports in the same poll or later also wait, whatever folder they land in. None is lost. They are processed in order once the folder recovers, and the next full scan covers healthy folders meanwhile. The wait also ends once the waiting import no longer needs a subtitle there, for example when you tag its series with one of your `exclude_arr_tags` or delete its video. Subflux rechecks it at most 5 minutes plus one `poll_interval` after its last check.
-- If a configured media root is missing or cannot be written, full library scans do not start until it is fixed or removed from `media_roots`.
-- A video counts as deleted only when it is missing from a media root that is present, readable and not empty. An unmounted share usually looks like an empty root. If the root is missing or empty, or a file check fails or takes over 10 seconds, subflux keeps the subtitle state and manual locks. It also holds new imports there and shows an alert naming the path, then checks again every 5 minutes. List each mounted share as its own `media_roots` entry, so an unmounted one shows up as an empty root.
-- Cloudflare-protected providers (subf2m, AvistaZ, CinemaZ) are not implemented.
-- Long-running anime with colliding aired/absolute numbering has a rare false-positive window: results matched by a stable ID skip title validation, so an aired SxxEyy that collides with another episode's absolute number can slip through.
+The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/security.md) covers reverse proxies, passkeys and what the image contains.
 
-## Dependencies
+## Troubleshooting
 
-Every pin below is tracked automatically and bumped by pull request; the base image is pinned by digest, and the two media libraries are built from source in the image because no distribution ships them in the shape subflux needs.
+The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page.
 
-| Dependency | Source |
-| --- | --- |
-| Runtime base image | `gcr.io/distroless/static-debian13:nonroot`, pinned by digest |
-| FFmpeg and ffprobe | built from source at a pinned release tag, statically linked, network support not compiled in |
-| x264 | built from source at a pinned commit, since upstream publishes no release tags |
-| Go modules | `go.mod` and `go.sum` |
-| Frontend packages | the `@cplieger/*` set, exact-pinned in `internal/server/static-src/package.json` |
+- The container restarts with `failed to write default config`. Create the settings folder for the container user, as in step 1.
+- An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
+- Full scans do not start. A folder in `media_roots` is missing or not writable. Fix it or remove it from the list.
+- An alert says a subtitle site was disabled. The site rejected your credentials three times. Save new ones or press the site's **Test** button.
+- A share is unmounted. subflux keeps its records, shows an alert naming the path and holds new imports there until the share returns.
+
+[How subflux works](docs/how-it-works.md) explains each case in full.
+
+## Monitoring
+
+subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Eight Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
+
+## Documentation
+
+- [Configuration](docs/configuration.md) lists every setting and command, for anyone writing `config.yaml` by hand.
+- [How subflux works](docs/how-it-works.md) covers scoring, timing, credential handling and the limits.
+- [Security](docs/security.md) covers reverse proxies, passkeys and what the image contains.
+- [Monitoring and alerts](docs/monitoring.md) lists the metrics and the alert rules.
+- [Database maintenance](docs/database-maintenance.md) covers recovering and compacting the database.
 
 ## Credits
 
-- [alass](https://github.com/kaegi/alass) by [@kaegi](https://github.com/kaegi): the subtitle alignment algorithm (constant-offset rating and split-aware DP) that subflux ports to Go.
-- The [WebRTC project](https://webrtc.org/): the GMM voice-activity detector that subflux ports and re-tunes for film audio.
-- [Bazarr](https://github.com/morpheus65535/bazarr): the project that defined this category; subflux is an original engine, not a fork, but Bazarr set the bar for what it has to do.
+- [FFmpeg](https://ffmpeg.org/) and [x264](https://www.videolan.org/developers/x264.html) are built into the image to read subtitle and audio tracks and to stream the preview in the timing editor.
+- The timing engine is a Go port of the alignment algorithm in [alass](https://github.com/kaegi/alass) by [@kaegi](https://github.com/kaegi).
+- The audio timing uses a port of the voice-activity detector from the [WebRTC project](https://webrtc.org/), re-tuned for film audio.
 
 ## Contributing
 
-Issues and pull requests are welcome; please open an issue first for larger changes so the approach can be discussed. Architecture notes and local build/test instructions are in [CONTRIBUTING.md](CONTRIBUTING.md); operational runbooks live in [docs/OPERABILITY.md](docs/OPERABILITY.md).
+Issues and pull requests are welcome. Open an issue first for a larger change, and see [CONTRIBUTING.md](CONTRIBUTING.md) for the layout and the checks.
 
 ## Disclaimer
 
