@@ -69,7 +69,7 @@ export function buildArrStep(): WizardStep {
           return "Sonarr URL is required";
         }
         if (!sKey) {
-          return "Sonarr API Key is required (or clear the Sonarr URL if you don't use Sonarr)";
+          return "Sonarr API Key is required. If you do not use Sonarr, clear the Sonarr URL.";
         }
       }
       if (rf) {
@@ -77,7 +77,7 @@ export function buildArrStep(): WizardStep {
           return "Radarr URL is required";
         }
         if (!rKey) {
-          return "Radarr API Key is required (or clear the Radarr URL if you don't use Radarr)";
+          return "Radarr API Key is required. If you do not use Radarr, clear the Radarr URL.";
         }
       }
       return "";
@@ -152,7 +152,7 @@ export function buildMediaRootsStep(): WizardStep {
           {
             style: "font-size:var(--text-sm);color:var(--text-2);margin-block-end:var(--sp-4)",
           },
-          "Paths to your media folders as seen inside the container (must match Sonarr/Radarr root folders).",
+          "Paths to your media folders as seen inside the container. They must match the Sonarr and Radarr root folders.",
         ),
       );
 
@@ -190,7 +190,7 @@ export function buildMediaRootsStep(): WizardStep {
       }
       for (const p of valid) {
         if (!p.startsWith("/")) {
-          return "Media root paths must be absolute (start with /): " + p;
+          return "Media root path " + p + " is not absolute. Paths must start with /";
         }
       }
       return "";
@@ -463,7 +463,7 @@ export function buildScoringStep(): WizardStep {
           {
             style: "font-size:var(--text-sm);color:var(--text-2);margin-block-end:var(--sp-4)",
           },
-          "Weights control how subtitle releases are ranked against your video. The defaults work well; tune only if you know your library.",
+          "Weights control how subtitle releases are ranked against your video. Each weight is the number of points a subtitle earns when that attribute matches your video's release. Raise a weight to make that attribute count for more in the ranking, or lower it to make it count for less.",
         ),
       );
       const saved = wizardValues["scoring"] ?? {};

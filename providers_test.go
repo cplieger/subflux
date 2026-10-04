@@ -311,7 +311,7 @@ func TestTestConnection_unchanged_opensubtitles_settings_clear_a_disable(t *test
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("HandleTestConnection = %d %q: %v", rec.Code, rec.Body.String(), err)
 	}
-	if !got.Valid || got.Message != "credentials accepted; provider re-enabled" {
+	if !got.Valid || got.Message != "credentials accepted. Provider re-enabled" {
 		t.Errorf("HandleTestConnection(unchanged settings) = %+v, want valid and re-enabled", got)
 	}
 	if gate.Status()[subflux.ProviderNameOpenSubtitles].Disabled {

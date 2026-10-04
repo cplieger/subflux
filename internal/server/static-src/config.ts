@@ -176,8 +176,8 @@ async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boo
   }
   return confirm(
     "Change WebAuthn RP ID?",
-    `Existing passkeys are bound to "${oldRPID}" and will STOP working after this change; ` +
-      "affected users must sign in with their password and re-register their passkeys.",
+    `Existing passkeys are bound to "${oldRPID}" and will STOP working after this change. ` +
+      "Affected users must sign in with their password and re-register their passkeys.",
     "Change RP ID",
   );
 }
@@ -386,8 +386,8 @@ function renderConfigForm(): void {
 }
 
 const RAW_SECTION_NOTICE =
-  "Subflux does not recognise this section, so the settings form cannot edit it \u2014 " +
-  "a save from this dialog keeps it exactly as it is on disk. " +
+  "Subflux does not recognise this section, so the settings form cannot edit it. " +
+  "A save from this dialog keeps it exactly as it is on disk. " +
   "Edit it in the config file.";
 
 /** buildSectionsFromForm round-trips the STORED value for this section, so a save

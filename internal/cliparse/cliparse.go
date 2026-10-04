@@ -154,8 +154,8 @@ func PrintRootHelp(w io.Writer, specs []Spec) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Environment:")
 	fmt.Fprintln(w, "  SUBFLUX_URL      Server base URL for remote commands (default http://127.0.0.1:8374)")
-	fmt.Fprintln(w, "  SUBFLUX_API_KEY  API key sent as X-API-Key (required when the server has auth enabled;")
-	fmt.Fprintln(w, "                   create one with 'subflux generate-api-key' or in the web UI)")
+	fmt.Fprintln(w, "  SUBFLUX_API_KEY  API key sent as X-API-Key. Required when the server has auth enabled.")
+	fmt.Fprintln(w, "                   Create one with 'subflux generate-api-key' or in the web UI.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use 'subflux <command> --help' for command-specific flags.")
 }
@@ -202,7 +202,7 @@ func (p Params) consumeToken(args []string, i int, known map[string]Flag, spec *
 	}
 	name, isFlag := strings.CutPrefix(arg, "--")
 	if !isFlag {
-		return i, fmt.Errorf("unexpected argument %q (subcommands take --flag arguments only)", arg)
+		return i, fmt.Errorf("unexpected argument %q. Subcommands take --flag arguments only", arg)
 	}
 	if name == "" {
 		return i, nil // bare "--"
@@ -231,7 +231,7 @@ func (p Params) consumeToken(args []string, i int, known map[string]Flag, spec *
 			// Report the missing value instead of silently consuming the next
 			// flag as this one's value ("--lang --download" must not set lang
 			// to "--download" and suppress the download flag).
-			return i, fmt.Errorf("--%s requires a value (to pass a value beginning with --, use --%s=<value>)", name, name)
+			return i, fmt.Errorf("--%s requires a value. To pass a value beginning with --, use --%s=<value>", name, name)
 		}
 		p.strs[name] = args[i+1]
 		return i + 1, nil
@@ -292,11 +292,11 @@ func checkType(f Flag, value string) error {
 	switch f.Type {
 	case TypeInt:
 		if _, err := strconv.Atoi(value); err != nil {
-			return fmt.Errorf("--%s: %q is not a valid integer", f.Name, value)
+			return fmt.Errorf("the --%s value %q is not a valid integer", f.Name, value)
 		}
 	case TypeDuration:
 		if _, err := time.ParseDuration(value); err != nil {
-			return fmt.Errorf("--%s: %q is not a valid duration (e.g. 30s, 5m, 1h): %w", f.Name, value, err)
+			return fmt.Errorf("the --%s value %q is not a valid duration such as 30s, 5m or 1h. %w", f.Name, value, err)
 		}
 	}
 	return nil
@@ -323,7 +323,7 @@ func suggestion(name string, flags []Flag) string {
 	if best.dist == -1 {
 		return ""
 	}
-	return fmt.Sprintf(" (did you mean --%s?)", best.name)
+	return fmt.Sprintf(". Did you mean --%s?", best.name)
 }
 
 // editDistance computes the Levenshtein distance between a and b.

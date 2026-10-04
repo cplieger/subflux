@@ -1035,8 +1035,8 @@ func TestRunFullScan_summary_reports_the_backed_off_total(t *testing.T) {
 	if !strings.HasPrefix(infos[0], wantSummary) {
 		t.Errorf("RunFullScan summary = %q, want prefix %q", infos[0], wantSummary)
 	}
-	if !strings.HasSuffix(infos[0], " (2 backed off)") {
-		t.Errorf("RunFullScan summary = %q, want suffix %q", infos[0], " (2 backed off)")
+	if !strings.HasSuffix(infos[0], ", 2 backed off") {
+		t.Errorf("RunFullScan summary = %q, want suffix %q", infos[0], ", 2 backed off")
 	}
 }
 

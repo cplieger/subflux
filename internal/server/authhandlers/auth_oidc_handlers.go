@@ -270,7 +270,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if last {
 		httpapi.ConflictC(w, r, subflux.CodeConflict,
-			"cannot switch the last local admin to SSO-only; keep a break-glass admin or reset via the CLI")
+			"cannot switch the last local admin to SSO-only. Keep a break-glass admin, or reset it with the CLI")
 		return
 	}
 

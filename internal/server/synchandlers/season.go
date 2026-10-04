@@ -95,7 +95,7 @@ func (h *Handler) HandleSyncSeason(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.SeriesID <= 0 || req.Season < 0 {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest,
-			"series_id (positive) and season (non-negative) are required")
+			"series_id must be positive and season must be non-negative")
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *Handler) HandleSyncSeason(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, syncjobs.ErrCapacity):
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited,
-			"sync queue is full; wait for a running sync to finish")
+			"sync queue is full. Wait for a running sync to finish")
 		return
 	case errors.Is(err, syncjobs.ErrShuttingDown):
 		httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable,

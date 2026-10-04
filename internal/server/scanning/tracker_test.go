@@ -232,7 +232,7 @@ func TestSeasonTracker_zero_season_ep_count_uses_minimum(t *testing.T) {
 func TestShowLevelSkip_an_uncallable_counter_is_not_cached(t *testing.T) {
 	t.Parallel()
 	for name, err := range map[string]error{
-		"gated":        fmt.Errorf("%w: opensubtitles: credentials rejected; next attempt in 5m", search.ErrProviderGated),
+		"gated":        fmt.Errorf("%w: opensubtitles: the credentials were rejected, so the next attempt is in 5m", search.ErrProviderGated),
 		"auth":         &subflux.AuthError{Msg: "401"},
 		"rate limited": fmt.Errorf("count: %w", &subflux.RateLimitError{Msg: "429"}),
 	} {

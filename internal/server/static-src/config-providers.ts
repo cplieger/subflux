@@ -74,7 +74,7 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
         "number",
         priVal,
         "99",
-        "Tiebreaker when subtitles have equal scores. Lower = more trusted.",
+        "Tiebreaker when subtitles have equal scores. A lower value is more trusted.",
       ),
     );
 

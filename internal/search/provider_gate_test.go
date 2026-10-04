@@ -505,7 +505,7 @@ func TestSweepProviders_reports_a_gated_and_an_erroring_provider(t *testing.T) {
 		t.Errorf("gated provider searches = %d, want 0", gated.searches.Load())
 	}
 	if len(notices) != 2 || notices[0].Provider != "hdbits" || !notices[0].Gated ||
-		!strings.Contains(notices[0].Reason, "next attempt in 5m") || notices[1].Provider != "subdl" || notices[1].Err == nil {
+		!strings.Contains(notices[0].Reason, "next attempt is in 5m") || notices[1].Provider != "subdl" || notices[1].Err == nil {
 		t.Errorf("SweepProviders() notices = %+v, want a gated hdbits and an erroring subdl", notices)
 	}
 }

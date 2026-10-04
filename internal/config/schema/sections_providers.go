@@ -23,21 +23,21 @@ func searchSection() subflux.SchemaSection {
 				Default:     formatDuration(defaults.DefaultScanDelay),
 				Placeholder: formatDuration(defaults.DefaultScanDelay),
 				Min:         formatDuration(defaults.MinScanDelay),
-				Help:        "Delay after items that queried providers during scans, to avoid hammering them (minimum 5s; items needing no provider work skip it)",
+				Help:        "Delay after each item that queried providers during a scan, so providers are not overloaded (minimum 5s). Items that need no provider work skip the delay.",
 			},
 			{
 				Key: "provider_timeout", Label: "Provider Timeout", Type: fieldDuration,
 				Default:     formatDuration(defaults.DefaultProviderTimeout),
 				Placeholder: formatDuration(defaults.DefaultProviderTimeout),
 				Min:         formatDuration(defaults.MinProviderTimeout),
-				Help:        "Cooldown after a provider fails repeatedly (minimum 1h, 0 to disable)",
+				Help:        "Cooldown after a provider fails repeatedly (minimum 1h). Set 0 to disable.",
 			},
 			{
 				Key: "min_score", Label: "Min Score", Type: fieldNumber,
 				Default:     strconv.Itoa(defaults.MinScoreValue),
 				Placeholder: strconv.Itoa(defaults.MinScoreValue),
 				Min:         strconv.Itoa(defaults.MinScoreValue), Max: strconv.Itoa(defaults.MaxScoreValue),
-				Help: "Global minimum score threshold (0 = accept any match)",
+				Help: "Global minimum score threshold. 0 accepts any match.",
 			},
 			{
 				Key: "exclude_arr_tags", Label: "Exclude Arr Tags", Type: fieldText,
@@ -93,7 +93,7 @@ func adaptiveSection() subflux.SchemaSection {
 				Default:     "0",
 				Placeholder: "0",
 				Min:         "0",
-				Help:        "Stop retrying after this many attempts (0 = retry forever)",
+				Help:        "Stop retrying after this many attempts. 0 retries forever.",
 			},
 		},
 	}
@@ -130,12 +130,12 @@ func postProcessSection() subflux.SchemaSection {
 			{
 				Key: "normalize_utf8", Label: "Normalize UTF-8", Type: fieldBool,
 				Default: defaultTrue,
-				Help:    "Convert subtitle encoding to UTF-8 (handles UTF-16, Windows-1252)",
+				Help:    "Convert subtitle encoding to UTF-8, including from UTF-16 and Windows-1252",
 			},
 			{
 				Key: "normalize_endings", Label: "Normalize Endings", Type: fieldBool,
 				Default: defaultTrue,
-				Help:    "Convert line endings to CRLF (SRT standard)",
+				Help:    "Convert line endings to CRLF, the SRT standard",
 			},
 			{
 				Key: "clean_whitespace", Label: "Clean Whitespace", Type: fieldBool,
@@ -159,35 +159,35 @@ func scoringSection() subflux.SchemaSection {
 		Fields: []subflux.SchemaField{
 			{
 				Key: "hash", Label: "Hash", Type: fieldNumber, Default: strconv.Itoa(d.Hash),
-				Help: "File hash match (authoritative, bypasses other weights)",
+				Help: "File hash match. It is authoritative and bypasses the other weights.",
 			},
 			{
 				Key: "source", Label: "Source", Type: fieldNumber, Default: strconv.Itoa(d.Source),
-				Help: "BluRay, WEB-DL, HDTV, DVDRip, etc.",
+				Help: "Release source, for example BluRay, WEB-DL, HDTV or DVDRip",
 			},
 			{
 				Key: "release_group", Label: "Release Group", Type: fieldNumber, Default: strconv.Itoa(d.ReleaseGroup),
-				Help: "Scene group name (e.g. SPARKS, FGT)",
+				Help: "Scene group name, for example SPARKS or FGT",
 			},
 			{
 				Key: "streaming_service", Label: "Streaming Service", Type: fieldNumber, Default: strconv.Itoa(d.StreamingService),
-				Help: "AMZN, NF, DSNP, ATVP, etc.",
+				Help: "Streaming service, for example AMZN, NF, DSNP or ATVP",
 			},
 			{
 				Key: "video_codec", Label: "Video Codec", Type: fieldNumber, Default: strconv.Itoa(d.VideoCodec),
-				Help: "x264, x265, AV1, etc.",
+				Help: "Video codec, for example x264, x265 or AV1",
 			},
 			{
 				Key: "hdr", Label: "HDR", Type: fieldNumber, Default: strconv.Itoa(d.HDR),
-				Help: "HDR10, Dolby Vision, HDR10+, etc.",
+				Help: "HDR format, for example HDR10, Dolby Vision or HDR10+",
 			},
 			{
 				Key: "edition", Label: "Edition", Type: fieldNumber, Default: strconv.Itoa(d.Edition),
-				Help: "Director's Cut, Extended, Theatrical (movies only)",
+				Help: "Movie edition, for example Director's Cut, Extended or Theatrical. Movies only.",
 			},
 			{
 				Key: "season_pack", Label: "Season Pack", Type: fieldNumber, Default: strconv.Itoa(d.SeasonPack),
-				Help: "Bonus for season packs (consistent subs across episodes)",
+				Help: "Bonus for season packs, which keep subtitles consistent across episodes",
 			},
 		},
 	}

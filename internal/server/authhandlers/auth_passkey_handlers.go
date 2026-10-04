@@ -197,7 +197,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		// authenticator rather than retry with this one.
 		if errors.Is(err, authwebauthn.ErrNotDiscoverable) {
 			httpapi.BadRequestC(w, r, subflux.CodeWebAuthnNotDiscoverable,
-				"this authenticator cannot store a passkey; try a different device or a password manager")
+				"this authenticator cannot store a passkey. Try a different device or a password manager")
 			return
 		}
 		httpapi.BadRequestC(w, r, subflux.CodeWebAuthnRegisterFailed, "registration failed")

@@ -43,7 +43,7 @@ const (
 // emits the server's response verbatim for jq / scripted consumers.
 var formatFlag = cliparse.Flag{
 	Name:    "format",
-	Help:    "Output format: pretty (default, indented JSON) or json (server passthrough, single line)",
+	Help:    "Output format: pretty for indented JSON, or json for the server response as one line",
 	Default: "pretty",
 }
 
@@ -58,20 +58,20 @@ var cliSpecs = map[string]cliparse.Spec{
 		Synopsis: "Search subtitles for a media item via the running server",
 		Help: "Remote command: resolves the media in the server's Sonarr/Radarr libraries, " +
 			"searches all configured providers through GET /api/search, and prints scored results. " +
-			"--download saves the picked result server-side (top pick keeps automation; other picks " +
-			"lock the item) and reports the saved path.\n\n" +
-			"Requires a running subflux server: set SUBFLUX_URL (default http://127.0.0.1:8374) " +
-			"and SUBFLUX_API_KEY when the server has auth enabled.",
+			"--download saves the picked result server-side and reports the saved path. " +
+			"The top pick keeps automation, and any other pick locks the item.\n\n" +
+			"Requires a running subflux server. Set SUBFLUX_URL (default http://127.0.0.1:8374), " +
+			"and set SUBFLUX_API_KEY when the server has auth enabled.",
 		Run: runCLISearchRemote,
 		Flags: []cliparse.Flag{
-			{Name: "imdb", Help: "IMDb ID (e.g. tt0903747)"},
-			{Name: "tmdb", Help: "TMDB ID (movies)"},
-			{Name: "title", Help: "Title (exact match, case-insensitive)"},
-			{Name: cmdType, Help: "Media type (series|movie); omitted: try series, then movie"},
+			{Name: "imdb", Help: "IMDb ID, for example tt0903747"},
+			{Name: "tmdb", Help: "TMDB ID, movies only"},
+			{Name: "title", Help: "Title to match exactly, ignoring case"},
+			{Name: cmdType, Help: "Media type, series or movie. Without it, series is tried first, then movie"},
 			{Name: flagSeason, Help: "Limit series expansion to a season", Type: cliparse.TypeInt},
 			{Name: flagEpisode, Help: "Limit series expansion to an episode number", Type: cliparse.TypeInt},
 			{Name: cmdLang, Help: "Language code", Default: "fr"},
-			{Name: "pick", Help: "Result index to download with --download (1 = top pick)", Type: cliparse.TypeInt, Default: "1"},
+			{Name: "pick", Help: "Result index to download with --download. 1 is the top pick", Type: cliparse.TypeInt, Default: "1"},
 			{Name: "download", Help: "Download the picked subtitle", Type: cliparse.TypeBool},
 		},
 	},
@@ -88,7 +88,7 @@ var cliSpecs = map[string]cliparse.Spec{
 		Help:     "Fetches /api/state with optional filters. Defaults to limit=20.",
 		Run:      runCLIState,
 		Flags: []cliparse.Flag{
-			{Name: cmdType, Help: "Filter by media type (episode|movie)"},
+			{Name: cmdType, Help: "Filter by media type, episode or movie"},
 			{Name: cmdLang, Help: "Filter by language code"},
 			{Name: flagProvider, Help: "Filter by provider name"},
 			{Name: "limit", Help: "Max rows to return", Type: cliparse.TypeInt, Default: "20"},
@@ -105,7 +105,7 @@ var cliSpecs = map[string]cliparse.Spec{
 	cmdLocks: {
 		Name:     cmdLocks,
 		Synopsis: "List manual download locks",
-		Help:     "Manual downloads (non-top-pick) lock the item from automation.",
+		Help:     "A manual download of any result other than the top pick locks the item from automation.",
 		Run:      func(p cliparse.Params) int { return runCLIRemote(p, apipaths.PathListLocks) },
 		Flags:    []cliparse.Flag{formatFlag},
 	},
@@ -119,13 +119,13 @@ var cliSpecs = map[string]cliparse.Spec{
 	cmdUnlock: {
 		Name:     cmdUnlock,
 		Synopsis: "Remove a manual download lock",
-		Help:     "Clears the lock so the next scan can re-evaluate this item. Locks are held per variant; omit --variant to clear all variants for the language.",
+		Help:     "Clears the lock so the next scan can re-evaluate this item. Locks are held per variant. Omit --variant to clear all variants for the language.",
 		Run:      runCLIUnlock,
 		Flags: []cliparse.Flag{
-			{Name: cmdType, Help: "Media type (episode|movie)", Required: true},
-			{Name: "id", Help: "Media id (e.g. tt0903747-s01e01)", Required: true},
+			{Name: cmdType, Help: "Media type, episode or movie", Required: true},
+			{Name: "id", Help: "Media ID, for example tt0903747-s01e01", Required: true},
 			{Name: cmdLang, Help: "Language code", Required: true},
-			{Name: "variant", Help: "Variant to unlock (standard|hi|forced); default all variants"},
+			{Name: "variant", Help: "Variant to unlock: standard, hi or forced. Default is all variants"},
 			formatFlag,
 		},
 	},
@@ -159,17 +159,17 @@ var cliSpecs = map[string]cliparse.Spec{
 		Help:     "Useful for debugging release-name parsing without running a full search.",
 		Run:      runCLIScore,
 		Flags: []cliparse.Flag{
-			{Name: cmdType, Help: "Media type (episode|movie)", Default: "episode"},
+			{Name: cmdType, Help: "Media type, episode or movie", Default: "episode"},
 			{Name: "video", Help: "Video release name", Required: true},
 			{Name: "sub", Help: "Subtitle release name", Required: true},
-			{Name: "match", Help: "Identity match basis (imdb|tmdb)"},
+			{Name: "match", Help: "Identity match basis, imdb or tmdb"},
 			formatFlag,
 		},
 	},
 	cmdResetPassword: {
 		Name:     cmdResetPassword,
-		Synopsis: "Reset an existing user's password (interactive)",
-		Help:     "Prompts for the new password on stdin, then applies it through the running server's private admin socket (/tmp/subflux-admin/admin.sock; bbolt holds an exclusive file lock, so the store cannot be opened directly). Run inside the server's container, e.g. via docker exec. The user must already exist.",
+		Synopsis: "Reset an existing user's password interactively",
+		Help:     "Prompts for the new password on stdin, then applies it through the running server's private admin socket at /tmp/subflux-admin/admin.sock. The store cannot be opened directly, because bbolt holds an exclusive file lock. Run it inside the server's container, for example with docker exec. The user must already exist.",
 		Run:      runCLIResetPassword,
 		Flags: []cliparse.Flag{
 			{Name: "user", Help: "Username", Required: true},
@@ -178,7 +178,7 @@ var cliSpecs = map[string]cliparse.Spec{
 	cmdGenerateAPIKey: {
 		Name:     cmdGenerateAPIKey,
 		Synopsis: "Generate a new API key for a user",
-		Help:     "Prints the API key once; only the SHA-256 hash is stored. Applies through the running server's private admin socket (/tmp/subflux-admin/admin.sock; run inside the server's container, e.g. via docker exec).",
+		Help:     "Prints the API key once. Only its SHA-256 hash is stored. Applies through the running server's private admin socket at /tmp/subflux-admin/admin.sock, so run it inside the server's container, for example with docker exec.",
 		Run:      runCLIGenerateAPIKey,
 		Flags: []cliparse.Flag{
 			{Name: "user", Help: "Username", Required: true},
@@ -187,7 +187,7 @@ var cliSpecs = map[string]cliparse.Spec{
 	},
 	cmdEnablePwLogin: {
 		Name:     cmdEnablePwLogin,
-		Synopsis: "Re-enable password login (lockout recovery)",
+		Synopsis: "Re-enable password login to recover from a lockout",
 		Help:     "Sets auth.basic_enabled: true in the config file. Use when password login was disabled and OIDC is unavailable. Restart subflux to apply.",
 		Run:      runCLIEnablePasswordLogin,
 	},

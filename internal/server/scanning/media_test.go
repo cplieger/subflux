@@ -115,7 +115,7 @@ func TestRunFullScan_counts_write_blocked_items(t *testing.T) {
 	if res.Outcome != activity.OutcomeCompleted || res.MediaUnwritable {
 		t.Fatalf("RunFullScan = %+v, want completed: a known-bad folder is skipped, not fatal", res)
 	}
-	if infos := rig.alerts.infoAlerts(); len(infos) != 1 || !strings.Contains(infos[0], "(2 in unwritable folders)") {
+	if infos := rig.alerts.infoAlerts(); len(infos) != 1 || !strings.Contains(infos[0], ", 2 in unwritable folders") {
 		t.Errorf("summary = %q, want it to count the two write-blocked items", infos)
 	}
 }

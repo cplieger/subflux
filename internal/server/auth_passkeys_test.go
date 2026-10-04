@@ -419,11 +419,11 @@ func TestWebAuthnLoginBegin_originDecidesBeforeAnyChallenge(t *testing.T) {
 		{name: "covered_subdomain_proceeds", origin: "https://subflux.example.com", wantCode: http.StatusOK},
 		{
 			name: "localhost_is_refused_as_not_covered", origin: "http://localhost:8374", wantCode: http.StatusBadRequest,
-			wantErr: `this page's origin "http://localhost:8374" is not covered by the configured relying-party ID "example.com"; set auth.webauthn_rp_id to "localhost" under Settings → Authentication`,
+			wantErr: `this page's origin "http://localhost:8374" is not covered by the configured relying-party ID "example.com". Set auth.webauthn_rp_id to "localhost" in the Authentication section of Settings`,
 		},
 		{
 			name: "dot_guard", origin: "https://evilexample.com", wantCode: http.StatusBadRequest,
-			wantErr: `this page's origin "https://evilexample.com" is not covered by the configured relying-party ID "example.com"; set auth.webauthn_rp_id to "evilexample.com" under Settings → Authentication`,
+			wantErr: `this page's origin "https://evilexample.com" is not covered by the configured relying-party ID "example.com". Set auth.webauthn_rp_id to "evilexample.com" in the Authentication section of Settings`,
 		},
 		{
 			name: "no_origin_header", origin: "", wantCode: http.StatusBadRequest,
@@ -431,7 +431,7 @@ func TestWebAuthnLoginBegin_originDecidesBeforeAnyChallenge(t *testing.T) {
 		},
 		{
 			name: "trailing_dot_names_the_dotless_host", origin: "https://subflux.example.com.", wantCode: http.StatusBadRequest,
-			wantErr: `this page's address ends in a dot; reach subflux at "https://subflux.example.com"`,
+			wantErr: `this page's address ends in a dot. Reach subflux at "https://subflux.example.com"`,
 		},
 	}
 	for _, tt := range tests {

@@ -49,7 +49,7 @@ func NewProviderGateHook(alerts *activity.AlertLog, label func(subflux.ProviderI
 		switch ev.Kind {
 		case providergate.Disabled:
 			alerts.RecordPersistent(source, fmt.Sprintf(
-				"%s rejected its credentials and was disabled after %d attempts (%s). "+
+				"%s rejected its credentials and was disabled after %d attempts. The reason was %s. "+
 					"Fix the credentials in Settings, then Providers and save, or press Test.",
 				label(ev.Provider), providergate.MaxAuthFailures, ev.Reason,
 			))
@@ -71,7 +71,7 @@ func NewProviderGateHook(alerts *activity.AlertLog, label func(subflux.ProviderI
 
 func settingRejectedText(label, setting string) string {
 	if setting == "anidb_client_key" {
-		return fmt.Sprintf("%s's AniDB client key was rejected; episode lookup is off and %s searches by title. "+
+		return fmt.Sprintf("%s's AniDB client key was rejected, so episode lookup is off and %s searches by title. "+
 			"Fix or clear the key in Settings, then Providers.", label, label)
 	}
 	return fmt.Sprintf("%s rejected its %s setting. Fix or clear it in Settings, then Providers.", label, setting)

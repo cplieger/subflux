@@ -27,7 +27,7 @@ const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean
   { code: ErrorCode.SearchNoResults, msg: "No results found from any provider.", empty: true },
   {
     code: ErrorCode.ProviderTimedOut,
-    msg: "This provider is in cooldown; try again in a few minutes.",
+    msg: "This provider is in cooldown. Try again in a few minutes.",
   },
 ];
 
@@ -448,7 +448,7 @@ function renderPopupResults(
   const shown = Math.min(results.length, 30);
   const countText =
     results.length > shown
-      ? `Showing ${shown} of ${results.length} results (best matches first)`
+      ? `Showing ${shown} of ${results.length} results, best matches first`
       : `${results.length} ${results.length === 1 ? "result" : "results"}`;
   frag.appendChild(el("div", { className: "muted result-count" }, countText));
 
@@ -476,8 +476,8 @@ function renderPopupResults(
         type: "button",
         "aria-label": isTop ? "Download (auto)" : "Download (manual)",
         "data-tip": isTop
-          ? "Top match: downloads as auto subtitle"
-          : "Not top match: downloads as manual (pauses automation)",
+          ? "This is the top match. It downloads as an auto subtitle"
+          : "This is not the top match. It downloads as a manual subtitle, which pauses automation",
         onclick: () => {
           void downloadFromPopup(dlBtn, {
             sub: s,

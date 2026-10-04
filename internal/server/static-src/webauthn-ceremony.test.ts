@@ -595,7 +595,7 @@ describe("unavailableSentence", () => {
       reason: "init_failed",
       rpID: "Example.COM",
       suggested: "",
-      want: "Passkeys are unavailable: the configured relying-party ID \u201cExample.COM\u201d was rejected at startup. Fix auth.webauthn_rp_id under Settings \u2192 Authentication.",
+      want: 'Passkeys are unavailable because the configured relying-party ID "Example.COM" was rejected at startup. Fix auth.webauthn_rp_id in the Authentication section of Settings.',
     },
     {
       reason: "insecure_scheme",
@@ -607,13 +607,13 @@ describe("unavailableSentence", () => {
       reason: "address_unusable",
       rpID: "example.com",
       suggested: "",
-      want: "Passkeys cannot be used at this address: the browser reports it in a form a passkey cannot be scoped to. A trailing dot is the usual cause \u2014 reach subflux at the same host without it.",
+      want: "Passkeys cannot be used at this address. The browser reports it in a form a passkey cannot be scoped to. A trailing dot is the usual cause, so reach subflux at the same host without the trailing dot.",
     },
     {
       reason: "origin_not_accepted",
       rpID: "example.com",
       suggested: "example.net",
-      want: "Passkeys here are configured for \u201cexample.com\u201d, which does not cover this address. Reach subflux at a host inside \u201cexample.com\u201d, or change auth.webauthn_rp_id to \u201cexample.net\u201d \u2014 which strands any passkey already registered.",
+      want: 'Passkeys here are configured for "example.com", which does not cover this address. Reach subflux at a host inside "example.com", or change auth.webauthn_rp_id to "example.net". That change strands any passkey already registered.',
     },
     {
       reason: "origin_not_allowlisted",
@@ -675,7 +675,7 @@ describe("unavailableSentence", () => {
         suggestedRPID: "",
       }),
     ).toBe(
-      "Passkeys here are configured for \u201cexample.com\u201d, which does not cover this address. Reach subflux at a host inside \u201cexample.com\u201d.",
+      'Passkeys here are configured for "example.com", which does not cover this address. Reach subflux at a host inside "example.com".',
     );
   });
 });

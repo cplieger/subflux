@@ -53,22 +53,22 @@ func TestAdmit_walks_the_ladder_to_a_disable(t *testing.T) {
 
 	mustAdmit(t, b, hdbits, OpSearch)
 	b.Observe(t.Context(), hdbits, OpSearch, errAuth)
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; next attempt in 5m")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the next attempt is in 5m")
 	r.clock.Advance(4*time.Minute + 30*time.Second)
-	mustRefuse(t, b, hdbits, OpDownload, "credentials rejected; next attempt in 30s")
+	mustRefuse(t, b, hdbits, OpDownload, "the credentials were rejected, so the next attempt is in 30s")
 	r.clock.Advance(30 * time.Second)
 
 	mustAdmit(t, b, hdbits, OpSearch)
 	mustRefuse(t, b, hdbits, OpSearch, "credential check in progress")
 	b.Observe(t.Context(), hdbits, OpSearch, errAuth)
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; next attempt in 30m")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the next attempt is in 30m")
 	r.clock.Advance(30 * time.Minute)
 
 	mustAdmit(t, b, hdbits, OpDownload)
 	b.Observe(t.Context(), hdbits, OpDownload, errAuth)
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; disabled until the settings change or a Test passes")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
 	r.clock.Advance(48 * time.Hour)
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; disabled until the settings change or a Test passes")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
 
 	if v, ok := r.metrics.disabledSeries(hdbits); !ok || !v {
 		t.Errorf("provider_disabled{hdbits} = (%v, exists %v), want 1", v, ok)
@@ -214,7 +214,7 @@ func TestObserve_recognises_a_wrapped_auth_error(t *testing.T) {
 	r := newRig(t)
 	b := r.liveBinding(t, hdbitsSettings(secretA))
 	b.Observe(t.Context(), hdbits, OpSearch, fmt.Errorf("find torrents: %w", errAuth))
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; next attempt in 5m")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the next attempt is in 5m")
 }
 
 func TestBinding_stale_settings_are_refused_and_ignored(t *testing.T) {
@@ -223,7 +223,7 @@ func TestBinding_stale_settings_are_refused_and_ignored(t *testing.T) {
 	live := r.liveBinding(t, hdbitsSettings(secretB))
 	before := r.store.writeCount()
 
-	mustRefuse(t, stale, hdbits, OpSearch, "settings changed; waiting for the new settings to load")
+	mustRefuse(t, stale, hdbits, OpSearch, "the settings changed and the new settings are still loading")
 	stale.Observe(t.Context(), hdbits, OpSearch, errAuth)
 	stale.ObserveSetting(hdbits, refusing("passkey", errAuth))
 
@@ -281,10 +281,10 @@ func TestReconcile_survives_restart_and_settings_changes(t *testing.T) {
 	}
 	nb := restarted.gate.Bind(asStrings)
 	restarted.gate.Activate(nb)
-	mustRefuse(t, nb, hdbits, OpSearch, "settings changed; waiting for the new settings to load")
+	mustRefuse(t, nb, hdbits, OpSearch, "the settings changed and the new settings are still loading")
 	restarted.gate.Reconcile(t.Context())
 
-	mustRefuse(t, nb, hdbits, OpSearch, "credentials rejected; disabled until the settings change or a Test passes")
+	mustRefuse(t, nb, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
 	if got := restarted.events.kinds(hdbits); !slices.Equal(got, []Kind{Disabled}) {
 		t.Errorf("events after restart = %v, want [disabled]", got)
 	}
@@ -308,7 +308,7 @@ func TestReconcile_survives_restart_and_settings_changes(t *testing.T) {
 	back := restarted.gate.Bind(asStrings)
 	restarted.gate.Activate(back)
 	restarted.gate.Reconcile(t.Context())
-	mustRefuse(t, back, hdbits, OpSearch, "credentials rejected; disabled until the settings change or a Test passes")
+	mustRefuse(t, back, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
 
 	changed := restarted.gate.Bind(hdbitsSettings(secretB))
 	restarted.gate.Activate(changed)
@@ -329,7 +329,7 @@ func TestReconcile_refuses_until_an_unverified_record_is_checked(t *testing.T) {
 
 	b := r.gate.Bind(hdbitsSettings(secretB))
 	r.gate.Activate(b)
-	mustRefuse(t, b, hdbits, OpSearch, "settings changed; waiting for the new settings to load")
+	mustRefuse(t, b, hdbits, OpSearch, "the settings changed and the new settings are still loading")
 	r.gate.Reconcile(t.Context())
 	mustAdmit(t, b, hdbits, OpSearch)
 	if _, ok := r.store.stored(hdbits); ok {
@@ -344,7 +344,7 @@ func TestReconcile_matching_record_is_admitted_only_per_the_ladder(t *testing.T)
 	r2 := &rig{clock: r.clock, metrics: newMetrics(), events: &eventLog{}, store: r.store}
 	r2.gate = r2.open(t, r.store)
 	b := r2.liveBinding(t, hdbitsSettings(secretA))
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; next attempt in 5m")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the next attempt is in 5m")
 	r.clock.Advance(5 * time.Minute)
 	mustAdmit(t, b, hdbits, OpSearch)
 }
@@ -449,7 +449,7 @@ func TestObserve_a_slow_write_cannot_land_over_a_later_state(t *testing.T) {
 		wg.Go(func() { b.Observe(t.Context(), hdbits, OpSearch, errAuth) })
 		<-store.entered
 		b.Observe(t.Context(), hdbits, OpSearch, errAuth)
-		mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; next attempt in 5m")
+		mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the next attempt is in 5m")
 		close(store.release)
 		wg.Wait()
 		if rec, _ := store.stored(hdbits); rec.Failures != 1 {
@@ -589,7 +589,7 @@ func TestClearIfMatches_answers_per_recorded_settings(t *testing.T) {
 	if got := r.gate.ClearIfMatches(t.Context(), hdbits, hdbitsSettings(secretB)[hdbits]); got != Mismatch {
 		t.Fatalf("ClearIfMatches(other settings) = %v, want Mismatch", got)
 	}
-	mustRefuse(t, b, hdbits, OpSearch, "credentials rejected; disabled until the settings change or a Test passes")
+	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
 	if got := r.gate.ClearIfMatches(t.Context(), subdl, hdbitsSettings(secretA)[subdl]); got != NoRecord {
 		t.Errorf("ClearIfMatches(no record) = %v, want NoRecord", got)
 	}

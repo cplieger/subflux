@@ -334,7 +334,9 @@ function buildSubTarget(
     autocomplete: "off",
     value: (sub.providers ?? []).join(", "),
   });
-  advInner.appendChild(cfgFieldEl("Providers", prov, "Only use these providers (empty = all)"));
+  advInner.appendChild(
+    cfgFieldEl("Providers", prov, "Only use these providers. Leave empty to use all of them."),
+  );
   const excl = el("input", {
     type: "text",
     className: "lang-exclude",

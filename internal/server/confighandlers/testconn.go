@@ -129,8 +129,8 @@ func (h *Handler) testProviderCredentials(w http.ResponseWriter, r *http.Request
 }
 
 var clearMessage = map[providergate.ClearResult]string{
-	providergate.Cleared:  "credentials accepted; provider re-enabled",
-	providergate.Mismatch: "credentials accepted; save to apply them and re-enable the provider",
+	providergate.Cleared:  "credentials accepted. Provider re-enabled",
+	providergate.Mismatch: "credentials accepted. Save to apply them and re-enable the provider",
 }
 
 // resolveProviderSecrets turns the submitted settings into the map a factory
@@ -173,7 +173,7 @@ func describeArrFailure(err error) string {
 		case http.StatusUnauthorized, http.StatusForbidden:
 			return fmt.Sprintf("HTTP %d: the API key was rejected", status.Code)
 		case http.StatusNotFound:
-			return fmt.Sprintf("HTTP %d: no arr API at this URL; check for a missing or extra base path", status.Code)
+			return fmt.Sprintf("the server at this URL answered HTTP %d but has no arr API. Check for a missing or extra base path", status.Code)
 		default:
 			return fmt.Sprintf("the server at this URL answered HTTP %d", status.Code)
 		}

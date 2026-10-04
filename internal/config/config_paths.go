@@ -56,7 +56,7 @@ var ErrPathNotAllowed = errors.New("path not under any configured media_roots")
 func (c *Config) ValidatePath(ctx context.Context, path string) error {
 	if len(c.MediaRootDirs) == 0 {
 		slog.Warn("ValidatePath: refused, no media_roots configured", "path", path)
-		return fmt.Errorf("path %q: %w (no media_roots configured)", path, ErrPathNotAllowed)
+		return fmt.Errorf("path %q: %w because no media_roots are configured", path, ErrPathNotAllowed)
 	}
 	for i, root := range c.MediaRootDirs {
 		if err := ctx.Err(); err != nil {
@@ -127,7 +127,7 @@ func pathUnderRoot(root, path string) bool {
 func (c *Config) RemoveUnderRoot(ctx context.Context, path string) error {
 	if len(c.MediaRootDirs) == 0 {
 		slog.Warn("RemoveUnderRoot: refused, no media_roots configured", "path", path)
-		return fmt.Errorf("path %q: %w (no media_roots configured)", path, ErrPathNotAllowed)
+		return fmt.Errorf("path %q: %w because no media_roots are configured", path, ErrPathNotAllowed)
 	}
 	for i, root := range c.MediaRootDirs {
 		if err := ctx.Err(); err != nil {

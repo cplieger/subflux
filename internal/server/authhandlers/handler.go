@@ -65,7 +65,7 @@ const (
 	authDBTimeout = 5 * time.Second
 
 	// msgBreachedPassword is the user-facing error when a password appears in a breach database.
-	msgBreachedPassword = "this password has appeared in a data breach; please choose a different one"
+	msgBreachedPassword = "this password has appeared in a data breach. Please choose a different one"
 
 	// maxAuthBodySize limits request body size for auth endpoints (4 KB).
 	maxAuthBodySize = 4096

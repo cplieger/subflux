@@ -81,16 +81,16 @@ const SENTENCES: Record<UnavailableReason, (a: Unavailable) => string> = {
   unconfigurable: () =>
     "Passkeys cannot be used at this address. A passkey is scoped to a domain name, so an IP address, a single-label hostname or a bare public suffix cannot have one. Use a domain name over HTTPS, or http://localhost.",
   init_failed: (a) =>
-    `Passkeys are unavailable: the configured relying-party ID \u201c${a.rpID}\u201d was rejected at startup. Fix auth.webauthn_rp_id under Settings \u2192 Authentication.`,
+    `Passkeys are unavailable because the configured relying-party ID "${a.rpID}" was rejected at startup. Fix auth.webauthn_rp_id in the Authentication section of Settings.`,
   insecure_scheme: () =>
     "Passkeys require HTTPS. This page is served over plain HTTP, and the only exception the standard makes is http://localhost.",
   address_unusable: () =>
-    "Passkeys cannot be used at this address: the browser reports it in a form a passkey cannot be scoped to. A trailing dot is the usual cause \u2014 reach subflux at the same host without it.",
+    "Passkeys cannot be used at this address. The browser reports it in a form a passkey cannot be scoped to. A trailing dot is the usual cause, so reach subflux at the same host without the trailing dot.",
   origin_not_accepted: (a) =>
-    `Passkeys here are configured for \u201c${a.rpID}\u201d, which does not cover this address. Reach subflux at a host inside \u201c${a.rpID}\u201d` +
+    `Passkeys here are configured for "${a.rpID}", which does not cover this address. Reach subflux at a host inside "${a.rpID}"` +
     (a.suggestedRPID === ""
       ? "."
-      : `, or change auth.webauthn_rp_id to \u201c${a.suggestedRPID}\u201d \u2014 which strands any passkey already registered.`),
+      : `, or change auth.webauthn_rp_id to "${a.suggestedRPID}". That change strands any passkey already registered.`),
   origin_not_allowlisted: () =>
     "Passkeys here are restricted to specific addresses, and this is not one of them. Reach subflux at an address on its allowed list.",
   browser_unsupported: () =>

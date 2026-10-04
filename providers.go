@@ -95,7 +95,7 @@ var providerEntries = []providerEntry{
 			},
 			{
 				Key: "use_hash", Label: "Use Hash", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Match by file hash (fast, exact)",
+				Help: "Match by file hash, which is fast and exact",
 			},
 			{
 				Key: "include_ai_translated", Label: "Include AI Translated", Type: fieldTypeBool,
@@ -105,7 +105,7 @@ var providerEntries = []providerEntry{
 			{
 				Key: "include_machine_translated", Label: "Include Machine Translated",
 				Type: fieldTypeBool, Default: fieldDefaultFalse,
-				Help: "Include older machine-translated uploads (Google Translate era)",
+				Help: "Include older machine-translated uploads from the Google Translate era",
 			},
 		},
 	},
@@ -149,7 +149,7 @@ var providerEntries = []providerEntry{
 		fields: []subflux.ProviderSchemaField{
 			{
 				Key: "anidb_client_key", Label: "AniDB Client Key", Type: fieldTypeSecret,
-				Secret: true, Help: "Optional; enables AniDB episode ID search",
+				Secret: true, Help: "Optional. Enables AniDB episode ID search",
 			},
 		},
 	},
