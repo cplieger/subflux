@@ -1,3 +1,4 @@
+// Synced from cplieger/ci/configs/eslint.config.base.mjs. Change it there.
 // Strict typed-linting config.
 // References:
 //   https://typescript-eslint.io/users/configs/#strict-type-checked

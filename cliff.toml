@@ -1,3 +1,4 @@
+# Synced from cplieger/ci/configs/cliff-alpha.toml. Change it there.
 # Version-bump policy. Pre-1.0 (alpha): stay within 0.x.
 # feat -> patch in 0.x; breaking -> minor (stays 0.x, no auto 1.0).
 [bump]
