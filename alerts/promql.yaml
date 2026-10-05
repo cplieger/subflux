@@ -113,7 +113,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "subflux: {{ $labels.provider }} rejected its credentials"
+          summary: "subflux: {{ $labels.provider }} rejected a credential"
           description: >
             The provider rejected a credential and subflux stopped using it. After
             three attempts that is the whole provider, otherwise only the rejected
@@ -149,7 +149,7 @@ groups:
         annotations:
           summary: "subflux cannot read the media under {{ $labels.root }}"
           description: >
-            A file under this media root could not be checked: the root is
+            A file under this media root could not be checked. The root is
             missing or empty, or the filesystem refused or timed out. Nothing
             under it is treated as deleted, and new imports there wait until it
             can be read again. The share is probably unmounted or hung. The web
