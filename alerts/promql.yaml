@@ -1,29 +1,18 @@
-# Recommended alert rules for subflux. Prometheus / Mimir ruler (PromQL) rule
-# group: subflux exposes metrics on /metrics, so scrape it and evaluate this
-# group with Prometheus or the Mimir ruler; firing alerts deliver through your
-# Alertmanager. Thresholds, the `for:` windows and the severity labels are
-# starting points; adjust them to your deployment.
+# Recommended alert rules for subflux, for Prometheus or the Mimir ruler.
+# Scrape subflux's /metrics endpoint and load this group into your ruler.
+# Firing alerts go through your Alertmanager. Thresholds, `for:` windows and
+# severity labels are starting points, so adjust them to your deployment.
 #
-# The selector label is the scrape `job` YOUR config assigns, not a container
-# name. The two target rules pin `job="subflux"` because they read the synthetic
-# `up` series, where a bare `up == 0` would fire on every unrelated target in
-# your Prometheus; set that matcher to whatever your scrape config calls
-# subflux. The rules reading subflux's own metrics carry no job matcher, so add
-# one if you run more than one instance.
+# The selector label is the scrape `job` your config assigns. The two target
+# rules pin `job="subflux"` because they read the synthetic `up` series. Set
+# that matcher to your scrape job name. The other rules carry no job matcher,
+# so add one if you run more than one instance.
 groups:
   - name: subflux
     rules:
-      # The floor under every other rule here: all of them read a subflux metric,
-      # so all of them go quiet together when subflux stops being scraped.
-      #
-      # Two arms, because neither covers the other. `up == 0` catches a target
-      # that is configured and failing, and keeps its labels. `absent(up{...})`
-      # catches a target that stopped EXISTING — a dropped scrape target, a
-      # removed scrape config, a deleted Kubernetes pod or ServiceMonitor —
-      # where `up` has no series and `up == 0` cannot match. Use an EXACT job
-      # matcher: a regex absent() form asks whether ANY matching target is up,
-      # so one healthy replica masks every failed one, and its synthetic result
-      # carries no job label to route on.
+      # The floor under every other rule here, which all read a subflux metric.
+      # Two rules, because `up == 0` cannot match a target that no longer exists
+      # and `absent()` cannot see one that is failing. Keep the job matcher exact.
       - alert: SubfluxTargetDown
         expr: up{job="subflux"} == 0
         for: 15m
@@ -33,9 +22,8 @@ groups:
           summary: "subflux is not being scraped successfully"
           description: >
             No successful scrape of subflux for 15m, so every rule in this group
-            is blind. Either the scrape is failing (container down, wrong port,
-            network) or the target is gone from service discovery entirely. Set
-            the job matcher to whatever your scrape config calls subflux.
+            is blind. The container may be down, or the port or network may be
+            wrong. Set the job matcher to your scrape job name.
       - alert: SubfluxTargetAbsent
         expr: absent(up{job="subflux"})
         for: 15m
@@ -44,22 +32,14 @@ groups:
         annotations:
           summary: "subflux has no scrape target at all"
           description: >
-            There is no up{job="subflux"} series, so subflux is not merely failing
-            to scrape but is no longer a configured target: a dropped scrape
-            target, a removed scrape config, or a deleted Kubernetes pod or
-            ServiceMonitor. Every other rule in this group is blind.
-      # The deadman for the scan loop. subflux can be up, scraped and answering
-      # HTTP while its scheduled scan has been wedged for days, and nothing else
-      # here notices.
-      #
-      # The uptime guard is load-bearing, not decoration. A range selector does
-      # NOT require the series to have existed for the whole range: after a
-      # restart, increase(subflux_scans_total[26h]) reads 0 as soon as there are
-      # two samples, so without the guard this fires about `for:` after every
-      # restart rather than 26h after the last scan. The guard says the process
-      # has actually been up long enough for the window to mean anything.
-      # subflux_configured keeps it quiet in unconfigured mode, where there is
-      # no engine and no scan to miss.
+            No up{job="subflux"} series exists, so subflux is no longer a
+            configured scrape target. Check for a dropped target, a removed scrape
+            config, or a deleted Kubernetes pod or ServiceMonitor. Every other rule
+            in this group is blind.
+      # The deadman for the scan loop. The uptime guard is required. After a
+      # restart, increase() reads 0 as soon as there are two samples, so without
+      # the guard this fires after every restart. subflux_configured keeps it
+      # quiet in unconfigured mode, where there is no scan to miss.
       - alert: SubfluxScanStalled
         expr: >
           subflux_configured == 1
@@ -71,13 +51,9 @@ groups:
         annotations:
           summary: "subflux has not completed a scan in over a day"
           description: >
-            subflux is configured, has been up for more than 26h, and no
-            scheduled full scan has completed in that window (scan_interval
-            defaults to 24h). The scheduler may be stalled, a scan may be stuck
-            mid-run, or the arrs may be unreachable. Check the subflux logs and
-            /api/activity. A scan that legitimately runs longer than the window
-            will also trip this; widen the range and the uptime guard together
-            if that is your normal.
+            subflux is configured and has been up for over 26h, but no scheduled
+            scan completed in that window. The scheduler or a scan may be stuck,
+            or the arrs unreachable. Check the subflux logs and /api/activity.
       - alert: SubfluxHTTP5xx
         expr: sum(increase(subflux_http_requests_total{status=~"5.."}[10m])) > 5
         for: 10m
@@ -118,9 +94,7 @@ groups:
             The provider rejected a credential and subflux stopped using it. After
             three attempts that is the whole provider, otherwise only the rejected
             optional setting. Fix it in the settings dialog and save, or use the
-            provider's Test button. A disabled provider never re-enables on its
-            own. A rejected optional setting also clears when the upstream accepts
-            it on a later lookup.
+            provider's Test button.
       # The rule reads a gauge and not the write-error counter. While a folder is
       # unwritable no subtitle work happens there, so an increase() rule would
       # resolve while the share is still broken. The gauge stays at 1 until every
@@ -133,12 +107,10 @@ groups:
         annotations:
           summary: "subflux cannot write subtitle files in a folder under {{ $labels.root }}"
           description: >
-            A write test or a subtitle save failed in a folder under this media
-            root, and that folder has not accepted a write since. Scans and
-            downloads for files in it are paused, so no subtitles are being saved
-            there. The share may be mounted read-only, full, or refusing subflux's
-            user. The web UI alert and the subflux log name the folder and the
-            error.
+            A folder under this media root failed a write and has not accepted one
+            since, so no subtitles are saved there. The share may be read-only,
+            full or refusing subflux's user. The web UI and the log name the
+            folder.
       # The gauge stays at 1 until the path that failed reads again, which the
       # recheck tries every 5 minutes.
       - alert: SubfluxMediaUnavailable
@@ -149,8 +121,6 @@ groups:
         annotations:
           summary: "subflux cannot read the media under {{ $labels.root }}"
           description: >
-            A file under this media root could not be checked. The root is
-            missing or empty, or the filesystem refused or timed out. Nothing
-            under it is treated as deleted, and new imports there wait until it
-            can be read again. The share is probably unmounted or hung. The web
-            UI alert and the subflux log name the path and the error.
+            A file under this media root could not be checked, so the share is
+            likely unmounted or hung. Nothing under it is treated as deleted and
+            new imports there wait. The web UI and the log name the path.
