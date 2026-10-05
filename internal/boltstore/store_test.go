@@ -123,6 +123,9 @@ func TestOpen_reopenIdempotent(t *testing.T) {
 // robust: it requires an error AND that the call returned in well under twice
 // the timeout, without depending on the exact error text.
 func TestOpen_heldLockFailsFast(t *testing.T) {
+	saved := openTimeout
+	openTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { openTimeout = saved })
 	path := filepath.Join(t.TempDir(), "subflux.bolt")
 
 	first, err := Open(path)
@@ -143,6 +146,14 @@ func TestOpen_heldLockFailsFast(t *testing.T) {
 	// but still well below an "indefinite hang".
 	if elapsed > openTimeout+5*time.Second {
 		t.Errorf("second Open took %v, want fail-fast within ~%v", elapsed, openTimeout)
+	}
+}
+
+// TestOpenOptions_lockTimeout pins the production lock timeout the held-lock
+// test above shortens.
+func TestOpenOptions_lockTimeout(t *testing.T) {
+	if got, want := openOptions().Timeout, 5*time.Second; got != want {
+		t.Errorf("openOptions().Timeout = %v, want %v", got, want)
 	}
 }
 
