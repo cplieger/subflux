@@ -167,6 +167,12 @@ func (t *readTable) plainRead(ctx context.Context, key string, fetch fetchFn) (a
 		ks.mu.Unlock()
 		return awaitFlight(ctx, f)
 	}
+	// A flight that settled after the unlocked lookup above committed before
+	// clearing ks.flight, so re-checking here is what keeps it one upstream call.
+	if e, ok := t.lookup(key); ok {
+		ks.mu.Unlock()
+		return e.payload, nil
+	}
 	f := &plainFlight{done: make(chan struct{})}
 	ks.flight = f
 	ks.mu.Unlock()

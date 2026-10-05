@@ -33,8 +33,8 @@ import (
 // openTimeout bounds how long Open waits for the bbolt file lock before failing
 // fast. bbolt takes an exclusive OS lock on the file, so a second opener (for
 // example a stale or duplicate process) must surface quickly at startup rather
-// than block indefinitely.
-const openTimeout = 5 * time.Second
+// than block indefinitely. A var only so a test can shorten it.
+var openTimeout = 5 * time.Second
 
 // initialMmapSize is the initial mmap span (not allocated disk) requested at
 // Open. bbolt grows the file by remapping, and on non-Linux platforms (no

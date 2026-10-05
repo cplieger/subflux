@@ -15,14 +15,13 @@ import (
 // TestSSEStream_outlives_the_server_read_timeout pins the property the whole
 // SSE surface rests on: newHTTPServer arms a whole-request ReadTimeout, and a
 // stream served through the production middleware chain must not be ended by
-// it. It runs the real http.Server on a real listener, waits past the
-// configured ReadTimeout, then publishes and requires the frame to arrive: a
-// stream whose request context the read deadline had cancelled would have
-// ended, and the read would answer EOF instead. Wall-clock bound to the
-// production value; skipped under -short.
+// it. It waits past the deadline, then publishes and requires the frame to
+// arrive; a stream the deadline had cancelled would answer EOF instead. The
+// deadline is armed per request from the field, so after pinning the
+// production value the test shortens it. Skipped under -short.
 func TestSSEStream_outlives_the_server_read_timeout(t *testing.T) {
 	if testing.Short() {
-		t.Skip("waits past the production ReadTimeout")
+		t.Skip("waits past the server ReadTimeout")
 	}
 	s := &Server{metrics: obs.New(), events: events.New(0, nil)}
 	mux := http.NewServeMux()
@@ -30,9 +29,10 @@ func TestSSEStream_outlives_the_server_read_timeout(t *testing.T) {
 		events.Handle(s.events, w, r)
 	})
 	srv := newHTTPServer(s.buildHandler(mux))
-	if srv.ReadTimeout <= 0 {
-		t.Fatalf("newHTTPServer ReadTimeout = %v, want a positive value; the test has nothing to outlive", srv.ReadTimeout)
+	if srv.ReadTimeout != 10*time.Second {
+		t.Fatalf("newHTTPServer ReadTimeout = %v, want 10s", srv.ReadTimeout)
 	}
+	srv.ReadTimeout = time.Second
 
 	var lc net.ListenConfig
 	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
