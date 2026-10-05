@@ -140,7 +140,7 @@ subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Eight Prom
 
 ## Contributing
 
-Issues and pull requests are welcome. Open an issue first for a larger change, and see [CONTRIBUTING.md](CONTRIBUTING.md) for the layout and the checks.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
