@@ -16,5 +16,13 @@
   "singleAttributePerLine": true,
   "objectWrap": "preserve",
   "htmlWhitespaceSensitivity": "css",
-  "proseWrap": "preserve"
+  "proseWrap": "preserve",
+  "overrides": [
+    {
+      "files": "*.md",
+      "options": {
+        "requirePragma": true
+      }
+    }
+  ]
 }
