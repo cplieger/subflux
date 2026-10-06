@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	github.com/cplieger/arrapi/v2 v2.1.0
 	github.com/cplieger/atomicfile/v4 v4.0.0
-	github.com/cplieger/auth/v6 v6.1.0
+	github.com/cplieger/auth/v6 v6.1.1
 	github.com/cplieger/envx/v2 v2.0.3
 	github.com/cplieger/envx/yamlenv/v2 v2.0.1
 	github.com/cplieger/health v1.8.0
