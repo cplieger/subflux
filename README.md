@@ -53,11 +53,11 @@ services:
 ```
 
 1. Create the settings folder for user 1000 with `sudo install -d -o 1000 -g 1000 /opt/appdata/subflux`. If your `.env` sets `PUID` and `PGID`, use those numbers.
-2. Replace `/path/to/media` with your media folder, and `/media` with the root folder Sonarr and Radarr show under Settings > Media Management. If they use two root folders, add one line for each.
+2. Replace `/path/to/media` with your media folder, and `/media` with the root folder Sonarr and Radarr show under Settings, then Media Management. If they use two root folders, add one line for each.
 3. Run `docker compose up -d`.
 4. From another device on your network, open the host's address on port 8374 in a browser, for example `http://192.0.2.10:8374`.
 5. Create the admin account.
-6. In the setup wizard, enter Sonarr's address as you open it from another device, not `localhost`, and the API key from Sonarr's Settings > General page. Do the same for Radarr.
+6. In the setup wizard, enter Sonarr's address as you open it from another device, not `localhost`, and the API key from the General page of Sonarr's Settings. Do the same for Radarr.
 7. Enter the right-hand paths from step 2 as media roots, pick your subtitle sites and languages, then click **Finish**.
 
 Run `docker logs subflux`. You should see `HTTP server listening`. If you see `failed to write default config`, the settings folder from step 1 is missing or belongs to another user.
@@ -69,7 +69,7 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | Key | Default | Description |
 | --- | --- | --- |
 | `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
-| `sonarr.api_key`, `radarr.api_key` | required | The API key from that app's Settings > General page |
+| `sonarr.api_key`, `radarr.api_key` | required | The API key from the General page of that app's Settings |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
 | `languages` | required | The subtitle languages to fetch for each audio language, plus a fallback list |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |

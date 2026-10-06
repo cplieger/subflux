@@ -51,7 +51,7 @@ A deployment reached by IP address can never use passkeys, because an IP address
 
 Passkeys need HTTPS, with one exception: `localhost` over plain HTTP, which the WebAuthn specification treats as trustworthy.
 
-`auth.webauthn_rp_id` holds the domain, and you normally never set it. subflux fills it in on the first settings save, from the address you saved from. It is shown under Settings > Authentication, where you can narrow it to a single host. Changing it after passkeys exist makes them stop working, and the settings dialog asks before it lets you. Clearing the field does not turn passkeys off or lose the value. A save without a value keeps the stored one, and the dialog asks nothing.
+`auth.webauthn_rp_id` holds the domain, and you normally never set it. subflux fills it in on the first settings save, from the address you saved from. It is shown in the Authentication section of Settings, where you can narrow it to a single host. Changing it after passkeys exist makes them stop working, and the settings dialog asks before it lets you. Clearing the field does not turn passkeys off or lose the value. A save without a value keeps the stored one, and the dialog asks nothing.
 
 One save is refused. You cannot change the field while the address you save from is outside the new value, because a passkey could never be tested from there. Save the change from a browser at a host inside the domain you want. A save that leaves the value alone is never refused, whatever address you are on.
 

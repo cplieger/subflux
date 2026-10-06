@@ -142,7 +142,7 @@
 }
 
 /* `display: flex` above beats the UA sheet's `[hidden] { display: none }`, so the
-   upgrade-window field wizard-steps.ts hides needs its own arm (web.md). */
+   upgrade-window field wizard-steps.ts hides needs its own arm. */
 .wiz-field[hidden] {
   display: none;
 }

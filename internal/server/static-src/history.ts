@@ -1,9 +1,3 @@
-// history.ts — download history page (server-side paginated).
-//
-// See subflux-ui.md "History Reloads" (E4) for the full protocol: the
-// serializer's foreground priority, depth-preserving reload semantics, and
-// the transaction leg join.
-
 import { el, option, errDiv } from "./dom.js";
 import { historyPanel } from "./panels.js";
 import { listStateRaw } from "./wire/client.gen.js";

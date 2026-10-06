@@ -6,14 +6,6 @@ import (
 	"testing"
 )
 
-// Pinning-suite provenance: this file was updated for the in-place PCRE
-// layer repair (spec subflux-release-parse-fidelity; study appendix
-// .kiro/specs/subflux-release-parse-fidelity/study.md). Tests exercising
-// the retired linear extraction internals (extractAssertions,
-// parseLookaround, SplitTopLevelAlternation) were replaced by equivalents
-// on the marker-based compiler; behavior pins classified "contract" in the
-// study are unchanged.
-
 func mustCompilePCRE(t *testing.T, pat string) *Pattern {
 	t.Helper()
 	p, err := CompilePCRE(pat)

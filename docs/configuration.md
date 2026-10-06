@@ -26,7 +26,7 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | Key | Default | Description |
 | --- | --- | --- |
 | `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
-| `sonarr.api_key`, `radarr.api_key` | required | The API key from that app's Settings > General page |
+| `sonarr.api_key`, `radarr.api_key` | required | The API key from the General page of that app's Settings |
 | `sonarr.enabled`, `radarr.enabled` | `true` in the first-start file | Turn one app off without deleting its settings |
 | `sonarr.public_url`, `radarr.public_url` | _(unset)_ | The address your browser opens the app at, for links on the web page. Falls back to `url` |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |

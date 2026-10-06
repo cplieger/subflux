@@ -1,20 +1,11 @@
 // Package subtitlefile owns the subtitle file on disk: what subflux names it,
-// and what it will accept as its contents.
-//
-// One package rather than two because both save paths call both halves in the
-// same breath — search/search_download.go and manualops/download_exec.go each
-// Validate the downloaded bytes and then compute the Path or ManualPath they
-// write them to, and media_paths_test.go already tested the two together.
-//
-// The naming half is the fleet's only reachable cross-OS portability surface
-// (ratified row C10): these filenames land on SMB and NFS shares that Windows
-// clients read, so the segment layout, the ordinal position and the extension
-// are compatibility contract, and ManualOrdinal must stay the exact inverse of
-// ManualPath's numbering. Behaviour here is unchanged by the move.
-//
-// Related but separate: internal/subtitleext decides which extensions COUNT as
-// subtitle files, in capability-scoped views. Its coverage test pins ExtSRT to
-// the writerOutput view, so the constant and the authority cannot drift.
+// and what it will accept as its contents. Both save paths validate the
+// downloaded bytes and then compute the Path or ManualPath they write them to.
+// The names land on SMB and NFS shares Windows clients read, so the segment
+// layout, the ordinal position and the extension are compatibility contract,
+// and ManualOrdinal must stay the exact inverse of ManualPath's numbering.
+// internal/subtitleext separately decides which extensions COUNT as subtitles;
+// its coverage test pins ExtSRT to the writerOutput view.
 package subtitlefile
 
 import (

@@ -231,8 +231,7 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
 
 /** The `.controls` node's presence in the head IS the condition. The
  *  already-in-place check keeps a library route apply from re-seating an
- *  attached node, which would blur the filter input being typed in (web.md,
- *  re-inserting an attached node). */
+ *  attached node, which would blur the filter input being typed in. */
 export function showLibraryControls(visible: boolean): void {
   const p = libraryPanel();
   if (!visible) {

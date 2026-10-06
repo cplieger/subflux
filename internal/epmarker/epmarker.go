@@ -418,7 +418,7 @@ func BareEpisode(name string) (episode int, ok bool) {
 }
 
 // Compile-time proof that both diagnostic renderings satisfy fmt.Stringer, per
-// the fleet rule that a well-known interface method is paired with an assertion
+// the shared rule that a well-known interface method is paired with an assertion
 // at the implementation site. Both have production call sites in the archive
 // extractor's refusal messages.
 var (

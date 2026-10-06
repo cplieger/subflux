@@ -1,24 +1,11 @@
-// Command bundle builds subflux's browser client: it bundles the SSE worker
-// and the two page entrypoints (app.ts, login.ts) with esbuild (a Go library
-// — no Node, no npm, per the fleet's no-Node-in-the-builder doctrine),
-// assembles the CSS bundles from the manifest files, copies
-// @cplieger/ui-primitives' base stylesheet. (Precompressed .gz siblings are
-// no longer emitted: the server's webhttp.StaticHandler gzips the embedded
-// originals at construction, at the same BestCompression level.)
-//
-// It replaces the previous tsc-emit pipeline (per-module JS served over the
-// pages' importmaps: dozens of uncached module fetches per page load) with
-// cacheable artifacts: /app.js and /login.js plus hashed shared chunks under
-// /chunks/ (code both pages import — the @cplieger libs, the wire decoders —
-// is split out once and cached across the login → app transition). tsc
-// remains the TYPE gate (run with --noEmit in CI and the Docker build);
-// esbuild does not typecheck.
-//
-// Usage: go run ./cmd/bundle   (from the repo root; also run by the
-// Dockerfile builder stage). Inputs are internal/server/static-src/ plus the
-// library sources under its node_modules/ (npm install locally; registry
-// tarballs in the Docker build). Outputs land in internal/server/static/,
-// which go:embed ships.
+// Command bundle builds subflux's browser client: it bundles the SSE worker and
+// the two page entrypoints (app.ts, login.ts) with esbuild, a Go library, so the
+// builder needs no Node. It emits /app.js, /login.js and hashed shared chunks
+// under /chunks/ (code both pages import, cached across the login-to-app
+// transition), assembles the CSS bundles and copies @cplieger/ui-primitives' base
+// stylesheet. esbuild does not typecheck: tsc --noEmit is the type gate.
+// Usage: go run ./cmd/bundle from the repo root (the Dockerfile builder stage
+// runs it too); outputs land in internal/server/static/, which go:embed ships.
 package main
 
 import (
