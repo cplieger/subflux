@@ -333,7 +333,7 @@ async function addPasskey(password: string): Promise<void> {
       return;
     case "timeout":
       notify.error(
-        "Passkey registration timed out. It may have completed — reload and check your passkey list before trying again.",
+        "Passkey registration timed out. It may have completed. Reload and check your passkey list before trying again.",
       );
       return;
     case "not-discoverable":

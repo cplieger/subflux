@@ -73,11 +73,11 @@ async function probe(): Promise<Availability> {
 
 const SENTENCES: Record<UnavailableReason, (a: Unavailable) => string> = {
   unconfigured: (a) =>
-    "Passkeys are not set up yet: no relying-party ID is configured. " +
+    "Passkeys are not set up yet because no relying-party ID is configured. " +
     (a.suggestedRPID === ""
       ? "Save your settings once from this address and subflux fills it in, "
-      : `Save your settings once from this address and subflux fills it in as \u201c${a.suggestedRPID}\u201d, `) +
-    "or set auth.webauthn_rp_id under Settings \u2192 Authentication.",
+      : `Save your settings once from this address and subflux fills it in as "${a.suggestedRPID}", `) +
+    "or set auth.webauthn_rp_id in the Authentication section of Settings.",
   unconfigurable: () =>
     "Passkeys cannot be used at this address. A passkey is scoped to a domain name, so an IP address, a single-label hostname or a bare public suffix cannot have one. Use a domain name over HTTPS, or http://localhost.",
   init_failed: (a) =>

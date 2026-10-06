@@ -267,9 +267,9 @@ describe("passkeys unavailable", () => {
     await finishInto({ password: "pw" });
 
     expect(reasonText()).toBe(
-      "Passkeys are not set up yet: no relying-party ID is configured. " +
+      "Passkeys are not set up yet because no relying-party ID is configured. " +
         "Save your settings once from this address and subflux fills it in, " +
-        "or set auth.webauthn_rp_id under Settings \u2192 Authentication.",
+        "or set auth.webauthn_rp_id in the Authentication section of Settings.",
     );
   });
 });
