@@ -333,7 +333,7 @@ export function openSyncDialog(
 
   // Single source of truth for whether Reset is offered. It is the footer's
   // last child, so appending restores its place; re-seating an attached node
-  // drops hover and focus (web.md), and this effect runs on every offset edit.
+  // drops hover and focus, and this effect runs on every offset edit.
   stopOffsetEffect = effect(() => {
     if (offset.value === 0) {
       resetBtn.remove();

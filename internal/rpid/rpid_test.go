@@ -23,7 +23,7 @@ func TestDerive_accepts(t *testing.T) {
 		{"h.dynv6.net", "h.dynv6.net"},
 		{"h.freeddns.org", "h.freeddns.org"},
 		{"nas.internal", "nas.internal"},
-		{"borgcube.lan", "borgcube.lan"},
+		{"nas.lan", "nas.lan"},
 		{"localhost", "localhost"},
 		{"localhost:8374", "localhost"},
 		{"localhost.", "localhost"},

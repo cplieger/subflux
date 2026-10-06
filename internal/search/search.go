@@ -319,21 +319,13 @@ func (e *Engine) detectExistingObserved(ctx context.Context, videoPath string) (
 // maxLogPathLen bounds the path attribute on detector-error log lines.
 const maxLogPathLen = 256
 
-// boundLogPath caps a path for use as a log attribute, keeping the tail
-// (the identifying filename end) when truncation is needed.
-//
-// The cut is advanced to the next UTF-8 rune start instead of being taken at
-// the raw byte offset. A media path routinely carries multi-byte runes
-// (accented titles, CJK), and a cut landing inside one would emit that rune's
-// bare continuation bytes into a slog attribute and from there into Loki as
-// invalid UTF-8. Advancing FORWARD rather than backing off is what keeps the
-// 256-byte cap a cap: backing off to the previous boundary would let the kept
-// tail exceed it. runesafe.CapBytes is the fleet's canonical rune-safe cut,
-// but it keeps the HEAD — the wrong end here, since the filename at the end
-// is what identifies the video — and runesafe exports no tail variant, so the
-// boundary walk is local. Bytes before the cut are unaffected: this bounds
-// the length, it does not sanitize a path that was already invalid UTF-8 on
-// disk.
+// boundLogPath caps a path for use as a log attribute, keeping the tail (the
+// identifying filename end) when truncation is needed. The cut advances to the
+// next UTF-8 rune start, so a multi-byte rune is never split into invalid UTF-8
+// in the log, and advancing FORWARD keeps the 256-byte cap a cap. It is local
+// because runesafe.CapBytes, the shared rune-safe cut, keeps the HEAD and
+// runesafe exports no tail variant. It bounds length only: a path already
+// invalid UTF-8 on disk is not sanitized.
 func boundLogPath(p string) string {
 	if len(p) <= maxLogPathLen {
 		return p

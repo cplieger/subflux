@@ -1241,7 +1241,7 @@ describe("coverage: configurePanel", () => {
 
   it("leaves the controls where they are on a library re-apply, so typing survives it", () => {
     // Re-inserting an attached node blurs whatever is focused inside it, and
-    // configurePanel(true) runs on every library route apply (web.md).
+    // configurePanel(true) runs on every library route apply.
     configurePanel(true);
     libraryPanel().filter.focus();
     expect(document.activeElement).toBe(libraryPanel().filter);

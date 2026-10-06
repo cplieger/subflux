@@ -127,7 +127,7 @@ func refSonarrSeriesJSON(t *testing.T) []byte {
 }
 
 // refRadarrMoviesJSON renders the fixture's 4,360 movies as a realistic
-// Radarr /api/v3/movie payload (the fleet's measured largest arr payload).
+// Radarr /api/v3/movie payload (the largest arr payload measured in a real deployment).
 func refRadarrMoviesJSON(t *testing.T) []byte {
 	t.Helper()
 	items := testsupport.RefMovieItems()

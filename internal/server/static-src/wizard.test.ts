@@ -108,25 +108,13 @@ function hiddenOf(id: string): boolean {
 }
 
 // This file imports wizard.ts ONCE, statically, and resets it between tests
-// through its own `_resetForTest` export. Neither of the two module-freshness
-// routes is available here:
-//   - `vi.resetModules()` does not re-evaluate a module in Browser Mode (the
-//     module map is URL-keyed), so it hands back the cached instance;
-//   - `./wizard.ts?boot=N` -- the fix the other files in this package use --
-//     mints a DUPLICATE instance, which used to strand the step modules: they
-//     imported `schemaByKey`, `wizardValues`, `secretSaved` and `mediaRoots`
-//     back from "./wizard.js", so the copy set `fullSchema` on itself while the
-//     single shared step modules kept reading the original's, which stayed
-//     empty (measured: the busted arr step rendered its <h3> and no fields at
-//     all). That specific failure is gone -- the shared state moved to
-//     wizard-store.ts, which a duplicate wizard.ts imports under the same
-//     specifier and therefore shares -- but nothing here depends on the
-//     duplicate working, and one `_resetForTest` call resets both modules.
-// The explicit reset is the fleet's pattern for exactly this (see
-// `_resetForTest` in @cplieger/ui-primitives, `resetActionFramework` in
-// @cplieger/actions). `navWired` is the binding that made the leak visible:
-// left true from a previous test, `wireWizardNav()` no-ops and the freshly
-// mounted page gets no nav listeners, so clicking Next never saves a draft.
+// through its own `_resetForTest` export, since neither module-freshness route
+// works here: `vi.resetModules()` hands back the cached instance in Browser Mode
+// (the module map is URL-keyed), and `./wizard.ts?boot=N` mints a DUPLICATE
+// instance. An explicit reset is the shared pattern (`_resetForTest` in
+// @cplieger/ui-primitives, `resetActionFramework` in @cplieger/actions).
+// `navWired` shows why: left true from a previous test, `wireWizardNav()` no-ops
+// and the freshly mounted page gets no nav listeners, so Next never saves a draft.
 
 /** Wait past the 150ms step fade-in used when wizardSection already holds
  *  content (the init-error UI) at render time. */

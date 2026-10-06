@@ -153,7 +153,7 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 			// /api/health (Docker HEALTHCHECK CLI is file-marker, but Gatus
 			// HTTP-probes it every 30s), /metrics (Prometheus/Alloy
 			// scrapes) and /api/events/alive (one 204 per keepalive per
-			// browser profile) ride the fleet-standard ProbeLogLevel: healthy
+			// browser profile) ride the shared ProbeLogLevel: healthy
 			// probes at Debug instead of an Info line per probe, failures
 			// surfaced at Warn/Error. The SSE stream above stays fully
 			// skipped (one open-to-close line would be misleading by shape).

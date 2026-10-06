@@ -1,5 +1,5 @@
 // Credential-check control for a config section or provider. Which sections
-// carry it is schema-declared, and the probe runs server-side; see `subflux.md`.
+// carry it is schema-declared, and the probe runs server-side.
 
 import { el, icon } from "./dom.js";
 import { testConnectionRaw } from "./wire/client.gen.js";

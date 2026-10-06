@@ -181,7 +181,7 @@ func TestBuildSubtitles(t *testing.T) {
 			episodes: []seasonEpisode{
 				{Number: 1, Subtitles: []subtitleResult{
 					{SubtitleID: "a", Version: "LOL", DownloadURI: "/a", Completed: true},
-					{SubtitleID: "b", Version: "FLEET", DownloadURI: "/b", Completed: true},
+					{SubtitleID: "b", Version: "CREW", DownloadURI: "/b", Completed: true},
 				}},
 				{Number: 2, Subtitles: []subtitleResult{
 					{SubtitleID: "c", Version: "NTb", DownloadURI: "/c", Completed: true},
