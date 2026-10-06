@@ -29,7 +29,7 @@ These series tell a fetched subtitle from a saved one, and carry the state the a
 
 ## Alerting
 
-Scrape `/metrics` and load the rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus or the Mimir ruler. Firing alerts go through your Alertmanager. They cover:
+Load the rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus or the Mimir ruler, as [Loading metric alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-metric-alert-rules) shows. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |

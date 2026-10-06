@@ -19,7 +19,7 @@ Login is on by default. On the first start, the first visitor to the page create
 
 ## Running behind a reverse proxy
 
-Behind a reverse proxy such as nginx, Caddy, Traefik or HAProxy, subflux sees the proxy's address and not the browser's. Set `trusted_proxies` to the proxy's address range. subflux then reads the real client address from a trusted `X-Forwarded-For` header. It uses that address for the audit log, the login rate limit, the session record and the access log, as in this example:
+Behind a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md), subflux sees the proxy's address and not the browser's. Set `trusted_proxies` to the proxy's address range. subflux then reads the real client address from a trusted `X-Forwarded-For` header. It uses that address for the audit log, the login rate limit, the session record and the access log, as in this example:
 
 ```yaml
 trusted_proxies:
@@ -69,4 +69,4 @@ The image has no shell and no package manager. It runs as the user in your `comp
 | Go modules | `go.mod` and `go.sum` |
 | Web page packages | the `@cplieger/*` packages, pinned exactly in `internal/server/static-src/package.json` and the Dockerfile |
 
-Images are published for `amd64` and `arm64`, with cosign signatures and SBOM attestations. The license text of every bundled component is under `/usr/share/licenses/` in the image.
+Images are published for `amd64` and `arm64`, with cosign signatures and SBOM attestations, which [Checking a signature](https://github.com/cplieger/docs/blob/main/docs/images.md#checking-a-signature) and [Reading the software bill of materials](https://github.com/cplieger/docs/blob/main/docs/images.md#reading-the-software-bill-of-materials) show how to check. The license text of every bundled component is under `/usr/share/licenses/` in the image.
