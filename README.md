@@ -102,7 +102,7 @@ Every other setting, the command line and environment references in `config.yaml
 
 ## Security
 
-Create the admin account right after the first start. Until one exists, the first visitor to the page creates it. Keep port 8374 on your own network, or put a reverse proxy with HTTPS in front of it and set `trusted_proxies` and `allowed_hosts`. `/metrics` and `/api/health` answer without a login.
+Create the admin account right after the first start. Until one exists, the first visitor to the page creates it. Keep port 8374 on your own network, or put a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md) with HTTPS in front of it and set `trusted_proxies` and `allowed_hosts`. `/metrics` and `/api/health` answer without a login.
 
 Logins use passwords, passkeys or OIDC, and an admin can create API keys for the command line. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
