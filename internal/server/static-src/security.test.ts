@@ -1511,7 +1511,7 @@ describe("security dialog: passkey availability", () => {
 
     expect(add.disabled).toBe(true);
     expect(req(".sec-pk-unavailable", section("Passkeys")).textContent).toBe(
-      "Passkeys are not set up yet: no relying-party ID is configured. Save your settings once from this address and subflux fills it in as \u201cexample.com\u201d, or set auth.webauthn_rp_id under Settings \u2192 Authentication.",
+      'Passkeys are not set up yet because no relying-party ID is configured. Save your settings once from this address and subflux fills it in as "example.com", or set auth.webauthn_rp_id in the Authentication section of Settings.',
     );
     expect(asks.calls).toEqual([]);
     expect(client.beginBodies).toEqual([]);

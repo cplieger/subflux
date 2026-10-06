@@ -5,18 +5,18 @@
 sonarr:
   enabled: true # disable to skip Sonarr integration
   url: "http://sonarr:8989" # internal Docker hostname or IP:port
-  api_key: "" # required; from Settings > General
-  public_url: "" # browser URL, e.g. https://sonarr.example.com
+  api_key: "" # required, from Settings, then General
+  public_url: "" # browser URL, for example https://sonarr.example.com
 
 radarr:
   enabled: true # disable to skip Radarr integration
   url: "http://radarr:7878" # internal Docker hostname or IP:port
-  api_key: "" # required; from Settings > General
-  public_url: "" # browser URL, e.g. https://radarr.example.com
+  api_key: "" # required, from Settings, then General
+  public_url: "" # browser URL, for example https://radarr.example.com
 
-# Must match the media paths inside Sonarr/Radarr containers.
+# Must match the media paths inside the Sonarr and Radarr containers.
 # If you change this, update the volume mounts in compose.yaml too.
-# Multiple roots supported (e.g. /movies and /tv mounted separately).
+# Several roots work, such as /movies and /tv mounted separately.
 # Each listed root must exist and be writable. subflux writes and deletes a
 # small hidden test file to check this at these times:
 #   - in each root before a full scan
@@ -28,33 +28,33 @@ media_roots:
   - /media
 
 # Reverse-proxy trust for client-IP resolution.
-# When subflux runs behind a reverse proxy (nginx, Caddy, Traefik, HAProxy, ...)
-# the socket peer is the proxy, not the client. Set trusted_proxies to the
-# proxy's IP/CIDR so the real client IP (resolved from a trusted
-# X-Forwarded-For) is used for the audit log, the login rate limiter, the
-# session IPAddress, and the access log — instead of the proxy's address.
-# Entries are CIDR ranges; write a single proxy as a /32 (IPv4) or /128 (IPv6).
-# Leave empty (the default) when subflux is directly exposed: the socket peer
-# is used and X-Forwarded-For is ignored (spoof-safe).
+# When subflux runs behind a reverse proxy such as nginx, Caddy, Traefik or
+# HAProxy, the socket peer is the proxy, not the client. Set trusted_proxies to
+# the proxy's IP or CIDR so the real client IP, resolved from a trusted
+# X-Forwarded-For, is used for the audit log, the login rate limiter, the
+# session IPAddress and the access log instead of the proxy's address.
+# Entries are CIDR ranges. Write a single proxy as a /32 (IPv4) or /128 (IPv6).
+# Leave empty (the default) when subflux is directly exposed. The socket peer
+# is then used and X-Forwarded-For is ignored, so it cannot be spoofed.
 trusted_proxies: []
 #  - 10.0.0.0/8
 #  - 192.168.0.0/16
 
-# Exact hostnames or IPs subflux answers for (the DNS-rebinding gate).
+# Exact hostnames or IPs subflux answers for. This is the DNS-rebinding gate.
 # When set, a request whose Host header is not listed is rejected with 403.
-# This blocks DNS rebinding against the browser session: a malicious page
+# This blocks DNS rebinding against the browser session. A malicious page
 # re-resolves its own hostname to subflux's address, and the victim's browser
-# then sends same-origin requests that carry the attacker's name in Host —
-# the cross-origin (CSRF) check cannot reject them because Origin and Host
-# agree, so the exact-Host check is what breaks the chain.
-# Entries are bare hostnames or IPs (no scheme, path, or port). Requests from
-# localhost (e.g. the container healthcheck) always pass. Leave empty (the
+# then sends same-origin requests that carry the attacker's name in Host. The
+# cross-origin (CSRF) check cannot reject them because Origin and Host agree,
+# so the exact-Host check is what breaks the chain.
+# Entries are bare hostnames or IPs, with no scheme, path or port. Requests from
+# localhost, such as the container healthcheck, always pass. Leave empty (the
 # default) to accept any Host.
 allowed_hosts: []
 #  - subflux.example.com
 #  - 192.168.1.5
 
-# How often to check Sonarr/Radarr for new imports (minimum 10s).
+# How often to check Sonarr and Radarr for new imports (minimum 10s).
 poll_interval: 30s
 
 # ---------------------------------------------------------------------------
@@ -63,33 +63,33 @@ poll_interval: 30s
 
 # Audio-to-subtitle language mapping using ISO 639-1 codes.
 # https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
-# Special code: "pb" = Brazilian Portuguese (distinct from "pt" = European Portuguese).
+# Special code: "pb" is Brazilian Portuguese, distinct from "pt", European Portuguese.
 # Codes are checked when the config loads, so a typo is reported at startup
 # instead of silently matching nothing. Use the two-letter form: "en", not "eng"
 # or "EN", and "pb" rather than "pt-BR". The error names the code to use.
 # At least one of "rules" or "default" must be configured.
 languages:
   rules:
-    # Simple: English audio -> French subtitles
+    # Simple: English audio gets French subtitles
     - audio: en
       subtitles:
         - code: fr
           min_score: 80 # per-target minimum score override
 
-    # Variants: French audio -> English standard + forced
+    # Variants: French audio gets English standard and forced subtitles
     - audio: fr
       subtitles:
         - code: en
           variants: [standard, forced] # standard, forced, or hi
 
-    # Provider filter: Japanese audio -> specific providers only
+    # Provider filter: Japanese audio uses specific providers only
     - audio: ja
       subtitles:
         - code: en
           providers: [opensubtitles, animetosho]
           exclude: [yifysubtitles] # skip these providers
 
-    # Skip: Spanish audio -> no subtitles (prevents default)
+    # Skip: Spanish audio gets no subtitles, which also skips the default
     - audio: es
       subtitles: []
 
@@ -102,13 +102,13 @@ languages:
 # Embedded subtitles
 # ---------------------------------------------------------------------------
 
-# Embedded track detection is always active (local ffprobe inspection, not a
-# provider). These settings decide which codecs count as usable subtitles:
-# ignored codecs stay visible in coverage but trigger external search.
+# Embedded track detection is always active. It is a local ffprobe inspection,
+# not a provider. These settings decide which codecs count as usable subtitles.
+# Ignored codecs stay visible in coverage but trigger an external search.
 embedded_subtitles:
-  ignore_pgs: true # PGS bitmap subs (Blu-ray) don't satisfy a target
-  ignore_vobsub: true # VobSub bitmap subs (DVD) don't satisfy a target
-  ignore_ass: false # ASS/SSA styled subs (anime) count as usable
+  ignore_pgs: true # PGS bitmap subs from Blu-ray do not satisfy a target
+  ignore_vobsub: true # VobSub bitmap subs from DVD do not satisfy a target
+  ignore_ass: false # ASS and SSA styled subs, common for anime, count as usable
 
 # ---------------------------------------------------------------------------
 # Subtitle providers
@@ -121,7 +121,7 @@ embedded_subtitles:
 providers:
   hdbits:
     enabled: false
-    priority: 1 # tiebreaker: lower = more trusted
+    priority: 1 # tiebreaker: a lower number is more trusted
     settings:
       username: "" # hdbits.org account
       passkey: "" # from hdbits.org user settings
@@ -132,7 +132,7 @@ providers:
       username: "" # opensubtitles.com account
       password: "" # opensubtitles.com password
       api_key: "" # from opensubtitles.com/consumers
-      use_hash: true # match by file hash (fast, exact)
+      use_hash: true # match by file hash, which is fast and exact
       include_ai_translated: false # subs from OpenSubtitles' own AI translation pipeline
       include_machine_translated: false # older machine-translated uploads
   betaseries:
@@ -142,7 +142,7 @@ providers:
       token: "" # from betaseries.com/en/account/api
   gestdown:
     enabled: true
-    priority: 4 # Addic7ed proxy, TV shows only, no auth
+    priority: 4 # Addic7ed proxy for TV shows only, no account needed
   subsource:
     enabled: false
     priority: 5
@@ -157,7 +157,7 @@ providers:
     enabled: true
     priority: 8
     settings:
-      anidb_client_key: "" # optional; enables AniDB episode ID search
+      anidb_client_key: "" # optional, enables AniDB episode ID search
   yifysubtitles:
     enabled: true
     priority: 9
@@ -166,14 +166,14 @@ providers:
 # Search behavior
 # ---------------------------------------------------------------------------
 # Duration units (case-sensitive):
-#   s  = seconds       m  = minutes       h  = hours
-#   D  = days (24h)    M  = months (730h) Y  = years (8760h)
-# Fractional values OK for all units: 0.5D = 12h, 1.5h = 90m. s/m/h can be combined: 1h30m.
+#   s  seconds         m  minutes         h  hours
+#   D  days (24h)      M  months (730h)   Y  years (8760h)
+# Every unit takes a fraction: 0.5D is 12h and 1.5h is 90m. s, m and h combine, as in 1h30m.
 
 search:
   scan_interval: 24h # time between scan completions (minimum 1h)
   provider_timeout: 1h # cooldown after a provider fails repeatedly (minimum 1h)
-  scan_delay: 5s # delay after items that queried providers during scans (minimum 5s; items needing no provider work skip it)
+  scan_delay: 5s # delay after items that queried providers during scans (minimum 5s). Items needing no provider work skip it
   upgrade_enabled: true # search for better subtitles during scans
   upgrade_window_days: 7 # only upgrade subtitles for this many days
   exclude_arr_tags: # skip media with these Sonarr/Radarr tags
@@ -183,7 +183,7 @@ adaptive:
   initial_delay: 7D # wait before retrying after search
   max_delay: 90D # maximum wait between retries
   backoff_multiplier: 2 # multiply delay after each search
-  max_attempts: 10 # 0 = retry forever
+  max_attempts: 10 # 0 retries forever
 
 # ---------------------------------------------------------------------------
 # Post-processing
@@ -193,35 +193,35 @@ adaptive:
 post_processing:
   sync_subtitles: true # sync timing against embedded subs on import
   audio_sync_fallback: false # fall back to audio sync if no reference sub
-  strip_hi: false # remove [sounds], (music), SPEAKER: labels
+  strip_hi: false # remove hearing-impaired cues such as [sounds], (music) and SPEAKER: labels
   strip_tags: true # remove <i>, <b>, <u>, <font> HTML tags
-  normalize_utf8: true # convert UTF-16/Windows-1252 to UTF-8
+  normalize_utf8: true # convert UTF-16 and Windows-1252 to UTF-8
   normalize_endings: true # convert line endings to CRLF (SRT standard)
-  clean_whitespace: true # trim lines, remove empty lines
+  clean_whitespace: true # trim lines and remove empty lines
   remove_empty: true # drop cues with no text after processing
 
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
 
-# Weights control how subtitles are ranked. Higher = better match.
+# Weights control how subtitles are ranked. A higher weight counts more.
 # Hash match scores 100 automatically. All other weights sum to 100.
 scoring:
   weights:
     hash: 100
-    source: 28 # BluRay, WEB-DL, HDTV
+    source: 28 # BluRay, WEB-DL or HDTV
     release_group: 23
-    streaming_service: 14 # AMZN, NF, DSNP
-    edition: 15 # Director's Cut, Extended, etc.
+    streaming_service: 14 # AMZN, NF or DSNP
+    edition: 15 # Director's Cut, Extended and similar
     video_codec: 10
     hdr: 8
-    season_pack: 15 # Consistent subs across episodes
+    season_pack: 15 # consistent subs across episodes
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
-# Uses Go slog; json format is parsed by Alloy/Loki for Grafana dashboards.
+# json suits a log pipeline such as Alloy and Loki feeding Grafana dashboards.
 # Use text format for local development or terminal debugging.
 logging:
   level: info # debug, info, warn, error

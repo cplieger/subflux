@@ -302,8 +302,8 @@ func checkType(f Flag, value string) error {
 	return nil
 }
 
-// suggestion returns " (did you mean --x?)" if name is within edit
-// distance 2 of any known flag; empty string otherwise.
+// suggestion returns ". Did you mean --x?" when name is within edit distance
+// 2 of a known flag, and "" otherwise.
 func suggestion(name string, flags []Flag) string {
 	type candidate struct {
 		name string
