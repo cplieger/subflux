@@ -15,7 +15,7 @@ name: Functional
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
     paths:
       - '**.go'
       - 'go.mod'
@@ -24,7 +24,7 @@ on:
       - 'tests/functional/**'
       - '.github/workflows/functional.yaml'
   pull_request:
-    branches: [main]
+    branches: [dev, main]
     paths:
       - '**.go'
       - 'go.mod'
