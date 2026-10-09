@@ -1,5 +1,0 @@
-{
-  "ts": {
-    "entry_files": ["app.ts", "login.ts", "sse-worker.ts"]
-  }
-}

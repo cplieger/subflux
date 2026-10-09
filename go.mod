@@ -53,3 +53,5 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
 )
+
+ignore ./internal/server/static-src/node_modules
