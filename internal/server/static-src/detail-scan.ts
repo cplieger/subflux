@@ -33,7 +33,6 @@ import type { Scope } from "./view-scope.js";
 
 interface ScanStartArgs {
   url: string;
-  scopeKey: string;
 }
 
 const scanAction = apiAction<ScanStartArgs, ScanAccepted>({
@@ -51,7 +50,7 @@ const scanAction = apiAction<ScanStartArgs, ScanAccepted>({
  */
 async function triggerScan(url: string, scopeKey: string): Promise<void> {
   await scanAction.dispatch(
-    { url, scopeKey },
+    { url },
     {
       onSuccess: (accepted) => {
         // Optimistic: mark the scope running immediately with the accepted
@@ -128,6 +127,7 @@ export function registerScanButton(btn: HTMLButtonElement, scope: Scope): void {
 }
 
 /** Registry population, for the registry-hygiene tests. */
+// deadset:ignore DS1004 -- The registry-hygiene tests read the size of the private scan-button registry.
 export function _scanButtonCountForTest(): number {
   return scanButtons.size;
 }

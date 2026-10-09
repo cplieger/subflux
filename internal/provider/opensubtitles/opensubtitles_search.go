@@ -64,7 +64,7 @@ func episodeNumberings(req *subflux.SearchRequest) []numbering {
 }
 
 // searchNumbering runs a paginated search for a specific (season, episode) pair.
-func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchRequest,
+func (p *source) searchNumbering(ctx context.Context, req *subflux.SearchRequest,
 	season, episode int,
 ) ([]subflux.Subtitle, error) {
 	maxResults := req.MaxResults
@@ -110,7 +110,7 @@ func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchReque
 }
 
 // paginatedSearch runs a paginated search with the given parameters.
-func (p *Provider) paginatedSearch(ctx context.Context, params url.Values,
+func (p *source) paginatedSearch(ctx context.Context, params url.Values,
 	languages []string, maxResults int,
 ) ([]subflux.Subtitle, error) {
 	const maxPages = 3
@@ -179,7 +179,7 @@ func joinOSLangs(langs []string) string {
 // query-based searches. The AI/machine-translation flags send only their
 // non-default direction (API defaults are asymmetric), and
 // filterSearchResults re-checks both on the returned attributes.
-func (p *Provider) commonSearchParams(req *subflux.SearchRequest,
+func (p *source) commonSearchParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := url.Values{}
@@ -201,7 +201,7 @@ func (p *Provider) commonSearchParams(req *subflux.SearchRequest,
 	return params
 }
 
-func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
+func (p *source) buildSearchParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := p.commonSearchParams(req, season, episode)
@@ -230,7 +230,7 @@ func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
 
 // buildQueryParams builds search parameters using the title as a text query
 // instead of an ID, used as a fallback when ID-based search returns none.
-func (p *Provider) buildQueryParams(req *subflux.SearchRequest,
+func (p *source) buildQueryParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := p.commonSearchParams(req, season, episode)
@@ -273,7 +273,6 @@ func filterSearchResults(data []searchResult, languages []string,
 			Forced:      item.Attributes.ForeignPartsOnly && !item.Attributes.HearingImpaired,
 			MatchedBy:   matchByTitle,
 			Title:       item.Attributes.FeatureDetails.Title,
-			Year:        item.Attributes.FeatureDetails.Year,
 			Season:      item.Attributes.FeatureDetails.SeasonNumber,
 			Episode:     item.Attributes.FeatureDetails.EpisodeNumber,
 		}

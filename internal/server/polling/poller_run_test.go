@@ -126,7 +126,7 @@ func newTestPollCache() *PollCache {
 
 // --- poll-cycle test helpers ---
 
-// noopStore is a stateless (race-free) PollerStore for the concurrent PollOnce
+// noopStore is a stateless (race-free) PollerStore for the concurrent pollOnce
 // test where store side effects are not asserted.
 type noopStore struct{}
 
@@ -153,7 +153,7 @@ func histEntry(path string) arrapi.HistoryRecord {
 	return arrapi.HistoryRecord{Date: time.Now().UTC(), Data: map[string]string{"importedPath": path}}
 }
 
-// --- PollOnce smoke tests ---
+// --- pollOnce smoke tests ---
 
 func TestPollOnce_sonarr_nil_radarr_nil(t *testing.T) {
 	deps := Deps{
@@ -173,7 +173,7 @@ func TestPollOnce_sonarr_nil_radarr_nil(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 	// Should not panic with nil sonarr/radarr.
-	p.PollOnce(t.Context())
+	p.pollOnce(t.Context())
 }
 
 func TestPollOnce_sonarr_no_events(t *testing.T) {
@@ -195,7 +195,7 @@ func TestPollOnce_sonarr_no_events(t *testing.T) {
 		deps:      deps,
 		stateFunc: func() *LiveState { return ls },
 	}
-	p.PollOnce(t.Context())
+	p.pollOnce(t.Context())
 	if len(metrics.imports) != 0 {
 		t.Errorf("expected 0 imports, got %d", len(metrics.imports))
 	}
@@ -223,7 +223,7 @@ func TestPollOnce_returns_zero_when_no_events(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 
-	if n := p.PollOnce(t.Context()); n != 0 {
+	if n := p.pollOnce(t.Context()); n != 0 {
 		t.Errorf("PollOnce with no events: got %d, want 0", n)
 	}
 }
@@ -260,7 +260,7 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	// resolveImport; the count we care about is the new entries the
 	// HistorySince response carried, not the imports-applied count.
 	// Adaptive burst keys off the former.
-	if n := p.PollOnce(t.Context()); n != 2 {
+	if n := p.pollOnce(t.Context()); n != 2 {
 		t.Errorf("PollOnce with 2 sonarr entries: got %d, want 2", n)
 	}
 }
@@ -279,16 +279,16 @@ func TestBurstPollConstants_in_canonical_relationship(t *testing.T) {
 	}
 }
 
-// --- PollOnce cycle observability ---
+// --- pollOnce cycle observability ---
 
-// Within the poll interval and with no arr clients, PollOnce emits neither the
+// Within the poll interval and with no arr clients, pollOnce emits neither the
 // "poll cycle error" nor the "poll cycle exceeded interval" WARN.
 func TestPollOnce_no_spurious_warns_within_interval(t *testing.T) {
 	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg} // nil arrs: g.Wait() returns nil, cycle is fast
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.PollOnce(t.Context())
+	p.pollOnce(t.Context())
 	if sink.CountLevel(slog.LevelWarn, "poll cycle error") > 0 {
 		t.Errorf("unexpected WARN 'poll cycle error' for a clean cycle")
 	}
@@ -303,13 +303,13 @@ func TestPollOnce_warns_when_exceeds_interval(t *testing.T) {
 	cfg := &mockCfg{interval: 0, langs: []string{"en"}} // any elapsed dur > 0 exceeds
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.PollOnce(t.Context())
+	p.pollOnce(t.Context())
 	if sink.CountLevel(slog.LevelWarn, "poll cycle exceeded interval") == 0 {
 		t.Errorf("want WARN 'poll cycle exceeded interval' with a 0 interval")
 	}
 }
 
-// PollOnce returns the sum of imported-history entries seen across Sonarr and Radarr.
+// pollOnce returns the sum of imported-history entries seen across Sonarr and Radarr.
 func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{
 		histEntry("/nonexistent/s1.mkv"),
@@ -323,7 +323,7 @@ func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Radarr: radarr}
 	p := NewPoller(deps, func() *LiveState { return ls })
-	if got := p.PollOnce(t.Context()); got != 3 {
+	if got := p.pollOnce(t.Context()); got != 3 {
 		t.Errorf("PollOnce() = %d, want 3 (sonarr 2 + radarr 1)", got)
 	}
 }
@@ -542,7 +542,7 @@ func TestDetect_queue_full_defers_batch(t *testing.T) {
 
 	// Fill the queue with placeholder batches.
 	for range cap(p.work) {
-		p.work <- sourceBatch{source: PollSourceRadarr, key: subflux.PollKeyRadarr}
+		p.work <- sourceBatch{source: pollSourceRadarr, key: subflux.PollKeyRadarr}
 	}
 	before := p.detectSince(t.Context(), subflux.PollKeySonarr)
 	p.detectSonarr(t.Context(), ls)

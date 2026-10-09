@@ -34,22 +34,22 @@ const (
 
 // Factory creates a YIFY Subtitles provider from settings.
 func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
-	return &Provider{
+	return &source{
 		client: provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 	}, nil
 }
 
-// Provider implements the YIFY Subtitles scraper.
-type Provider struct {
+// source implements the YIFY Subtitles scraper.
+type source struct {
 	client *http.Client
 }
 
 // Name returns the provider identifier for YIFY Subtitles.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (p *source) Name() subflux.ProviderID { return providerName }
 
 // Search finds movie subtitles by scraping the YIFY Subtitles HTML page for the
 // given IMDB ID. Only movie requests are handled; episodes are skipped.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.MediaType != subflux.MediaTypeMovie || req.ImdbID == "" {
 		slog.Debug("yifysubtitles: not a movie or no IMDB ID, skipping")
 		return nil, nil
@@ -79,7 +79,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 
 // Download fetches the subtitle archive for the given search result by first
 // loading the subtitle detail page to extract the real download link.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("yifysubtitles: %w", err)
 	}
@@ -119,7 +119,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 // fetchDownload retrieves raw bytes from a download URL with browser-like
 // headers. Body is capped at 10 MB.
-func (p *Provider) fetchDownload(ctx context.Context, dlURL, referer string) ([]byte, error) {
+func (p *source) fetchDownload(ctx context.Context, dlURL, referer string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, http.NoBody)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (p *Provider) fetchDownload(ctx context.Context, dlURL, referer string) ([]
 // headers. A 404 yields an empty string and no error, because the two callers
 // read it differently: a missing search page is no results, while a missing
 // subtitle page is subflux.ErrSubtitleAbsent. Body is capped at 2 MB.
-func (p *Provider) fetchPage(ctx context.Context, pageURL string) (string, error) {
+func (p *source) fetchPage(ctx context.Context, pageURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, http.NoBody)
 	if err != nil {
 		return "", err

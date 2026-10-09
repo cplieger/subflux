@@ -49,26 +49,26 @@ type SubtitleProcessor interface {
 // work to; Files and SeasonState feed the season batch's enumeration.
 type Deps struct {
 	Store        SyncStore
-	Files        SeasonFileStore
+	Files        seasonFileStore
 	SubtitleProc SubtitleProcessor
-	Media        MediaWriter
+	Media        mediaWriter
 	Jobs         *syncjobs.Dispatcher
 	Resolve      *resolve.Resolver
 	SeasonState  func() *SeasonState
 }
 
-// MediaWriter writes a corrected subtitle back beside its video;
+// mediaWriter writes a corrected subtitle back beside its video;
 // *mediawrite.Writer satisfies it.
-type MediaWriter interface {
+type mediaWriter interface {
 	WriteFile(ctx context.Context, path string, data []byte) error
 }
 
 // Handler holds all dependencies for the sync handler family.
 type Handler struct {
 	store        SyncStore
-	files        SeasonFileStore
+	files        seasonFileStore
 	subtitleProc SubtitleProcessor
-	media        MediaWriter
+	media        mediaWriter
 	jobs         *syncjobs.Dispatcher
 	resolve      *resolve.Resolver
 	seasonState  func() *SeasonState
@@ -91,8 +91,8 @@ func New(d Deps) *Handler { //nolint:gocritic // hugeParam: callers pass by valu
 	}
 }
 
-// MaxSyncSubSize caps subtitle file reads for sync operations.
-const MaxSyncSubSize = httpwire.MaxDownloadBytes
+// maxSyncSubSize caps subtitle file reads for sync operations.
+const maxSyncSubSize = httpwire.MaxDownloadBytes
 
 // maxBodySize references the canonical constant from api.
 const maxBodySize = httpapi.MaxDefaultBodySize
@@ -287,7 +287,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	}
 	delta := req.OffsetMs - currentOffset
 
-	_, cues, parseErr := h.readAndParseSRT(ctx, subtitlePath)
+	cues, parseErr := h.readAndParseSRT(ctx, subtitlePath)
 	if parseErr != nil || len(cues) == 0 {
 		slog.Debug("sync offset: read/parse failed",
 			"path", subtitlePath, "error", parseErr, "cues", len(cues))
@@ -297,11 +297,11 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 
 	if delta != 0 {
 		offset := time.Duration(delta) * time.Millisecond
-		// ShiftAndFilterCues (not the bare ShiftCues clamp) so a large
+		// shiftAndFilterCues (not the bare shiftCues clamp) so a large
 		// negative offset DROPS cues pushed entirely before time zero instead
 		// of writing them as 00:00:00,000 --> 00:00:00,000 flashes — matching
 		// what the preview path already shows the user.
-		cues = ShiftAndFilterCues(cues, offset)
+		cues = shiftAndFilterCues(cues, offset)
 	}
 
 	srtData, err := h.subtitleProc.WriteSRT(cues)
@@ -346,9 +346,9 @@ func isASSSubtitlePath(path string) bool {
 	}
 }
 
-// ShiftAndFilterCues applies a timing shift to all cues and removes cues
+// shiftAndFilterCues applies a timing shift to all cues and removes cues
 // that end before time zero. Cue start times are clamped to zero.
-func ShiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []subflux.SubtitleCue {
+func shiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []subflux.SubtitleCue {
 	if totalShift == 0 {
 		return cues
 	}
@@ -368,15 +368,15 @@ func ShiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []
 
 // readAndParseSRT reads a subtitle file, normalizes encoding, and parses SRT.
 // The caller's context bounds the read.
-func (h *Handler) readAndParseSRT(ctx context.Context, path string) ([]byte, []subflux.SubtitleCue, error) {
-	data, err := atomicfile.ReadBounded(ctx, path, MaxSyncSubSize)
+func (h *Handler) readAndParseSRT(ctx context.Context, path string) ([]subflux.SubtitleCue, error) {
+	data, err := atomicfile.ReadBounded(ctx, path, maxSyncSubSize)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read subtitle: %w", err)
+		return nil, fmt.Errorf("failed to read subtitle: %w", err)
 	}
 	data = h.subtitleProc.NormalizeEncoding(data)
 	cues, err := h.subtitleProc.ParseSRT(data)
 	if err != nil {
-		return data, nil, fmt.Errorf("failed to parse subtitle: %w", err)
+		return nil, fmt.Errorf("failed to parse subtitle: %w", err)
 	}
-	return data, cues, nil
+	return cues, nil
 }

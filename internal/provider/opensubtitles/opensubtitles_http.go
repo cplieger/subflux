@@ -17,7 +17,7 @@ import (
 // doPostDownload performs a rate-limited, authenticated POST to the default
 // (non-VIP) baseURL + path. /download must not use the VIP host from
 // login — it returns 503 from Varnish. 401 invalidates the cached token.
-func (p *Provider) doPostDownload(ctx context.Context, path string,
+func (p *source) doPostDownload(ctx context.Context, path string,
 	body io.Reader,
 ) (io.ReadCloser, error) {
 	if err := p.rateLimit(ctx); err != nil {
@@ -44,7 +44,7 @@ func (p *Provider) doPostDownload(ctx context.Context, path string,
 // logQuota records the per-account download quota telemetry returned by
 // /download: `requests` (used) and `remaining` sum to the daily cap (10
 // free, 1000 VIP). Warns at ≥70% utilization.
-func (p *Provider) logQuota(dl *downloadResponse) {
+func (p *source) logQuota(dl *downloadResponse) {
 	total := dl.Requests + dl.Remaining
 	if total == 0 {
 		return
@@ -67,7 +67,7 @@ func (p *Provider) logQuota(dl *downloadResponse) {
 
 // doGet performs a rate-limited, authenticated GET request to the
 // OpenSubtitles API. Returns a 10 MB-capped ReadCloser.
-func (p *Provider) doGet(ctx context.Context, path string, params url.Values) (io.ReadCloser, error) {
+func (p *source) doGet(ctx context.Context, path string, params url.Values) (io.ReadCloser, error) {
 	if err := p.rateLimit(ctx); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (p *Provider) doGet(ctx context.Context, path string, params url.Values) (i
 
 // invalidateTokenOn401 clears the cached token when the server returns 401,
 // so the next API call triggers a fresh login instead of repeating the failure.
-func (p *Provider) invalidateTokenOn401(err error) {
+func (p *source) invalidateTokenOn401(err error) {
 	authErr, ok := errors.AsType[*subflux.AuthError](err)
 	if !ok {
 		return
@@ -109,7 +109,7 @@ func (p *Provider) invalidateTokenOn401(err error) {
 
 // doPostUnauthed performs a rate-limited POST request to the default
 // OpenSubtitles base URL without requiring authentication.
-func (p *Provider) doPostUnauthed(ctx context.Context, path string, body io.Reader) (io.ReadCloser, error) {
+func (p *source) doPostUnauthed(ctx context.Context, path string, body io.Reader) (io.ReadCloser, error) {
 	if err := p.rateLimit(ctx); err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (p *Provider) doPostUnauthed(ctx context.Context, path string, body io.Read
 
 // setHeaders adds the required API key, user agent, and optional
 // authorization headers to an outgoing request.
-func (p *Provider) setHeaders(req *http.Request) {
+func (p *source) setHeaders(req *http.Request) {
 	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
 	req.Header.Set("Accept", httpwire.ContentTypeJSON)
 	req.Header.Set("Api-Key", p.apiKey)

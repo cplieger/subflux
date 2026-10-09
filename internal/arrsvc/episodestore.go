@@ -64,11 +64,3 @@ func (s *episodeStore) put(key string, e readEntry) {
 	}
 	s.entries[key] = episodeEntry{entry: e, expires: time.Now().Add(arrCacheTTL)}
 }
-
-// resident reports how many entries the store holds, expired ones included:
-// the bound is about retained memory, not about hits.
-func (s *episodeStore) resident() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.entries)
-}

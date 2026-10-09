@@ -202,7 +202,7 @@ func (g *Gate) observeSuccess(fx *effects, id subflux.ProviderID, op Op, rec *re
 	}
 	rec.probeUntil = time.Time{}
 	if slices.Contains(rec.rec.FailedOps, string(op)) {
-		g.dropRecord(fx, id, CauseCredentialsAccepted)
+		g.dropRecord(fx, id, causeCredentialsAccepted)
 	}
 }
 
@@ -324,7 +324,7 @@ func (b *Binding) applyVerdictLocked(fx *effects, id subflux.ProviderID, sr Sett
 		fx.metric(func() { g.metrics.SetProviderSettingRejected(id, setting, true) })
 		fx.event(Event{Provider: id, Kind: SettingRejected, Setting: setting, Reason: describe(refusal)})
 	case refusal == nil && rejected:
-		g.clearRejection(fx, key, CauseCredentialsAccepted)
+		g.clearRejection(fx, key)
 	default:
 		return
 	}
@@ -332,7 +332,7 @@ func (b *Binding) applyVerdictLocked(fx *effects, id subflux.ProviderID, sr Sett
 }
 
 // ResetAll is Gate.ResetAll.
-func (b *Binding) ResetAll(ctx context.Context) { b.gate.ResetAll(ctx) }
+func (b *Binding) ResetAll(ctx context.Context) { b.gate.resetAll(ctx) }
 
 // Status is Gate.Status.
 func (b *Binding) Status() map[subflux.ProviderID]Status { return b.gate.Status() }

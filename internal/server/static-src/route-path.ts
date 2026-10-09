@@ -24,7 +24,7 @@ export type Route =
   | { readonly kind: "movie-sync"; readonly id: number }
   | { readonly kind: "movie-files"; readonly id: number };
 
-export type RouteKind = Route["kind"];
+type RouteKind = Route["kind"];
 
 /** The media kinds: every route carrying an id. */
 type MediaKind = Exclude<RouteKind, "library" | "settings" | "history">;
@@ -217,6 +217,7 @@ export function syncRouteFor(route: Route): Route | null {
  *  produces and zero for anything else. Counting is the only way to assert
  *  mutual exclusivity, so this exists for router.test.ts and has no production
  *  caller. */
+// deadset:ignore DS1004 -- The router tests count the kinds claiming a path to prove the route table is mutually exclusive.
 export function kindsMatching(pathname: string): RouteKind[] {
   const kinds: RouteKind[] = [];
   for (const entry of STATIC_ROUTES) {

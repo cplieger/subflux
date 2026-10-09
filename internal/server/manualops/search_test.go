@@ -93,7 +93,7 @@ func TestTryComputeHash(t *testing.T) {
 			ls := &LiveState{Cfg: fakeManualCfg{}, Engine: engine}
 			req := &subflux.SearchRequest{Title: "Show", VideoHash: tc.haveHash}
 
-			TryComputeHash(t.Context(), ls, req, tc.filePath)
+			tryComputeHash(t.Context(), ls, req, tc.filePath)
 
 			if req.VideoHash != tc.wantHash {
 				t.Errorf("TryComputeHash(path=%q, have=%q) VideoHash = %q, want %q",
@@ -223,7 +223,7 @@ func TestRunSearch_names_gated_and_failed_providers(t *testing.T) {
 			t.Errorf("RunSearch() notice for %s has no message", n.Provider)
 		}
 	}
-	want := map[subflux.ProviderID]string{"hdbits": NoticeGated, "subdl": NoticeError}
+	want := map[subflux.ProviderID]string{"hdbits": noticeGated, "subdl": noticeError}
 	if !maps.Equal(kinds, want) {
 		t.Errorf("RunSearch() provider notices = %+v, want kinds %v", got.Providers, want)
 	}

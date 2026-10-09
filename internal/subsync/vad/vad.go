@@ -78,16 +78,12 @@ const (
 	backEta           = 154  // Q8
 )
 
-// Mode represents the VAD aggressiveness level (WebRTC modes 0-3).
-type Mode int
+// mode represents the VAD aggressiveness level (WebRTC modes 0-3).
+type mode int
 
-// Mode constants for the supported WebRTC VAD aggressiveness levels.
-const (
-	ModeQuality        Mode = 0 // Most permissive, fewest false negatives
-	ModeLowBitrate     Mode = 1 // Low bitrate
-	ModeAggressive     Mode = 2 // Aggressive
-	ModeVeryAggressive Mode = 3 // Most restrictive, fewest false positives
-)
+// ModeVeryAggressive is WebRTC VAD mode 3, the most restrictive level (fewest
+// false positives), and the one the sync engine runs.
+const ModeVeryAggressive mode = 3
 
 // Mode thresholds for 10ms frames (original WebRTC values).
 // [local, global, overhang1, overhang2]
@@ -98,7 +94,7 @@ var vadModes = [4]struct{ local, global, oh1, oh2 int16 }{
 	{94, 1100, 6, 9}, // Mode 3: Very aggressive
 }
 
-func newVADInst(mode Mode) *vadInst {
+func newVADInst(mode mode) *vadInst {
 	if mode < 0 || int(mode) >= len(vadModes) {
 		mode = ModeVeryAggressive
 	}
@@ -128,7 +124,7 @@ func newVADInst(mode Mode) *vadInst {
 // newVADInstAdapt creates a VAD instance with custom adaptation speed.
 // adaptScale multiplies the default update constants (1.0 = default,
 // 2.0 = twice as fast, 0.5 = half speed).
-func newVADInstAdapt(mode Mode, adaptScale float64) *vadInst {
+func newVADInstAdapt(mode mode, adaptScale float64) *vadInst {
 	v := newVADInst(mode)
 	// Clamp to prevent int16 overflow.
 	// speechUpdateConst * 5.0 = 32770, which overflows int16 by 3.
@@ -165,7 +161,7 @@ type Tuning struct {
 	minEnergy   *int16           // nil = use default
 
 	// Mode is the WebRTC aggressiveness level.
-	Mode Mode
+	Mode mode
 	// Threshold is the GMM log-likelihood ratio a frame must reach to be called
 	// speech. NOT a duration: the safe and precise passes use 250 and 125.
 	Threshold float64

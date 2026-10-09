@@ -107,8 +107,8 @@ func TestShouldSkipShow_caches(t *testing.T) {
 func TestSeasonTracker_no_early_stop_below_minimum(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	if st.shouldSkipSeason("tt1", 1, "fr") {
 		t.Fatal("should not skip after only 2 no-results (minimum is 3)")
 	}
@@ -117,9 +117,9 @@ func TestSeasonTracker_no_early_stop_below_minimum(t *testing.T) {
 func TestSeasonTracker_early_stop_at_minimum(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	if !st.shouldSkipSeason("tt1", 1, "fr") {
 		t.Fatal("expected skip after 3 consecutive no-results")
 	}
@@ -129,12 +129,12 @@ func TestSeasonTracker_early_stop_large_season(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 5 {
-		st.recordOutcome(t.Context(), "tt121220", 3, "fr", "", ScanNoResult, 33)
+		st.recordOutcome(t.Context(), "tt121220", 3, "fr", "", scanNoResult, 33)
 	}
 	if st.shouldSkipSeason("tt121220", 3, "fr") {
 		t.Fatal("should not skip after only 5 no-results (threshold is 6)")
 	}
-	st.recordOutcome(t.Context(), "tt121220", 3, "fr", "", ScanNoResult, 33)
+	st.recordOutcome(t.Context(), "tt121220", 3, "fr", "", scanNoResult, 33)
 	if !st.shouldSkipSeason("tt121220", 3, "fr") {
 		t.Fatal("expected skip after 6 consecutive no-results")
 	}
@@ -143,11 +143,11 @@ func TestSeasonTracker_early_stop_large_season(t *testing.T) {
 func TestSeasonTracker_found_resets_streak(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanFound, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanFound, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	if st.shouldSkipSeason("tt1", 1, "fr") {
 		t.Fatal("should not skip: found reset the streak")
 	}
@@ -156,10 +156,10 @@ func TestSeasonTracker_found_resets_streak(t *testing.T) {
 func TestSeasonTracker_skipped_does_not_affect_streak(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanSkipped, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanSkipped, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	if !st.shouldSkipSeason("tt1", 1, "fr") {
 		t.Fatal("expected skip: skipped doesn't reset streak, 3 no-results reached")
 	}
@@ -169,7 +169,7 @@ func TestSeasonTracker_independent_seasons(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 3 {
-		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	}
 	if st.shouldSkipSeason("tt1", 2, "fr") {
 		t.Fatal("season 2 should not be affected by season 1")
@@ -180,7 +180,7 @@ func TestSeasonTracker_independent_languages(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 3 {
-		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	}
 	if st.shouldSkipSeason("tt1", 1, "en") {
 		t.Fatal("en should not be affected by fr early stop")
@@ -191,8 +191,8 @@ func TestShouldSkipEpisode_all_langs_stopped(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 3 {
-		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
-		st.recordOutcome(t.Context(), "tt1", 1, "en", "", ScanNoResult, 10)
+		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
+		st.recordOutcome(t.Context(), "tt1", 1, "en", "", scanNoResult, 10)
 	}
 	if !st.shouldSkipEpisode("tt1", 1, []string{"fr", "en"}) {
 		t.Fatal("expected skip: both languages hit early stop")
@@ -203,7 +203,7 @@ func TestShouldSkipEpisode_one_lang_still_active(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 3 {
-		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 10)
+		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 10)
 	}
 	if st.shouldSkipEpisode("tt1", 1, []string{"fr", "en"}) {
 		t.Fatal("should not skip: en is still active")
@@ -222,7 +222,7 @@ func TestSeasonTracker_zero_season_ep_count_uses_minimum(t *testing.T) {
 	t.Parallel()
 	st := newSeasonTracker(nil, showskip.New(1*time.Hour), seedDeps{})
 	for range 3 {
-		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", ScanNoResult, 0)
+		st.recordOutcome(t.Context(), "tt1", 1, "fr", "", scanNoResult, 0)
 	}
 	if !st.shouldSkipSeason("tt1", 1, "fr") {
 		t.Fatal("expected skip after 3 no-results with zero season count")

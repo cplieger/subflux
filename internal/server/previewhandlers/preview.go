@@ -322,7 +322,7 @@ func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, cues, parseErr := h.readAndParseSRT(subPath)
+	cues, parseErr := h.readAndParseSRT(subPath)
 	if parseErr != nil || len(cues) == 0 {
 		slog.Warn("preview start: read/parse subtitle failed",
 			"path", subPath, "error", parseErr, "cues", len(cues))
@@ -419,17 +419,17 @@ func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) 
 
 const maxSyncSubSize int64 = 10 << 20 // 10 MB
 
-func (h *Handler) readAndParseSRT(path string) ([]byte, []subflux.SubtitleCue, error) {
+func (h *Handler) readAndParseSRT(path string) ([]subflux.SubtitleCue, error) {
 	data, err := h.deps.ReadBounded(context.Background(), path, maxSyncSubSize)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read subtitle: %w", err)
+		return nil, fmt.Errorf("failed to read subtitle: %w", err)
 	}
 	data = h.deps.SubtitleProc.NormalizeEncoding(data)
 	cues, err := h.deps.SubtitleProc.ParseSRT(data)
 	if err != nil {
-		return data, nil, fmt.Errorf("failed to parse subtitle: %w", err)
+		return nil, fmt.Errorf("failed to parse subtitle: %w", err)
 	}
-	return data, cues, nil
+	return cues, nil
 }
 
 func shiftAndFilterCues(cues []subflux.SubtitleCue, totalShift time.Duration) []subflux.SubtitleCue {

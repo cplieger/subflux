@@ -56,8 +56,8 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{deps: deps}
 }
 
-// SeriesItem is the JSON shape returned by GET /api/media/series.
-type SeriesItem struct {
+// seriesItem is the JSON shape returned by GET /api/media/series.
+type seriesItem struct {
 	Title    string `json:"title"`
 	ImdbID   string `json:"imdb_id,omitempty"`
 	ID       int    `json:"id"`
@@ -73,7 +73,7 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
 		slog.Debug("media series: sonarr not configured")
-		httpapi.WriteJSON(w, []SeriesItem{})
+		httpapi.WriteJSON(w, []seriesItem{})
 		return
 	}
 	// The arr-read wrapper beneath coalesces concurrent readers into one
@@ -85,9 +85,9 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch series")
 		return
 	}
-	out := make([]SeriesItem, 0, len(series))
+	out := make([]seriesItem, 0, len(series))
 	for i := range series {
-		item := SeriesItem{
+		item := seriesItem{
 			ID:     series[i].ID,
 			Title:  series[i].Title,
 			Year:   series[i].Year,
@@ -103,10 +103,10 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, out)
 }
 
-// MovieItem is the JSON shape returned by GET /api/media/movies. It
+// movieItem is the JSON shape returned by GET /api/media/movies. It
 // carries no file path: clients address the video by MediaRef (id = arr
 // ID) and the server resolves paths.
-type MovieItem struct {
+type movieItem struct {
 	Title     string `json:"title"`
 	ImdbID    string `json:"imdb_id,omitempty"`
 	SceneName string `json:"scene_name,omitempty"`
@@ -122,7 +122,7 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
 		slog.Debug("media movies: radarr not configured")
-		httpapi.WriteJSON(w, []MovieItem{})
+		httpapi.WriteJSON(w, []movieItem{})
 		return
 	}
 	movies, err := ls.Radarr.Movies(h.deps.ServerCtx())
@@ -131,10 +131,10 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch movies")
 		return
 	}
-	out := make([]MovieItem, 0, len(movies))
+	out := make([]movieItem, 0, len(movies))
 	for i := range movies {
 		m := &movies[i]
-		item := MovieItem{
+		item := movieItem{
 			ID:      m.ID,
 			Title:   m.Title,
 			Year:    m.Year,

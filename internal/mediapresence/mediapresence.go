@@ -63,14 +63,14 @@ func (e *UnavailableError) Error() string {
 // Unwrap exposes ErrUnavailable and the underlying error.
 func (e *UnavailableError) Unwrap() []error { return []error{ErrUnavailable, e.Err} }
 
-// Metrics is the gauge surface the checker reports through.
-type Metrics interface {
+// metrics is the gauge surface the checker reports through.
+type metrics interface {
 	SetMediaRootUnavailable(root string, unavailable bool)
 	DeleteMediaRootUnavailable(root string)
 }
 
-// Alerts is the persistent-alert surface the checker raises into.
-type Alerts interface {
+// alerts is the persistent-alert surface the checker raises into.
+type alerts interface {
 	RecordPersistent(source, msg string)
 	DismissBySource(source string)
 }
@@ -78,8 +78,8 @@ type Alerts interface {
 // Config configures a Checker. Metrics and Alerts are required; every other
 // zero field takes its documented default.
 type Config struct {
-	Metrics Metrics
-	Alerts  Alerts
+	Metrics metrics
+	Alerts  alerts
 	Stat    func(path string) (fs.FileInfo, error) // nil: os.Stat
 	// HasEntries reports whether a directory holds at least one entry; nil
 	// reads one name.

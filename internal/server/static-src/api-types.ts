@@ -8,7 +8,6 @@ export type {
   CoverageTarget,
   EpisodeItem,
   MeResponse,
-  MovieItem,
   ProviderSchema,
   SchemaField,
   SchemaSection,

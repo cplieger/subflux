@@ -7,6 +7,8 @@ import (
 )
 
 // EventType is a typed string for server-sent event types.
+//
+//deadset:ignore DS1101 -- The wire generator registers it by name (internal/wirespec/wirespec.go:184) and emits the TypeScript EventType from that name.
 type EventType string
 
 // EventData is a sealed interface restricting Event.Data to known payload types.
@@ -31,13 +33,13 @@ type Event struct {
 const (
 	CoverageUpdate EventType = "coverage"   // subtitle file added/removed
 	Notify         EventType = "notify"     // toast notification for the UI
-	ScanStart      EventType = "scan:start" // scan activity started (any scope)
-	ScanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
-	Epoch          EventType = "epoch"      // legacy per-connection handshake, written only without SSE-Wire (never replayed, no id)
+	scanStart      EventType = "scan:start" // scan activity started (any scope)
+	scanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
+	epoch          EventType = "epoch"      // legacy per-connection handshake, written only without SSE-Wire (never replayed, no id)
 	ActivityDelta  EventType = "activity"   // activity log delta (upsert/remove)
-	AlertDelta     EventType = "alert"      // alert raised or dismissed
-	ProviderDelta  EventType = "provider"   // provider timeout raised or cleared
-	SyncDone       EventType = "sync:done"  // one sync job's terminal result
+	alertDelta     EventType = "alert"      // alert raised or dismissed
+	providerDelta  EventType = "provider"   // provider timeout raised or cleared
+	syncDone       EventType = "sync:done"  // one sync job's terminal result
 )
 
 // CoverageEvent is the data payload for coverage updates. It deliberately
@@ -46,9 +48,6 @@ const (
 type CoverageEvent struct {
 	MediaType subflux.MediaType `json:"media_type"`
 	MediaID   string            `json:"media_id"`
-	Language  string            `json:"language"`
-	Variant   string            `json:"variant"`
-	Source    string            `json:"source"`
 }
 
 func (CoverageEvent) eventData() {}
@@ -60,7 +59,6 @@ type NotifyLevel string
 const (
 	NotifyError   NotifyLevel = "error"
 	NotifySuccess NotifyLevel = "success"
-	NotifyInfo    NotifyLevel = "info"
 )
 
 // NotifyEvent is the data payload for toast notifications pushed to the UI.
@@ -106,12 +104,14 @@ func (EpochEvent) eventData() {}
 
 // ActivityOp discriminates an activity event: an entry changed or appeared
 // (upsert) or left the log (remove).
+//
+//deadset:ignore DS1101 -- The wire generator registers it by name (internal/wirespec/wirespec.go:187) and emits the TypeScript ActivityOp the activity decoder checks.
 type ActivityOp string
 
 // Activity event operations.
 const (
 	ActivityUpsert ActivityOp = "upsert"
-	ActivityRemove ActivityOp = "remove"
+	activityRemove ActivityOp = "remove"
 )
 
 // ActivityEvent is the data payload for activity log deltas (E1). Upserts

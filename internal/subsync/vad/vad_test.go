@@ -62,7 +62,7 @@ func TestNewVADInst_default_mode(t *testing.T) {
 func TestNewVADInst_all_modes(t *testing.T) {
 	t.Parallel()
 	names := [4]string{"quality", "low_bitrate", "aggressive", "very_aggressive"}
-	for mode := range Mode(4) {
+	for mode := range mode(4) {
 		t.Run(names[mode], func(t *testing.T) {
 			t.Parallel()
 			v := newVADInst(mode)
@@ -85,17 +85,17 @@ func TestNewVADInst_all_modes(t *testing.T) {
 
 func TestNewVADInst_out_of_range_mode_defaults_to_3(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(Mode(-1))
+	v := newVADInst(mode(-1))
 	if v.localThresh != vadModes[3].local {
 		t.Errorf("newVADInst(-1).localThresh = %d, want %d", v.localThresh, vadModes[3].local)
 	}
-	v2 := newVADInst(Mode(99))
+	v2 := newVADInst(mode(99))
 	if v2.localThresh != vadModes[3].local {
 		t.Errorf("newVADInst(99).localThresh = %d, want %d", v2.localThresh, vadModes[3].local)
 	}
 	// 4 is the first mode past the end of the table, so it is where an
 	// off-by-one range check would index out of bounds instead of falling back.
-	v3 := newVADInst(Mode(4))
+	v3 := newVADInst(mode(4))
 	if v3.localThresh != vadModes[3].local {
 		t.Errorf("newVADInst(4).localThresh = %d, want %d", v3.localThresh, vadModes[3].local)
 	}
@@ -320,7 +320,7 @@ func TestProcessFrameLLR_never_panics(t *testing.T) {
 		for i := range frame {
 			frame[i] = rapid.Int16().Draw(t, "sample")
 		}
-		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
+		mode := mode(rapid.IntRange(0, 3).Draw(t, "mode"))
 		v := newVADInst(mode)
 		flag, llr := v.processFrameLLR(frame)
 		if flag < 0 || flag > 1 {
@@ -455,7 +455,7 @@ func TestFramesBinary_output_binary(t *testing.T) {
 		for i := range pcm {
 			pcm[i] = rapid.Int16().Draw(t, "sample")
 		}
-		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
+		mode := mode(rapid.IntRange(0, 3).Draw(t, "mode"))
 		result := FramesBinary(t.Context(), pcm, Tuning{Mode: mode, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 		// Output length must equal number of frames.
 		if len(result) != nFrames {
@@ -482,3 +482,11 @@ func TestFramesBinary_empty_returns_empty(t *testing.T) {
 		}
 	})
 }
+
+// The less aggressive WebRTC VAD modes, which the tests exercise beside the
+// mode production runs.
+const (
+	ModeQuality    mode = 0 // Most permissive, fewest false negatives
+	ModeLowBitrate mode = 1 // Low bitrate
+	ModeAggressive mode = 2 // Aggressive
+)

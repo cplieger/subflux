@@ -35,7 +35,7 @@ import (
 
 var errHTTPFake = errors.New("mock error")
 
-// fakeActivity satisfies ActivityTracker with no-op lifecycle tracking.
+// fakeActivity satisfies activityTracker with no-op lifecycle tracking.
 type fakeActivity struct{}
 
 func (fakeActivity) Start(string, string, activity.Source) string { return "act-1" }
@@ -43,7 +43,7 @@ func (fakeActivity) End(string)                                   {}
 func (fakeActivity) Fail(string)                                  {}
 func (fakeActivity) Progress(string, int, int, string)            {}
 
-// fakeEvents satisfies EventPublisher with no-ops.
+// fakeEvents satisfies eventPublisher with no-ops.
 type fakeEvents struct{}
 
 func (fakeEvents) PublishNotify(events.NotifyLevel, string)    {}
@@ -776,7 +776,7 @@ func TestRunManualDownload_reports_a_shutdown_interruption(t *testing.T) {
 		Provider: "os", SubtitleID: "sub-1", Language: "en",
 		MediaType: subflux.MediaTypeMovie, ArrID: 42,
 	}
-	req.SetVideoPath("/media/movie.mkv")
+	req.setVideoPath("/media/movie.mkv")
 
 	h.runManualDownload(h.deps.StateFunc(), req, "act-1")
 

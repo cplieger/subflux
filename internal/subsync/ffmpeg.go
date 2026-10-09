@@ -48,7 +48,7 @@ func ExtractEmbeddedSRT(ctx context.Context, videoPath, lang, excludeLang string
 	// For ASS/SSA codecs, use native ASS extraction with style-based
 	// dialogue filtering.
 	if best.CodecName == ffmpeg.CodecASS || best.CodecName == ffmpeg.CodecSSA {
-		dlgCues, _, err := ffmpegExtractASSDialogue(ctx, videoPath, best.Index)
+		dlgCues, err := ffmpegExtractASSDialogue(ctx, videoPath, best.Index)
 		if err == nil && len(dlgCues) > 0 {
 			slog.Debug("ASS dialogue extraction",
 				"dialogue_cues", len(dlgCues))

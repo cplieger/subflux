@@ -8,11 +8,11 @@ import (
 
 func TestAlignMergeSort_direct(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 5000, End: 7000},
 		{Start: 10000, End: 12000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 3000, End: 5000},
 		{Start: 8000, End: 10000},
 	}
@@ -25,8 +25,8 @@ func TestAlignMergeSort_direct(t *testing.T) {
 func TestAlignMergeSort_event_offsets(t *testing.T) {
 	t.Parallel()
 	// The four events per pair define the tent function shape.
-	ref := []TimeSpan{{Start: 5000, End: 8000}}
-	inc := []TimeSpan{{Start: 2000, End: 5000}}
+	ref := []timeSpan{{Start: 5000, End: 8000}}
+	inc := []timeSpan{{Start: 2000, End: 5000}}
 	got := alignMergeSort(t.Context(), ref, inc, -5000)
 	if got != 3000 {
 		t.Errorf("alignMergeSort(+3000 offset) = %d, want 3000", got)
@@ -36,11 +36,11 @@ func TestAlignMergeSort_event_offsets(t *testing.T) {
 func TestAlignMergeSort_gap_computation(t *testing.T) {
 	t.Parallel()
 	// The gap between consecutive events affects the rating accumulation.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 3000},
 		{Start: 10000, End: 13000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 1000, End: 4000},
 		{Start: 11000, End: 14000},
 	}
@@ -54,8 +54,8 @@ func TestAlignMergeSort_gap_computation(t *testing.T) {
 func TestAlignMergeSort_bestRating_boundary(t *testing.T) {
 	t.Parallel()
 	// If the comparison is wrong, the best offset is never updated or updated incorrectly.
-	ref := []TimeSpan{{Start: 0, End: 5000}}
-	inc := []TimeSpan{{Start: 10000, End: 15000}}
+	ref := []timeSpan{{Start: 0, End: 5000}}
+	inc := []timeSpan{{Start: 10000, End: 15000}}
 	got := alignMergeSort(t.Context(), ref, inc, -15000)
 	if got != -10000 {
 		t.Errorf("alignMergeSort(-10000 offset) = %d, want -10000", got)
@@ -66,8 +66,8 @@ func TestAlignMergeSort_bestOffset_selection(t *testing.T) {
 	t.Parallel()
 	// When the best rating is at the last event, bestOffset = events[i].offset.
 	// When not at the last event, bestOffset = events[i+1].offset.
-	ref := []TimeSpan{{Start: 20000, End: 22000}}
-	inc := []TimeSpan{{Start: 10000, End: 12000}}
+	ref := []timeSpan{{Start: 20000, End: 22000}}
+	inc := []timeSpan{{Start: 10000, End: 12000}}
 	got := alignMergeSort(t.Context(), ref, inc, -12000)
 	if got != 10000 {
 		t.Errorf("alignMergeSort(+10000 offset) = %d, want 10000", got)
@@ -80,10 +80,10 @@ func TestAlignMergeSort_bestOffset_selection(t *testing.T) {
 func TestAlignMergeSort_last_event_boundary(t *testing.T) {
 	t.Parallel()
 	// Force merge sort path with sparse spans (large range, few entries).
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 1000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 1000000, End: 1001000}, // 1M ms apart → huge range, few entries
 	}
 	// This should not panic.
@@ -98,11 +98,11 @@ func TestAlignMergeSort_last_event_boundary(t *testing.T) {
 // detected peak. Sparse spans force the merge-sort path.
 func TestAlignMergeSort_gap_sign(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 500},
 		{Start: 100000, End: 100500},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 200, End: 700},
 		{Start: 100200, End: 100700},
 	}
@@ -116,11 +116,11 @@ func TestAlignMergeSort_event_cap(t *testing.T) {
 	t.Parallel()
 	// Create spans with extreme timestamps to force bucket→merge fallback,
 	// then verify the event cap prevents unbounded allocation.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 500},
 		{Start: 200_000_000, End: 200_000_500}, // 200K seconds apart
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 100, End: 600},
 		{Start: 200_000_100, End: 200_000_600},
 	}
@@ -136,11 +136,11 @@ func TestAlignMergeSort_first_peak_wins_on_tie(t *testing.T) {
 	t.Parallel()
 	// The strict > comparison means the earlier offset wins when two offsets
 	// have equal rating; >= would let the later peak win instead.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 1000},
 		{Start: 4000, End: 5000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 2000, End: 3000},
 	}
 	got := alignMergeSort(t.Context(), ref, inc, -3000)
@@ -153,14 +153,14 @@ func TestAlignMergeSort_first_peak_wins_on_tie(t *testing.T) {
 // search floor is the only offset that can be reported.
 func TestAlignMergeSort_an_empty_side_returns_the_search_floor(t *testing.T) {
 	t.Parallel()
-	spans := []TimeSpan{
+	spans := []timeSpan{
 		{Start: 0, End: 20},
 		{Start: 40, End: 60},
 		{Start: 80, End: 100},
 	}
 	tests := []struct {
 		name      string
-		ref, inc  []TimeSpan
+		ref, inc  []timeSpan
 		minOffset int64
 		want      int64
 	}{

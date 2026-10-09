@@ -62,12 +62,6 @@ func TestExtractAnchors_never_panics(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		input := rapid.String().Draw(t, "input")
 		a := extractAnchors(input)
-		if a.WordCount < 0 {
-			t.Errorf("extractAnchors(%q).WordCount = %d, want >= 0", input, a.WordCount)
-		}
-		if a.CharLen < 0 {
-			t.Errorf("extractAnchors(%q).CharLen = %d, want >= 0", input, a.CharLen)
-		}
 		for i, n := range a.Numbers {
 			for _, r := range n {
 				if r < '0' || r > '9' {

@@ -70,14 +70,14 @@ func (p Params) Bool(name string) bool { return p.bools[name] }
 const (
 	TypeInt      = "int"
 	TypeBool     = "bool"
-	TypeDuration = "duration"
+	typeDuration = "duration"
 )
 
 // Flag describes one CLI flag for a subcommand.
 type Flag struct {
 	Name     string
 	Help     string
-	Type     string // empty = string, or TypeInt, TypeBool, TypeDuration
+	Type     string // empty = string, or TypeInt, TypeBool, typeDuration
 	Default  string
 	Required bool
 }
@@ -294,7 +294,7 @@ func checkType(f Flag, value string) error {
 		if _, err := strconv.Atoi(value); err != nil {
 			return fmt.Errorf("the --%s value %q is not a valid integer", f.Name, value)
 		}
-	case TypeDuration:
+	case typeDuration:
 		if _, err := time.ParseDuration(value); err != nil {
 			return fmt.Errorf("the --%s value %q is not a valid duration such as 30s, 5m or 1h. %w", f.Name, value, err)
 		}

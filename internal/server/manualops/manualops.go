@@ -38,39 +38,39 @@ type SearchResult struct {
 	OnDisk     bool              `json:"on_disk"`
 }
 
-// WarnRecorder records an actionable warning for the UI's alert list.
+// warnRecorder records an actionable warning for the UI's alert list.
 // Satisfied structurally by activity.AlertLog.
-type WarnRecorder interface {
+type warnRecorder interface {
 	RecordWarn(source, msg string)
 }
 
 // SearchDeps holds the dependencies a manual search or download pass needs.
 type SearchDeps struct {
-	DB       Store
-	Activity ActivityTracker
-	Alerts   WarnRecorder
-	Events   EventPublisher
+	DB       store
+	Activity activityTracker
+	Alerts   warnRecorder
+	Events   eventPublisher
 }
 
-// MediaWriter saves a manual subtitle and write-tests its folder before the
+// mediaWriter saves a manual subtitle and write-tests its folder before the
 // download is accepted; *mediawrite.Writer satisfies it.
-type MediaWriter interface {
+type mediaWriter interface {
 	WriteFile(ctx context.Context, path string, data []byte) error
 	Preflight(ctx context.Context, req mediawrite.PreflightRequest) error
 }
 
-// Store is the two rows a manual search touches: what is already on disk
+// store is the two rows a manual search touches: what is already on disk
 // for the language and releasing a lock. The lock key's empty variant means
 // "all variants of the language" (see subflux.ManualLockKey).
-type Store interface {
+type store interface {
 	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
 
-// ActivityTracker manages activity lifecycle. Progress also mutates the
+// activityTracker manages activity lifecycle. Progress also mutates the
 // entry detail: download completion writes the saved subtitle path there so
 // the remote CLI's poll loop can report it.
-type ActivityTracker interface {
+type activityTracker interface {
 	Start(action, detail string, source activity.Source) string
 	End(id string)
 	Fail(id string)
@@ -89,9 +89,9 @@ type ManualRadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// EventPublisher publishes events to SSE clients. Satisfied structurally
+// eventPublisher publishes events to SSE clients. Satisfied structurally
 // by *events.EventBus.
-type EventPublisher interface {
+type eventPublisher interface {
 	PublishNotify(level events.NotifyLevel, text string)
 	PublishCoverageUpdate(ev *events.CoverageEvent)
 }
@@ -151,11 +151,11 @@ func isValidLockVariant(v subflux.Variant) bool {
 // alertSourceManual attributes an alert to the manual-download path.
 const alertSourceManual = "manual"
 
-// ErrorNotice is one error's two audiences: the operator reading the alert
+// errorNotice is one error's two audiences: the operator reading the alert
 // log and the user watching the UI. Named fields rather than positional,
 // because Alert and UI are both human-readable strings and a transposition
 // would compile and read plausibly at most call sites.
-type ErrorNotice struct {
+type errorNotice struct {
 	// Source attributes the alert to a subsystem.
 	Source string
 	// Alert is the operator-facing text; it lands in the alert log.
@@ -164,8 +164,8 @@ type ErrorNotice struct {
 	UI string
 }
 
-// NotifyError records an error notice to both the operator alert log and the user notify bus.
-func NotifyError(deps *SearchDeps, n ErrorNotice) {
+// notifyError records an error notice to both the operator alert log and the user notify bus.
+func notifyError(deps *SearchDeps, n errorNotice) {
 	deps.Alerts.RecordWarn(n.Source, n.Alert)
 	deps.Events.PublishNotify(events.NotifyError, n.UI)
 }

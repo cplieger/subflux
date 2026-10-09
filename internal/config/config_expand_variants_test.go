@@ -136,7 +136,7 @@ providers:
 	if err == nil {
 		t.Fatal("expected error for both variant and variants set")
 	}
-	if !errors.Is(err, ErrVariantConflict) {
+	if !errors.Is(err, errVariantConflict) {
 		t.Errorf("error = %q, want ErrVariantConflict", err)
 	}
 }
@@ -240,7 +240,7 @@ providers:
 	if err == nil {
 		t.Fatal("expected error for both variant and variants in default target")
 	}
-	if !errors.Is(err, ErrVariantConflict) {
+	if !errors.Is(err, errVariantConflict) {
 		t.Errorf("error = %q, want ErrVariantConflict", err)
 	}
 }

@@ -94,7 +94,7 @@ func TestSessionHashFromContext_roundtrip(t *testing.T) {
 
 	const hash = "deadbeefcafe"
 	ctx := NewSessionHashContext(t.Context(), hash)
-	if got := SessionHashFromContext(ctx); got != hash {
+	if got := sessionHashFromContext(ctx); got != hash {
 		t.Errorf("SessionHashFromContext = %q, want %q", got, hash)
 	}
 }
@@ -102,7 +102,7 @@ func TestSessionHashFromContext_roundtrip(t *testing.T) {
 func TestSessionHashFromContext_empty_when_absent(t *testing.T) {
 	t.Parallel()
 
-	if got := SessionHashFromContext(t.Context()); got != "" {
+	if got := sessionHashFromContext(t.Context()); got != "" {
 		t.Errorf("SessionHashFromContext(empty ctx) = %q, want \"\"", got)
 	}
 }
@@ -112,7 +112,7 @@ func TestSessionHashFromContext_distinct_from_user_key(t *testing.T) {
 
 	// A user-valued context must not leak into the session-hash key.
 	ctx := NewUserContext(t.Context(), &auth.User{ID: 1, Username: "u"})
-	if got := SessionHashFromContext(ctx); got != "" {
+	if got := sessionHashFromContext(ctx); got != "" {
 		t.Errorf("SessionHashFromContext on user-only ctx = %q, want \"\"", got)
 	}
 

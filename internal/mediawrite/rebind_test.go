@@ -60,8 +60,8 @@ func TestBind_reattaches_bad_folders_to_the_new_roots(t *testing.T) {
 	}
 	err := h.w.Preflight(t.Context(), PreflightRequest{Folders: []string{show}})
 	var uerr *UnwritableError
-	if !errors.As(err, &uerr) || uerr.Root != nested {
-		t.Errorf("Preflight(%s) = %v, want an *UnwritableError under the nested root %s", show, err, nested)
+	if !errors.As(err, &uerr) || uerr.Folder != show {
+		t.Errorf("Preflight(%s) = %v, want an *UnwritableError for %s", show, err, show)
 	}
 
 	h.w.Bind([]string{h.root}, h.validate)
@@ -82,9 +82,11 @@ func TestBind_adopts_or_drops_a_folder_outside_every_root(t *testing.T) {
 	folder := filepath.Join(outside, "Show")
 	h.setWrite(failUnder(folder, erofs))
 	err := h.w.WriteFile(t.Context(), filepath.Join(folder, "a.srt"), []byte("1\n"))
-	var uerr *UnwritableError
-	if !errors.As(err, &uerr) || uerr.Root != unconfiguredRoot {
-		t.Fatalf("Setup: WriteFile outside every root = %v, want root %q", err, unconfiguredRoot)
+	if _, ok := errors.AsType[*UnwritableError](err); !ok {
+		t.Fatalf("Setup: WriteFile outside every root = %v, want an *UnwritableError", err)
+	}
+	if u := h.gauge(t, unconfiguredRoot); u != 1 {
+		t.Fatalf("Setup: unconfigured gauge = %v, want 1", u)
 	}
 
 	h.w.Bind([]string{h.root, outside}, h.validate)

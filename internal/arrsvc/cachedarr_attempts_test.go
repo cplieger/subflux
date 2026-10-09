@@ -60,7 +60,7 @@ func TestSingleAttempt_markedPassIssuesExactlyOneRequest(t *testing.T) {
 func TestSingleAttempt_plainPassKeepsTheShippedRetryPolicy(t *testing.T) {
 	srv, calls := transientThenOK(t)
 	// The shipped client's 3-attempt policy with a test-speed base delay
-	// (production uses NewSonarr's 5 s; the policy, not the pacing, is the
+	// (production uses newSonarr's 5 s; the policy, not the pacing, is the
 	// subject — the wrapper must not clamp the shipped client's retries).
 	shipped, err := arrapi.NewSonarr(srv.URL, "key",
 		arrapi.WithMaxAttempts(3), arrapi.WithBaseDelay(time.Millisecond))
@@ -68,7 +68,7 @@ func TestSingleAttempt_plainPassKeepsTheShippedRetryPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(shipped.Close)
-	c := testCachedSonarr(&Sonarr{Sonarr: shipped}, &fakeSonarr{}, testGate(t.Context()))
+	c := testCachedSonarr(&sonarr{Sonarr: shipped}, &fakeSonarr{}, testGate(t.Context()))
 
 	rows, err := c.Series(t.Context())
 	if err != nil {

@@ -14,7 +14,7 @@ import { el, icon, emptyDiv, errDiv, confirm } from "./dom.js";
 import { libraryPanel } from "./panels.js";
 import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
 import { listFiles, PATH_BULK_DELETE_FILES, PATH_DELETE_FILE } from "./wire/client.gen.js";
-import type { DeleteFileRequest, FileEntry } from "./wire/types.gen.js";
+import type { BulkDeleteRequest, DeleteFileRequest, FileEntry } from "./wire/types.gen.js";
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { fmtEpisode, langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
@@ -56,7 +56,6 @@ const files = createCollection<FileEntry>(fileKey);
 let currentMediaType: MediaType | "" = "";
 let currentMediaID = "";
 let currentTitle = "";
-let currentBackPath = "/";
 /** Sonarr/Radarr internal numeric ID for poster + MediaRef lookups. */
 let currentArrId = 0;
 
@@ -98,13 +97,11 @@ export function openFileManager(
   mediaType: MediaType,
   mediaID: string,
   title: string,
-  backPath: string,
   arrId?: number,
 ): void {
   currentMediaType = mediaType;
   currentMediaID = mediaID;
   currentTitle = title;
-  currentBackPath = backPath || "/";
   currentArrId = arrId ?? 0;
 
   const path =
@@ -130,7 +127,6 @@ async function loadFiles(): Promise<void> {
     detail: {
       title: currentTitle,
       info: "Subtitle Files",
-      backPath: currentBackPath,
     },
   });
 
@@ -433,6 +429,11 @@ const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
 });
 
 async function bulkDelete(): Promise<void> {
+  const mediaType = currentMediaType;
+  const mediaID = currentMediaID;
+  if (mediaType === "") {
+    return;
+  }
   const extCount = files.size;
   const ok = await confirm(
     "Delete All External Subtitles",
@@ -444,8 +445,8 @@ async function bulkDelete(): Promise<void> {
   }
 
   const r = await bulkDeleteAction.dispatch({
-    media_type: currentMediaType,
-    media_id: currentMediaID,
+    media_type: mediaType,
+    media_id: mediaID,
   });
   if (r !== null) {
     notify.success(`Deleted ${r.deleted} file(s)`);
@@ -453,17 +454,13 @@ async function bulkDelete(): Promise<void> {
   }
 }
 
-interface BulkDeleteArgs {
-  media_type: string;
-  media_id: string;
-}
 interface BulkDeleteOp {
   externals: FileEntry[];
 }
 
 /** Optimistically clears the collection with rollback restoration; `success:
  *  false` lets the dispatch wrapper show the count from the response. */
-const bulkDeleteAction = apiAction<BulkDeleteArgs, BulkDeleteResponse, BulkDeleteOp>({
+const bulkDeleteAction = apiAction<BulkDeleteRequest, BulkDeleteResponse, BulkDeleteOp>({
   name: "files.delete_bulk",
   request: (args) => ({ method: "DELETE", path: PATH_BULK_DELETE_FILES, body: args }),
   optimistic: (): BulkDeleteOp => {

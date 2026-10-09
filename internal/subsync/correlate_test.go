@@ -135,9 +135,9 @@ func TestNextPow2_invariants(t *testing.T) {
 func TestCrossCorrelateEdges_empty(t *testing.T) {
 	t.Parallel()
 	result := crossCorrelateEdges(t.Context(), nil, nil)
-	if result.OffsetFrames != 0 || result.Peak != 0 || result.OffsetMs != 0 {
-		t.Fatalf("CrossCorrelateEdges(nil, nil) = {offset=%d, peak=%f, ms=%d}, want all zero",
-			result.OffsetFrames, result.Peak, result.OffsetMs)
+	if result.Peak != 0 || result.OffsetMs != 0 {
+		t.Fatalf("CrossCorrelateEdges(nil, nil) = {peak=%f, ms=%d}, want all zero",
+			result.Peak, result.OffsetMs)
 	}
 }
 
@@ -145,9 +145,9 @@ func TestCrossCorrelateEdges_one_empty(t *testing.T) {
 	t.Parallel()
 	a := []float64{1.0, -1.0, 1.0}
 	result := crossCorrelateEdges(t.Context(), a, nil)
-	if result.OffsetFrames != 0 || result.Peak != 0 || result.OffsetMs != 0 {
-		t.Fatalf("CrossCorrelateEdges(a, nil) = {offset=%d, peak=%f, ms=%d}, want all zero",
-			result.OffsetFrames, result.Peak, result.OffsetMs)
+	if result.Peak != 0 || result.OffsetMs != 0 {
+		t.Fatalf("CrossCorrelateEdges(a, nil) = {peak=%f, ms=%d}, want all zero",
+			result.Peak, result.OffsetMs)
 	}
 }
 
@@ -174,8 +174,8 @@ func TestCrossCorrelateEdges_zero_energy(t *testing.T) {
 	if result.Peak != 0 {
 		t.Errorf("CrossCorrelateEdges(zeros) peak = %f, want 0", result.Peak)
 	}
-	if result.OffsetFrames != 0 {
-		t.Errorf("CrossCorrelateEdges(zeros) offset = %d, want 0", result.OffsetFrames)
+	if result.OffsetMs != 0 {
+		t.Errorf("CrossCorrelateEdges(zeros) offset = %dms, want 0", result.OffsetMs)
 	}
 }
 
@@ -192,9 +192,9 @@ func TestCrossCorrelateEdges_known_offset(t *testing.T) {
 		b[i] = 1.0
 	}
 	result := crossCorrelateEdges(t.Context(), a, b)
-	if math.Abs(float64(result.OffsetFrames)-(-10)) > 2 {
-		t.Errorf("CrossCorrelateEdges(known offset): OffsetFrames = %d, want ~-10",
-			result.OffsetFrames)
+	if math.Abs(float64(result.OffsetMs)-(-10*frameMs)) > 2*frameMs {
+		t.Errorf("CrossCorrelateEdges(known offset): OffsetMs = %d, want ~%d",
+			result.OffsetMs, -10*frameMs)
 	}
 	if result.Peak < 0.5 {
 		t.Errorf("CrossCorrelateEdges(known offset): peak = %f, want > 0.5", result.Peak)
@@ -212,20 +212,10 @@ func TestCrossCorrelateEdges_parabolic_interpolation(t *testing.T) {
 		b[i] = 1.0
 	}
 	result := crossCorrelateEdges(t.Context(), a, b)
-	// The integer offset should be close to -10.
-	if math.Abs(float64(result.OffsetFrames)-(-10)) > 3 {
-		t.Fatalf("parabolic interpolation test: OffsetFrames = %d, want ~-10",
-			result.OffsetFrames)
-	}
-	// OffsetMs should be within half a frame of OffsetFrames * frameMs.
-	wantMs := int64(result.OffsetFrames) * frameMs
-	diff := result.OffsetMs - wantMs
-	if diff < 0 {
-		diff = -diff
-	}
-	if diff > frameMs/2 {
+	// The refined offset lies within 3.5 frames of the -10 frame shift.
+	if math.Abs(float64(result.OffsetMs)-(-10*frameMs)) > 3*frameMs+frameMs/2 {
 		t.Fatalf("parabolic interpolation: OffsetMs = %d, want ~%d (±%d)",
-			result.OffsetMs, wantMs, frameMs/2)
+			result.OffsetMs, -10*frameMs, 3*frameMs+frameMs/2)
 	}
 }
 
@@ -254,33 +244,29 @@ func TestCrossCorrelateEdges_identical_signals(t *testing.T) {
 		signal[i] = 1.0
 	}
 	result := crossCorrelateEdges(t.Context(), signal, signal)
-	if result.OffsetFrames != 0 {
-		t.Errorf("CrossCorrelateEdges(identical): OffsetFrames = %d, want 0", result.OffsetFrames)
+	if result.OffsetMs != 0 {
+		t.Errorf("CrossCorrelateEdges(identical): OffsetMs = %d, want 0", result.OffsetMs)
 	}
 	if result.Peak < 0.9 {
 		t.Errorf("CrossCorrelateEdges(identical): Peak = %f, want >= 0.9", result.Peak)
 	}
 }
 
-func TestCrossCorrelateEdges_offset_ms_consistent(t *testing.T) {
+func TestParabolicRefine_stays_within_half_a_frame(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		n := rapid.IntRange(10, 200).Draw(t, "n")
-		a := make([]float64, n)
-		b := make([]float64, n)
+		n := rapid.IntRange(3, 200).Draw(t, "n")
+		corr := make([]complex128, n)
 		for i := range n {
-			a[i] = rapid.Float64Range(-1, 1).Draw(t, "a")
-			b[i] = rapid.Float64Range(-1, 1).Draw(t, "b")
+			corr[i] = complex(rapid.Float64Range(-1, 1).Draw(t, "corr"), 0)
 		}
-		result := crossCorrelateEdges(t.Context(), a, b)
-		wantMs := int64(result.OffsetFrames) * frameMs
-		diff := result.OffsetMs - wantMs
-		if diff < 0 {
-			diff = -diff
-		}
-		if diff > frameMs/2 {
-			t.Fatalf("CrossCorrelateEdges: OffsetMs = %d, want ~OffsetFrames(%d) * %d = %d (diff %d > %d)",
-				result.OffsetMs, result.OffsetFrames, frameMs, wantMs, diff, frameMs/2)
+		bestIdx := rapid.IntRange(0, n-1).Draw(t, "bestIdx")
+		offset := rapid.IntRange(-n, n).Draw(t, "offset")
+		bestVal := rapid.Float64Range(-1, 1).Draw(t, "bestVal")
+		gotMs := parabolicRefine(corr, bestIdx, offset, n, bestVal)
+		if diff := math.Abs(gotMs - float64(offset*frameMs)); diff > frameMs/2 {
+			t.Fatalf("parabolicRefine(offset %d) = %vms, want within %dms of %dms",
+				offset, gotMs, frameMs/2, offset*frameMs)
 		}
 	})
 }
@@ -306,9 +292,6 @@ func TestCrossCorrelateEdges_refines_the_peak_between_frames(t *testing.T) {
 
 	got := crossCorrelateEdges(t.Context(), a, b)
 
-	if got.OffsetFrames != 0 {
-		t.Errorf("crossCorrelateEdges(%v, %v).OffsetFrames = %d, want 0", a, b, got.OffsetFrames)
-	}
 	if got.OffsetMs != 3 {
 		t.Errorf("crossCorrelateEdges(%v, %v).OffsetMs = %d, want 3", a, b, got.OffsetMs)
 	}
@@ -333,10 +316,6 @@ func TestCrossCorrelateEdges_ignores_a_half_frame_refinement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := crossCorrelateEdges(t.Context(), tt.a, tt.b)
-			if got.OffsetFrames != 0 {
-				t.Errorf("crossCorrelateEdges(%v, %v).OffsetFrames = %d, want 0",
-					tt.a, tt.b, got.OffsetFrames)
-			}
 			if got.OffsetMs != 0 {
 				t.Errorf("crossCorrelateEdges(%v, %v).OffsetMs = %d, want 0",
 					tt.a, tt.b, got.OffsetMs)
@@ -372,9 +351,9 @@ func TestCrossCorrelateEdges_peak_is_amplitude_invariant(t *testing.T) {
 				t.Errorf("crossCorrelateEdges(signal, signal).Peak = %v for amplitude %v, want 1",
 					got.Peak, tt.amp)
 			}
-			if got.OffsetFrames != 0 {
-				t.Errorf("crossCorrelateEdges(signal, signal).OffsetFrames = %d for amplitude %v, want 0",
-					got.OffsetFrames, tt.amp)
+			if got.OffsetMs != 0 {
+				t.Errorf("crossCorrelateEdges(signal, signal).OffsetMs = %d for amplitude %v, want 0",
+					got.OffsetMs, tt.amp)
 			}
 		})
 	}
@@ -420,10 +399,6 @@ func TestCrossCorrelateEdges_opposed_signals_report_a_forward_lag(t *testing.T) 
 
 	got := crossCorrelateEdges(t.Context(), high, low)
 
-	if got.OffsetFrames != n {
-		t.Errorf("crossCorrelateEdges(+1 x %d, -1 x %d).OffsetFrames = %d, want %d",
-			n, n, got.OffsetFrames, n)
-	}
 	if got.OffsetMs != n*frameMs {
 		t.Errorf("crossCorrelateEdges(+1 x %d, -1 x %d).OffsetMs = %d, want %d",
 			n, n, got.OffsetMs, n*frameMs)

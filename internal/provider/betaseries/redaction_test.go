@@ -17,7 +17,7 @@ func TestSearch_an_echoed_token_reaches_no_log(t *testing.T) {
 	var logs bytes.Buffer
 	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, nil)))
 	body := `{"errors":[{"code":2001,"text":"bad key placeholder token, placeholder\ntoken"}],"episodes":[]}`
-	p := &Provider{
+	p := &source{
 		token: "placeholder token",
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return &http.Response{

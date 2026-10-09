@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,9 +53,9 @@ func TestParseTrustedProxies(t *testing.T) {
 					t.Fatalf("parseTrustedProxies(%v) = nil error, want error", tt.in)
 				}
 				// Invalid CIDRs must surface as a field-tagged validation error.
-				var ve *ValidationError
-				if !errors.As(err, &ve) || ve.Field != "trusted_proxies" {
-					t.Errorf("error = %v, want *ValidationError with Field=trusted_proxies", err)
+				var ve *validationError
+				if !errors.As(err, &ve) || !strings.Contains(ve.Message, "trusted_proxies") {
+					t.Errorf("error = %v, want *ValidationError naming trusted_proxies", err)
 				}
 				return
 			}
@@ -98,8 +99,8 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
-			PollIntervalCfg: Duration{D: 30 * time.Second},
-			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+			PollIntervalCfg: duration{D: 30 * time.Second},
+			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: duration{D: time.Hour}, UpgradeWindowDays: 7},
 		}
 	}
 
@@ -128,9 +129,9 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 		if err == nil {
 			t.Fatal("Validate() = nil, want error for invalid trusted_proxies")
 		}
-		var ve *ValidationError
-		if !errors.As(err, &ve) || ve.Field != "trusted_proxies" {
-			t.Errorf("Validate() error = %v, want *ValidationError Field=trusted_proxies", err)
+		var ve *validationError
+		if !errors.As(err, &ve) || !strings.Contains(ve.Message, "trusted_proxies") {
+			t.Errorf("Validate() error = %v, want *ValidationError naming trusted_proxies", err)
 		}
 	})
 

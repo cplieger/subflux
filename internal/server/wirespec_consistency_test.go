@@ -9,11 +9,31 @@ import (
 	"github.com/cplieger/subflux/internal/wirespec"
 )
 
+// routePatterns maps endpoint names to their routes.go registration pattern
+// when it differs from the default "METHOD path": the prefix-style
+// registrations whose handlers parse the suffix themselves, and the
+// method-less routes.
+func routePatterns() map[string]string {
+	return map[string]string{
+		"health":               "/api/health", // method-less: probes may use any method
+		"metrics":              "/metrics",
+		"renamePasskey":        "PUT /api/auth/passkeys/",
+		"deletePasskey":        "DELETE /api/auth/passkeys/",
+		"deleteUser":           "DELETE /api/auth/users/",
+		"revokeAPIKey":         "DELETE /api/auth/apikeys/",
+		"mediaEpisodes":        "GET /api/media/series/",
+		"coverageSeriesDetail": "GET /api/coverage/series/",
+		"scanSeries":           "POST /api/scan/series/",
+		"scanSeason":           "POST /api/scan/season/",
+		"scanMovie":            "POST /api/scan/movie/",
+	}
+}
+
 // wirespecPattern returns the routes.go registration pattern an endpoint is
 // expected to appear under: the explicit override for prefix-style and
 // method-less routes, else "METHOD path".
 func wirespecPattern(name, method, path string) string {
-	if p, ok := wirespec.RoutePatterns()[name]; ok {
+	if p, ok := routePatterns()[name]; ok {
 		return p
 	}
 	return method + " " + path
@@ -140,10 +160,10 @@ func TestWirespec_routePatterns_are_prefix_consistent(t *testing.T) {
 	for _, e := range wirespec.Endpoints() {
 		byName[e.Name] = struct{ method, path string }{e.Method, e.Path}
 	}
-	for name, pattern := range wirespec.RoutePatterns() {
+	for name, pattern := range routePatterns() {
 		ep, ok := byName[name]
 		if !ok {
-			t.Errorf("RoutePatterns has entry %q with no matching endpoint", name)
+			t.Errorf("routePatterns has entry %q with no matching endpoint", name)
 			continue
 		}
 		if !strings.Contains(pattern, " ") {

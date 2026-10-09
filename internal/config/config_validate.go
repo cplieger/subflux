@@ -20,70 +20,68 @@ import (
 // Sentinel errors for the most common config validation failures.
 // These enable errors.Is dispatch instead of string matching.
 var (
-	// ErrEmbeddedProviderRemoved indicates a legacy embedded-provider config
+	// errEmbeddedProviderRemoved indicates a legacy embedded-provider config
 	// shape (alpha hard cutover, no migration path): the fail-fast message is
 	// guidance to the new section, not a compatibility path.
-	ErrEmbeddedProviderRemoved = errors.New("providers.embedded has been replaced by the top-level embedded_subtitles section")
+	errEmbeddedProviderRemoved = errors.New("providers.embedded has been replaced by the top-level embedded_subtitles section")
 
-	// ErrNoArr indicates neither Sonarr nor Radarr is configured.
-	ErrNoArr = errors.New("at least one of sonarr or radarr must be configured")
+	// errNoArr indicates neither Sonarr nor Radarr is configured.
+	errNoArr = errors.New("at least one of sonarr or radarr must be configured")
 
-	// ErrNoDefaultLang indicates the languages.default section is empty.
-	ErrNoDefaultLang = errors.New("languages.default must contain at least one subtitle target. Every item must have a fallback set of subtitles to look for")
+	// errNoDefaultLang indicates the languages.default section is empty.
+	errNoDefaultLang = errors.New("languages.default must contain at least one subtitle target. Every item must have a fallback set of subtitles to look for")
 
-	// ErrDuplicateAudioRule indicates a duplicate audio language rule was found.
-	ErrDuplicateAudioRule = errors.New("duplicate audio language rule")
+	// errDuplicateAudioRule indicates a duplicate audio language rule was found.
+	errDuplicateAudioRule = errors.New("duplicate audio language rule")
 
-	// ErrSearchConfig indicates an invalid search configuration.
-	ErrSearchConfig = errors.New("invalid search configuration")
+	// errSearchConfig indicates an invalid search configuration.
+	errSearchConfig = errors.New("invalid search configuration")
 
-	// ErrAdaptiveConfig indicates an invalid adaptive configuration.
-	ErrAdaptiveConfig = errors.New("invalid adaptive configuration")
+	// errAdaptiveConfig indicates an invalid adaptive configuration.
+	errAdaptiveConfig = errors.New("invalid adaptive configuration")
 
-	// ErrLoggingConfig indicates an invalid logging configuration.
-	ErrLoggingConfig = errors.New("invalid logging configuration")
+	// errLoggingConfig indicates an invalid logging configuration.
+	errLoggingConfig = errors.New("invalid logging configuration")
 
-	// ErrPostProcessConfig indicates an invalid post-processing configuration.
-	ErrPostProcessConfig = errors.New("invalid post-processing configuration")
+	// errPostProcessConfig indicates an invalid post-processing configuration.
+	errPostProcessConfig = errors.New("invalid post-processing configuration")
 
-	// ErrScoringConfig indicates an invalid scoring configuration.
-	ErrScoringConfig = errors.New("invalid scoring configuration")
+	// errScoringConfig indicates an invalid scoring configuration.
+	errScoringConfig = errors.New("invalid scoring configuration")
 
-	// ErrMissingAPIKey indicates a required API key is not configured.
-	ErrMissingAPIKey = errors.New("API key required")
+	// errMissingAPIKey indicates a required API key is not configured.
+	errMissingAPIKey = errors.New("API key required")
 )
 
-// FieldDependencyError is a typed error for config field-requires-field
+// fieldDependencyError is a typed error for config field-requires-field
 // constraint violations. Callers can use errors.As to programmatically
 // identify which field combinations are invalid.
-type FieldDependencyError struct {
+type fieldDependencyError struct {
 	Field     string // the field that has the constraint
 	DependsOn string // the field it depends on
 	Reason    string // human-readable explanation
 }
 
-func (e *FieldDependencyError) Error() string {
+func (e *fieldDependencyError) Error() string {
 	return fmt.Sprintf("%s requires %s: %s", e.Field, e.DependsOn, e.Reason)
 }
 
 // Validate checks that the Config has the minimum required configuration.
 func (c *Config) Validate() error { return validate(context.Background(), c) }
 
-// ValidationError is a structured validation error that identifies the
-// offending config field. Callers can use errors.As to extract the field name
-// for targeted UI display or programmatic handling.
-type ValidationError struct {
-	Field   string // e.g. "search.min_score", "sonarr.api_key"
+// validationError is a config validation failure; its message names the
+// offending field.
+type validationError struct {
 	Message string
 }
 
-func (e *ValidationError) Error() string {
+func (e *validationError) Error() string {
 	return e.Message
 }
 
-// configFieldErr constructs a ValidationError for the given field.
-func configFieldErr(field, msg string) error {
-	return &ValidationError{Field: field, Message: msg}
+// configFieldErr constructs a validationError; msg names the field.
+func configFieldErr(msg string) error {
+	return &validationError{Message: msg}
 }
 
 // hasEnabledProvider reports whether at least one provider is enabled.
@@ -101,30 +99,30 @@ func hasEnabledProvider(providers map[subflux.ProviderID]yamlProviderCfg) bool {
 // non-empty codes in all rules, and at least one enabled provider.
 // Accumulates all validation errors and returns them joined.
 
-// ValidationErrors accumulates multiple validation errors from config
+// validationErrors accumulates multiple validation errors from config
 // checking. Sub-validators append directly via Add, eliminating the
 // repeated if-err-append boilerplate.
-type ValidationErrors struct {
+type validationErrors struct {
 	errs []error
 }
 
-// Add appends a non-nil error to the accumulator.
-func (ve *ValidationErrors) Add(err error) {
+// add appends a non-nil error to the accumulator.
+func (ve *validationErrors) add(err error) {
 	if err != nil {
 		ve.errs = append(ve.errs, err)
 	}
 }
 
-// Err returns the accumulated errors joined, or nil if none.
-func (ve *ValidationErrors) Err() error {
+// err returns the accumulated errors joined, or nil if none.
+func (ve *validationErrors) err() error {
 	return errors.Join(ve.errs...)
 }
 
 func validate(ctx context.Context, cfg *Config) error {
-	var ve ValidationErrors
-	ve.Add(validateArrs(cfg))
-	ve.Add(validateLanguages(&cfg.Languages))
-	ve.Add(validateEmbeddedCutover(cfg))
+	var ve validationErrors
+	ve.add(validateArrs(cfg))
+	ve.add(validateLanguages(&cfg.Languages))
+	ve.add(validateEmbeddedCutover(cfg))
 	// Zero enabled acquisition providers is a VALID configuration (embedded
 	// detection and coverage only), not an error: the former ErrNoProvider
 	// guard was dead code while the fake embedded provider was force-enabled
@@ -133,40 +131,40 @@ func validate(ctx context.Context, cfg *Config) error {
 	if !hasEnabledProvider(cfg.ProvidersCfg) {
 		slog.Warn("no acquisition providers enabled; embedded detection and coverage only")
 	}
-	ve.Add(validateDurationConstraints([]durationConstraint{
+	ve.add(validateDurationConstraints([]durationConstraint{
 		{"poll_interval", cfg.PollIntervalCfg.D, defaults.MinPollInterval, false},
 	}))
-	ve.Add(validateSearch(&cfg.Cfg))
-	ve.Add(validateAdaptive(&cfg.AdaptiveCfg))
-	ve.Add(validateScoring(cfg.Scoring.Weights))
+	ve.add(validateSearch(&cfg.Cfg))
+	ve.add(validateAdaptive(&cfg.AdaptiveCfg))
+	ve.add(validateScoring(cfg.Scoring.Weights))
 	if cfg.PostProcessing.AudioSyncFallback && !cfg.PostProcessing.SyncSubtitles {
-		ve.Add(fmt.Errorf("%w: %w", ErrPostProcessConfig, &FieldDependencyError{
+		ve.add(fmt.Errorf("%w: %w", errPostProcessConfig, &fieldDependencyError{
 			Field:     "post_processing.audio_sync_fallback",
 			DependsOn: "post_processing.sync_subtitles",
 			Reason:    "audio_sync_fallback requires sync_subtitles to be enabled",
 		}))
 	}
-	ve.Add(validateLogging(&cfg.Logging))
-	ve.Add(validateBackup(&cfg.Backup))
+	ve.add(validateLogging(&cfg.Logging))
+	ve.add(validateBackup(&cfg.Backup))
 	if _, err := parseTrustedProxies(cfg.TrustedProxies); err != nil {
-		ve.Add(err)
+		ve.add(err)
 	}
 	if _, err := parseAllowedHosts(cfg.AllowedHosts); err != nil {
-		ve.Add(err)
+		ve.add(err)
 	}
 	if cfg.Auth.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}
 	warnIllegalWebAuthnRPID(cfg.Auth.WebAuthnRPID)
 	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
-		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it"))
+		ve.add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it"))
 	}
 	if len(cfg.MediaRootDirs) == 0 {
 		slog.Warn("media_roots not configured, path-based operations (preview, sync, manual download, subtitle deletion) will be refused")
 	} else {
 		for _, root := range cfg.MediaRootDirs {
 			if err := ctx.Err(); err != nil {
-				ve.Add(err)
+				ve.add(err)
 				break
 			}
 			if _, err := os.Stat(root); err != nil {
@@ -175,7 +173,7 @@ func validate(ctx context.Context, cfg *Config) error {
 			}
 		}
 	}
-	return ve.Err()
+	return ve.err()
 }
 
 // warnIllegalWebAuthnRPID WARNs rather than failing the load: a passkey field
@@ -203,19 +201,19 @@ const legacyEmbeddedProvider = subflux.ProviderID("embedded")
 // means "all providers", which would broaden a deliberate no-network rule —
 // so erroring is both safer and simpler than rewriting user config.
 func validateEmbeddedCutover(cfg *Config) error {
-	var ve ValidationErrors
+	var ve validationErrors
 	if _, ok := cfg.ProvidersCfg[legacyEmbeddedProvider]; ok {
-		ve.Add(ErrEmbeddedProviderRemoved)
+		ve.add(errEmbeddedProviderRemoved)
 	}
 	checkTargets := func(context string, targets []yamlSubtitleTarget) {
 		for _, t := range targets {
 			if slices.Contains(t.Providers, legacyEmbeddedProvider) {
-				ve.Add(fmt.Errorf("%w: remove %q from the providers list (%s, code=%s)",
-					ErrEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
+				ve.add(fmt.Errorf("%w: remove %q from the providers list (%s, code=%s)",
+					errEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
 			}
 			if slices.Contains(t.Exclude, legacyEmbeddedProvider) {
-				ve.Add(fmt.Errorf("%w: remove %q from the exclude list (%s, code=%s)",
-					ErrEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
+				ve.add(fmt.Errorf("%w: remove %q from the exclude list (%s, code=%s)",
+					errEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
 			}
 		}
 	}
@@ -223,7 +221,7 @@ func validateEmbeddedCutover(cfg *Config) error {
 		checkTargets("rule audio="+rule.Audio, rule.Subtitles)
 	}
 	checkTargets("languages.default", cfg.Languages.Default)
-	return ve.Err()
+	return ve.err()
 }
 
 // durationConstraint defines a minimum-duration validation rule.
@@ -242,8 +240,7 @@ func validateDurationConstraints(constraints []durationConstraint) error {
 			continue
 		}
 		if c.value < c.min {
-			return configFieldErr(c.field,
-				fmt.Sprintf("%s must be at least %s, got %s", c.field, c.min, c.value))
+			return configFieldErr(fmt.Sprintf("%s must be at least %s, got %s", c.field, c.min, c.value))
 		}
 	}
 	return nil
@@ -254,11 +251,11 @@ func validateBackup(c *yamlBackupConfig) error {
 	if !c.Enabled {
 		return nil
 	}
-	var ve ValidationErrors
+	var ve validationErrors
 	if c.Retention < 1 {
-		ve.Add(configFieldErr("backup.retention", "backup.retention must be at least 1 when backups are enabled"))
+		ve.add(configFieldErr("backup.retention must be at least 1 when backups are enabled"))
 	}
-	ve.Add(validateDurationConstraints([]durationConstraint{
+	ve.add(validateDurationConstraints([]durationConstraint{
 		{"backup.frequency", c.Frequency.D, defaults.MinBackupFrequency, false},
 	}))
 	if c.Path != "" {
@@ -282,12 +279,12 @@ func validateBackup(c *yamlBackupConfig) error {
 		// ".." components — including one buried mid-path, which a cleaning
 		// predicate such as RelEscapes would collapse and accept.
 		if err := atomicfile.ValidatePath(c.Path); err != nil {
-			ve.Add(configFieldErr("backup.path", "backup.path must be an absolute directory"))
+			ve.add(configFieldErr("backup.path must be an absolute directory"))
 		} else if pathinside.HasDotDot(c.Path) {
-			ve.Add(configFieldErr("backup.path", "backup.path must not contain a '..' path segment"))
+			ve.add(configFieldErr("backup.path must not contain a '..' path segment"))
 		}
 	}
-	return ve.Err()
+	return ve.err()
 }
 
 // validateScoring checks custom scoring weights against the documented
@@ -305,7 +302,7 @@ func validateScoring(w *subflux.Scores) error {
 	if w == nil {
 		return nil
 	}
-	var ve ValidationErrors
+	var ve validationErrors
 	weights := []struct {
 		name  string
 		value int
@@ -321,37 +318,33 @@ func validateScoring(w *subflux.Scores) error {
 	}
 	for _, f := range weights {
 		if f.value < 0 {
-			ve.Add(configFieldErr("scoring."+f.name,
-				fmt.Sprintf("scoring.%s must be non-negative, got %d", f.name, f.value)))
+			ve.add(configFieldErr(fmt.Sprintf("scoring.%s must be non-negative, got %d", f.name, f.value)))
 		}
 	}
 	common := w.Source + w.ReleaseGroup + w.StreamingService + w.VideoCodec + w.HDR
 	movieSum := common + w.Edition
 	episodeSum := common + w.SeasonPack
 	if w.Hash < movieSum || w.Hash < episodeSum {
-		ve.Add(configFieldErr("scoring.hash",
-			fmt.Sprintf("scoring.hash (%d) must be >= the maximum attribute-only score (movies %d, episodes %d) so a hash match always outranks attribute matches",
-				w.Hash, movieSum, episodeSum)))
+		ve.add(configFieldErr(fmt.Sprintf("scoring.hash (%d) must be >= the maximum attribute-only score (movies %d, episodes %d) so a hash match always outranks attribute matches",
+			w.Hash, movieSum, episodeSum)))
 	}
-	if err := ve.Err(); err != nil {
-		return fmt.Errorf("%w: %w", ErrScoringConfig, err)
+	if err := ve.err(); err != nil {
+		return fmt.Errorf("%w: %w", errScoringConfig, err)
 	}
 	return nil
 }
 
 // validateLogging checks that log level and format are recognized values.
-func validateLogging(l *LoggingConfig) error {
-	var ve ValidationErrors
-	if l.Level != "" && !ValidLogLevel(l.Level) {
-		ve.Add(configFieldErr("logging.level",
-			fmt.Sprintf("logging.level must be one of error/warn/info/debug, got %q", l.Level)))
+func validateLogging(l *loggingConfig) error {
+	var ve validationErrors
+	if l.Level != "" && !validLogLevel(l.Level) {
+		ve.add(configFieldErr(fmt.Sprintf("logging.level must be one of error/warn/info/debug, got %q", l.Level)))
 	}
-	if l.Format != "" && !ValidLogFormat(l.Format) {
-		ve.Add(configFieldErr("logging.format",
-			fmt.Sprintf("logging.format must be one of json/text, got %q", l.Format)))
+	if l.Format != "" && !validLogFormat(l.Format) {
+		ve.add(configFieldErr(fmt.Sprintf("logging.format must be one of json/text, got %q", l.Format)))
 	}
-	if err := ve.Err(); err != nil {
-		return fmt.Errorf("%w: %w", ErrLoggingConfig, err)
+	if err := ve.err(); err != nil {
+		return fmt.Errorf("%w: %w", errLoggingConfig, err)
 	}
 	return nil
 }
@@ -379,7 +372,7 @@ func validateArrs(cfg *Config) error {
 	sonarr := cfg.Sonarr()
 	radarr := cfg.Radarr()
 	if sonarr.URL == "" && radarr.URL == "" {
-		return ErrNoArr
+		return errNoArr
 	}
 	warnArrURLs("sonarr", cfg.SonarrCfg)
 	warnArrURLs("radarr", cfg.RadarrCfg)
@@ -391,7 +384,7 @@ func validateArrs(cfg *Config) error {
 		missing = append(missing, "radarr")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("%w: %s", ErrMissingAPIKey, strings.Join(missing, ", "))
+		return fmt.Errorf("%w: %s", errMissingAPIKey, strings.Join(missing, ", "))
 	}
 	return nil
 }

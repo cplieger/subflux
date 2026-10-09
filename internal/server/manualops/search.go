@@ -65,8 +65,8 @@ func QueryInt(q interface{ Get(string) string }, key string) int {
 	return n
 }
 
-// TryComputeHash computes and sets the request's video hash, best-effort, when a file path is available.
-func TryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchRequest, filePath string) {
+// tryComputeHash computes and sets the request's video hash, best-effort, when a file path is available.
+func tryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchRequest, filePath string) {
 	if filePath == "" || req.VideoHash != "" {
 		return
 	}
@@ -82,7 +82,6 @@ func TryComputeHash(ctx context.Context, ls *LiveState, req *subflux.SearchReque
 		return
 	}
 	req.VideoHash = hash
-	req.VideoSize = size
 	slog.Debug("manual search: video hash computed",
 		"path", filePath, "hash", hash, "size", size)
 }
@@ -147,8 +146,8 @@ type ManualProviderNotice struct {
 
 // Manual provider notice kinds.
 const (
-	NoticeGated = "gated"
-	NoticeError = "error"
+	noticeGated = "gated"
+	noticeError = "error"
 )
 
 const maxNoticeBytes = 256
@@ -159,7 +158,7 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *subflux.SearchRequest, lang string, mediaType subflux.MediaType, filePath string,
 ) ManualSearchResponse {
 	mediaID := mediaid.Build(req)
-	TryComputeHash(ctx, ls, req, filePath)
+	tryComputeHash(ctx, ls, req, filePath)
 
 	// The per-provider timeout is shared with the CLI search path via
 	// subflux.DefaultManualProviderTimeout to prevent silent divergence.
@@ -202,12 +201,12 @@ func providerNotices(swept []search.SweepNotice) []ManualProviderNotice {
 	out := make([]ManualProviderNotice, 0, len(swept))
 	for _, n := range swept {
 		if n.Gated {
-			out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: NoticeGated, Message: n.Reason})
+			out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: noticeGated, Message: n.Reason})
 			continue
 		}
 		msg := runesafe.SanitizeSingleLineBounded(n.Err.Error(), maxNoticeBytes)
 		slog.Warn("manual search: provider failed", "provider", n.Provider, "error", msg)
-		out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: NoticeError, Message: msg})
+		out = append(out, ManualProviderNotice{Provider: n.Provider, Kind: noticeError, Message: msg})
 	}
 	return out
 }

@@ -82,7 +82,6 @@ type SearchRequest struct {
 	AudioLang         string   // resolved audio language (for coverage tracking)
 	Languages         []string // ISO 639-1 codes to search for
 	TmdbID            int      // Movie TMDB ID from Radarr; 0 for episodes
-	VideoSize         int64    // file size for hash-based search
 	Year              int
 	Season            int // 0 for movies
 	Episode           int // 0 for movies
@@ -145,7 +144,6 @@ type Subtitle struct {
 	DownloadURL string
 	MatchedBy   MatchMethod // how this subtitle was matched (hash, title, imdb, etc.)
 	Title       string      // show/movie title from provider (for identity validation)
-	Year        int         // year from provider (0 if unknown)
 	Season      int         // season from provider (0 if unknown or movie)
 	Episode     int         // episode from provider (0 if unknown or movie)
 	HearingImp  bool
@@ -191,7 +189,6 @@ type LangOutcome struct {
 	Kind     LangOutcomeKind // what happened for this language group
 	Paths    []string        // subtitle files downloaded for this language
 	Searched int             // variant targets processed against provider results
-	Skipped  int             // variant targets skipped within the group
 	// Queried counts the provider queries the group's single sweep actually
 	// issued (successful or erroring; providers skipped by the health
 	// timeout never sent a request and don't count). Zero for skipped and

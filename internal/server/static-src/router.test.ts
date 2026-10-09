@@ -392,14 +392,12 @@ describe("route table", () => {
     expect(collaborators.searchCalls).toStrictEqual([["episode", series(42), null, null, "fr"]]);
   });
 
-  it("routes the series files path to the file manager with a back path", async () => {
+  it("routes the series files path to the file manager", async () => {
     at("/series/42/files");
 
     await router.applyRoute();
 
-    expect(collaborators.fileManagerCalls).toStrictEqual([
-      ["episode", "tvdb-42-", "Show", "/series/42", 142],
-    ]);
+    expect(collaborators.fileManagerCalls).toStrictEqual([["episode", "tvdb-42-", "Show", 142]]);
   });
 
   it("falls back to the series detail when a sync route finds no sync button", async () => {
@@ -454,9 +452,7 @@ describe("route table", () => {
 
     await router.applyRoute();
 
-    expect(collaborators.fileManagerCalls).toStrictEqual([
-      ["movie", "tmdb-7", "Film", "/movie/7", 207],
-    ]);
+    expect(collaborators.fileManagerCalls).toStrictEqual([["movie", "tmdb-7", "Film", 207]]);
   });
 
   it("falls back to the movie detail when a sync route finds no sync button", async () => {

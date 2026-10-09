@@ -12,14 +12,14 @@ interface PanelShell {
   readonly content: HTMLElement; // div#coverageContent / div#historyContent
 }
 
-export interface LibraryPanel extends PanelShell {
+interface LibraryPanel extends PanelShell {
   readonly filter: HTMLInputElement; // #cov-filter
   readonly missingOnly: HTMLInputElement; // #cov-missing
   readonly typeFilter: HTMLSelectElement; // #cov-type-filter
   readonly sort: HTMLSelectElement; // #cov-sort
 }
 
-export interface HistoryPanel extends PanelShell {
+interface HistoryPanel extends PanelShell {
   readonly filter: HTMLInputElement; // #h-filter
   readonly type: HTMLSelectElement; // #h-type
   readonly lang: HTMLSelectElement; // #h-lang
@@ -132,6 +132,7 @@ export function historyPanel(): HistoryPanel {
   return history;
 }
 
+// deadset:ignore DS1004 -- Tests rebuild the panels between cases; the module keeps them private.
 export function _resetPanelsForTest(): void {
   // Release the hosts BEFORE rebuilding: both mount paths gate on host
   // OCCUPANCY rather than on the container node, so a rebuilt panel with a live

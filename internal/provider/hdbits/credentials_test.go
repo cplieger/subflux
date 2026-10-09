@@ -13,8 +13,8 @@ import (
 // stubbedProvider builds a provider whose transport answers one canned
 // response, so the check runs its real request-building and classification
 // without a network dial.
-func stubbedProvider(status int, body string, transportErr error) *Provider {
-	return &Provider{
+func stubbedProvider(status int, body string, transportErr error) *source {
+	return &source{
 		username: "user",
 		passkey:  "supersecret32hex",
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
@@ -104,7 +104,7 @@ func TestCheckCredentials(t *testing.T) {
 func TestCheckCredentials_posts_the_pair_to_the_test_endpoint(t *testing.T) {
 	t.Parallel()
 	var gotMethod, gotURL, gotBody string
-	p := &Provider{
+	p := &source{
 		username: "user",
 		passkey:  "supersecret32hex",
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {

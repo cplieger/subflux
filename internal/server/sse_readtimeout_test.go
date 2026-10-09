@@ -69,7 +69,7 @@ func TestSSEStream_outlives_the_server_read_timeout(t *testing.T) {
 	// Past the read deadline nothing has been written to the stream yet
 	// (the keepalive is 15s), so what keeps it open is the cleared deadline.
 	time.Sleep(srv.ReadTimeout + 500*time.Millisecond)
-	s.events.PublishNotify(events.NotifyInfo, "after-read-timeout")
+	s.events.PublishNotify(events.NotifySuccess, "after-read-timeout")
 	waitForLine(t, lines, `"after-read-timeout"`, 5*time.Second)
 }
 

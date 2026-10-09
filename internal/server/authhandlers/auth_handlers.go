@@ -36,7 +36,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	// Rate limit check.
 	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
-		Audit(r, slog.LevelWarn, AuditLoginRateLimited, false, req.Username,
+		audit(r, slog.LevelWarn, auditLoginRateLimited, false, req.Username,
 			slog.Int("retry_after_seconds", int(retryAfter.Seconds())+1))
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
@@ -56,7 +56,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(rlIP, rlUser)
-		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
+		audit(r, slog.LevelWarn, auditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
@@ -65,7 +65,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if !user.Enabled {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(rlIP, rlUser)
-		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
+		audit(r, slog.LevelWarn, auditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
@@ -74,7 +74,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	passOK, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !passOK {
 		h.RateLimiter.Record(rlIP, rlUser)
-		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
+		audit(r, slog.LevelWarn, auditLoginFailure, false, req.Username,
 			slog.String("reason", "invalid_password"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
@@ -88,7 +88,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
-	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
+	audit(r, slog.LevelInfo, auditLoginSuccess, true, user.Username,
 		slog.String("method", string(auth.MethodPassword)))
 }
 
@@ -115,7 +115,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 	SessionCookie.ClearCookie(w, r)
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditLogout, true, user)
+	audit(r, slog.LevelInfo, auditLogout, true, user)
 }
 
 // --- GET /api/auth/setup ---
@@ -178,7 +178,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), PasswordCheck{
+	hash, userMsg, err := validateAndHashPassword(r.Context(), passwordCheck{
 		Password:    req.Password,
 		Username:    req.Username,
 		SoleFactor:  true,

@@ -9,18 +9,18 @@ func TestPut_itemSizeBoundary(t *testing.T) {
 	dc := newDownloadCache(8, 10) // maxItemSize 10 bytes
 
 	atLimit := []byte("0123456789") // exactly 10 bytes
-	if ok := dc.Put("at", atLimit, nil); !ok {
+	if ok := dc.put("at", atLimit, nil); !ok {
 		t.Fatalf("Put(len=%d, maxItemSize=10) = false, want true (boundary stores)", len(atLimit))
 	}
-	if got, found := dc.Get("at"); !found || len(got) != 10 {
+	if got, found := dc.get("at"); !found || len(got) != 10 {
 		t.Fatalf("Get(\"at\") = %q, %v; want 10 bytes, true", got, found)
 	}
 
 	over := []byte("0123456789X") // 11 bytes
-	if ok := dc.Put("over", over, nil); ok {
+	if ok := dc.put("over", over, nil); ok {
 		t.Fatalf("Put(len=%d, maxItemSize=10) = true, want false (over-limit rejected)", len(over))
 	}
-	if _, found := dc.Get("over"); found {
+	if _, found := dc.get("over"); found {
 		t.Fatal("Get(\"over\") found = true, want false (was rejected)")
 	}
 }
@@ -30,20 +30,20 @@ func TestPut_itemSizeBoundary(t *testing.T) {
 func TestPut_evictsOldestWhenFull(t *testing.T) {
 	t.Parallel()
 	dc := newDownloadCache(2, 1024)
-	if ok := dc.Put("a", []byte("A"), nil); !ok {
+	if ok := dc.put("a", []byte("A"), nil); !ok {
 		t.Fatal("Put(\"a\") = false, want true")
 	}
-	if ok := dc.Put("b", []byte("B"), nil); !ok {
+	if ok := dc.put("b", []byte("B"), nil); !ok {
 		t.Fatal("Put(\"b\") = false, want true")
 	}
 	// Cache is full (2/2). A third Put must evict the oldest ("a") and store "c".
-	if ok := dc.Put("c", []byte("C"), nil); !ok {
+	if ok := dc.put("c", []byte("C"), nil); !ok {
 		t.Fatal("Put(\"c\") on full cache = false, want true (evict then store)")
 	}
-	if _, found := dc.Get("a"); found {
+	if _, found := dc.get("a"); found {
 		t.Error("entry \"a\" should have been evicted as the oldest")
 	}
-	if got, found := dc.Get("c"); !found || string(got) != "C" {
+	if got, found := dc.get("c"); !found || string(got) != "C" {
 		t.Errorf("Get(\"c\") = %q, %v; want \"C\", true", got, found)
 	}
 }
@@ -53,10 +53,10 @@ func TestPut_evictsOldestWhenFull(t *testing.T) {
 func TestPut_zeroMaxEntriesRejects(t *testing.T) {
 	t.Parallel()
 	dc := newDownloadCache(0, 1024)
-	if ok := dc.Put("k", []byte("v"), nil); ok {
+	if ok := dc.put("k", []byte("v"), nil); ok {
 		t.Fatal("Put on maxEntries=0 cache = true, want false (cannot store)")
 	}
-	if _, found := dc.Get("k"); found {
+	if _, found := dc.get("k"); found {
 		t.Fatal("Get(\"k\") found = true, want false (maxEntries=0 stores nothing)")
 	}
 }
@@ -66,11 +66,11 @@ func TestPut_zeroMaxEntriesRejects(t *testing.T) {
 func TestPut_existingKeyKeepsOriginalData(t *testing.T) {
 	t.Parallel()
 	dc := newDownloadCache(4, 1024)
-	dc.Put("k", []byte("first"), nil)
-	if ok := dc.Put("k", []byte("second"), nil); !ok {
+	dc.put("k", []byte("first"), nil)
+	if ok := dc.put("k", []byte("second"), nil); !ok {
 		t.Fatal("re-Put of existing key = false, want true")
 	}
-	if got, _ := dc.Get("k"); string(got) != "first" {
+	if got, _ := dc.get("k"); string(got) != "first" {
 		t.Errorf("Get(\"k\") = %q, want \"first\" (re-Put must not overwrite)", got)
 	}
 }
@@ -81,23 +81,23 @@ func TestPut_existingKeyKeepsOriginalData(t *testing.T) {
 func TestGet_refreshesRecencyForLRU(t *testing.T) {
 	t.Parallel()
 	dc := newDownloadCache(2, 1024)
-	dc.Put("a", []byte("A"), nil)
-	dc.Put("b", []byte("B"), nil)
+	dc.put("a", []byte("A"), nil)
+	dc.put("b", []byte("B"), nil)
 
 	// Touch "a" so it becomes newer than "b".
-	if _, found := dc.Get("a"); !found {
+	if _, found := dc.get("a"); !found {
 		t.Fatal("Get(\"a\") not found before eviction")
 	}
 
 	// Inserting "c" must now evict "b" (the least-recently-used), not "a".
-	dc.Put("c", []byte("C"), nil)
-	if _, found := dc.Get("b"); found {
+	dc.put("c", []byte("C"), nil)
+	if _, found := dc.get("b"); found {
 		t.Error("entry \"b\" should have been evicted as least-recently-used after Get(\"a\")")
 	}
-	if _, found := dc.Get("a"); !found {
+	if _, found := dc.get("a"); !found {
 		t.Error("entry \"a\" should survive eviction after being refreshed by Get")
 	}
-	if _, found := dc.Get("c"); !found {
+	if _, found := dc.get("c"); !found {
 		t.Error("entry \"c\" should be present after insertion")
 	}
 }
@@ -108,7 +108,7 @@ func TestPut_onSaturatedWhenItemTooBig(t *testing.T) {
 	t.Parallel()
 	dc := newDownloadCache(4, 5) // maxItemSize 5 bytes
 	calls := 0
-	ok := dc.Put("big", []byte("123456"), func() { calls++ }) // 6 bytes
+	ok := dc.put("big", []byte("123456"), func() { calls++ }) // 6 bytes
 	if ok {
 		t.Error("Put of oversized item = true, want false")
 	}
@@ -125,14 +125,14 @@ func TestPut_onSaturatedFiresOncePerClearCycle(t *testing.T) {
 	calls := 0
 	cb := func() { calls++ }
 
-	dc.Put("a", []byte("A"), cb)
-	dc.Put("b", []byte("B"), cb)
+	dc.put("a", []byte("A"), cb)
+	dc.put("b", []byte("B"), cb)
 	if calls != 1 {
 		t.Errorf("onSaturated fired %d times before Clear, want 1 (once per cycle)", calls)
 	}
 
-	dc.Clear() // re-arms the saturation guard
-	dc.Put("c", []byte("C"), cb)
+	dc.clear() // re-arms the saturation guard
+	dc.put("c", []byte("C"), cb)
 	if calls != 2 {
 		t.Errorf("onSaturated fired %d times total, want 2 (Clear re-arms the guard)", calls)
 	}

@@ -60,7 +60,6 @@ var ErrUnwritable = errors.New("media folder is not writable")
 type UnwritableError struct {
 	Err    error
 	Folder string
-	Root   string
 	Op     string
 }
 
@@ -71,15 +70,15 @@ func (e *UnwritableError) Error() string {
 // Unwrap exposes ErrUnwritable and the underlying error.
 func (e *UnwritableError) Unwrap() []error { return []error{ErrUnwritable, e.Err} }
 
-// Metrics is the gauge and counter surface the writer reports through.
-type Metrics interface {
+// metrics is the gauge and counter surface the writer reports through.
+type metrics interface {
 	SetMediaRootUnwritable(root string, unwritable bool)
 	DeleteMediaRoot(root string)
 	IncSubtitleWriteError()
 }
 
-// Alerts is the persistent-alert surface the writer raises into.
-type Alerts interface {
+// alerts is the persistent-alert surface the writer raises into.
+type alerts interface {
 	RecordPersistent(source, msg string)
 	DismissBySource(source string)
 	HasUndismissed(source string) bool
@@ -88,8 +87,8 @@ type Alerts interface {
 // Config configures a Writer. Metrics and Alerts are required; every other
 // zero field takes its documented default.
 type Config struct {
-	Metrics Metrics
-	Alerts  Alerts
+	Metrics metrics
+	Alerts  alerts
 	// Write writes one file; nil is atomicfile.WriteFile capped at MaxBytes,
 	// with no WithMode, so a subtitle gets the share's creation defaults.
 	// Probes and subtitle writes both go through it.
@@ -284,8 +283,8 @@ func (w *Writer) WriteFile(ctx context.Context, path string, data []byte) error 
 		slog.Warn("subtitle not written; its folder accepts other writes", "path", path, "error", err)
 		return err
 	}
-	root := w.reraise(folder)
-	return &UnwritableError{Folder: folder, Root: root, Op: opWrite, Err: err}
+	w.reraise(folder)
+	return &UnwritableError{Folder: folder, Op: opWrite, Err: err}
 }
 
 // Blocked reports the deepest marked folder at or above path's folder, up to
@@ -420,17 +419,14 @@ func (w *Writer) dropLocked(folder string) (fx effects, root string, ok bool) {
 }
 
 // reraise re-creates a folder's dismissed alert (or its root aggregate's);
-// an undismissed one was already refreshed by the settlement. It returns the
-// root the folder reports under.
-func (w *Writer) reraise(folder string) (root string) {
+// an undismissed one was already refreshed by the settlement.
+func (w *Writer) reraise(folder string) {
 	w.mu.Lock()
-	root = w.labelLocked(folder)
 	var fx effects
 	if b, ok := w.bad[folder]; ok {
 		fx = append(fx, w.recreateFn(folder, b))
 	}
 	w.commitLocked(fx)
-	return root
 }
 
 func (w *Writer) refreshFn(folder string, b *badFolder) func() {

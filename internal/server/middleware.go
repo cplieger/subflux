@@ -42,7 +42,7 @@ func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 // writes happen inside the library's session verifier, throttled per session.
 //
 // Handlers downstream read the user with authhandlers.UserFromContext and the
-// session hash with authhandlers.SessionHashFromContext. The latter is empty for
+// session hash with authhandlers.sessionHashFromContext. The latter is empty for
 // API-key-authenticated requests.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

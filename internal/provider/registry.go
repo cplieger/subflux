@@ -13,38 +13,38 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// RegistryErrorKind categorizes registry loading failures.
-type RegistryErrorKind int
+// registryErrorKind categorizes registry loading failures.
+type registryErrorKind int
 
 // ErrProviderInit indicates a provider factory returned an error.
-const ErrProviderInit RegistryErrorKind = iota + 1
+const ErrProviderInit registryErrorKind = iota + 1
 
 // String returns a human-readable name for the error kind.
-func (k RegistryErrorKind) String() string {
+func (k registryErrorKind) String() string {
 	if k == ErrProviderInit {
 		return "provider_init"
 	}
 	return fmt.Sprintf("RegistryErrorKind(%d)", int(k))
 }
 
-// Compile-time assertion: RegistryErrorKind satisfies fmt.Stringer.
-var _ fmt.Stringer = RegistryErrorKind(0)
+// Compile-time assertion: registryErrorKind satisfies fmt.Stringer.
+var _ fmt.Stringer = registryErrorKind(0)
 
-// RegistryError is a typed error returned by LoadAll.
-type RegistryError struct {
+// registryError is a typed error returned by LoadAll.
+type registryError struct {
 	Err      error              // underlying error for ErrProviderInit
 	Provider subflux.ProviderID // non-empty for ErrProviderInit
-	Kind     RegistryErrorKind
+	Kind     registryErrorKind
 }
 
-func (e *RegistryError) Error() string {
+func (e *registryError) Error() string {
 	if e.Kind == ErrProviderInit {
 		return fmt.Sprintf("init provider %s: %v", e.Provider, e.Err)
 	}
 	return fmt.Sprintf("registry error: %s", e.Kind)
 }
 
-func (e *RegistryError) Unwrap() error { return e.Err }
+func (e *registryError) Unwrap() error { return e.Err }
 
 // Provider is what a subtitle source must offer to be registered here: the name
 // config and logs identify it by, a search over one media item, and a download
@@ -57,7 +57,7 @@ func (e *RegistryError) Unwrap() error { return e.Err }
 // pair is not in it.
 //
 // Declared in this package because this package is the consumer: FactoryFunc
-// below returns one, Registry.LoadAll builds them, and WrapRetry wraps one.
+// below returns one, Registry.LoadAll builds them, and wrapRetry wraps one.
 // EXPORTED against the unexported-by-default rule because the nine Factory
 // functions in the subpackages name it in their return type, and providers.go
 // types them as FactoryFunc — the name has to cross the package boundary for the
@@ -126,11 +126,11 @@ func (r *Registry) RegisterSchema(name subflux.ProviderID, label string, fields 
 	r.schemas[name] = fields
 }
 
-// ErrNoCredentialCheck reports that a provider offers no credential check:
+// errNoCredentialCheck reports that a provider offers no credential check:
 // either the name is unregistered, or its implementation does not satisfy
 // CredentialChecker. Callers gate on CredentialCheck first, so reaching this is
 // a caller bug rather than an operator mistake.
-var ErrNoCredentialCheck = errors.New("provider: no credential check")
+var errNoCredentialCheck = errors.New("provider: no credential check")
 
 // RegisterCredentialCheck records whether a provider's implementation can
 // validate its credentials without searching. Declared at the registration
@@ -158,7 +158,7 @@ func (r *Registry) CredentialCheck(name subflux.ProviderID) bool {
 func (r *Registry) CheckCredentials(ctx context.Context, name subflux.ProviderID, settings map[string]any) error {
 	f, ok := r.factories[name]
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
+		return fmt.Errorf("%w: %s", errNoCredentialCheck, name)
 	}
 	p, err := f(ctx, r.Normalize(name, settings))
 	if err != nil {
@@ -166,7 +166,7 @@ func (r *Registry) CheckCredentials(ctx context.Context, name subflux.ProviderID
 	}
 	checker, ok := p.(CredentialChecker)
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrNoCredentialCheck, name)
+		return fmt.Errorf("%w: %s", errNoCredentialCheck, name)
 	}
 	return checker.CheckCredentials(ctx)
 }
@@ -298,12 +298,12 @@ func (r *Registry) buildProviders(ctx context.Context, toLoad []subflux.Provider
 }
 
 // partitionResults separates successfully built providers from initialization
-// failures, wrapping each failure in a typed RegistryError and logging it. The
+// failures, wrapping each failure in a typed registryError and logging it. The
 // input order is preserved so the joined error is deterministic.
 func partitionResults(results []loadResult) (providers []Provider, errs []error) {
 	for _, lr := range results {
 		if lr.err != nil {
-			errs = append(errs, &RegistryError{Kind: ErrProviderInit, Provider: lr.name, Err: lr.err})
+			errs = append(errs, &registryError{Kind: ErrProviderInit, Provider: lr.name, Err: lr.err})
 			slog.Warn("provider init failed", "provider", lr.name, "error", lr.err)
 			continue
 		}

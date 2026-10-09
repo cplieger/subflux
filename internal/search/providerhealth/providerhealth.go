@@ -28,7 +28,7 @@ import (
 type Config struct {
 	Now       func() time.Time // Clock function; nil defaults to time.Now.
 	Threshold int              // failures within window to trigger (default: DefaultThreshold)
-	Window    time.Duration    // sliding window (default: DefaultWindow)
+	Window    time.Duration    // sliding window (default: defaultWindow)
 	Cooldown  time.Duration
 }
 
@@ -37,10 +37,10 @@ type Config struct {
 // without repeating the magic number.
 const DefaultThreshold = 5
 
-// DefaultWindow is the sliding window duration for failure counting.
+// defaultWindow is the sliding window duration for failure counting.
 // Exported so callers can rely on the package default without repeating
 // the magic number.
-const DefaultWindow = 10 * time.Minute
+const defaultWindow = 10 * time.Minute
 
 // OnChange observes a provider's timeout transitions: raised=true when the
 // provider trips into cooldown, raised=false when it leaves it (expiry
@@ -57,7 +57,7 @@ func New(cfg Config) *Tracker {
 		cfg.Threshold = DefaultThreshold
 	}
 	if cfg.Window <= 0 {
-		cfg.Window = DefaultWindow
+		cfg.Window = defaultWindow
 	}
 	if cfg.Cooldown <= 0 {
 		cfg.Cooldown = time.Hour

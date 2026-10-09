@@ -47,13 +47,12 @@ func testRunConfig(buf *bytes.Buffer) *searchRunConfig {
 
 // startCLIServer serves mux and points SUBFLUX_URL at it (API key cleared
 // unless a test sets one).
-func startCLIServer(t *testing.T, mux *http.ServeMux) *httptest.Server {
+func startCLIServer(t *testing.T, mux *http.ServeMux) {
 	t.Helper()
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	t.Setenv("SUBFLUX_URL", srv.URL)
 	t.Setenv("SUBFLUX_API_KEY", "")
-	return srv
 }
 
 func writeTestJSON(t *testing.T, w http.ResponseWriter, v any) {

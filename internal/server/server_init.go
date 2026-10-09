@@ -138,7 +138,6 @@ func (s *Server) initHandlers() {
 		Resolve:      resolver,
 		StateFunc:    s.previewLiveState,
 		ReadBounded:  atomicfile.ReadBounded,
-		ServerCtx:    func() context.Context { return s.lifetime },
 	})
 
 	s.storeOps = storeops.New(storeops.Deps{

@@ -876,13 +876,7 @@ describe("detail: renderSeriesDetail", () => {
     expect(btn.querySelector(".btn-text")?.textContent).toBe(" Files");
     btn.click();
 
-    expect(openFileManager).toHaveBeenCalledWith(
-      "episode",
-      "tvdb-319-",
-      "Show V",
-      "/series/319",
-      319,
-    );
+    expect(openFileManager).toHaveBeenCalledWith("episode", "tvdb-319-", "Show V", 319);
   });
 
   it("withholds the Files button from a non-admin and where subs are embedded", () => {
@@ -1032,7 +1026,6 @@ describe("detail: openSeriesDetail", () => {
     expect(location.pathname).toBe("/series/400");
     expect(document.title).toBe("Subflux \u00B7 Breaking Bad");
     expect(panelDetail()["info"]).toBe("3 ep \u00B7 audio: English \u00B7 subs: en");
-    expect(panelDetail()["backPath"]).toBe("/");
     expect(panelDetail()["arrName"]).toBe("Sonarr");
   });
 
@@ -1398,7 +1391,6 @@ describe("detail: openMovieDetail", () => {
       detail: {
         title: "Movie 77",
         info: "2021 \u00B7 audio: English \u00B7 subs: en, fr",
-        backPath: "/",
         // Trailing slashes stripped, so the path is appended exactly once.
         arrLink: "http://radarr:7878/movie/77",
         arrName: "Radarr",
@@ -1440,7 +1432,7 @@ describe("detail: openMovieDetail", () => {
     expect(filesBtn.querySelector(".btn-text")?.textContent).toBe(" Files");
     filesBtn.click();
 
-    expect(openFileManager).toHaveBeenCalledWith("movie", "tmdb-79", "Movie 79", "/movie/79", 79);
+    expect(openFileManager).toHaveBeenCalledWith("movie", "tmdb-79", "Movie 79", 79);
   });
 
   it("withholds the Files button from a non-admin", async () => {
@@ -2050,7 +2042,6 @@ describe("detail: openSeriesDetail panel", () => {
       detail: {
         title: "Show AP",
         info: "3 ep \u00B7 audio: English \u00B7 subs: en",
-        backPath: "/",
         arrLink: null,
         arrName: "Sonarr",
       },

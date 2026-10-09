@@ -134,12 +134,12 @@ func FuzzMatchPathShrinkRetry(f *testing.F) {
 
 		// MatchString and FindStringSubmatch must agree on existence for
 		// every pattern (merge scan cannot invent or lose matches).
-		for _, p := range []*Pattern{retryPat, witness, flagship} {
+		for name, p := range map[string]*Pattern{"retry": retryPat, "witness": witness, "flagship": flagship} {
 			match := p.MatchString(input)
 			found := p.FindStringSubmatch(input) != nil
 			if match != found {
-				t.Errorf("pattern %q on %q: MatchString=%v but FindStringSubmatch!=nil is %v",
-					p.String(), input, match, found)
+				t.Errorf("%s pattern on %q: MatchString=%v but FindStringSubmatch!=nil is %v",
+					name, input, match, found)
 			}
 		}
 	})

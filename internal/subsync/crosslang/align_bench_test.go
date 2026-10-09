@@ -19,10 +19,10 @@ func makeBenchCues(n int) []Cue {
 	return cues
 }
 
-func makeBenchPairs(n int) []CuePair {
-	pairs := make([]CuePair, n)
+func makeBenchPairs(n int) []cuePair {
+	pairs := make([]cuePair, n)
 	for i := range n {
-		pairs[i] = CuePair{
+		pairs[i] = cuePair{
 			IncIdx:   i,
 			RefIdx:   i + rand.IntN(3),
 			Score:    0.5 + rand.Float64()*0.5,

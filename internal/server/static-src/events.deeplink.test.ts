@@ -202,9 +202,6 @@ async function healFrame(tvdb: number, offset: number): Promise<void> {
     {
       media_type: "episode",
       media_id: `tvdb-${String(tvdb)}-s01e01`,
-      language: "en",
-      variant: "standard",
-      source: "auto",
     },
     `${EPOCH_A}:${String(offset)}`,
   );

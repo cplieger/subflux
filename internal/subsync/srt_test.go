@@ -157,7 +157,7 @@ func TestShiftCues_positive_offset(t *testing.T) {
 		{Start: 5 * time.Second, End: 7 * time.Second, Text: "B"},
 	}
 
-	shifted := ShiftCues(cues, 2*time.Second)
+	shifted := shiftCues(cues, 2*time.Second)
 
 	if shifted[0].Start != 3*time.Second {
 		t.Errorf("shifted[0].Start = %v, want 3s", shifted[0].Start)
@@ -179,7 +179,7 @@ func TestShiftCues_negative_offset_clamps_to_zero(t *testing.T) {
 		{Start: 1 * time.Second, End: 3 * time.Second, Text: "A"},
 	}
 
-	shifted := ShiftCues(cues, -5*time.Second)
+	shifted := shiftCues(cues, -5*time.Second)
 
 	if shifted[0].Start != 0 {
 		t.Errorf("shifted[0].Start = %v, want 0 (clamped)", shifted[0].Start)
@@ -195,7 +195,7 @@ func TestShiftCues_preserves_text(t *testing.T) {
 		{Start: 1 * time.Second, End: 2 * time.Second, Text: "Keep me"},
 	}
 
-	shifted := ShiftCues(cues, 500*time.Millisecond)
+	shifted := shiftCues(cues, 500*time.Millisecond)
 	if shifted[0].Text != "Keep me" {
 		t.Errorf("ShiftCues() text = %q, want %q", shifted[0].Text, "Keep me")
 	}
@@ -207,7 +207,7 @@ func TestShiftCues_does_not_mutate_original(t *testing.T) {
 		{Start: 1 * time.Second, End: 2 * time.Second, Text: "Original"},
 	}
 
-	_ = ShiftCues(cues, 5*time.Second)
+	_ = shiftCues(cues, 5*time.Second)
 
 	if cues[0].Start != 1*time.Second {
 		t.Errorf("original cue mutated: Start = %v, want 1s", cues[0].Start)
@@ -222,7 +222,7 @@ func TestShiftCues_does_not_mutate_original(t *testing.T) {
 
 func TestShiftCues_empty_slice(t *testing.T) {
 	t.Parallel()
-	shifted := ShiftCues(nil, 1*time.Second)
+	shifted := shiftCues(nil, 1*time.Second)
 	if len(shifted) != 0 {
 		t.Errorf("ShiftCues(nil) returned %d cues, want 0", len(shifted))
 	}
@@ -569,7 +569,7 @@ func TestShiftCues_never_negative(t *testing.T) {
 		offsetMs := rapid.Int64Range(-7_200_000, 7_200_000).Draw(t, "offset_ms")
 		offset := time.Duration(offsetMs) * time.Millisecond
 
-		shifted := ShiftCues(cues, offset)
+		shifted := shiftCues(cues, offset)
 
 		for i, c := range shifted {
 			if c.Start < 0 {
@@ -591,7 +591,7 @@ func TestShiftCues_idempotent_zero_offset(t *testing.T) {
 			cues[i] = genCue(t)
 		}
 
-		shifted := ShiftCues(cues, 0)
+		shifted := shiftCues(cues, 0)
 
 		for i := range cues {
 			if shifted[i].Start != cues[i].Start {

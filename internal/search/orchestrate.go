@@ -40,7 +40,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 		searchCfg, mediaType, mediaID, lang, label, upgradeCutoff)
 	if !anyNeedsSearch {
 		out.Kind = subflux.LangSkipped
-		out.Skipped = len(targets)
 		return out, nil
 	}
 	if folder, blocked := e.media.Blocked(videoPath); blocked {
@@ -80,7 +79,6 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest
 	var writeFailure *mediawrite.UnwritableError
 	for i := range states {
 		if !states[i].needsSearch {
-			out.Skipped++
 			continue
 		}
 		out.Searched++
@@ -120,8 +118,6 @@ func writeBlockedGroup(out *subflux.LangOutcome, states []targetState) {
 	for i := range states {
 		if states[i].needsSearch {
 			out.WriteBlocked++
-		} else {
-			out.Skipped++
 		}
 	}
 	out.Kind = subflux.LangWriteBlocked

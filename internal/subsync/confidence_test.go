@@ -17,10 +17,10 @@ func TestSyncResult_Applied(t *testing.T) {
 		{"negative offset", SyncResult{Offset: -200}, true},
 		{"nonzero rate", SyncResult{Rate: 1.001}, true},
 		{"rate below 1", SyncResult{Rate: 0.999}, true},
-		{"split with confidence", SyncResult{Method: MethodSplit, Confidence: 0.6}, true},
-		{"split with zero confidence", SyncResult{Method: MethodSplit, Confidence: ConfidenceNone}, false},
-		{"non-split with zero offset", SyncResult{Method: MethodOffset, Confidence: 0.8}, false},
-		{"split with nonzero offset returns true via offset", SyncResult{Method: MethodSplit, Offset: 100, Confidence: 0.8}, true},
+		{"split with confidence", SyncResult{Method: methodSplit, Confidence: 0.6}, true},
+		{"split with zero confidence", SyncResult{Method: methodSplit, Confidence: confidenceNone}, false},
+		{"non-split with zero offset", SyncResult{Method: methodOffset, Confidence: 0.8}, false},
+		{"split with nonzero offset returns true via offset", SyncResult{Method: methodSplit, Offset: 100, Confidence: 0.8}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -39,7 +39,7 @@ func TestSyncResult_ShouldApply(t *testing.T) {
 		confidence Confidence
 		want       bool
 	}{
-		{"zero", ConfidenceNone, false},
+		{"zero", confidenceNone, false},
 		{"weak", 0.3, false},
 		{"just below threshold", ShouldApplyThreshold - 0.001, false},
 		{"at threshold", ShouldApplyThreshold, true},

@@ -28,26 +28,26 @@ import (
 	"github.com/cplieger/webhttp/v3"
 )
 
-// AuthStore is the four writes and one read the bootstrap actions perform. Five
+// authStore is the four writes and one read the bootstrap actions perform. Five
 // of the auth SPI's methods, named here because this is the package that calls
 // them.
-type AuthStore interface {
+type authStore interface {
 	UserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
 	UpdateUser(ctx context.Context, user *auth.User) error
 	DeleteUserSessions(ctx context.Context, userID int64, exceptHash string) error
 	CreateAPIKey(ctx context.Context, key *auth.Key) error
 }
 
-// PanicRecorder counts a recovered panic. One method: this plane installs no
+// panicRecorder counts a recovered panic. One method: this plane installs no
 // request-metric hook at all (see Handler).
-type PanicRecorder interface {
+type panicRecorder interface {
 	RecordPanic()
 }
 
 // Deps is what the plane needs.
 type Deps struct {
-	Store   AuthStore
-	Metrics PanicRecorder
+	Store   authStore
+	Metrics panicRecorder
 }
 
 // Plane serves the admin socket's single route.

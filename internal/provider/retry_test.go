@@ -138,7 +138,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 				name:      "test",
 				dlResults: tc.dlResults,
 			}
-			p := WrapRetry(inner, 3, time.Millisecond)
+			p := wrapRetry(inner, 3, time.Millisecond)
 
 			_, err := p.Download(t.Context(), &subflux.Subtitle{})
 			if (err != nil) != tc.wantErr {
@@ -159,7 +159,7 @@ func TestRetryProvider_context_cancellation(t *testing.T) {
 			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
-	p := WrapRetry(inner, 3, time.Second)
+	p := wrapRetry(inner, 3, time.Second)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately.
@@ -183,7 +183,7 @@ func TestRetryProvider_cancellation_during_backoff(t *testing.T) {
 			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
-	p := WrapRetry(inner, 3, 500*time.Millisecond)
+	p := wrapRetry(inner, 3, 500*time.Millisecond)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
@@ -217,7 +217,7 @@ func TestRetryProvider_backoff_doubles_between_attempts(t *testing.T) {
 		},
 		callTimes: &callTimes,
 	}
-	p := WrapRetry(inner, 4, 50*time.Millisecond)
+	p := wrapRetry(inner, 4, 50*time.Millisecond)
 
 	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
@@ -244,7 +244,7 @@ func TestRetryProvider_maxAttempts_one_calls_once_no_backoff(t *testing.T) {
 			{data: []byte("should-not-reach")},
 		},
 	}
-	p := WrapRetry(inner, 1, 500*time.Millisecond)
+	p := wrapRetry(inner, 1, 500*time.Millisecond)
 
 	start := time.Now()
 	_, err := p.Download(t.Context(), &subflux.Subtitle{})
@@ -267,7 +267,7 @@ func TestRetryProvider_maxAttempts_one_calls_once_no_backoff(t *testing.T) {
 func TestRetryProvider_preserves_name(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{name: "myProvider"}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 	if p.Name() != "myProvider" {
 		t.Errorf("Name() = %q, want %q", p.Name(), "myProvider")
 	}
@@ -276,7 +276,7 @@ func TestRetryProvider_preserves_name(t *testing.T) {
 func TestRetryProvider_delegates_search(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{name: "test"}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 
 	results, err := p.Search(t.Context(), &subflux.SearchRequest{})
 	if err != nil {
@@ -292,7 +292,7 @@ func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	inner := &retryFakeCounterProvider{
 		name: "opensubtitles",
 	}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 
 	counter, ok := p.(ShowSubtitleCounter)
 	if !ok {
@@ -313,7 +313,7 @@ func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 func TestWrapRetry_plain_provider_no_counter(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{name: "hdbits"}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 
 	if _, ok := p.(ShowSubtitleCounter); ok {
 		t.Error("plain provider should not implement ShowSubtitleCounter")
@@ -323,7 +323,7 @@ func TestWrapRetry_plain_provider_no_counter(t *testing.T) {
 func TestRetryProvider_ClearCache_delegates(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeCacheProvider{name: "test"}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 
 	cc, ok := p.(CacheClearer)
 	if !ok {
@@ -341,7 +341,7 @@ func TestRetryProvider_zero_retries_delegates_directly(t *testing.T) {
 		name:      "test",
 		dlResults: []dlResult{{data: []byte("direct")}},
 	}
-	p := WrapRetry(inner, 0, time.Millisecond)
+	p := wrapRetry(inner, 0, time.Millisecond)
 
 	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
@@ -361,7 +361,7 @@ func TestRetryProvider_negative_retries_delegates_directly(t *testing.T) {
 		name:      "test",
 		dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 503}}},
 	}
-	p := WrapRetry(inner, -1, time.Millisecond)
+	p := wrapRetry(inner, -1, time.Millisecond)
 
 	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err == nil {
@@ -375,7 +375,7 @@ func TestRetryProvider_negative_retries_delegates_directly(t *testing.T) {
 func TestRetryProvider_ClearCache_noop_without_inner(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{name: "test"}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 
 	type clearer interface{ ClearCache() }
 	if cc, ok := p.(clearer); ok {
@@ -428,7 +428,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 	for _, attempts := range []int{1, 2, 3} {
 		name := fmt.Sprintf("attempts=%d", attempts)
 		b.Run("Download/"+name, func(b *testing.B) {
-			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
+			rp := wrapRetry(inner, attempts, 100*time.Millisecond)
 			ctx := b.Context()
 			b.ResetTimer()
 			for b.Loop() {
@@ -436,7 +436,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 			}
 		})
 		b.Run("Search/"+name, func(b *testing.B) {
-			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
+			rp := wrapRetry(inner, attempts, 100*time.Millisecond)
 			ctx := b.Context()
 			req := &subflux.SearchRequest{Title: "test"}
 			b.ResetTimer()
@@ -470,7 +470,7 @@ const (
 func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 	recs := capture.Default(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{{data: []byte("ok")}}}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
@@ -491,7 +491,7 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 		{err: &httpwire.HTTPStatusError{Code: 503}}, // transient: retried
 		{data: []byte("ok")},                        // success on the second attempt
 	}}
-	p := WrapRetry(inner, 3, time.Millisecond)
+	p := wrapRetry(inner, 3, time.Millisecond)
 	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
@@ -525,7 +525,7 @@ func TestRetryProvider_exhaustedDownloadIsNotLoggedAsError(t *testing.T) {
 		{err: &httpwire.HTTPStatusError{Code: 503}},
 		{err: &httpwire.HTTPStatusError{Code: 503}},
 	}}
-	p := WrapRetry(inner, 2, time.Millisecond)
+	p := wrapRetry(inner, 2, time.Millisecond)
 
 	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err == nil {
@@ -562,7 +562,7 @@ func TestRetryProvider_search_clamps_release_names(t *testing.T) {
 		{ReleaseName: "Movie.2024.1080p.BluRay.x264-GRP"},
 		{ReleaseName: long},
 	}}
-	p := WrapRetry(inner, 1, time.Millisecond)
+	p := wrapRetry(inner, 1, time.Millisecond)
 
 	subs, err := p.Search(t.Context(), &subflux.SearchRequest{})
 	if err != nil {
@@ -598,7 +598,7 @@ func (f *retryFakeReporter) ForgetSettingVerdict() { f.reason = nil }
 func TestRetryProvider_SettingReporter_delegates(t *testing.T) {
 	t.Parallel()
 	refused := errors.New("client version missing or invalid")
-	wrapped, ok := WrapRetry(&retryFakeReporter{name: "animetosho", reason: refused}, 3, time.Millisecond).(SettingReporter)
+	wrapped, ok := wrapRetry(&retryFakeReporter{name: "animetosho", reason: refused}, 3, time.Millisecond).(SettingReporter)
 	if !ok {
 		t.Fatal("wrapped provider does not implement SettingReporter")
 	}
@@ -609,7 +609,7 @@ func TestRetryProvider_SettingReporter_delegates(t *testing.T) {
 	if setting, reason := wrapped.SettingVerdict(); setting != "" || reason != nil {
 		t.Errorf("SettingVerdict() after ForgetSettingVerdict = (%q, %v), want (\"\", nil)", setting, reason)
 	}
-	plain, _ := WrapRetry(&retryFakeProvider{name: "subdl"}, 3, time.Millisecond).(SettingReporter)
+	plain, _ := wrapRetry(&retryFakeProvider{name: "subdl"}, 3, time.Millisecond).(SettingReporter)
 	plain.ForgetSettingVerdict()
 	if setting, reason := plain.SettingVerdict(); setting != "" || reason != nil {
 		t.Errorf("SettingVerdict() without an inner reporter = (%q, %v), want (\"\", nil)", setting, reason)

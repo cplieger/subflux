@@ -52,7 +52,7 @@ func TestServerURL(t *testing.T) {
 
 	t.Run("default when no server host set", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{}
+		p := &source{}
 		got := p.serverURL()
 		if got != baseURL {
 			t.Errorf("serverURL() = %q, want %q", got, baseURL)
@@ -61,7 +61,7 @@ func TestServerURL(t *testing.T) {
 
 	t.Run("custom server host", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{serverHost: "vip-api.opensubtitles.com"}
+		p := &source{serverHost: "vip-api.opensubtitles.com"}
 		got := p.serverURL()
 		want := "https://vip-api.opensubtitles.com/api/v1"
 		if got != want {
@@ -71,7 +71,7 @@ func TestServerURL(t *testing.T) {
 
 	t.Run("empty server host uses default", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{serverHost: ""}
+		p := &source{serverHost: ""}
 		got := p.serverURL()
 		if got != baseURL {
 			t.Errorf("serverURL() = %q, want %q", got, baseURL)
@@ -86,7 +86,7 @@ func TestRateLimit_no_wait_when_token_available(t *testing.T) {
 
 	rateCh := make(chan struct{}, 1)
 	rateCh <- struct{}{} // pre-fill token
-	p := &Provider{vip: false, rateCh: rateCh}
+	p := &source{vip: false, rateCh: rateCh}
 
 	start := time.Now()
 	err := p.rateLimit(t.Context())
@@ -105,7 +105,7 @@ func TestRateLimit_blocks_when_no_token_available(t *testing.T) {
 
 	rateCh := make(chan struct{}, 1)
 	// Don't pre-fill — no token available, so rateLimit blocks.
-	p := &Provider{vip: false, rateCh: rateCh}
+	p := &source{vip: false, rateCh: rateCh}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
@@ -126,8 +126,8 @@ func TestRateLimit_refills_token_after_interval(t *testing.T) {
 	t.Parallel()
 
 	rateCh := make(chan struct{}, 1)
-	rateCh <- struct{}{}                      // pre-fill
-	p := &Provider{vip: true, rateCh: rateCh} // VIP = 200ms refill
+	rateCh <- struct{}{}                    // pre-fill
+	p := &source{vip: true, rateCh: rateCh} // VIP = 200ms refill
 
 	// Consume the token.
 	if err := p.rateLimit(t.Context()); err != nil {
@@ -155,7 +155,7 @@ func TestRateLimit_respects_context_cancellation(t *testing.T) {
 
 	rateCh := make(chan struct{}, 1)
 	// No token — will block until context cancelled.
-	p := &Provider{vip: false, rateCh: rateCh}
+	p := &source{vip: false, rateCh: rateCh}
 
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)

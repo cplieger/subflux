@@ -187,7 +187,7 @@ func TestDownloadFromProvider_not_found(t *testing.T) {
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error for unknown provider, got nil")
 	}
-	if !errors.Is(err, ErrProviderNotFound) {
+	if !errors.Is(err, errProviderNotFound) {
 		t.Errorf("downloadFromProvider() error = %q, want ErrProviderNotFound", err.Error())
 	}
 }

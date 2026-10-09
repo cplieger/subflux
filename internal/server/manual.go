@@ -1,20 +1,6 @@
 package server
 
-import (
-	"context"
-
-	"github.com/cplieger/subflux/internal/server/manualops"
-	"github.com/cplieger/subflux/internal/subflux"
-)
-
-// manualStore is the two rows manual search and download touch directly from
-// the server root: what is already downloaded for a language, and releasing a
-// manual lock. Two methods, and it is embedded in Store rather than asserted
-// against a wide type, so the composite carries them by construction.
-type manualStore interface {
-	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
-}
+import "github.com/cplieger/subflux/internal/server/manualops"
 
 // manualLiveState converts the server's liveState to manualops.LiveState.
 //

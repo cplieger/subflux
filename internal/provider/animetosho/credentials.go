@@ -9,11 +9,11 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // CheckCredentials reports whether AnimeTosho's one credential — the optional
 // AniDB client key — is accepted. AnimeTosho's own feed needs no credential at
 // all, so there is nothing else to validate.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	return p.anidbMapper.CheckClientKey(ctx)
 }

@@ -18,11 +18,11 @@ import (
 // Audio-based sync never passes through here; it runs OUTSIDE the vote as a
 // fallback after the reference winner misses the caller's gate.
 
-// CorrectedCueAgreementMs is the maximum per-cue timing difference, over ALL
+// correctedCueAgreementMs is the maximum per-cue timing difference, over ALL
 // corrected cue starts and ends in milliseconds, for two candidates to count
 // as agreeing. 1500ms is the package's crosslang anchor-agreement scale; the
 // value is validated against the golden corpus (see corpusbench_test.go).
-const CorrectedCueAgreementMs = 1500
+const correctedCueAgreementMs = 1500
 
 // voteCluster groups candidates whose corrected cues agree.
 type voteCluster struct {
@@ -67,7 +67,7 @@ func filterValidCandidates(candidates []SyncResult, incorrect []Cue) []SyncResul
 }
 
 // correctedCuesAgree reports whether two corrected cue slices agree within
-// CorrectedCueAgreementMs at EVERY cue start and end. Full comparison, not
+// correctedCueAgreementMs at EVERY cue start and end. Full comparison, not
 // a sample: a sampled scheme can miss a short mis-corrected segment, and
 // the cost is bounded (at most 6 candidate pairs x cue count).
 func correctedCuesAgree(a, b []Cue) bool {
@@ -75,8 +75,8 @@ func correctedCuesAgree(a, b []Cue) bool {
 		return false
 	}
 	for i := range a {
-		if absMsDelta(a[i].Start.Milliseconds(), b[i].Start.Milliseconds()) > CorrectedCueAgreementMs ||
-			absMsDelta(a[i].End.Milliseconds(), b[i].End.Milliseconds()) > CorrectedCueAgreementMs {
+		if absMsDelta(a[i].Start.Milliseconds(), b[i].Start.Milliseconds()) > correctedCueAgreementMs ||
+			absMsDelta(a[i].End.Milliseconds(), b[i].End.Milliseconds()) > correctedCueAgreementMs {
 			return false
 		}
 	}
@@ -94,7 +94,7 @@ func absMsDelta(a, b int64) int64 { return abs64(a - b) }
 // beyond ClusterMs is a different hypothesis family. Passing the prefilter
 // never grants membership: every pair still needs correctedCuesAgree.
 func candidatesAgree(a, b *SyncResult) bool {
-	if a.Transform.Kind == TransformShift && b.Transform.Kind == TransformShift &&
+	if a.Transform.Kind == transformShift && b.Transform.Kind == transformShift &&
 		abs64(a.Transform.Shift-b.Transform.Shift) > defaultVoteConfig.ClusterMs {
 		return false
 	}
@@ -102,7 +102,7 @@ func candidatesAgree(a, b *SyncResult) bool {
 }
 
 // clusterCandidates groups candidates by corrected-cue agreement. The input
-// is first copied and sorted into canonical CandidateSource order, making
+// is first copied and sorted into canonical candidateSource order, making
 // clustering order-canonical regardless of strategy completion order. It
 // then applies complete linkage: a candidate joins a cluster only if it
 // agrees with EVERY existing member (threshold agreement is non-transitive;
@@ -168,7 +168,7 @@ func alignmentRating(reference, corrected []Cue) float64 {
 // shift winners), never the cross-cluster order, the rating, or the
 // calibrated confidence.
 func plausibleCandidate(c *SyncResult, similarDuration bool) bool {
-	if !similarDuration || c.Transform.Kind != TransformShift {
+	if !similarDuration || c.Transform.Kind != transformShift {
 		return true
 	}
 	return abs64(c.Transform.Shift) <= defaultVoteConfig.LargeOffsetMs

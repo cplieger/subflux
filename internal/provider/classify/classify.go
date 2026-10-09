@@ -4,25 +4,25 @@ package classify
 
 import "strings"
 
-// Rule defines a single subtitle classification entry.
+// rule defines a single subtitle classification entry.
 // Polarity determines the match outcome: true = positive (confirms the
 // classification), false = negative (denies it, overrides positive matches).
-type Rule struct {
+type rule struct {
 	Pattern  string
 	Polarity bool
 }
 
-// ForcedRules is the declarative table for forced/foreign-parts classification.
+// forcedRules is the declarative table for forced/foreign-parts classification.
 // All entries are positive (any match confirms forced status).
-var ForcedRules = []Rule{
+var forcedRules = []rule{
 	{"forced", true},
 	{"foreign", true},
 }
 
-// HearingImpairedRules is the declarative table for HI/SDH/CC classification.
+// hearingImpairedRules is the declarative table for HI/SDH/CC classification.
 // Negative entries (Polarity=false) deny HI status and take precedence over
 // positive entries. The first matching entry determines the result.
-var HearingImpairedRules = []Rule{
+var hearingImpairedRules = []rule{
 	// Negative: deny HI despite containing HI-like keywords.
 	{"hi remove", false},
 	{"non hi", false},
@@ -47,7 +47,7 @@ var HearingImpairedRules = []Rule{
 // foreign-parts subtitle track.
 func IsForced(comment string) bool {
 	c := strings.ToLower(comment)
-	for _, rule := range ForcedRules {
+	for _, rule := range forcedRules {
 		if strings.Contains(c, rule.Pattern) {
 			return rule.Polarity
 		}
@@ -68,7 +68,7 @@ func IsHearingImpaired(commentary, filename string) bool {
 		return false
 	}
 	c := strings.ToLower(commentary)
-	for _, rule := range HearingImpairedRules {
+	for _, rule := range hearingImpairedRules {
 		if strings.Contains(c, rule.Pattern) {
 			return rule.Polarity
 		}

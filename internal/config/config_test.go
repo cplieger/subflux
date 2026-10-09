@@ -14,7 +14,7 @@ import (
 // --- Test helpers ---
 
 // minScanDelay is the minimum valid ScanDelay for test configs that go through validate().
-var minScanDelay = Duration{D: 5 * time.Second}
+var minScanDelay = duration{D: 5 * time.Second}
 
 // captureLogs runs fn with the default slog logger swapped for a text handler
 // writing to a buffer, and returns the captured output. The previous default

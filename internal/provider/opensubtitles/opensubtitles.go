@@ -63,7 +63,7 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	rateCh := make(chan struct{}, 1)
 	rateCh <- struct{}{}
 
-	return &Provider{
+	return &source{
 		username:  ps.Username,
 		password:  ps.Password,
 		apiKey:    ps.APIKey,
@@ -75,8 +75,8 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	}, nil
 }
 
-// Provider implements the OpenSubtitles.com API.
-type Provider struct {
+// source implements the OpenSubtitles.com API.
+type source struct {
 	tokenTime  time.Time
 	tokenSfg   singleflight.Group
 	client     *http.Client
@@ -94,7 +94,7 @@ type Provider struct {
 }
 
 // Name returns the provider identifier for OpenSubtitles.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (p *source) Name() subflux.ProviderID { return providerName }
 
 // numberingResult holds the outcome of searching one numbering scheme.
 type numberingResult struct {
@@ -105,7 +105,7 @@ type numberingResult struct {
 // Search queries OpenSubtitles for subtitles matching the request. For episodes
 // with alternate numbering (scene, absolute), it searches each scheme and merges
 // deduplicated results.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if err := p.ensureToken(ctx); err != nil {
 		return nil, fmt.Errorf("auth: %w", err)
 	}
@@ -136,7 +136,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 // parsing with the next request's rate-limit wait, saving ~30-50% wall-clock
 // time. The returned slice is index-aligned with numberings; a failed scheme
 // carries its error and never aborts the group.
-func (p *Provider) searchNumberingsConcurrent(ctx context.Context,
+func (p *source) searchNumberingsConcurrent(ctx context.Context,
 	req *subflux.SearchRequest, numberings []numbering,
 ) []numberingResult {
 	perScheme := make([]numberingResult, len(numberings))
@@ -186,7 +186,7 @@ func mergeNumberingResults(perScheme []numberingResult) ([]subflux.Subtitle, err
 // in one language, without season/episode — used for show-level pre-checks
 // that skip an entire series with too few subtitles. It satisfies
 // provider.ShowSubtitleCounter.
-func (p *Provider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
+func (p *source) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	imdbID, lang := q.ImdbID, q.Language
 	sanitized := classify.SanitizeImdbID(imdbID)
 	if sanitized == "" {
@@ -230,7 +230,7 @@ func (p *Provider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitl
 
 // Download requests a download link from OpenSubtitles and fetches the subtitle
 // file. The /download endpoint always uses the default base URL, not the VIP host.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := p.ensureToken(ctx); err != nil {
 		return nil, fmt.Errorf("auth: %w", err)
 	}
@@ -279,7 +279,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 }
 
 // fetchSubtitleFile downloads the subtitle content from the given URL.
-func (p *Provider) fetchSubtitleFile(ctx context.Context, fileID int, link string) ([]byte, error) {
+func (p *source) fetchSubtitleFile(ctx context.Context, fileID int, link string) ([]byte, error) {
 	if err := p.rateLimit(ctx); err != nil {
 		return nil, err
 	}

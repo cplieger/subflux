@@ -11,11 +11,11 @@ type SyncMethod string
 // Sync method identifiers.
 const (
 	MethodNone      SyncMethod = "none"
-	MethodOffset    SyncMethod = "offset"
-	MethodFramerate SyncMethod = "framerate"
-	MethodSplit     SyncMethod = "split"
+	methodOffset    SyncMethod = "offset"
+	methodFramerate SyncMethod = "framerate"
+	methodSplit     SyncMethod = "split"
 	MethodAudio     SyncMethod = "audio"
-	MethodCrosslang SyncMethod = "crosslang"
+	methodCrosslang SyncMethod = "crosslang"
 )
 
 // String implements fmt.Stringer.
@@ -24,17 +24,17 @@ func (m SyncMethod) String() string { return string(m) }
 // Compile-time assertion: SyncMethod satisfies fmt.Stringer.
 var _ fmt.Stringer = SyncMethod("")
 
-// ConfidenceNone means no sync was performed or the result is unusable.
+// confidenceNone means no sync was performed or the result is unusable.
 // It is the only named point on the 0.0-1.0 Confidence scale: every other
 // threshold that production reads is a purpose-specific constant
 // (ShouldApplyThreshold here, subflux.DefaultSyncMinConfidence at the API layer)
-// or a per-strategy ceiling in DefaultConfidenceCaps.
-const ConfidenceNone Confidence = 0
+// or a per-strategy ceiling in defaultConfidenceCaps.
+const confidenceNone Confidence = 0
 
-// ConfidenceCaps holds per-strategy confidence ceilings. Each strategy has a
+// confidenceCaps holds per-strategy confidence ceilings. Each strategy has a
 // different cap reflecting its inherent reliability. The relative ordering is
 // intentional: framerate with FPS confirmation > known ratio > audio/offset > GSS/split.
-type ConfidenceCaps struct {
+type confidenceCaps struct {
 	Audio                  Confidence // audio-based sync
 	Offset                 Confidence // constant-offset sync
 	FramerateGSS           Confidence // golden-section framerate search
@@ -46,8 +46,8 @@ type ConfidenceCaps struct {
 	SplitMinConf           Confidence // minimum confidence floor for split alignment
 }
 
-// DefaultConfidenceCaps is the production confidence cap table.
-var DefaultConfidenceCaps = ConfidenceCaps{
+// defaultConfidenceCaps is the production confidence cap table.
+var defaultConfidenceCaps = confidenceCaps{
 	Audio:                  0.9,
 	Offset:                 0.9,
 	FramerateGSS:           0.85,
@@ -59,20 +59,20 @@ var DefaultConfidenceCaps = ConfidenceCaps{
 	SplitMinConf:           0.4,
 }
 
-// ForMethod returns the confidence cap for the given sync method.
+// forMethod returns the confidence cap for the given sync method.
 // For framerate methods, returns FramerateGSS as the conservative default;
 // callers with FPS confirmation should use FramerateFPS directly.
-func (c ConfidenceCaps) ForMethod(m SyncMethod) Confidence {
+func (c confidenceCaps) forMethod(m SyncMethod) Confidence {
 	switch m {
 	case MethodAudio:
 		return c.Audio
-	case MethodOffset:
+	case methodOffset:
 		return c.Offset
-	case MethodFramerate:
+	case methodFramerate:
 		return c.FramerateGSS
-	case MethodSplit:
+	case methodSplit:
 		return c.SplitBase
-	case MethodCrosslang:
+	case methodCrosslang:
 		return c.Crosslang
 	default:
 		return 0
@@ -95,13 +95,13 @@ const MinCuesForSync = 5
 
 // SyncResult holds the output of any sync operation.
 type SyncResult struct {
-	Method     SyncMethod // MethodNone, MethodOffset, MethodFramerate, MethodSplit, MethodAudio, MethodCrosslang
+	Method     SyncMethod // MethodNone, methodOffset, methodFramerate, methodSplit, MethodAudio, methodCrosslang
 	Cues       []Cue
-	Transform  Transform       // descriptor of the correction applied to Cues (voted candidates)
+	Transform  transform       // descriptor of the correction applied to Cues (voted candidates)
 	Offset     int64           // milliseconds (constant offset applied)
 	Confidence Confidence      // quality of the sync (calibrated; gates read this)
 	Rate       float64         // framerate ratio applied (1.0 = no change)
-	Source     CandidateSource // generating strategy identity (voted candidates)
+	Source     candidateSource // generating strategy identity (voted candidates)
 }
 
 // Applied returns true if the sync actually changed the subtitle timing.
@@ -116,7 +116,7 @@ func (r *SyncResult) Applied() bool {
 	}
 	// Split-aware alignment applies per-segment offsets that aren't captured
 	// by the single Offset field. Detect via method + non-zero confidence.
-	return r.Method == MethodSplit && r.Confidence > ConfidenceNone
+	return r.Method == methodSplit && r.Confidence > confidenceNone
 }
 
 // ShouldApply returns true if the confidence is high enough to use the result.

@@ -8,74 +8,65 @@ package subsync
 
 import "fmt"
 
-// TransformKind identifies the shape of the timing correction a sync
+// transformKind identifies the shape of the timing correction a sync
 // candidate applies to the incorrect cues.
-type TransformKind uint8
+type transformKind uint8
 
 // Transform kinds.
 const (
-	// TransformNone marks a result that carries no transform descriptor
+	// transformNone marks a result that carries no transform descriptor
 	// (results that never enter the vote, and no-op placeholders).
-	TransformNone TransformKind = iota
-	// TransformShift is a single constant time shift of all cues.
-	TransformShift
-	// TransformFramerate is a linear rescale of all cue times by a ratio.
-	TransformFramerate
-	// TransformSegments is a set of per-segment constant shifts
+	transformNone transformKind = iota
+	// transformShift is a single constant time shift of all cues.
+	transformShift
+	// transformFramerate is a linear rescale of all cue times by a ratio.
+	transformFramerate
+	// transformSegments is a set of per-segment constant shifts
 	// (split-aware alignment).
-	TransformSegments
+	transformSegments
 )
 
-// Segment describes one contiguous cue range and the constant shift a
-// split-aware correction applies to it. Indexes address the corrected cue
-// slice; EndIdx is exclusive.
-type Segment struct {
-	StartIdx int
-	EndIdx   int
-	ShiftMs  int64
-}
-
-// Transform describes the timing correction a SyncResult applies to the
+// transform describes the timing correction a SyncResult applies to the
 // incorrect cues. It exists for candidate validation, logging, and the
-// corpus digest. It is deliberately NOT usable as a map key (Segments is a
-// slice, and Ratio would need canonical float equality): cluster membership
-// is decided by comparing corrected cues, never by comparing transforms.
-type Transform struct {
-	Segments []Segment // per-segment shifts (Kind == TransformSegments)
-	Shift    int64     // shift in milliseconds (Kind == TransformShift)
-	Ratio    float64   // framerate ratio (Kind == TransformFramerate)
-	Kind     TransformKind
+// corpus digest. It is deliberately NOT used as a map key (Ratio would need
+// canonical float equality): cluster membership is decided by comparing
+// corrected cues, never by comparing transforms.
+type transform struct {
+	Shift        int64   // shift in milliseconds (Kind == transformShift)
+	Ratio        float64 // framerate ratio (Kind == transformFramerate)
+	SegmentCount int     // per-segment shifts applied (Kind == transformSegments)
+	Kind         transformKind
 }
 
-// Digest renders the transform as a compact "kind(parameter)" string for
+// digest renders the transform as a compact "kind(parameter)" string for
 // the voting log line and the corpus artifacts: the shift in milliseconds,
 // the framerate ratio, or the segment count.
-func (t Transform) Digest() string {
+func (t transform) digest() string {
 	switch t.Kind {
-	case TransformShift:
+	case transformShift:
 		return fmt.Sprintf("shift(%dms)", t.Shift)
-	case TransformFramerate:
+	case transformFramerate:
 		return fmt.Sprintf("framerate(%.6g)", t.Ratio)
-	case TransformSegments:
-		return fmt.Sprintf("segments(%d)", len(t.Segments))
+	case transformSegments:
+		return fmt.Sprintf("segments(%d)", t.SegmentCount)
 	default:
 		return "none"
 	}
 }
 
-// CandidateSource is the stable identity of the strategy that generated a
+// candidateSource is the stable identity of the strategy that generated a
 // candidate. It is distinct from Transform.Kind (crosslang and the constant
 // offset strategy both apply shift transforms) and from SyncMethod (a
 // string with no ordering). The declared order is the canonical arbitration
 // order: clustering input is sorted by it, and rating ties resolve to the
 // earliest source.
-type CandidateSource int
+type candidateSource int
 
 // Candidate sources in canonical arbitration order.
 const (
 	// SourceNone marks a result that did not come from a voted reference
 	// strategy (audio results and no-result placeholders).
-	SourceNone CandidateSource = iota
+	SourceNone candidateSource = iota
 	// SourceCrosslang is the cross-language anchor alignment strategy.
 	SourceCrosslang
 	// SourceFramerate is the framerate correction strategy.
@@ -88,7 +79,7 @@ const (
 
 // String implements fmt.Stringer. The zero value renders as "none", which
 // the corpus artifacts admit as a winner source.
-func (s CandidateSource) String() string {
+func (s candidateSource) String() string {
 	switch s {
 	case SourceCrosslang:
 		return "crosslang"
@@ -103,5 +94,5 @@ func (s CandidateSource) String() string {
 	}
 }
 
-// Compile-time assertion: CandidateSource satisfies fmt.Stringer.
+// Compile-time assertion: candidateSource satisfies fmt.Stringer.
 var _ fmt.Stringer = SourceNone

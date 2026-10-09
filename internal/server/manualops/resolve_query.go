@@ -97,12 +97,12 @@ type ResolveResponse struct {
 	Resolved   bool               `json:"resolved"`
 }
 
-// ResolveQueryParams is the validated query surface of the resolve
+// resolveQueryParams is the validated query surface of the resolve
 // endpoint. Season and Episode carry PRESENCE, not just value: nil means
 // the parameter was absent, while a non-nil zero is an explicit season=0
 // (specials) or episode=0 — an explicit zero narrows the expansion and
 // marks the query episodic exactly like any other supplied value.
-type ResolveQueryParams struct {
+type resolveQueryParams struct {
 	Season  *int
 	Episode *int
 	Title   string
@@ -113,8 +113,8 @@ type ResolveQueryParams struct {
 
 // parseResolveParams validates the raw query. errMsg is non-empty on a
 // validation failure.
-func parseResolveParams(q url.Values) (p ResolveQueryParams, errMsg string) {
-	p = ResolveQueryParams{
+func parseResolveParams(q url.Values) (p resolveQueryParams, errMsg string) {
+	p = resolveQueryParams{
 		Title: strings.TrimSpace(q.Get("title")),
 		Imdb:  strings.TrimSpace(q.Get("imdb")),
 		Type:  q.Get("type"),
@@ -172,7 +172,7 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), resolveTimeout)
 	defer cancel()
 
-	resp, err := ResolveQuery(ctx, h.deps.StateFunc(), &params)
+	resp, err := resolveQuery(ctx, h.deps.StateFunc(), &params)
 	switch {
 	case errors.Is(err, errResolveConflict):
 		httpapi.BadRequestC(w, r, "resolve_conflict", err.Error())
@@ -185,7 +185,7 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ResolveQuery maps the validated query onto arr media items. With an
+// resolveQuery maps the validated query onto arr media items. With an
 // explicit type only that arm runs (an unconfigured arr is then an error);
 // with no type, series runs first and movies only when the series arm
 // found nothing and no season/episode narrowing was requested — EXCEPT
@@ -193,7 +193,7 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 // since a supplied stable ID always outranks a title match. A conflict
 // short-circuits; an arm failure surfaces only when the healthy arm could
 // not satisfy the query (partial-arr rule).
-func ResolveQuery(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (ResolveResponse, error) {
+func resolveQuery(ctx context.Context, ls *LiveState, p *resolveQueryParams) (ResolveResponse, error) {
 	switch p.Type {
 	case resolveTypeSeries:
 		return resolveSeriesArm(ctx, ls.SonarrLib, p, true)
@@ -207,7 +207,7 @@ func ResolveQuery(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (Re
 // episodic reports whether season/episode narrowing was supplied by
 // presence, not value: an explicit season=0 (specials) narrows exactly
 // like season=3.
-func (p *ResolveQueryParams) episodic() bool {
+func (p *resolveQueryParams) episodic() bool {
 	return p.Season != nil || p.Episode != nil
 }
 
@@ -222,7 +222,7 @@ func (p *ResolveQueryParams) episodic() bool {
 //     tmdb is not a series matching criterion, so the series arm would
 //     otherwise answer from the TITLE alone and the wrong media could win
 //     over the supplied stable movie id (IDs outrank titles).
-func resolveWithFallback(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (ResolveResponse, error) {
+func resolveWithFallback(ctx context.Context, ls *LiveState, p *resolveQueryParams) (ResolveResponse, error) {
 	if p.Tmdb > 0 && !p.episodic() {
 		return resolveMovieFirst(ctx, ls, p)
 	}
@@ -261,7 +261,7 @@ func resolveWithFallback(ctx context.Context, ls *LiveState, p *ResolveQueryPara
 // resolve_conflict 400, while a title matching no movie never overrides
 // the id. When the movie arm finds nothing, a bare title must not rescue
 // it via the series arm; that arm runs only when imdb was also supplied.
-func resolveMovieFirst(ctx context.Context, ls *LiveState, p *ResolveQueryParams) (ResolveResponse, error) {
+func resolveMovieFirst(ctx context.Context, ls *LiveState, p *resolveQueryParams) (ResolveResponse, error) {
 	movieRes, movieErr := resolveMovieArm(ctx, ls.RadarrLib, p, false)
 	if errors.Is(movieErr, errResolveConflict) {
 		return ResolveResponse{}, movieErr
@@ -305,7 +305,7 @@ type armCandidate struct {
 // the single match into its file-bearing episodes. required marks an
 // explicit type=series query, for which an unconfigured Sonarr is an error
 // rather than an empty fallback arm.
-func resolveSeriesArm(ctx context.Context, sonarr ResolveSonarrClient, p *ResolveQueryParams, required bool) (ResolveResponse, error) {
+func resolveSeriesArm(ctx context.Context, sonarr ResolveSonarrClient, p *resolveQueryParams, required bool) (ResolveResponse, error) {
 	if sonarr == nil {
 		if required {
 			return ResolveResponse{}, errors.New("sonarr is not configured")
@@ -379,7 +379,7 @@ func expandSeries(ctx context.Context, sonarr ResolveSonarrClient, s *armCandida
 // file-bearing movies participate (the deleted resolver's first
 // file-bearing match preserved as a pre-filter). required marks an explicit
 // type=movie query.
-func resolveMovieArm(ctx context.Context, radarr ResolveRadarrClient, p *ResolveQueryParams, required bool) (ResolveResponse, error) {
+func resolveMovieArm(ctx context.Context, radarr ResolveRadarrClient, p *resolveQueryParams, required bool) (ResolveResponse, error) {
 	if radarr == nil {
 		if required {
 			return ResolveResponse{}, errors.New("radarr is not configured")

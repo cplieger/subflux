@@ -48,8 +48,8 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 	if len(reference) == 0 || len(incorrect) == 0 {
 		return SyncResult{
 			Cues:       incorrect,
-			Confidence: ConfidenceNone,
-			Method:     MethodSplit,
+			Confidence: confidenceNone,
+			Method:     methodSplit,
 			Source:     SourceSplit,
 		}
 	}
@@ -75,8 +75,8 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 		// referenceSync drops this result.
 		return SyncResult{
 			Cues:       incorrect,
-			Confidence: ConfidenceNone,
-			Method:     MethodSplit,
+			Confidence: confidenceNone,
+			Method:     methodSplit,
 			Source:     SourceSplit,
 		}
 	}
@@ -100,24 +100,10 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 	return SyncResult{
 		Cues:       corrected,
 		Confidence: confidence,
-		Method:     MethodSplit,
+		Method:     methodSplit,
 		Source:     SourceSplit,
-		Transform:  Transform{Kind: TransformSegments, Segments: transformSegments(segments)},
+		Transform:  transform{Kind: transformSegments, SegmentCount: len(segments)},
 	}
-}
-
-// transformSegments converts the internal segment representation into the
-// exported per-segment shift descriptor carried on SyncResult.Transform.
-func transformSegments(segs []segment) []Segment {
-	out := make([]Segment, len(segs))
-	for i, s := range segs {
-		out[i] = Segment{
-			StartIdx: s.startIdx,
-			EndIdx:   s.endIdx,
-			ShiftMs:  s.offset.Milliseconds(),
-		}
-	}
-	return out
 }
 
 // perCueOffset holds the best offset for a single cue.
@@ -132,7 +118,7 @@ type perCueOffset struct {
 // The computation is O(n*m) where n=len(incorrect) and m=len(refSpans).
 // Since each cue's offset is independent (reads refSpans, writes to its own
 // slot), the work is parallelized across CPUs via errgroup.
-func perCueOffsets(ctx context.Context, refSpans []TimeSpan, incorrect []Cue) []perCueOffset {
+func perCueOffsets(ctx context.Context, refSpans []timeSpan, incorrect []Cue) []perCueOffset {
 	// Cap inputs to prevent O(n*m) blowup on pathological inputs.
 	if len(refSpans) > maxAlignSpans {
 		refSpans = refSpans[:maxAlignSpans]
@@ -172,13 +158,13 @@ func perCueOffsets(ctx context.Context, refSpans []TimeSpan, incorrect []Cue) []
 // fillCueOffsets computes the best offset for incorrect cues in [start,end)
 // and stores them in offsets. Runs as one parallel chunk; returns early if
 // the context is cancelled.
-func fillCueOffsets(ctx context.Context, offsets []perCueOffset, incorrect []Cue, refSpans []TimeSpan, start, end int) error {
+func fillCueOffsets(ctx context.Context, offsets []perCueOffset, incorrect []Cue, refSpans []timeSpan, start, end int) error {
 	for i := start; i < end; i++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		cue := incorrect[i]
-		incSpan := TimeSpan{
+		incSpan := timeSpan{
 			Start: cue.Start.Milliseconds(),
 			End:   cue.End.Milliseconds(),
 		}
@@ -189,12 +175,12 @@ func fillCueOffsets(ctx context.Context, offsets []perCueOffset, incorrect []Cue
 
 // bestCueOffset returns the constant offset that maximizes the overlap score
 // between incSpan (shifted by that offset) and any reference span.
-func bestCueOffset(incSpan TimeSpan, refSpans []TimeSpan) int64 {
+func bestCueOffset(incSpan timeSpan, refSpans []timeSpan) int64 {
 	var bestScore float64
 	var bestOffset int64
 	for _, ref := range refSpans {
 		offset := ref.Start - incSpan.Start
-		shifted := TimeSpan{
+		shifted := timeSpan{
 			Start: incSpan.Start + offset,
 			End:   incSpan.End + offset,
 		}
@@ -209,7 +195,7 @@ func bestCueOffset(incSpan TimeSpan, refSpans []TimeSpan) int64 {
 
 // buildSegments creates segments from split points and computes the best
 // offset for each segment.
-func buildSegments(ctx context.Context, refSpans []TimeSpan, incorrect []Cue, splits []int) []segment {
+func buildSegments(ctx context.Context, refSpans []timeSpan, incorrect []Cue, splits []int) []segment {
 	segments := make([]segment, 0, len(splits))
 
 	for i, start := range splits {
@@ -267,7 +253,7 @@ func alignSegments(incorrect []Cue, segments []segment) []Cue {
 // the contribution is capped at the span's own length, preserving
 // totalOverlap <= totalRef and the callers' normalization to [0,1]. Both
 // slices must be sorted by start time.
-func overlapTotal(corrSpans, refSpans []TimeSpan) (totalOverlap, totalRef float64) {
+func overlapTotal(corrSpans, refSpans []timeSpan) (totalOverlap, totalRef float64) {
 	var j int
 	for _, r := range refSpans {
 		totalRef += float64(r.End - r.Start)
@@ -294,9 +280,9 @@ func overlapTotal(corrSpans, refSpans []TimeSpan) (totalOverlap, totalRef float6
 // segmentConfidence computes overall confidence by measuring how well
 // the corrected cues actually overlap with the reference.
 // This prevents high confidence on garbage segmentations.
-func segmentConfidence(segments []segment, incorrect []Cue, refSpans []TimeSpan) Confidence {
+func segmentConfidence(segments []segment, incorrect []Cue, refSpans []timeSpan) Confidence {
 	if len(segments) == 0 || len(incorrect) == 0 || len(refSpans) == 0 {
-		return ConfidenceNone
+		return confidenceNone
 	}
 
 	// Apply segment offsets and measure overlap with reference.
@@ -306,7 +292,7 @@ func segmentConfidence(segments []segment, incorrect []Cue, refSpans []TimeSpan)
 	totalOverlap, totalRef := overlapTotal(corrSpans, refSpans)
 
 	if totalRef == 0 {
-		return ConfidenceNone
+		return confidenceNone
 	}
 
 	overlapRatio := totalOverlap / totalRef
@@ -315,10 +301,10 @@ func segmentConfidence(segments []segment, incorrect []Cue, refSpans []TimeSpan)
 	}
 
 	// Penalize complexity: more segments = less confident.
-	segPenalty := float64(len(segments)-1) * float64(DefaultConfidenceCaps.SplitPenaltyPerSegment)
-	maxConf := float64(DefaultConfidenceCaps.SplitBase) - segPenalty
-	if maxConf < float64(DefaultConfidenceCaps.SplitMinConf) {
-		maxConf = float64(DefaultConfidenceCaps.SplitMinConf)
+	segPenalty := float64(len(segments)-1) * float64(defaultConfidenceCaps.SplitPenaltyPerSegment)
+	maxConf := float64(defaultConfidenceCaps.SplitBase) - segPenalty
+	if maxConf < float64(defaultConfidenceCaps.SplitMinConf) {
+		maxConf = float64(defaultConfidenceCaps.SplitMinConf)
 	}
 
 	return Confidence(overlapRatio * maxConf)

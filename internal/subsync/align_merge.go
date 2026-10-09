@@ -18,7 +18,7 @@ type alignEvent struct {
 // span pair (the breakpoints of the piecewise-linear rating derivative), sorts
 // them by offset, then sweeps through to find the offset with the highest
 // cumulative rating.
-func alignMergeSort(ctx context.Context, ref, inc []TimeSpan, minOffset int64) int64 {
+func alignMergeSort(ctx context.Context, ref, inc []timeSpan, minOffset int64) int64 {
 	events := buildAlignEvents(ref, inc)
 
 	if ctx.Err() != nil {
@@ -61,7 +61,7 @@ func alignMergeSort(ctx context.Context, ref, inc []TimeSpan, minOffset int64) i
 // buildAlignEvents generates the merge-sort event list: 4 piecewise-linear
 // rating-derivative breakpoints per reference/incorrect span pair, capped at
 // maxAlignEvents to bound memory on pathological inputs.
-func buildAlignEvents(ref, inc []TimeSpan) []alignEvent {
+func buildAlignEvents(ref, inc []timeSpan) []alignEvent {
 	capacity := min(int64(len(ref))*int64(len(inc))*4, maxAlignEvents)
 	events := make([]alignEvent, 0, capacity)
 

@@ -126,8 +126,8 @@ func TestObserve_success_resets_only_an_operation_that_failed(t *testing.T) {
 	if st, ok := b.Status()[hdbits]; ok {
 		t.Errorf("after a search success, Status()[hdbits] = %+v, want no entry", st)
 	}
-	if e, _ := r.events.last(hdbits); e.Kind != Enabled || e.Cause != CauseCredentialsAccepted {
-		t.Errorf("last hdbits event = %+v, want enabled/credentials_accepted", e)
+	if e := r.events.last(hdbits); e.Kind != Enabled {
+		t.Errorf("last hdbits event = %+v, want enabled", e)
 	}
 	if _, ok := r.store.stored(hdbits); ok {
 		t.Error("store still holds the hdbits record after it was cleared")
@@ -297,7 +297,7 @@ func TestReconcile_survives_restart_and_settings_changes(t *testing.T) {
 	if _, ok := restarted.metrics.disabledSeries(hdbits); ok {
 		t.Error("provider_disabled{hdbits} series survived the provider being switched off")
 	}
-	if e, _ := restarted.events.last(hdbits); e.Kind != Inactive {
+	if e := restarted.events.last(hdbits); e.Kind != Inactive {
 		t.Errorf("last event after switch-off = %+v, want inactive", e)
 	}
 	recs, err := db2.ProviderAuthRecords(t.Context())
@@ -314,8 +314,8 @@ func TestReconcile_survives_restart_and_settings_changes(t *testing.T) {
 	restarted.gate.Activate(changed)
 	restarted.gate.Reconcile(t.Context())
 	mustAdmit(t, changed, hdbits, OpSearch)
-	if e, _ := restarted.events.last(hdbits); e.Kind != Enabled || e.Cause != CauseSettingsChanged {
-		t.Errorf("last event after a settings change = %+v, want enabled/settings_changed", e)
+	if e := restarted.events.last(hdbits); e.Kind != Enabled {
+		t.Errorf("last event after a settings change = %+v, want enabled", e)
 	}
 	if recs, _ := db2.ProviderAuthRecords(t.Context()); len(recs) != 0 {
 		t.Errorf("stored records after a settings change = %v, want none", recs)
@@ -590,7 +590,7 @@ func TestClearIfMatches_answers_per_recorded_settings(t *testing.T) {
 		t.Fatalf("ClearIfMatches(other settings) = %v, want Mismatch", got)
 	}
 	mustRefuse(t, b, hdbits, OpSearch, "the credentials were rejected, so the provider is disabled until the settings change or a Test passes")
-	if got := r.gate.ClearIfMatches(t.Context(), subdl, hdbitsSettings(secretA)[subdl]); got != NoRecord {
+	if got := r.gate.ClearIfMatches(t.Context(), subdl, hdbitsSettings(secretA)[subdl]); got != noRecord {
 		t.Errorf("ClearIfMatches(no record) = %v, want NoRecord", got)
 	}
 	if got := r.gate.ClearIfMatches(t.Context(), hdbits, map[string]any{"passkey": secretA, "username": "placeholder-user"}); got != Cleared {
@@ -600,8 +600,8 @@ func TestClearIfMatches_answers_per_recorded_settings(t *testing.T) {
 	if v, _ := r.metrics.disabledSeries(hdbits); v {
 		t.Error("provider_disabled{hdbits} still 1 after a passing test")
 	}
-	if e, _ := r.events.last(hdbits); e.Kind != Enabled || e.Cause != CauseCredentialTestPassed {
-		t.Errorf("last event = %+v, want enabled/credential_test_passed", e)
+	if e := r.events.last(hdbits); e.Kind != Enabled {
+		t.Errorf("last event = %+v, want enabled", e)
 	}
 }
 
@@ -679,11 +679,11 @@ func TestResetAll_clears_every_state(t *testing.T) {
 	mustAdmit(t, b, hdbits, OpSearch)
 	mustAdmit(t, b, subdl, OpDownload)
 	for _, id := range []subflux.ProviderID{hdbits, subdl} {
-		if e, _ := r.events.last(id); e.Kind != Enabled || e.Cause != CauseReset {
-			t.Errorf("last %s event = %+v, want enabled/reset", id, e)
+		if e := r.events.last(id); e.Kind != Enabled {
+			t.Errorf("last %s event = %+v, want enabled", id, e)
 		}
 	}
-	if e, _ := r.events.last(animeto); e.Kind != SettingCleared {
+	if e := r.events.last(animeto); e.Kind != SettingCleared {
 		t.Errorf("last animetosho event = %+v, want setting_cleared", e)
 	}
 	if v, ok := r.metrics.disabledSeries(hdbits); !ok || v {
@@ -731,7 +731,7 @@ func TestObserveSetting_marks_once_and_clears_on_change_or_test(t *testing.T) {
 
 	b.ObserveSetting(animeto, refusing(animetoKey, errKeyRefused))
 	r.liveBinding(t, map[subflux.ProviderID]map[string]any{animeto: {animetoKey: "placeholder-other"}})
-	if e, _ := r.events.last(animeto); e.Kind != SettingCleared {
+	if e := r.events.last(animeto); e.Kind != SettingCleared {
 		t.Errorf("last event after a key change = %+v, want setting_cleared", e)
 	}
 }
@@ -753,8 +753,8 @@ func TestObserveSetting_an_acceptance_clears_the_rejection_for_every_instance(t 
 	if st, ok := live.Status()[animeto]; ok {
 		t.Errorf("Status()[animetosho] after an acceptance = %+v, want no entry", st)
 	}
-	if e, _ := r.events.last(animeto); e.Kind != SettingCleared || e.Cause != CauseCredentialsAccepted {
-		t.Errorf("last event after an acceptance = %+v, want setting_cleared/credentials_accepted", e)
+	if e := r.events.last(animeto); e.Kind != SettingCleared {
+		t.Errorf("last event after an acceptance = %+v, want setting_cleared", e)
 	}
 	if len(r.metrics.rejected) != 0 {
 		t.Errorf("provider_setting_rejected after an acceptance = %v, want no series", r.metrics.rejected)

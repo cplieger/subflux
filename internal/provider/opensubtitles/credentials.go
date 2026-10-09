@@ -9,7 +9,7 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // CheckCredentials reports whether OpenSubtitles accepts the configured
 // credentials, through the /login round trip a search performs first. That one
@@ -17,6 +17,6 @@ var _ provider.CredentialChecker = (*Provider)(nil)
 // and the endpoint the username and password (401) — where a probe of any other
 // endpoint would answer for the key alone. A refusal arrives as
 // *subflux.AuthError; every other failure means the check did not complete.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	return p.login(ctx)
 }

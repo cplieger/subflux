@@ -32,8 +32,8 @@ const (
 	baseURL      = "https://api.gestdown.info"
 )
 
-// Provider implements the Gestdown API client.
-type Provider struct {
+// source implements the Gestdown API client.
+type source struct {
 	client    *http.Client
 	showCache *cache.Cache[[]showResult]
 	subCache  *cache.Cache[[]subflux.Subtitle]
@@ -41,7 +41,7 @@ type Provider struct {
 
 // Factory creates a Gestdown provider. No configuration is required.
 func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
-	return &Provider{
+	return &source{
 		client:    provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		showCache: cache.New[[]showResult](cache.DefaultTTL),
 		subCache:  cache.New[[]subflux.Subtitle](cache.DefaultTTL),
@@ -49,7 +49,7 @@ func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 }
 
 // Name returns the provider identifier for Gestdown.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (p *source) Name() subflux.ProviderID { return providerName }
 
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
 // gestdown's rate-limit signal (Addic7ed throttle) with Retry-After parsed
@@ -81,7 +81,7 @@ type langResult struct {
 
 // Search finds subtitles for TV episodes via TVDB ID lookup.
 // Gestdown only supports TV shows; movies are skipped.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.MediaType != subflux.MediaTypeEpisode || req.TvdbID == 0 {
 		slog.Debug("gestdown: not an episode or no TVDB ID, skipping")
 		return nil, nil
@@ -132,7 +132,7 @@ func collectLangs(languages []string) []langEntry {
 
 // searchShowsForLang searches one language across the candidate shows,
 // stopping at the first show that yields subtitles (or the first error).
-func (p *Provider) searchShowsForLang(ctx context.Context, shows []showResult, req *subflux.SearchRequest, gestLang, isoLang string) langResult {
+func (p *source) searchShowsForLang(ctx context.Context, shows []showResult, req *subflux.SearchRequest, gestLang, isoLang string) langResult {
 	var lr langResult
 	for _, show := range shows {
 		if show.ID == "" {
@@ -179,7 +179,7 @@ func aggregateResults(perLang []langResult, req *subflux.SearchRequest) ([]subfl
 }
 
 // Download fetches the subtitle content for the given search result.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("gestdown: %w", err)
 	}
@@ -241,7 +241,7 @@ type seasonEpisode struct {
 // --- API calls ---
 
 // findShow resolves gestdown's show ids for a TVDB id, memoized per showCacheKey.
-func (p *Provider) findShow(ctx context.Context, tvdbID int) ([]showResult, error) {
+func (p *source) findShow(ctx context.Context, tvdbID int) ([]showResult, error) {
 	cacheKey := showCacheKey(tvdbID)
 	return p.showCache.GetOrFetch(cacheKey, func() ([]showResult, error) {
 		shows, err := p.findShowUncached(ctx, tvdbID)
@@ -259,7 +259,7 @@ func showCacheKey(tvdbID int) string {
 	return keyenc.Join("show", strconv.Itoa(tvdbID))
 }
 
-func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResult, error) {
+func (p *source) findShowUncached(ctx context.Context, tvdbID int) ([]showResult, error) {
 	u := fmt.Sprintf("%s/shows/external/tvdb/%d", baseURL, tvdbID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
@@ -288,7 +288,7 @@ func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResu
 
 // searchSeasonCached fetches one season's subtitles for one language, memoized
 // per seasonCacheKey, then narrows the result to the requested episode.
-func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
+func (p *source) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
 	cacheKey := seasonCacheKey(showID, season, gestLang)
 
 	allSubs, err := p.subCache.GetOrFetch(cacheKey, func() ([]subflux.Subtitle, error) {
@@ -319,7 +319,7 @@ func filterByEpisode(subs []subflux.Subtitle, episode int) []subflux.Subtitle {
 	return results
 }
 
-func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
+func (p *source) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
 	var subs []subflux.Subtitle
 	err := httpwire.RetryOnRateLimit(ctx, 3, 5*time.Minute, func() error {
 		var searchErr error
@@ -332,7 +332,7 @@ func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season 
 	return subs, nil
 }
 
-func (p *Provider) searchSeason(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
+func (p *source) searchSeason(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
 	u := fmt.Sprintf("%s/shows/%s/%d/%s", baseURL, url.PathEscape(showID), season, gestLang)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {

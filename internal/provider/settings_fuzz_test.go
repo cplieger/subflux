@@ -40,11 +40,11 @@ func FuzzFromMap(f *testing.F) {
 		// Invariant 2: if k1 is a common key with string value, the
 		// corresponding typed field must hold that value.
 		switch SettingKey(k1) {
-		case KeyAPIKey:
+		case keyAPIKey:
 			if result.APIKey != v1 {
 				t.Fatalf("APIKey = %q, want %q", result.APIKey, v1)
 			}
-		case KeyUsername:
+		case keyUsername:
 			if result.Username != v1 {
 				t.Fatalf("Username = %q, want %q", result.Username, v1)
 			}
@@ -52,11 +52,11 @@ func FuzzFromMap(f *testing.F) {
 			if result.Password != v1 {
 				t.Fatalf("Password = %q, want %q", result.Password, v1)
 			}
-		case KeyPasskey:
+		case keyPasskey:
 			if result.Passkey != v1 {
 				t.Fatalf("Passkey = %q, want %q", result.Passkey, v1)
 			}
-		case KeyToken:
+		case keyToken:
 			if result.Token != v1 {
 				t.Fatalf("Token = %q, want %q", result.Token, v1)
 			}

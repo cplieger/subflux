@@ -292,10 +292,10 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 		Provider: "os", SubtitleID: "sub-1", Language: "en",
 		MediaType: subflux.MediaTypeMovie, ArrID: 42,
 	}
-	req.SetVideoPath(videoPath)
+	req.setVideoPath(videoPath)
 
 	store := &recStore{}
-	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-9"); !ok {
+	if ok := runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-9"); !ok {
 		t.Fatal("RunDownload() = false, want success")
 	}
 
@@ -376,9 +376,9 @@ func TestRunDownload_rejects_zero_byte_payload(t *testing.T) {
 		Provider: "os", SubtitleID: "sub-1", Language: "en",
 		MediaType: subflux.MediaTypeMovie, ArrID: 42,
 	}
-	req.SetVideoPath(videoPath)
+	req.setVideoPath(videoPath)
 
-	if RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-1") {
+	if runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act-1") {
 		t.Error("RunDownload() = true: a zero-byte download reported success")
 	}
 
@@ -466,7 +466,7 @@ func (p *seqProvider) Download(context.Context, *subflux.Subtitle) ([]byte, erro
 }
 
 // downloadEngine builds a real engine over testsupport fakes whose only
-// provider is p, so RunDownload's fetch reaches p through the gate.
+// provider is p, so runDownload's fetch reaches p through the gate.
 func downloadEngine(cfg fakeManualCfg, p provider.Provider) *search.Engine {
 	scores := cfg.Scores()
 	return search.New([]provider.Provider{p},
@@ -477,7 +477,7 @@ func downloadEngine(cfg fakeManualCfg, p provider.Provider) *search.Engine {
 		search.WithProviderGate(testsupport.ProviderGateBinding()), search.WithMediaWriter(testsupport.MediaWriter()))
 }
 
-// ordinalHarness builds the RunDownload collaborators for the ordinal
+// ordinalHarness builds the runDownload collaborators for the ordinal
 // tests: a real engine serving p, no-op sinks, and a fake video file in a
 // temp dir.
 func ordinalHarness(t *testing.T, p provider.Provider) (*SearchDeps, *LiveState, string) {
@@ -504,7 +504,7 @@ func downloadReq(videoPath, subtitleID string, topPick bool) *DownloadRequest {
 		Provider: "os", SubtitleID: subtitleID, Language: "en",
 		MediaType: subflux.MediaTypeMovie, ArrID: 42, TopPick: topPick,
 	}
-	req.SetVideoPath(videoPath)
+	req.setVideoPath(videoPath)
 	return req
 }
 
@@ -530,7 +530,7 @@ func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 
 	for i := 1; i <= 2; i++ {
 		req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
-		if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act"); !ok {
+		if ok := runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act"); !ok {
 			t.Fatalf("RunDownload(top pick %d) = false, want success", i)
 		}
 	}
@@ -563,11 +563,11 @@ func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 	deps, ls, videoPath := ordinalHarness(t, prov)
 	store := &ordinalStore{}
 
-	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
+	if ok := runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
 		downloadReq(videoPath, "sub-top", true), "act"); !ok {
 		t.Fatal("RunDownload(top pick) = false, want success")
 	}
-	if ok := RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
+	if ok := runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(),
 		downloadReq(videoPath, "sub-manual", false), "act"); !ok {
 		t.Fatal("RunDownload(manual) = false, want success")
 	}
@@ -618,7 +618,7 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 		wg.Go(func() {
 			req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
 			<-start
-			results[i] = RunDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act")
+			results[i] = runDownload(t.Context(), deps, ls, store, testsupport.MediaWriter(), req, "act")
 		})
 	}
 	close(start)
@@ -661,7 +661,7 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 
 // --- post-download coverage upsert and arr refresh ---
 //
-// After a saved subtitle, PostDownloadUpdate writes the coverage row and asks
+// After a saved subtitle, postDownloadUpdate writes the coverage row and asks
 // the owning arr to rescan the item. Both halves are conditional, and every
 // condition below decides whether a remote call happens at all.
 
@@ -821,7 +821,7 @@ func TestPostDownloadUpdate(t *testing.T) {
 				MediaType: tt.mediaType, ArrID: tt.arrID,
 			}
 
-			PostDownloadUpdate(t.Context(), ls, store, req, tt.mediaType,
+			postDownloadUpdate(t.Context(), ls, store, req, tt.mediaType,
 				tt.coverageID, subPath, subflux.VariantStandard)
 
 			if !slices.Equal(store.upserts, tt.wantUpserts) {
@@ -852,7 +852,7 @@ func TestPostDownloadUpdate_clean_update_logs_no_warning(t *testing.T) {
 		MediaType: subflux.MediaTypeMovie, ArrID: 5,
 	}
 
-	PostDownloadUpdate(t.Context(), ls, &recStore{}, req, subflux.MediaTypeMovie,
+	postDownloadUpdate(t.Context(), ls, &recStore{}, req, subflux.MediaTypeMovie,
 		"tmdb-123", "/media/movie.en.1.srt", subflux.VariantStandard)
 
 	if strings.Contains(buf.String(), "level=WARN") {

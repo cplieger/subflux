@@ -94,21 +94,6 @@ func stateKey(id int64) []byte {
 	return kv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id, ordering preserved
 }
 
-// parseStateKey decodes a subtitle_state primary key back into its surrogate id.
-// ok is false for a non-8-byte key.
-//
-// Reached only by tests today: an index walk dereferences the primary through
-// stateQuadKeyID, which takes the id off the INDEX key's 8-byte suffix, so nothing
-// in production holds a bare primary key needing decode. Kept as the declared
-// inverse of stateKey, which a codec round-trip property exercises.
-func parseStateKey(key []byte) (id int64, ok bool) {
-	v, ok := kv.DecodeBe64(key)
-	if !ok {
-		return 0, false
-	}
-	return int64(v), true //nolint:gosec // G115: inverse of stateKey
-}
-
 // --- prefixes shared across subtitle_state / search_attempts / subtitle_files ---
 
 // triplePrefix builds the (media_type, media_id, language) scan prefix:

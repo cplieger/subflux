@@ -23,7 +23,6 @@ function resetStoreKeys(): void {
   store.set("configChecked", false);
   store.set("needsRefresh", false);
   store.set("isUnconfigured", false);
-  store.set("isReady", false);
 }
 
 describe("store property", () => {

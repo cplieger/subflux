@@ -19,10 +19,10 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 // credProvider builds a provider whose transport answers one canned response.
 // The rate-limit token is pre-filled the way the factory fills it, so the login
 // the check performs is not waiting on a bucket the test never refills.
-func credProvider(status int, body string, transportErr error) *Provider {
+func credProvider(status int, body string, transportErr error) *source {
 	rateCh := make(chan struct{}, 1)
 	rateCh <- struct{}{}
-	return &Provider{
+	return &source{
 		username: "user",
 		password: "pass",
 		apiKey:   "key",
@@ -110,7 +110,7 @@ func TestCheckCredentials_posts_to_login_only(t *testing.T) {
 	var requests []string
 	rateCh := make(chan struct{}, 1)
 	rateCh <- struct{}{}
-	p := &Provider{
+	p := &source{
 		username: "user", password: "pass", apiKey: "key", rateCh: rateCh,
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			requests = append(requests, r.Method+" "+r.URL.String())

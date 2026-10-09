@@ -58,7 +58,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		soleFactor = cfg.BasicAuthEnabled()
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, PasswordCheck{
+	hash, userMsg, hashErr := validateAndHashPassword(ctx, passwordCheck{
 		Password:    req.NewPassword,
 		Username:    user.Username,
 		SoleFactor:  soleFactor,
@@ -82,7 +82,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentHash := SessionHashFromContext(ctx)
+	currentHash := sessionHashFromContext(ctx)
 	if err := h.SecDB.DeleteUserSessions(ctx, user.ID, currentHash); err != nil {
 		slog.Warn("password change: invalidate sessions", "error", err)
 	}
@@ -91,7 +91,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		"username", user.Username, "ip", ClientIP(r))
 
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditPasswordChange, true, user.Username)
+	audit(r, slog.LevelInfo, auditPasswordChange, true, user.Username)
 }
 
 // --- PUT /api/auth/profile ---
@@ -145,5 +145,5 @@ func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditProfileUpdate, true, user.Username)
+	audit(r, slog.LevelInfo, auditProfileUpdate, true, user.Username)
 }

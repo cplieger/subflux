@@ -36,10 +36,10 @@ import (
 // running) top-level entries; the next dispatch answers a typed 429.
 const MaxJobs = 8
 
-// DefaultRegistryCap bounds retained terminal records between prune ticks.
+// defaultRegistryCap bounds retained terminal records between prune ticks.
 // Cap eviction removes only records already past retention, so within the
 // retention window every record survives whatever the count.
-const DefaultRegistryCap = 256
+const defaultRegistryCap = 256
 
 // JobState is a job's lifecycle position. (Named for the flat TS wire
 // namespace, where a bare State would collide with the activity vocabulary.)
@@ -99,10 +99,10 @@ type ExecResult struct {
 	Applied    bool
 }
 
-// ExecFunc runs one job's analysis. The hook MUST be invoked exactly once at
+// execFunc runs one job's analysis. The hook MUST be invoked exactly once at
 // execution-slot acquisition (the typed core does this); returning false
 // refuses the run and the executor reports subflux.JobCancelled.
-type ExecFunc func(ctx context.Context, in *ExecInput, hook func() bool) ExecResult
+type execFunc func(ctx context.Context, in *ExecInput, hook func() bool) ExecResult
 
 // Accepted is a dispatch answer: the two ids the 202 hands the client, and
 // whether they name a pre-existing live job (same-file dedupe).
@@ -143,7 +143,7 @@ var (
 // Deps wires the dispatcher's collaborators.
 type Deps struct {
 	// Exec runs one job's analysis (synchandlers' audio executor).
-	Exec ExecFunc
+	Exec execFunc
 	// Log is the activity log: one entry per job, created queued at accept.
 	Log *activity.Log
 	// Stops is the live stop registry; the admission hook registers each
@@ -155,7 +155,7 @@ type Deps struct {
 	// observe (accept, admission, settle, batch finish, prune), outside mu;
 	// the server mints the jobs digest version from it. Optional.
 	OnChange func()
-	// RegistryCap overrides DefaultRegistryCap when positive (tests).
+	// RegistryCap overrides defaultRegistryCap when positive (tests).
 	RegistryCap int
 }
 
@@ -200,7 +200,7 @@ type Dispatcher struct {
 func New(deps Deps) *Dispatcher {
 	capacity := deps.RegistryCap
 	if capacity <= 0 {
-		capacity = DefaultRegistryCap
+		capacity = defaultRegistryCap
 	}
 	return &Dispatcher{
 		deps:       deps,

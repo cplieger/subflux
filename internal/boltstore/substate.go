@@ -103,7 +103,6 @@ func saveAutoRow(tx *bolt.Tx, rec *subflux.DownloadRecord, m *subflux.DownloadMe
 		sr.ImdbID = m.ImdbID
 		sr.Season = m.Season
 		sr.Episode = m.Episode
-		sr.ReleaseTag = m.ReleaseTag
 		sr.VideoPath = m.VideoPath
 		if err := putState(tx, &sr); err != nil {
 			return err
@@ -141,7 +140,6 @@ func insertStateRow(tx *bolt.Tx, rec *subflux.DownloadRecord, m *subflux.Downloa
 		Path:          rec.Path,
 		Title:         m.Title,
 		ImdbID:        m.ImdbID,
-		ReleaseTag:    m.ReleaseTag,
 		Score:         rec.Score,
 		Season:        m.Season,
 		Episode:       m.Episode,
@@ -208,7 +206,7 @@ func clearTripleBackoff(tx *bolt.Tx, mt subflux.MediaType, mid, lang string) err
 		providers = append(providers, subflux.ProviderID(k[len(prefix):]))
 	}
 	for _, p := range providers {
-		if _, err := deleteAttempt(tx, mt, mid, lang, p); err != nil {
+		if err := deleteAttempt(tx, mt, mid, lang, p); err != nil {
 			return err
 		}
 	}

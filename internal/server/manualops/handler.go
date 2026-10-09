@@ -28,22 +28,22 @@ import (
 // server resolves the file path from the arr — no client-supplied paths.
 type HandlerDeps struct {
 	DBFunc     func() DownloadStore
-	Activity   ActivityTracker
-	Alerts     WarnRecorder
-	Events     EventPublisher
-	Media      MediaWriter
+	Activity   activityTracker
+	Alerts     warnRecorder
+	Events     eventPublisher
+	Media      mediaWriter
 	StateFunc  func() *LiveState
-	BGTracker  BGTracker
+	BGTracker  bgTracker
 	ServerCtx  func() context.Context
 	Resolve    *resolve.Resolver
 	DecodeJSON func(w http.ResponseWriter, r *http.Request, v any, maxSize int64) bool
 }
 
-// BGTracker registers a background goroutine with the server's WaitGroup
+// bgTracker registers a background goroutine with the server's WaitGroup
 // for graceful-shutdown tracking. One method, mirroring sync.WaitGroup.Go
 // (launch and count in one call), so an Add/Done pair can never leak a
 // counter via an early return or panic before the defer is installed.
-type BGTracker interface {
+type bgTracker interface {
 	Go(f func())
 }
 
@@ -182,7 +182,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		"variant", key.Variant)
 
 	h.deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
-		MediaType: key.MediaType, MediaID: key.MediaID, Language: key.Language,
+		MediaType: key.MediaType, MediaID: key.MediaID,
 	})
 
 	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})
@@ -200,7 +200,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ValidateDownloadRequest(&req); err != nil {
+	if err := validateDownloadRequest(&req); err != nil {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, err.Error())
 		return
 	}
@@ -223,7 +223,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		resolve.WriteError(w, r, err)
 		return
 	}
-	req.SetVideoPath(videoPath)
+	req.setVideoPath(videoPath)
 
 	// A folder known or found unwritable refuses the download before any
 	// provider request.
@@ -261,7 +261,7 @@ type DownloadAccepted struct {
 
 func (h *Handler) runManualDownload(ls *LiveState, req *DownloadRequest, actID string) {
 	serverCtx := h.deps.ServerCtx()
-	ctx, cancel := context.WithTimeout(serverCtx, DownloadTimeout)
+	ctx, cancel := context.WithTimeout(serverCtx, downloadTimeout)
 	defer cancel()
 
 	defer func() {
@@ -278,7 +278,7 @@ func (h *Handler) runManualDownload(ls *LiveState, req *DownloadRequest, actID s
 		Events:   h.deps.Events,
 	}
 
-	success := RunDownload(ctx, deps, ls, h.deps.DBFunc(), h.deps.Media, req, actID)
+	success := runDownload(ctx, deps, ls, h.deps.DBFunc(), h.deps.Media, req, actID)
 	if success {
 		h.deps.Activity.End(actID)
 	} else {

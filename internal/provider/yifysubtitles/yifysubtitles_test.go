@@ -431,7 +431,7 @@ func TestFetchPage_bodyAndMissingPage(t *testing.T) {
 	t.Run("served page returned verbatim", func(t *testing.T) {
 		t.Parallel()
 		const page = "<html><body>yify results</body></html>"
-		p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusOK, body: page}}}
+		p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusOK, body: page}}}
 
 		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
 		if err != nil {
@@ -444,7 +444,7 @@ func TestFetchPage_bodyAndMissingPage(t *testing.T) {
 
 	t.Run("missing page is empty with no error", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound, body: "nope"}}}
+		p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound, body: "nope"}}}
 
 		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
 		if err != nil {
@@ -463,7 +463,7 @@ func TestFetchPage_bodyAndMissingPage(t *testing.T) {
 func TestDownloadAbsentUpstream(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}}}
+	p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}}}
 	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: serverURL + "/subtitles/sub-1"}
 
 	data, err := p.Download(t.Context(), &sub)

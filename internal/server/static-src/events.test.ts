@@ -267,9 +267,6 @@ describe("events: SSE handlers (the replay table)", () => {
     const payload = {
       media_type: "episode",
       media_id: "tvdb-81189-s01e01",
-      language: "en",
-      variant: "standard",
-      source: "opensubtitles",
     };
     server.current!.last().frame("coverage", payload, id(1));
     await settle();
@@ -292,7 +289,7 @@ describe("events: SSE handlers (the replay table)", () => {
 
   it("a frame's id advances the cursor the next connect presents", async () => {
     await openStream();
-    server.current!.last().frame("notify", { level: "info", text: "x" }, id(4));
+    server.current!.last().frame("notify", { level: "success", text: "x" }, id(4));
     await settle();
 
     server.current!.last().end();
@@ -307,12 +304,10 @@ describe("events: SSE handlers (the replay table)", () => {
 
     const conn = server.current!.last();
     conn.frame("notify", { level: "error", text: "provider down" }, id(1));
-    conn.frame("notify", { level: "info", text: "fyi" }, id(2));
-    conn.frame("notify", { level: "success", text: "subtitle saved" }, id(3));
+    conn.frame("notify", { level: "success", text: "subtitle saved" }, id(2));
     await settle();
 
     expect(notify.error).toHaveBeenCalledWith("provider down");
-    expect(notify.info).toHaveBeenCalledWith("fyi");
     expect(notify.success).toHaveBeenCalledWith("subtitle saved");
   });
 
@@ -354,9 +349,6 @@ describe("events: SSE handlers (the replay table)", () => {
       {
         media_type: "episode",
         media_id: "tvdb-42-s01e01",
-        language: "en",
-        variant: "standard",
-        source: "opensubtitles",
       },
       id(5),
     );

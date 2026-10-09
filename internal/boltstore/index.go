@@ -239,10 +239,11 @@ func putState(tx *bolt.Tx, rec *stateRec) error {
 // deleteState removes the subtitle_state row with the given surrogate id, its
 // three state index entries (derived from the stored record), and decrements
 // the downloads counter, all in tx. It is idempotent: deleting an absent id is
-// a no-op and returns existed=false.
-func deleteState(tx *bolt.Tx, id int64) (existed bool, err error) {
-	return kv.DeleteIndexed(tx, bucketSubtitleState, stateKey(id),
+// a no-op.
+func deleteState(tx *bolt.Tx, id int64) error {
+	_, err := kv.DeleteIndexed(tx, bucketSubtitleState, stateKey(id),
 		stateIndexes(), downloadCounters())
+	return err
 }
 
 // putAttempt inserts or updates a search_attempts row and maintains the
@@ -257,9 +258,10 @@ func putAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.P
 
 // deleteAttempt removes a search_attempts row and decrements the attempts
 // counter, all in tx. Idempotent on an absent key.
-func deleteAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.ProviderID) (existed bool, err error) {
-	return kv.DeleteIndexed[attemptRec](tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p),
+func deleteAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.ProviderID) error {
+	_, err := kv.DeleteIndexed[attemptRec](tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p),
 		nil, attemptCounters())
+	return err
 }
 
 // putScanState upserts a scan_state row (one per (mt, mid)) and maintains the
@@ -274,9 +276,10 @@ func putScanState(tx *bolt.Tx, mt subflux.MediaType, mid string, rec *scanRec) e
 
 // deleteScanState removes a scan_state row and its ix_scan_at entry, all in tx.
 // Idempotent on an absent key. Used by reconcile/orphan cleanup.
-func deleteScanState(tx *bolt.Tx, mt subflux.MediaType, mid string) (existed bool, err error) {
-	return kv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
+func deleteScanState(tx *bolt.Tx, mt subflux.MediaType, mid string) error {
+	_, err := kv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
 		scanIndexes(), nil)
+	return err
 }
 
 // putSubtitleFile inserts or updates a subtitle_files row at the supplied

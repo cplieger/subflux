@@ -214,7 +214,7 @@ func (st *seasonTracker) shouldSkipEpisode(imdbID string, season int, langs []st
 	return true
 }
 
-func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, season int, lang, seasonIDPrefix string, outcome ScanOutcome, seasonEpCount int) {
+func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, season int, lang, seasonIDPrefix string, outcome scanOutcome, seasonEpCount int) {
 	if imdbID == "" {
 		return
 	}
@@ -234,9 +234,9 @@ func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, seaso
 		st.seasons[key] = s
 	}
 	switch outcome {
-	case ScanNoResult:
+	case scanNoResult:
 		s.noResults++
-	case ScanFound:
+	case scanFound:
 		s.noResults = 0
 		return
 	default:

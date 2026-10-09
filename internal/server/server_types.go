@@ -63,7 +63,7 @@ import (
 // the poller, which is the only one that both polls history and looks items
 // up by ID.
 //
-// An interface rather than the concrete *arrsvc.Sonarr, which is the opposite
+// An interface rather than the concrete *arrsvc.CachedSonarr, which is the opposite
 // call from cfg, and the difference is what the type is: the arr client is this
 // process's only network boundary to Sonarr and Radarr, and this field is the
 // one seam where it enters. internal/server's own suite drives handler behaviour
@@ -274,6 +274,7 @@ type Server struct {
 	// routeRegs records every route registration (group + pattern) made by
 	// registerRoutes; the wirespec consistency test compares it against the
 	// endpoint table.
+	//deadset:ignore DS1301 -- Recorded so the route consistency test can check every registration against the wire contract table.
 	routeRegs  []routeReg
 	bgWg       sync.WaitGroup
 	serverPort int

@@ -39,9 +39,9 @@ var defaultConfig = config{
 // circular import between subsync and crosslang.
 const MinCuesForSync = 5
 
-// CuePair holds a matched pair of cues with their similarity score.
+// cuePair holds a matched pair of cues with their similarity score.
 // Exported for test compatibility with the parent subsync package.
-type CuePair struct {
+type cuePair struct {
 	IncIdx   int
 	RefIdx   int
 	Score    float64
@@ -193,7 +193,7 @@ func shiftCues(cues []Cue, offset time.Duration) []Cue {
 	return out
 }
 
-func computeConfidence(aligned []CuePair, medianOffset int64) float64 {
+func computeConfidence(aligned []cuePair, medianOffset int64) float64 {
 	cfg := defaultConfig
 	var agreeCount int
 	var agreeWeight, totalWeight float64
@@ -238,10 +238,10 @@ func gatherCandidates(
 	incStrong, refStrong []bool,
 	inWindow windowFunc,
 	topK int,
-) []CuePair {
+) []cuePair {
 	refs := collectStrongRefs(reference, refStrong)
 
-	var candidates []CuePair
+	var candidates []cuePair
 	for i := range incorrect {
 		if ctx.Err() != nil {
 			return nil
@@ -251,7 +251,7 @@ func gatherCandidates(
 		}
 		incStartMs := incorrect[i].Start.Milliseconds()
 		for _, c := range scoredCandidatesForCue(i, incStartMs, refs, incAnchors, refAnchors, inWindow, topK) {
-			candidates = append(candidates, CuePair{
+			candidates = append(candidates, cuePair{
 				IncIdx: i, RefIdx: c.refIdx,
 				Score: c.score, OffsetMs: c.offsetMs,
 			})
@@ -358,13 +358,13 @@ func abs64(x int64) int64 {
 var dpMaxPredecessors = defaultConfig.DPMaxPred
 
 // weightedMedianOffset computes the weighted median offset from pairs.
-func weightedMedianOffset(pairs []CuePair) int64 {
+func weightedMedianOffset(pairs []cuePair) int64 {
 	if len(pairs) == 0 {
 		return 0
 	}
-	sorted := make([]CuePair, len(pairs))
+	sorted := make([]cuePair, len(pairs))
 	copy(sorted, pairs)
-	slices.SortFunc(sorted, func(a, b CuePair) int {
+	slices.SortFunc(sorted, func(a, b cuePair) int {
 		return cmp.Compare(a.OffsetMs, b.OffsetMs)
 	})
 	var totalWeight float64
@@ -384,7 +384,7 @@ func weightedMedianOffset(pairs []CuePair) int64 {
 
 // dpAlign finds the optimal monotonic alignment path through the candidate
 // pairs.
-func dpAlign(pairs []CuePair) []CuePair {
+func dpAlign(pairs []cuePair) []cuePair {
 	slices.SortFunc(pairs, compareCuePair)
 
 	n := len(pairs)
@@ -407,7 +407,7 @@ func dpAlign(pairs []CuePair) []CuePair {
 	// explicit: a corrupted parent array (e.g. a sentinel that is not -1, or
 	// any value that forms a cycle) can no longer turn this into an unbounded
 	// append that exhausts memory and takes the whole process down.
-	var path []CuePair
+	var path []cuePair
 	for idx := bestIdx; idx >= 0 && len(path) < n; idx = parent[idx] {
 		path = append(path, pairs[idx])
 	}
@@ -417,7 +417,7 @@ func dpAlign(pairs []CuePair) []CuePair {
 
 // compareCuePair orders pairs by IncIdx, then RefIdx — the canonical order the
 // DP fill assumes.
-func compareCuePair(a, b CuePair) int {
+func compareCuePair(a, b cuePair) int {
 	if a.IncIdx != b.IncIdx {
 		return cmp.Compare(a.IncIdx, b.IncIdx)
 	}
@@ -427,7 +427,7 @@ func compareCuePair(a, b CuePair) int {
 // computeDP runs the longest-increasing-path DP over the sorted pairs and
 // returns the best accumulated score and the parent chain for each node. Each
 // node looks back only over a bounded predecessor window (dpMaxPredecessors).
-func computeDP(pairs []CuePair) (dp []float64, parent []int) {
+func computeDP(pairs []cuePair) (dp []float64, parent []int) {
 	n := len(pairs)
 	dp = make([]float64, n)
 	parent = make([]int, n)

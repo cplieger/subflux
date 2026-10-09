@@ -51,7 +51,7 @@ func FuzzSRTRoundtrip(f *testing.F) {
 
 // FuzzShiftCuesMonotonic checks that shifting cues by a constant offset
 // preserves cue count and start-time ordering, and never produces negative
-// timestamps (ShiftCues clamps at zero).
+// timestamps (shiftCues clamps at zero).
 func FuzzShiftCuesMonotonic(f *testing.F) {
 	f.Add(int64(0), int64(1000), int64(2000), int64(3000), int64(500))
 	f.Add(int64(100), int64(200), int64(300), int64(400), int64(-50))
@@ -80,7 +80,7 @@ func FuzzShiftCuesMonotonic(f *testing.F) {
 			offsetMs = 86_400_000
 		}
 		offset := time.Duration(offsetMs) * time.Millisecond
-		shifted := ShiftCues(cues, offset)
+		shifted := shiftCues(cues, offset)
 		if len(shifted) != 2 {
 			t.Fatal("shifted length changed")
 		}

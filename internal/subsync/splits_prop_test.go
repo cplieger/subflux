@@ -113,7 +113,7 @@ func TestAlignWithSplits_identity(t *testing.T) {
 		if len(result.Cues) != len(cues) {
 			t.Fatalf("identity: returned %d cues, want %d", len(result.Cues), len(cues))
 		}
-		if result.Confidence == ConfidenceNone {
+		if result.Confidence == confidenceNone {
 			for i := range cues {
 				if result.Cues[i] != cues[i] {
 					t.Fatalf("identity: zero-confidence result altered cue %d: %+v", i, result.Cues[i])
@@ -355,7 +355,7 @@ func TestAlignWithSplits_is_invariant_to_shifting_the_incorrect_track(t *testing
 		shift := time.Duration(rapid.Int64Range(1, 1_000_000).Draw(t, "timebase_shift")) * time.Millisecond
 
 		base := alignWithSplits(t.Context(), ref, inc, 0)
-		moved := alignWithSplits(t.Context(), ref, ShiftCues(inc, shift), 0)
+		moved := alignWithSplits(t.Context(), ref, shiftCues(inc, shift), 0)
 
 		if len(moved.Cues) != len(base.Cues) {
 			t.Fatalf("alignWithSplits(track shifted by %v) returned %d cues, want %d",

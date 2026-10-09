@@ -170,7 +170,6 @@ func prepDeps(log *activity.Log, stops *activity.StopRegistry, bus *events.Event
 type nopMetrics struct{}
 
 func (nopMetrics) RecordScan(int, int, time.Duration) {}
-func (nopMetrics) AdaptiveSkip()                      {}
 
 func TestPrepareFullScan_hoists_activity_and_registration(t *testing.T) {
 	log := activity.New(10)

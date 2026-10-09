@@ -82,14 +82,14 @@ func BuildMatches(video *subflux.VideoInfo, sub *subflux.Subtitle, deps MatchDep
 	return matches
 }
 
-// Category is one row of the canonical scoring-category table: the
+// category is one row of the canonical scoring-category table: the
 // breakdown key, the weight accessor into subflux.Scores, the match-bit getter
 // and setter on subflux.MatchSet, and — for categories matched by simple
 // case-insensitive equality of parsed release attributes — the ReleaseInfo
 // extractor that drives BuildMatches. Categories with bespoke match logic
 // (source-family comparison, season-pack detection) leave Extract nil and
 // are handled explicitly in BuildMatches.
-type Category struct {
+type category struct {
 	Weight   func(*subflux.Scores) int
 	Match    func(subflux.MatchSet) bool
 	SetMatch func(*subflux.MatchSet)
@@ -103,7 +103,7 @@ type Category struct {
 // (IMDB) matching are handled separately by each consumer. Adding a scoring
 // category is a one-entry change here, plus the subflux.Scores/subflux.MatchSet
 // fields it references.
-var Categories = []Category{
+var Categories = []category{
 	{
 		Key:      "source",
 		Weight:   func(s *subflux.Scores) int { return s.Source },

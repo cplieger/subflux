@@ -64,7 +64,7 @@ func TestActivityPublisher_burst_one_event_per_activity_last_snapshot(t *testing
 		if got := len(rec.all()); got != 0 {
 			t.Fatalf("published %d events inside the coalesce window, want 0 (trailing coalescer)", got)
 		}
-		time.Sleep(ActivityEventMinInterval)
+		time.Sleep(activityEventMinInterval)
 		synctest.Wait()
 
 		deltas := activityDeltas(t, rec.all())
@@ -88,7 +88,7 @@ func TestActivityPublisher_burst_one_event_per_activity_last_snapshot(t *testing
 }
 
 // A sustained burst never publishes twice within one window for one
-// activity: publishes are spaced at least ActivityEventMinInterval apart.
+// activity: publishes are spaced at least activityEventMinInterval apart.
 func TestActivityPublisher_sustained_burst_spaces_windows(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestActivityPublisher_sustained_burst_spaces_windows(t *testing.T) {
 			p.Upsert(&activity.Entry{ID: "1", Current: i})
 			time.Sleep(150 * time.Millisecond)
 		}
-		time.Sleep(ActivityEventMinInterval)
+		time.Sleep(activityEventMinInterval)
 		synctest.Wait()
 
 		mu.Lock()
@@ -115,8 +115,8 @@ func TestActivityPublisher_sustained_burst_spaces_windows(t *testing.T) {
 			t.Fatalf("published %d events over a sustained burst, want several windows", len(times))
 		}
 		for i := 1; i < len(times); i++ {
-			if gap := times[i].Sub(times[i-1]); gap < ActivityEventMinInterval {
-				t.Errorf("publishes %d and %d are %v apart, want >= %v", i-1, i, gap, ActivityEventMinInterval)
+			if gap := times[i].Sub(times[i-1]); gap < activityEventMinInterval {
+				t.Errorf("publishes %d and %d are %v apart, want >= %v", i-1, i, gap, activityEventMinInterval)
 			}
 		}
 	})
@@ -155,7 +155,7 @@ func TestActivityPublisher_flush_barrier_no_stale_snapshot(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		p.Upsert(&activity.Entry{ID: "1", Current: 5, Total: 10, Done: true}) // t=100ms: barrier + terminal
 
-		time.Sleep(2 * ActivityEventMinInterval) // past the t=0 window
+		time.Sleep(2 * activityEventMinInterval) // past the t=0 window
 		synctest.Wait()
 
 		deltas := activityDeltas(t, rec.all())
@@ -179,7 +179,7 @@ func TestActivityPublisher_non_terminal_straggler_after_terminal_dropped(t *test
 		p.Upsert(&activity.Entry{ID: "1", Done: true})
 		p.Upsert(&activity.Entry{ID: "1", Current: 3}) // stale progress, lost the race
 
-		time.Sleep(2 * ActivityEventMinInterval)
+		time.Sleep(2 * activityEventMinInterval)
 		synctest.Wait()
 
 		deltas := activityDeltas(t, rec.all())
@@ -202,7 +202,7 @@ func TestActivityPublisher_remove_publishes_after_terminal_and_cancels_window(t 
 		p.Remove(&activity.Entry{ID: "1", Done: true}) // dismissed
 		p.Upsert(&activity.Entry{ID: "2", Current: 1}) // unrelated pending window
 		p.Remove(&activity.Entry{ID: "2", Current: 1}) // removed before its window fired
-		time.Sleep(2 * ActivityEventMinInterval)
+		time.Sleep(2 * activityEventMinInterval)
 		synctest.Wait()
 
 		deltas := activityDeltas(t, rec.all())
@@ -210,7 +210,7 @@ func TestActivityPublisher_remove_publishes_after_terminal_and_cancels_window(t 
 		for _, d := range deltas {
 			ops = append(ops, d.Op)
 		}
-		want := []ActivityOp{ActivityUpsert, ActivityRemove, ActivityRemove}
+		want := []ActivityOp{ActivityUpsert, activityRemove, activityRemove}
 		if len(deltas) != 3 || ops[0] != want[0] || ops[1] != want[1] || ops[2] != want[2] {
 			t.Fatalf("ops = %v, want %v (terminal upsert, then removes; no window fires after a remove)", ops, want)
 		}
@@ -268,14 +268,14 @@ func TestActivityPublisher_upsert_after_remove_is_dropped_and_leaves_no_state(t 
 		p.Upsert(&activity.Entry{ID: "1", Done: true})            // End's terminal hook, late
 		p.Upsert(&activity.Entry{ID: "1", Current: 5, Total: 10}) // a progress straggler too
 
-		time.Sleep(2 * ActivityEventMinInterval) // past the armed window
+		time.Sleep(2 * activityEventMinInterval) // past the armed window
 		synctest.Wait()
 
 		got := ops(t, rec.all())
-		if len(got) != 1 || got[0] != ActivityRemove {
+		if len(got) != 1 || got[0] != activityRemove {
 			// Establishes what the state assertions below are about.
 			t.Fatalf("ops = %v, want [%s] (nothing is published for an id after its remove)",
-				got, ActivityRemove)
+				got, activityRemove)
 		}
 		total, held := retainedState(p, "1")
 		if held || total != 0 {
@@ -305,7 +305,7 @@ func TestActivityPublisher_tombstones_are_bounded(t *testing.T) {
 		}
 
 		p.Upsert(&activity.Entry{ID: strconv.Itoa(removes), Done: true}) // straggler for the newest
-		time.Sleep(2 * ActivityEventMinInterval)
+		time.Sleep(2 * activityEventMinInterval)
 		synctest.Wait()
 
 		if got := len(ops(t, rec.all())); got != removes {

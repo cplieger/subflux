@@ -904,9 +904,6 @@ func TestSearchTargets_computes_video_hash_when_empty(t *testing.T) {
 	if req.VideoHash == "" {
 		t.Error("SearchTargets() did not compute VideoHash")
 	}
-	if req.VideoSize != hashBlockSize*2 {
-		t.Errorf("SearchTargets() VideoSize = %d, want %d", req.VideoSize, hashBlockSize*2)
-	}
 }
 
 func TestSearchTargets_skips_hash_when_already_set(t *testing.T) {
@@ -922,7 +919,6 @@ func TestSearchTargets_skips_hash_when_already_set(t *testing.T) {
 		MediaType: "movie",
 		ImdbID:    "tt123",
 		VideoHash: "prehashed",
-		VideoSize: 12345,
 	}
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 

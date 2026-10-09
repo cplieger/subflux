@@ -3,7 +3,6 @@ package search
 import (
 	"context"
 	"errors"
-	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -19,7 +18,11 @@ type Syncer = syncing.Syncer
 // --- Mock implementations ---
 
 // noopDetector implements TrackDetector with no results.
-type noopDetector = NoopDetector
+type noopDetector struct{}
+
+func (noopDetector) DetectTracks(context.Context, string) ([]subflux.EmbeddedTrack, error) {
+	return nil, nil
+}
 
 // errDetector implements TrackDetector with a fixed probe failure, for the
 // detector-error fail-open + coverage-retention fixtures.
@@ -111,10 +114,6 @@ func (m *mockMetrics) AdaptiveSkip() { m.adaptiveSkips.Add(1) }
 
 func (m *mockMetrics) RecordEmbeddedDetectorError()           { m.detectorErrs.Add(1) }
 func (m *mockMetrics) RecordSubtitleSaved(subflux.ProviderID) { m.saved.Add(1) }
-func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration)   {}
-func (m *mockMetrics) RecordImport(_ subflux.PollKey)         {}
-func (m *mockMetrics) TotalSearches() int64                   { return m.searches.Load() }
-func (m *mockMetrics) Handler() http.HandlerFunc              { return nil }
 
 type mockProvider struct {
 	name        string
@@ -175,4 +174,15 @@ func newEngine(providers []provider.Provider, db Store, cfg Cfg,
 	return New(providers, WithStore(db), WithConfig(cfg),
 		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks),
 		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
+}
+
+// errored lists the providers whose search returned an error.
+func (o searchOutcome) errored() []subflux.ProviderID {
+	var names []subflux.ProviderID
+	for _, p := range o.providers {
+		if p.outcome == providerError {
+			names = append(names, p.name)
+		}
+	}
+	return names
 }

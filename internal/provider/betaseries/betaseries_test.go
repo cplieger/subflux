@@ -338,7 +338,7 @@ func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 func TestDownloadAbsentUpstream(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{
+	p := &source{
 		client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}},
 		token:  "t",
 	}

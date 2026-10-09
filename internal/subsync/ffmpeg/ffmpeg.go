@@ -24,8 +24,8 @@ func Available() bool {
 	return err == nil
 }
 
-// ProbeAvailable checks if ffprobe is on PATH.
-func ProbeAvailable() bool {
+// probeAvailable checks if ffprobe is on PATH.
+func probeAvailable() bool {
 	_, err := exec.LookPath("ffprobe")
 	return err == nil
 }

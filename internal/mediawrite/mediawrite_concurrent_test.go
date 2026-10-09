@@ -16,7 +16,7 @@ import (
 // mutation while that one's effects are in flight. Set op and source before
 // the call that should block starts.
 type blockingAlerts struct {
-	Alerts
+	alerts
 	entered, release chan struct{}
 	op, source       string
 	once             sync.Once
@@ -25,7 +25,7 @@ type blockingAlerts struct {
 func newBlockingAlerts() (*blockingAlerts, harnessOpt) {
 	b := &blockingAlerts{entered: make(chan struct{}), release: make(chan struct{})}
 	return b, func(c *Config) {
-		b.Alerts = c.Alerts
+		b.alerts = c.Alerts
 		c.Alerts = b
 	}
 }
@@ -41,12 +41,12 @@ func (b *blockingAlerts) hold(op, source string) {
 
 func (b *blockingAlerts) RecordPersistent(source, msg string) {
 	b.hold("record", source)
-	b.Alerts.RecordPersistent(source, msg)
+	b.alerts.RecordPersistent(source, msg)
 }
 
 func (b *blockingAlerts) DismissBySource(source string) {
 	b.hold("dismiss", source)
-	b.Alerts.DismissBySource(source)
+	b.alerts.DismissBySource(source)
 }
 
 // B recovers while A, under the same root, is marked; B's alert dismissal
@@ -266,7 +266,7 @@ func TestPreflight_the_missing_roots_warning_is_logged_outside_the_lock(t *testi
 // blockingMetrics holds the first SetMediaRootUnwritable(_, true) until
 // release is closed.
 type blockingMetrics struct {
-	Metrics
+	metrics
 	entered, release chan struct{}
 	once             sync.Once
 }
@@ -278,13 +278,13 @@ func (b *blockingMetrics) SetMediaRootUnwritable(root string, unwritable bool) {
 			<-b.release
 		})
 	}
-	b.Metrics.SetMediaRootUnwritable(root, unwritable)
+	b.metrics.SetMediaRootUnwritable(root, unwritable)
 }
 
 func TestWriter_a_paused_metric_call_holds_no_lock(t *testing.T) {
 	block := &blockingMetrics{entered: make(chan struct{}), release: make(chan struct{})}
 	h := newHarness(t, func(c *Config) {
-		block.Metrics = c.Metrics
+		block.metrics = c.Metrics
 		c.Metrics = block
 	})
 	show := h.dir(t, "tv/Show")

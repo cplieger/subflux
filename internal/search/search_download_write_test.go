@@ -74,7 +74,7 @@ func TestSearchTargets_a_per_target_write_refusal_fails_only_the_target(t *testi
 
 func TestSearchTargets_an_unwritable_folder_stops_and_is_returned(t *testing.T) {
 	t.Parallel()
-	uerr := &mediawrite.UnwritableError{Folder: "/m", Root: "/m", Op: "write", Err: syscall.EROFS}
+	uerr := &mediawrite.UnwritableError{Folder: "/m", Op: "write", Err: syscall.EROFS}
 	media := &fakeMedia{err: func(int32) error { return uerr }}
 	p := &countingProvider{name: "subdl", results: candidates("subdl", 2)}
 	r := newWriteRig(t, media, p)

@@ -211,7 +211,6 @@ func (p *syntheticProvider) generateResults(req *subflux.SearchRequest) []subflu
 				DownloadURL: fmt.Sprintf("synthetic://download/%s/%d", lang, i),
 				MatchedBy:   subflux.MatchByTitle,
 				Title:       req.Title,
-				Year:        req.Year,
 				Season:      req.Season,
 				Episode:     req.Episode,
 				HearingImp:  p.hi,
@@ -240,7 +239,6 @@ func (p *syntheticProvider) generateSeasonPackResults(req *subflux.SearchRequest
 			DownloadURL: fmt.Sprintf("synthetic://download/spack/%s", lang),
 			MatchedBy:   subflux.MatchByTitle,
 			Title:       req.Title,
-			Year:        req.Year,
 			Season:      req.Season,
 		}
 		results = append(results, sub)

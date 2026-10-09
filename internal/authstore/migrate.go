@@ -72,6 +72,8 @@ type RowsetTransform func(*Rowset) error
 //
 // The auth schema stamp is advanced by the boltstore framework in the same
 // transaction, not here.
+//
+//deadset:ignore DS1004 -- The schema migration ladders ship empty; this is the destructive step a future schema bump registers.
 func ResetPreserving(tx *bbolt.Tx, transform RowsetTransform) error {
 	if transform == nil {
 		return errors.New("authstore: ResetPreserving: nil rowset transform (a destructive auth step must state its rewrite explicitly; pass a transform returning nil to keep rows unchanged)")

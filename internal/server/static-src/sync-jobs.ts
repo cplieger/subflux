@@ -20,7 +20,7 @@ import { SUBJECT_JOBS, forgetSubject } from "./subjects.js";
 /** A watcher's answer: the job's terminal event, or null when the
  *  correlation was lost (a restart, or a registry change the stream missed)
  *  and the owner must re-attach via the jobs read. */
-export type SyncJobWatcher = (ev: SyncDoneEvent | null) => void;
+type SyncJobWatcher = (ev: SyncDoneEvent | null) => void;
 
 // Terminal events kept for late watchers (a dialog re-watching a job whose
 // event already arrived) and for replay dedupe. Bounded drop-oldest: a
@@ -129,8 +129,7 @@ export function clearSyncCorrelation(): void {
 }
 
 /** What a re-attach found for one subtitle file. */
-export type SyncAttachState =
-  { kind: "live"; job: Job } | { kind: "done"; job: Job } | { kind: "none" };
+type SyncAttachState = { kind: "live"; job: Job } | { kind: "done"; job: Job } | { kind: "none" };
 
 /** RE-ATTACH via the jobs read: prefer a queued/running job for the FileRef,
  *  else the newest terminal one by the registry's total order (the read is

@@ -29,7 +29,7 @@ func fullDeps(store PollerStore) Deps {
 // importOne resolves and runs one import the way a batch does, without the
 // batch's write test.
 func importOne(ctx context.Context, p *Poller, ls *LiveState, path string,
-	buildFn func() (*ImportResult, error), refreshFn func(context.Context, int) error,
+	buildFn func() (*resolvedImport, error), refreshFn func(context.Context, int) error,
 ) importResult {
 	pi := p.resolveImport(ctx, ls, path, buildFn, refreshFn)
 	return p.runImport(ctx, ls, &pi)

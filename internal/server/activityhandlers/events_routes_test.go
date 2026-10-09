@@ -53,10 +53,8 @@ func newEventsHandler(t *testing.T, m events.Metrics) (*activityhandlers.Handler
 }
 
 type digestReply struct {
-	Epoch   string `json:"epoch"`
 	Changed []struct {
 		Kind    string `json:"kind"`
-		Ref     string `json:"ref"`
 		Version string `json:"version"`
 	} `json:"changed"`
 	Checked     int  `json:"checked"`

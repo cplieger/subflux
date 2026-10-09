@@ -33,8 +33,8 @@ import (
 	"github.com/cplieger/runesafe/v2"
 )
 
-// MaxFieldBytes bounds one sanitized attribute.
-const MaxFieldBytes = 256
+// maxFieldBytes bounds one sanitized attribute.
+const maxFieldBytes = 256
 
 // Field prepares one untrusted string for a slog attribute: runesafe's
 // single-line preset, then a cap on a rune boundary with a "..." marker.
@@ -43,7 +43,7 @@ const MaxFieldBytes = 256
 // look dangerous. A reader of a handler should not have to prove which of four
 // attributes is safe, and the cost is one call.
 func Field(s string) string {
-	return runesafe.SanitizeSingleLineBounded(s, MaxFieldBytes)
+	return runesafe.SanitizeSingleLineBounded(s, maxFieldBytes)
 }
 
 // RedactedField is Field for upstream text answering a request that carried
@@ -58,10 +58,10 @@ func RedactedField(s string, secrets ...httpx.Secret) string {
 	})
 	text := runesafe.SanitizeSingleLine(redactAll(s, ordered))
 	text = redactAll(text, ordered)
-	if len(text) <= MaxFieldBytes {
+	if len(text) <= maxFieldBytes {
 		return text
 	}
-	return runesafe.CapBytes(text, MaxFieldBytes) + "..."
+	return runesafe.CapBytes(text, maxFieldBytes) + "..."
 }
 
 func redactAll(s string, secrets []httpx.Secret) string {

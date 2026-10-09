@@ -63,7 +63,6 @@ type searchAttributes struct {
 
 type featureDetails struct {
 	Title         string `json:"movie_name"`
-	Year          int    `json:"year"`
 	SeasonNumber  int    `json:"season_number"`
 	EpisodeNumber int    `json:"episode_number"`
 }

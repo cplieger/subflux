@@ -87,11 +87,11 @@ func TestRegistry_CheckCredentials(t *testing.T) {
 		},
 		{
 			name: "a provider without a checker", probe: "p", noChecker: true,
-			wantErr: ErrNoCredentialCheck,
+			wantErr: errNoCredentialCheck,
 		},
 		{
 			name: "an unregistered name", probe: "absent",
-			wantErr: ErrNoCredentialCheck,
+			wantErr: errNoCredentialCheck,
 		},
 	}
 	for _, tt := range tests {

@@ -28,15 +28,15 @@ const (
 	baseDelay   = 5 * time.Second
 )
 
-// Sonarr composes arrapi.Sonarr with subflux's wanted-episode iteration,
+// sonarr composes arrapi.Sonarr with subflux's wanted-episode iteration,
 // exclude-tag resolution, and error-only rescan.
-type Sonarr struct {
+type sonarr struct {
 	*arrapi.Sonarr
 }
 
-// Radarr composes arrapi.Radarr with subflux's wanted-movie iteration,
+// radarr composes arrapi.Radarr with subflux's wanted-movie iteration,
 // exclude-tag resolution, and error-only rescan.
-type Radarr struct {
+type radarr struct {
 	*arrapi.Radarr
 }
 
@@ -46,96 +46,45 @@ type Radarr struct {
 // conversion without adding a guarantee.
 type APIKey = arrapi.APIKey
 
-// NewSonarr builds a Sonarr service for the given base URL and API key.
+// newSonarr builds a Sonarr service for the given base URL and API key.
 //
 // The key is typed rather than a second string: the two were adjacent and both
 // strings, so a transposed pair compiled and dialled the API key as a URL,
 // putting the credential in the connection error. The conversion to arrapi's
 // type used to happen INSIDE this function — one level past the boundary a
 // caller can actually get wrong.
-func NewSonarr(baseURL string, apiKey APIKey) (*Sonarr, error) {
+func newSonarr(baseURL string, apiKey APIKey) (*sonarr, error) {
 	c, err := arrapi.NewSonarr(baseURL, apiKey,
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err
 	}
-	return &Sonarr{Sonarr: c}, nil
+	return &sonarr{Sonarr: c}, nil
 }
 
-// NewRadarr builds a Radarr service for the given base URL and API key. The key
-// is typed for the same reason [NewSonarr]'s is.
-func NewRadarr(baseURL string, apiKey APIKey) (*Radarr, error) {
+// newRadarr builds a Radarr service for the given base URL and API key. The key
+// is typed for the same reason [newSonarr]'s is.
+func newRadarr(baseURL string, apiKey APIKey) (*radarr, error) {
 	c, err := arrapi.NewRadarr(baseURL, apiKey,
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err
 	}
-	return &Radarr{Radarr: c}, nil
+	return &radarr{Radarr: c}, nil
 }
 
 // RescanSeries asks Sonarr to rescan the series' folder for new or changed
 // files (subflux calls this after writing a subtitle). It is fire-and-forget:
 // arrapi returns the queued command, which subflux does not poll, so only the
 // error is surfaced.
-func (s *Sonarr) RescanSeries(ctx context.Context, seriesID int) error {
+func (s *sonarr) RescanSeries(ctx context.Context, seriesID int) error {
 	_, err := s.Sonarr.RescanSeries(ctx, seriesID)
 	return err
 }
 
 // RescanMovie asks Radarr to rescan the movie's folder for new or changed
 // files. Fire-and-forget, like RescanSeries.
-func (r *Radarr) RescanMovie(ctx context.Context, movieID int) error {
+func (r *radarr) RescanMovie(ctx context.Context, movieID int) error {
 	_, err := r.Radarr.RescanMovie(ctx, movieID)
 	return err
-}
-
-// ResolveExcludeTagIDs returns the arr tag IDs matching the given tag names.
-// When logMissing is true, names with no matching tag are logged once at INFO
-// (coverage passes false to avoid repeating the message on every page load).
-func (s *Sonarr) ResolveExcludeTagIDs(ctx context.Context, names []string, logMissing bool) map[int]struct{} {
-	return resolveExcludeTagIDs(ctx, s.ResolveTagIDs, names, logMissing)
-}
-
-// ResolveExcludeTagIDsErr is the error-returning form: a tag-fetch error
-// PROPAGATES instead of failing open, so a recovery read can surface it as a
-// typed leg failure.
-func (s *Sonarr) ResolveExcludeTagIDsErr(ctx context.Context, names []string, logMissing bool) (map[int]struct{}, error) {
-	return resolveExcludeTagIDsErr(ctx, s.ResolveTagIDs, names, logMissing)
-}
-
-// ResolveExcludeTagIDs is the Radarr-side counterpart.
-func (r *Radarr) ResolveExcludeTagIDs(ctx context.Context, names []string, logMissing bool) map[int]struct{} {
-	return resolveExcludeTagIDs(ctx, r.ResolveTagIDs, names, logMissing)
-}
-
-// ResolveExcludeTagIDsErr is the Radarr-side error-returning form.
-func (r *Radarr) ResolveExcludeTagIDsErr(ctx context.Context, names []string, logMissing bool) (map[int]struct{}, error) {
-	return resolveExcludeTagIDsErr(ctx, r.ResolveTagIDs, names, logMissing)
-}
-
-// resolveExcludeTagIDs is the fail-open projection of resolveExcludeTagIDsErr
-// (log + nil on a tag-fetch error), kept by plain reads and the scan path.
-func resolveExcludeTagIDs(ctx context.Context, resolve tagResolveFn,
-	names []string, logMissing bool,
-) map[int]struct{} {
-	return failOpenTagIDs(resolveExcludeTagIDsErr(ctx, resolve, names, logMissing))
-}
-
-// resolveExcludeTagIDsErr delegates the fetch-and-match to
-// arrapi.ResolveTagIDs, returning the error, and, when logMissing is set,
-// logs an INFO hint for each configured tag name that matched no arr tag.
-func resolveExcludeTagIDsErr(ctx context.Context, resolve tagResolveFn,
-	names []string, logMissing bool,
-) (map[int]struct{}, error) {
-	if len(names) == 0 {
-		return nil, nil
-	}
-	ids, unmatched, err := resolve(ctx, names...)
-	if err != nil {
-		return nil, err
-	}
-	if logMissing {
-		logUnmatchedTags(unmatched)
-	}
-	return ids, nil
 }

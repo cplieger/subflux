@@ -15,12 +15,12 @@ type StopResult int
 
 // Stop request outcomes. The registry reports only these three: every
 // registration is stoppable, so "not cancellable" is not a registry state —
-// the composing endpoint derives it by mapping StopNotFound plus an existing
+// the composing endpoint derives it by mapping stopNotFound plus an existing
 // entry onto 409 (see the default branch of handleCancelActivity).
 const (
 	StopRequested StopResult = iota
 	StopAlreadyStopping
-	StopNotFound
+	stopNotFound
 )
 
 // stopEntry pairs a registered stop callback with its requested flag, which
@@ -63,13 +63,13 @@ func (r *StopRegistry) RegisterStop(id string, stop func()) (unregister func()) 
 // StopRequested; repeated requests are idempotent (StopAlreadyStopping,
 // callback not re-invoked). An id without a live registration — never
 // registered, or already released by a terminal transition (the
-// cancel-vs-end race resolves here as a no-op) — returns StopNotFound.
+// cancel-vs-end race resolves here as a no-op) — returns stopNotFound.
 func (r *StopRegistry) RequestStop(id string) StopResult {
 	r.mu.Lock()
 	e, ok := r.stops[id]
 	if !ok {
 		r.mu.Unlock()
-		return StopNotFound
+		return stopNotFound
 	}
 	if e.requested {
 		r.mu.Unlock()

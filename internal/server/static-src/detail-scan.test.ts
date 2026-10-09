@@ -33,7 +33,6 @@ import type { SeriesItem, MovieDetail } from "./api-types.js";
 
 interface ScanArgs {
   url: string;
-  scopeKey: string;
 }
 interface ActionConfig {
   name: string;
@@ -132,31 +131,25 @@ describe("scan start endpoints", () => {
   it("posts the series scan path for a series", async () => {
     await triggerSeriesScan(series(42));
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/series/42", scopeKey: seriesScopeKey(42) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/series/42" }]);
   });
 
   it("posts the season scan path with both ids", async () => {
     await triggerSeasonScan(series(42), 3);
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/season/42/3", scopeKey: seasonScopeKey(42, 3) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/season/42/3" }]);
   });
 
   it("posts the movie scan path for a movie", async () => {
     await triggerMovieScan(movie(7));
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/movie/7", scopeKey: movieScopeKey(7) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/movie/7" }]);
   });
 
   it("builds a POST request from the dispatched url", async () => {
     await triggerSeriesScan(series(42));
 
-    expect(config().request({ url: "/api/scan/series/42", scopeKey: "x" })).toStrictEqual({
+    expect(config().request({ url: "/api/scan/series/42" })).toStrictEqual({
       method: "POST",
       path: "/api/scan/series/42",
     });
@@ -168,10 +161,8 @@ describe("scan start endpoints", () => {
       throw new Error("scan action declares no dedupe key");
     }
 
-    expect(dedupe({ url: "/api/scan/series/42", scopeKey: "a" })).toBe("scan:/api/scan/series/42");
-    expect(dedupe({ url: "/api/scan/series/42", scopeKey: "a" })).not.toBe(
-      dedupe({ url: "/api/scan/movie/42", scopeKey: "b" }),
-    );
+    expect(dedupe({ url: "/api/scan/series/42" })).toBe("scan:/api/scan/series/42");
+    expect(dedupe({ url: "/api/scan/series/42" })).not.toBe(dedupe({ url: "/api/scan/movie/42" }));
   });
 
   it("decodes the accepted response through the generated wire decoder", () => {

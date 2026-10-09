@@ -10,7 +10,6 @@ import type { CoverageItem, SeriesItem, MovieDetail } from "./api-types.js";
 export interface DetailConfig {
   title: string;
   info?: string;
-  backPath?: string;
   arrLink?: string | null;
   arrName?: string;
 }

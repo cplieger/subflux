@@ -79,31 +79,31 @@ func mustSub(fsys embed.FS, dir string) fs.FS {
 	return sub
 }
 
-// TransportMetrics records the HTTP surface's own behaviour and exposes the
+// transportMetrics records the HTTP surface's own behaviour and exposes the
 // scrape endpoint.
-type TransportMetrics interface {
+type transportMetrics interface {
 	RecordHTTP(rm webhttp.RequestMetric)
 	RecordPanic()
 	Handler() http.HandlerFunc
 }
 
-// StoreMetrics records bbolt store observability (Requirement 17): how large
+// storeMetrics records bbolt store observability (Requirement 17): how large
 // the file and its freelist have grown, and that a hot backup completed.
-type StoreMetrics interface {
+type storeMetrics interface {
 	RecordStoreFileSize(bytes int64)
 	RecordStoreFreelistBytes(bytes int64)
 	RecordBackupSuccess(dur time.Duration)
 }
 
-// ModeMetrics reports which mode the process is serving in: 1 when a valid
+// modeMetrics reports which mode the process is serving in: 1 when a valid
 // configuration is active, 0 unconfigured.
-type ModeMetrics interface {
+type modeMetrics interface {
 	SetConfigured(ok bool)
 }
 
-// DurabilityMetrics reports the poll-cursor durability gauge: the count of
+// durabilityMetrics reports the poll-cursor durability gauge: the count of
 // cursors whose durable persist is failing.
-type DurabilityMetrics interface {
+type durabilityMetrics interface {
 	SetPollCursorsDirty(n int)
 }
 
@@ -121,10 +121,10 @@ type Metrics interface {
 	scheduler.ReconcileMetrics
 	events.Metrics
 
-	TransportMetrics
-	StoreMetrics
-	ModeMetrics
-	DurabilityMetrics
+	transportMetrics
+	storeMetrics
+	modeMetrics
+	durabilityMetrics
 }
 
 // Store is the persistence surface New requires: the union of the narrow
@@ -151,7 +151,6 @@ type Store interface {
 	coveragehandlers.CoverageStore
 	filehandlers.FileStore
 	manualops.DownloadStore
-	manualStore
 	resolve.FileStore
 
 	// Subsystems.

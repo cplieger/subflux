@@ -14,14 +14,14 @@ func FuzzClusterCandidatesPartition(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, o1, o2, o3, o4 int64) {
 		offsets := []int64{o1, o2, o3, o4}
-		sources := []CandidateSource{SourceCrosslang, SourceFramerate, SourceOffset, SourceSplit}
+		sources := []candidateSource{SourceCrosslang, SourceFramerate, SourceOffset, SourceSplit}
 		candidates := make([]SyncResult, len(offsets))
 		for i, o := range offsets {
 			candidates[i] = SyncResult{
 				Offset:     o,
 				Confidence: 0.5,
 				Source:     sources[i],
-				Transform:  Transform{Kind: TransformShift, Shift: o},
+				Transform:  transform{Kind: transformShift, Shift: o},
 			}
 		}
 

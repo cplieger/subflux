@@ -65,8 +65,8 @@ const (
 	migrateCopy
 )
 
-// String implements fmt.Stringer for log attributes.
-func (k migrationKind) String() string {
+// label names the kind for log attributes.
+func (k migrationKind) label() string {
 	switch k {
 	case migrateInPlace:
 		return "in-place"
@@ -547,7 +547,7 @@ func runInPlaceStep(db *bolt.DB, d *migrationDomain, step migration, otherStampK
 			d.name, step.from, step.to, err, step.from, snapshot)
 	}
 	slog.Info("schema migration step applied",
-		"domain", d.name, "from", step.from, "to", step.to, "kind", step.kind.String())
+		"domain", d.name, "from", step.from, "to", step.to, "kind", step.kind.label())
 	return nil
 }
 
@@ -655,7 +655,7 @@ func runCopyStep(db *bolt.DB, d *migrationDomain, step migration, otherStampKey 
 			d.name, step.from, step.to, livePath, err, snapshot)
 	}
 	slog.Info("schema migration step applied",
-		"domain", d.name, "from", step.from, "to", step.to, "kind", step.kind.String())
+		"domain", d.name, "from", step.from, "to", step.to, "kind", step.kind.label())
 	return reopened, nil
 }
 
@@ -989,6 +989,8 @@ func migrationSnapshotPath(dbPath string, coreFrom, authFrom uint64) string {
 //
 // The core stamp itself is advanced by the framework in the same transaction
 // (runInPlaceStep), not here.
+//
+//deadset:ignore DS1004 -- The schema migration ladders ship empty; this is the destructive step a future schema bump registers.
 func resetCorePreserving(tx *bolt.Tx) error {
 	manualRows, err := exportManualStateRows(tx)
 	if err != nil {

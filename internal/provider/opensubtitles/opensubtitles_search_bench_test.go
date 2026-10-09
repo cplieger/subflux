@@ -16,7 +16,6 @@ func BenchmarkFilterSearchResults(b *testing.B) {
 					Files:    []searchFile{{FileID: 1000 + i}},
 					FeatureDetails: featureDetails{
 						Title: "Test Movie",
-						Year:  2024,
 					},
 				},
 			}

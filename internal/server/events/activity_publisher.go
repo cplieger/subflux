@@ -7,11 +7,11 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
-// ActivityEventMinInterval is the per-activity coalesce window for
+// activityEventMinInterval is the per-activity coalesce window for
 // non-terminal activity upserts (the spec's ACTIVITY_EVENT_MIN_MS): a
 // progress burst publishes at most one event per activity per window, last
 // snapshot wins. Terminal transitions bypass it.
-const ActivityEventMinInterval = 1000 * time.Millisecond
+const activityEventMinInterval = 1000 * time.Millisecond
 
 // activityTombstones bounds the recently-removed id set behind the
 // remove-is-final rule. Drop-oldest, sized well above the activity log's own
@@ -21,7 +21,7 @@ const activityTombstones = 256
 
 // ActivityPublisher turns the activity log's hook stream into activity SSE
 // events. Non-terminal upserts coalesce per activity on a trailing window
-// (ActivityEventMinInterval, last snapshot wins). A terminal upsert (the
+// (activityEventMinInterval, last snapshot wins). A terminal upsert (the
 // entry's Done transition) publishes IMMEDIATELY behind a flush barrier: any
 // pending window timer is cancelled and its queued snapshot discarded, so no
 // stale progress snapshot can follow the terminal state onto the wire — a
@@ -64,14 +64,14 @@ type pendingActivity struct {
 }
 
 // NewActivityPublisher returns a publisher feeding events into publish
-// (normally EventBus.Publish), coalescing at ActivityEventMinInterval.
+// (normally EventBus.Publish), coalescing at activityEventMinInterval.
 func NewActivityPublisher(publish func(Event)) *ActivityPublisher {
 	return &ActivityPublisher{
 		publish:     publish,
 		pending:     make(map[string]*pendingActivity),
 		removed:     make(map[string]struct{}, activityTombstones),
 		removedRing: make([]string, activityTombstones),
-		min:         ActivityEventMinInterval,
+		min:         activityEventMinInterval,
 	}
 }
 
@@ -135,7 +135,7 @@ func (p *ActivityPublisher) Remove(e *activity.Entry) {
 		delete(p.pending, e.ID)
 	}
 	p.tombstone(e.ID)
-	p.publish(Event{Type: ActivityDelta, Data: ActivityEvent{Op: ActivityRemove, Entry: e}})
+	p.publish(Event{Type: ActivityDelta, Data: ActivityEvent{Op: activityRemove, Entry: e}})
 }
 
 // tombstone records that id's remove has gone on the wire, evicting the

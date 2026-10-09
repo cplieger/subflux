@@ -447,8 +447,10 @@ function buildRuleBlock(rule: PlannedRule, gears: ReadonlyMap<string, boolean>):
 
 /** The languages section a save writes; a stored target goes back as the file
  *  held it wherever the reader left it as built. */
-export interface SavedLanguages {
+interface SavedLanguages {
+  // deadset:ignore DS1301 -- The structured save sends it as languages.rules, which the server reads at internal/config/config_types.go:108.
   rules?: { audio: string; subtitles: RawTarget[] }[];
+  // deadset:ignore DS1301 -- The structured save sends it as languages.default, which the server reads at internal/config/config_types.go:112.
   default?: RawTarget[];
 }
 

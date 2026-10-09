@@ -37,7 +37,7 @@ const workerWaitDelay = 5 * time.Second
 // download proceeds, the server keeps serving.
 type Client struct {
 	sem   chan struct{}
-	spawn func(ctx context.Context, req *Request) (*Response, error)
+	spawn func(ctx context.Context, req *request) (*response, error)
 	exe   string
 	args  []string
 	env   []string
@@ -70,8 +70,8 @@ func NewClient() (*Client, error) {
 // isolation (the pre-P13 posture — an OOM takes the server with it).
 func NewInProcess() *Client {
 	c := &Client{sem: make(chan struct{}, 1)}
-	c.spawn = func(ctx context.Context, req *Request) (*Response, error) {
-		resp := &Response{Version: ProtocolVersion}
+	c.spawn = func(ctx context.Context, req *request) (*response, error) {
+		resp := &response{Version: protocolVersion}
 		result, err := execute(ctx, req)
 		if err != nil {
 			resp.Error = err.Error()
@@ -99,9 +99,9 @@ const (
 	// OutcomeCancelled: the job context was cancelled (stop request,
 	// shutdown), or the admission hook refused the run.
 	OutcomeCancelled Outcome = "cancelled"
-	// OutcomeCrash: everything else — non-zero exit, protocol error, spawn
+	// outcomeCrash: everything else — non-zero exit, protocol error, spawn
 	// failure, or a worker-reported job error.
-	OutcomeCrash Outcome = "crash"
+	outcomeCrash Outcome = "crash"
 )
 
 // AdmissionHook is invoked exactly once, at acquisition of the single
@@ -131,25 +131,25 @@ var ErrAdmissionRefused = errors.New("sync job admission refused")
 // A thin projection of the typed core — every non-result outcome degrades to
 // the documented no-change result.
 func (c *Client) Reference(ctx context.Context, data []byte, videoPath, lang string, minConf float64) subsync.SyncResult {
-	out := c.run(ctx, &Request{
-		Version: ProtocolVersion, Op: OpReference,
+	out := c.run(ctx, &request{
+		Version: protocolVersion, Op: opReference,
 		Data: data, VideoPath: videoPath, Lang: lang, MinConfidence: minConf,
 	}, nil)
-	return degrade(&out, OpReference, videoPath)
+	return degrade(&out, opReference, videoPath)
 }
 
 // Audio implements syncing.SyncExec: audio-based sync in a worker. A thin
 // projection of the typed core, like Reference.
 func (c *Client) Audio(ctx context.Context, data []byte, videoPath, subtitlePath string) subsync.SyncResult {
 	out := c.RunAudio(ctx, data, videoPath, subtitlePath, nil)
-	return degrade(&out, OpAudio, videoPath)
+	return degrade(&out, opAudio, videoPath)
 }
 
 // RunAudio runs one audio-sync job through the typed core: admission on the
 // single slot (hook at acquisition), unconditional budget, typed outcome.
 func (c *Client) RunAudio(ctx context.Context, data []byte, videoPath, subtitlePath string, hook AdmissionHook) RunOutcome {
-	return c.run(ctx, &Request{
-		Version: ProtocolVersion, Op: OpAudio,
+	return c.run(ctx, &request{
+		Version: protocolVersion, Op: opAudio,
 		Data: data, VideoPath: videoPath, SubtitlePath: subtitlePath,
 	}, hook)
 }
@@ -177,7 +177,7 @@ func degrade(out *RunOutcome, op, videoPath string) subsync.SyncResult {
 // acquisition and may refuse), arm the runtime budget UNCONDITIONALLY, execute
 // one job, and discriminate the outcome by named signals — the budget's cause
 // sentinel vs the job context vs the exit state.
-func (c *Client) run(ctx context.Context, req *Request, hook AdmissionHook) RunOutcome {
+func (c *Client) run(ctx context.Context, req *request, hook AdmissionHook) RunOutcome {
 	// A bare pre-check so an already-dead context is deterministically
 	// cancelled instead of racing the select below.
 	if err := ctx.Err(); err != nil {
@@ -202,7 +202,7 @@ func (c *Client) run(ctx context.Context, req *Request, hook AdmissionHook) RunO
 	elapsed := time.Since(start).Round(time.Millisecond)
 	switch {
 	case err == nil && resp.Error != "":
-		return RunOutcome{Outcome: OutcomeCrash, Err: errors.New(resp.Error)}
+		return RunOutcome{Outcome: outcomeCrash, Err: errors.New(resp.Error)}
 	case err == nil:
 		return RunOutcome{Outcome: OutcomeResult, Result: resultFromWire(resp.Result)}
 	case errors.Is(context.Cause(runCtx), errWorkerBudget):
@@ -213,7 +213,7 @@ func (c *Client) run(ctx context.Context, req *Request, hook AdmissionHook) RunO
 	case ctx.Err() != nil:
 		return RunOutcome{Outcome: OutcomeCancelled, Err: context.Cause(ctx)}
 	default:
-		return RunOutcome{Outcome: OutcomeCrash, Err: err}
+		return RunOutcome{Outcome: outcomeCrash, Err: err}
 	}
 }
 
@@ -221,7 +221,7 @@ func (c *Client) run(ctx context.Context, req *Request, hook AdmissionHook) RunO
 // subcommand, JSON on stdin/stdout, stderr joined to the parent's log
 // stream. Context cancellation kills the child (SIGKILL after
 // workerWaitDelay); an OOM kill or crash surfaces as the run error.
-func (c *Client) spawnProcess(ctx context.Context, req *Request) (*Response, error) {
+func (c *Client) spawnProcess(ctx context.Context, req *request) (*response, error) {
 	payload, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("encode request: %w", err)
@@ -242,12 +242,12 @@ func (c *Client) spawnProcess(ctx context.Context, req *Request) (*Response, err
 		return nil, fmt.Errorf("worker process: %w", err)
 	}
 
-	var resp Response
+	var resp response
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	if resp.Version != ProtocolVersion {
-		return nil, fmt.Errorf("response protocol version %d, expected %d", resp.Version, ProtocolVersion)
+	if resp.Version != protocolVersion {
+		return nil, fmt.Errorf("response protocol version %d, expected %d", resp.Version, protocolVersion)
 	}
 	return &resp, nil
 }

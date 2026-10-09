@@ -28,7 +28,7 @@ func TestSearch_an_echoed_key_reaches_no_error_log_record_or_alert(t *testing.T)
 	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	body := `{"status":false,"error":"Invalid API key placeholder api-key, also placeholder\napi-key"}`
-	p := &Provider{
+	p := &source{
 		apiKey: echoKey,
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return &http.Response{

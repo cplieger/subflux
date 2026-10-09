@@ -129,7 +129,7 @@ func TestLoadFromBytes_data_exactly_at_max_size(t *testing.T) {
 		t.Fatal("LoadFromBytes(t.Context(), maxConfigSize) expected error (invalid YAML)")
 	}
 	// Must be a parse error, not a "too large" error.
-	if errors.Is(err, ErrConfigTooLarge) {
+	if errors.Is(err, errConfigTooLarge) {
 		t.Errorf("LoadFromBytes(t.Context(), maxConfigSize) = %q, want parse error not size error", err)
 	}
 }
@@ -141,7 +141,7 @@ func TestLoadFromBytes_data_one_over_max_size(t *testing.T) {
 	if err == nil {
 		t.Fatal("LoadFromBytes(t.Context(), maxConfigSize+1) expected error")
 	}
-	if !errors.Is(err, ErrConfigTooLarge) {
+	if !errors.Is(err, errConfigTooLarge) {
 		t.Errorf("LoadFromBytes(t.Context(), maxConfigSize+1) = %q, want 'too large' error", err)
 	}
 }
@@ -385,7 +385,7 @@ func TestLoad_file_exactly_at_max_size(t *testing.T) {
 		t.Fatal("Load(t.Context(), maxConfigSize) expected error (invalid YAML)")
 	}
 	// The error must be a parse error, NOT a "too large" error.
-	if errors.Is(err, ErrConfigTooLarge) {
+	if errors.Is(err, errConfigTooLarge) {
 		t.Errorf("Load(t.Context(), maxConfigSize) = %q, want parse error not size error", err)
 	}
 }

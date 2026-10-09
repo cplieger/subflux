@@ -68,7 +68,7 @@ func TestSetup_Create(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	found := false
 	for _, c := range cookies {
-		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == cookieNameSecure {
 			found = true
 		}
 	}

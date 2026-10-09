@@ -43,7 +43,6 @@ store.computed("isUnconfigured", () => {
   const cfg = store.get("config");
   return cfg?.configured === false;
 });
-store.computed("isReady", () => store.get("configChecked") && !store.get("isUnconfigured"));
 
 // Cache dialog references (typed as HTMLDialogElement).
 const searchDlg = dialog("searchResultPopup");

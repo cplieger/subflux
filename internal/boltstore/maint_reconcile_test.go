@@ -57,7 +57,7 @@ func rmfile(t *testing.T, path string) {
 // every reconcile branch keeps the O(1) counter consistent with the rows.
 func assertDownloadsConsistent(t *testing.T, db *DB) {
 	t.Helper()
-	downloads, _, _ := mustStats(t, db)
+	downloads, _ := mustStats(t, db)
 	page, err := db.State(t.Context(), &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("State: %v", err)

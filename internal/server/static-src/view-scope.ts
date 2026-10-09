@@ -80,7 +80,7 @@ function createScope(): Scope {
 }
 
 /** A container that renders ONE view at a time. */
-export interface ViewHost {
+interface ViewHost {
   /** Take the container for `viewId`, releasing the previous occupant. */
   mount(viewId: string): Scope;
   /** The live scope IF `viewId` is still the occupant — the reuse fast-path's

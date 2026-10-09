@@ -18,11 +18,10 @@ import (
 // secretKeyNames lists YAML keys that typically contain secrets.
 var secretKeyNames = []string{"api_key", "password", "passkey", "token", "secret", "client_key", "anidb_client_key", "client_secret"}
 
-// SecretKeyNames returns the list of YAML keys treated as secrets.
+// SecretKeyNames returns the list of YAML keys treated as secrets. The
+// provider registry test asserts every secret provider field has an entry.
 //
-// Reached only by tests, deliberately: the root package providers_test asserts
-// every Secret:true field in the provider registry has an entry here, so CI fails
-// when a new provider adds a secret field this list misses.
+//deadset:ignore DS1004 -- The provider registry test reads it to fail when a new secret provider field is missing from the redaction list.
 func SecretKeyNames() []string { return secretKeyNames }
 
 // secretKeyRe matches YAML keys that typically contain secrets.
@@ -30,8 +29,8 @@ var secretKeyRe = regexp.MustCompile(
 	`(?im)^(\s*(?:` + strings.Join(secretKeyNames, "|") + `)\s*:\s*)(.+)$`,
 )
 
-// FindClosingQuote returns the index of the closing quote character in val.
-func FindClosingQuote(val []byte, q byte) int {
+// findClosingQuote returns the index of the closing quote character in val.
+func findClosingQuote(val []byte, q byte) int {
 	for i := 1; i < len(val); i++ {
 		if val[i] == '\\' && q == '"' {
 			i++
@@ -44,13 +43,13 @@ func FindClosingQuote(val []byte, q byte) int {
 	return -1
 }
 
-// StripYAMLComment removes an inline YAML comment from a value.
-func StripYAMLComment(val []byte) []byte {
+// stripYAMLComment removes an inline YAML comment from a value.
+func stripYAMLComment(val []byte) []byte {
 	if len(val) == 0 {
 		return val
 	}
 	if val[0] == '"' || val[0] == '\'' {
-		ci := FindClosingQuote(val, val[0])
+		ci := findClosingQuote(val, val[0])
 		if ci < 0 {
 			return val
 		}
@@ -66,15 +65,15 @@ func StripYAMLComment(val []byte) []byte {
 	return val
 }
 
-// RedactSecrets replaces secret values in YAML config with a placeholder.
-func RedactSecrets(data []byte) []byte {
+// redactSecrets replaces secret values in YAML config with a placeholder.
+func redactSecrets(data []byte) []byte {
 	return secretKeyRe.ReplaceAllFunc(data, func(match []byte) []byte {
 		subs := secretKeyRe.FindSubmatch(match)
 		if len(subs) < 3 {
 			return match
 		}
 		val := bytes.TrimSpace(subs[2])
-		val = StripYAMLComment(val)
+		val = stripYAMLComment(val)
 		if len(val) == 0 || string(val) == `""` || string(val) == `''` {
 			return match
 		}
@@ -82,7 +81,7 @@ func RedactSecrets(data []byte) []byte {
 	})
 }
 
-// MergeSecrets fills empty secret values in newData from the existing config
+// mergeSecrets fills empty secret values in newData from the existing config
 // file. An empty or redacted incoming secret means "keep what I have", which
 // makes the baseline's readability a correctness input (the raw-path twin of
 // the structured path's mergeExistingSecrets contract): when newData relies
@@ -93,7 +92,7 @@ func RedactSecrets(data []byte) []byte {
 // true empty baseline (first save), and a payload with no keep-semantics
 // secrets never needs the baseline at all — which also lets a complete
 // payload overwrite, and thereby repair, an unreadable config file.
-func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
+func mergeSecrets(newData []byte, configPath string) ([]byte, error) {
 	existing, err := atomicfile.ReadBounded(context.Background(), configPath, 1<<20)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) || !hasKeepSecretLines(newData) {
@@ -102,7 +101,7 @@ func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: read existing config: %w", errBaselineUnavailable, err)
 	}
 
-	oldSecrets := ExtractSecretValues(existing)
+	oldSecrets := extractSecretValues(existing)
 	if len(oldSecrets) == 0 {
 		return newData, nil
 	}
@@ -115,10 +114,10 @@ func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
 			continue
 		}
 		stripped := bytes.Trim(val, `"'`)
-		if len(stripped) != 0 && !IsRedactedPlaceholder(stripped) {
+		if len(stripped) != 0 && !isRedactedPlaceholder(stripped) {
 			continue
 		}
-		ctxKey := SecretContextKey(lines, i, key)
+		ctxKey := secretContextKey(lines, i, key)
 		if oldVal, ok := oldSecrets[ctxKey]; ok {
 			indent := len(line) - len(bytes.TrimLeft(line, " "))
 			lines[i] = append(
@@ -132,7 +131,7 @@ func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
 
 // secretLineValue matches one trimmed YAML line against the secret key
 // names: the first matching key returns with the line's raw (space-trimmed)
-// value. The shared line classifier for MergeSecrets and hasKeepSecretLines.
+// value. The shared line classifier for mergeSecrets and hasKeepSecretLines.
 func secretLineValue(trimmed []byte) (key string, val []byte, ok bool) {
 	for _, k := range secretKeyNames {
 		prefix := []byte(k + ": ")
@@ -145,7 +144,7 @@ func secretLineValue(trimmed []byte) (key string, val []byte, ok bool) {
 
 // hasKeepSecretLines reports whether newData carries at least one secret key
 // line with keep semantics — an empty or redaction-placeholder value, the two
-// forms MergeSecrets fills from the baseline. Only such payloads depend on
+// forms mergeSecrets fills from the baseline. Only such payloads depend on
 // the baseline's readability.
 func hasKeepSecretLines(newData []byte) bool {
 	for line := range bytes.SplitSeq(newData, []byte("\n")) {
@@ -154,16 +153,16 @@ func hasKeepSecretLines(newData []byte) bool {
 			continue
 		}
 		stripped := bytes.Trim(val, `"'`)
-		if len(stripped) == 0 || IsRedactedPlaceholder(stripped) {
+		if len(stripped) == 0 || isRedactedPlaceholder(stripped) {
 			return true
 		}
 	}
 	return false
 }
 
-// ExtractSecretValues scans YAML lines and returns a map of context-qualified
+// extractSecretValues scans YAML lines and returns a map of context-qualified
 // secret keys to their raw values.
-func ExtractSecretValues(data []byte) map[string]string {
+func extractSecretValues(data []byte) map[string]string {
 	secrets := make(map[string]string)
 	lines := bytes.Split(data, []byte("\n"))
 	for i, line := range lines {
@@ -174,12 +173,12 @@ func ExtractSecretValues(data []byte) map[string]string {
 				continue
 			}
 			val := string(bytes.TrimSpace(trimmed[len(prefix):]))
-			val = string(StripYAMLComment([]byte(val)))
+			val = string(stripYAMLComment([]byte(val)))
 			stripped := strings.Trim(val, `"'`)
 			if stripped == "" {
 				break
 			}
-			ctxKey := SecretContextKey(lines, i, key)
+			ctxKey := secretContextKey(lines, i, key)
 			secrets[ctxKey] = val
 			break
 		}
@@ -187,8 +186,8 @@ func ExtractSecretValues(data []byte) map[string]string {
 	return secrets
 }
 
-// IsRedactedPlaceholder returns true if the value is a redaction placeholder.
-func IsRedactedPlaceholder(val []byte) bool {
+// isRedactedPlaceholder returns true if the value is a redaction placeholder.
+func isRedactedPlaceholder(val []byte) bool {
 	if len(val) == 0 {
 		return false
 	}
@@ -205,8 +204,8 @@ func IsRedactedPlaceholder(val []byte) bool {
 	return string(val) == "[REDACTED]"
 }
 
-// SecretContextKey builds a dot-separated path from parent YAML keys.
-func SecretContextKey(lines [][]byte, lineIdx int, key string) string {
+// secretContextKey builds a dot-separated path from parent YAML keys.
+func secretContextKey(lines [][]byte, lineIdx int, key string) string {
 	indent := len(lines[lineIdx]) - len(bytes.TrimLeft(lines[lineIdx], " "))
 	var parents []string
 	for i := lineIdx - 1; i >= 0; i-- {

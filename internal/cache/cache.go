@@ -18,14 +18,14 @@ type typedGroup[T any] struct {
 	g singleflight.Group
 }
 
-func (tg *typedGroup[T]) Do(key string, fn func() (T, error)) (val T, shared bool, err error) {
-	v, err, shared := tg.g.Do(key, func() (any, error) { return fn() })
+func (tg *typedGroup[T]) do(key string, fn func() (T, error)) (T, error) {
+	v, err, _ := tg.g.Do(key, func() (any, error) { return fn() })
 	if err != nil {
 		var zero T
-		return zero, shared, err
+		return zero, err
 	}
-	val, _ = v.(T)
-	return val, shared, nil
+	val, _ := v.(T)
+	return val, nil
 }
 
 // Cache is a generic TTL cache for provider lookups. Thread-safe.
@@ -92,7 +92,7 @@ func (c *Cache[T]) GetOrFetch(key string, fn func() (T, error)) (T, error) {
 	if v, ok := c.Get(key); ok {
 		return v, nil
 	}
-	v, _, err := c.group.Do(key, func() (T, error) {
+	v, err := c.group.do(key, func() (T, error) {
 		result, err := fn()
 		if err == nil {
 			c.Set(key, result)

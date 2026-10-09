@@ -15,15 +15,15 @@ import (
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// DownloadTimeout bounds a single manual download's run.
-const DownloadTimeout = 5 * time.Minute
+// downloadTimeout bounds a single manual download's run.
+const downloadTimeout = 5 * time.Minute
 
-// RunDownload performs the download, post-processing, and the save through
+// runDownload performs the download, post-processing, and the save through
 // media. actID is the download's activity entry: on success its detail is
 // updated with the saved subtitle path, which is how the remote CLI's poll
 // loop learns where the file landed. Returns true on success.
-func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	media MediaWriter, req *DownloadRequest, actID string,
+func runDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
+	media mediaWriter, req *DownloadRequest, actID string,
 ) bool {
 	sub := subflux.Subtitle{
 		Provider:    req.Provider,
@@ -39,7 +39,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if err != nil {
 		slog.Error("manual download failed",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		NotifyError(deps, ErrorNotice{
+		notifyError(deps, errorNotice{
 			Source: alertSourceManual,
 			Alert:  "Download failed from " + string(req.Provider),
 			UI:     "Download failed from " + string(req.Provider),
@@ -57,7 +57,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		if errors.Is(err, subtitlefile.ErrEmpty) {
 			alert = fmt.Sprintf("%s returned an empty file for this subtitle", req.Provider)
 		}
-		NotifyError(deps, ErrorNotice{
+		notifyError(deps, errorNotice{
 			Source: alertSourceManual,
 			Alert:  alert,
 			UI:     "Downloaded file is not a valid subtitle",
@@ -66,7 +66,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	}
 
 	variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: req.HearingImp, Forced: req.Forced})
-	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
+	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.videoPath, req.Language, variant)
 
 	mediaType := req.MediaType
 	coverageMediaID, historyMediaID := ResolveMediaIDs(ctx, ls, mediaType, req.ArrID, req.Season, req.Episode)
@@ -82,7 +82,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 			detail = fmt.Sprintf("Could not save the subtitle in %s: %v", uerr.Folder, uerr.Err)
 		}
 		deps.Activity.Progress(actID, 0, 0, detail)
-		NotifyError(deps, ErrorNotice{
+		notifyError(deps, errorNotice{
 			Source: alertSourceManual,
 			Alert:  "Write failed for manual subtitle download",
 			UI:     "Write failed for subtitle download",
@@ -98,7 +98,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if effectiveMediaID == "" {
 		effectiveMediaID = historyMediaID
 	}
-	PostDownloadUpdate(ctx, ls, db, req, mediaType, effectiveMediaID, subPath, variant)
+	postDownloadUpdate(ctx, ls, db, req, mediaType, effectiveMediaID, subPath, variant)
 
 	if syncOffsetMs != 0 {
 		if err := db.SetSyncOffset(ctx, subPath, syncOffsetMs); err != nil {
@@ -110,8 +110,6 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
 		MediaType: mediaType,
 		MediaID:   effectiveMediaID,
-		Language:  req.Language,
-		Source:    string(req.Provider),
 	})
 
 	return true
@@ -124,7 +122,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 // downloads off one number. Only local disk and bbolt work runs under it.
 // The error is the write's, returned with the path it targeted; a history
 // failure warns and keeps the saved file.
-func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore, media MediaWriter,
+func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore, media mediaWriter,
 	req *DownloadRequest, historyMediaID, title string, variant subflux.Variant, data []byte,
 ) (subPath string, err error) {
 	unlock := downloadPathGate.lock(downloadQuadKey(req.MediaType, historyMediaID, req.Language, variant))
@@ -136,7 +134,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		MediaType: req.MediaType, MediaID: historyMediaID,
 		Language: req.Language, Variant: variant,
 	})
-	subPath = subtitlefile.ManualPath(req.VideoPath(), n,
+	subPath = subtitlefile.ManualPath(req.videoPath, n,
 		subtitlefile.Tags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
 	if err := media.WriteFile(ctx, subPath, data); err != nil {
@@ -150,7 +148,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	// regardless of the Manual flag.
 	meta := &subflux.DownloadMeta{
 		Manual:    !req.TopPick,
-		VideoPath: req.VideoPath(),
+		VideoPath: req.videoPath,
 		Season:    req.Season,
 		Episode:   req.Episode,
 		Title:     title,
@@ -241,8 +239,8 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.Medi
 	return ""
 }
 
-// PostDownloadUpdate records the coverage file and triggers an arr rescan after a manual download.
-func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
+// postDownloadUpdate records the coverage file and triggers an arr rescan after a manual download.
+func postDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
 	req *DownloadRequest, mediaType subflux.MediaType, coverageMediaID, subPath string, variant subflux.Variant,
 ) {
 	if coverageMediaID != "" {

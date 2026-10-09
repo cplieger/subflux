@@ -12,9 +12,9 @@ import (
 func TestDPAlign_monotonicity(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 50).Draw(t, "n")
-		pairs := make([]CuePair, n)
+		pairs := make([]cuePair, n)
 		for i := range pairs {
-			pairs[i] = CuePair{
+			pairs[i] = cuePair{
 				IncIdx: rapid.IntRange(0, 100).Draw(t, "incIdx"),
 				RefIdx: rapid.IntRange(0, 100).Draw(t, "refIdx"),
 				Score:  rapid.Float64Range(0.01, 1.0).Draw(t, "score"),
@@ -42,11 +42,11 @@ func TestDPAlign_monotonicity(t *testing.T) {
 func TestWeightedMedianOffset_selectsInputOffset(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 40).Draw(t, "n")
-		pairs := make([]CuePair, n)
+		pairs := make([]cuePair, n)
 		offsets := make(map[int64]bool, n)
 		for i := range pairs {
 			off := rapid.Int64Range(-1_000_000, 1_000_000).Draw(t, "offset")
-			pairs[i] = CuePair{
+			pairs[i] = cuePair{
 				IncIdx:   i,
 				RefIdx:   i,
 				Score:    rapid.Float64Range(0, 1000).Draw(t, "score"),

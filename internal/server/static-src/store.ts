@@ -46,7 +46,6 @@ export interface StoreMap {
   // this shared map — never a local in-flight flag.
   runningScansByScope: RunningScansByScope;
   isUnconfigured: boolean;
-  isReady: boolean;
   isAdmin: boolean;
   // Allow arbitrary keys for test usage.
   [key: string]: unknown;
