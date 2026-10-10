@@ -97,7 +97,7 @@ func (a *historyArr) SeriesByID(_ context.Context, id int) (arrapi.Series, error
 	return s, a.seriesErr
 }
 
-func (a *historyArr) EpisodeByID(context.Context, int) (arrapi.Episode, error) {
+func (*historyArr) EpisodeByID(context.Context, int) (arrapi.Episode, error) {
 	return arrapi.Episode{ID: 1, SeasonNumber: 1, EpisodeNumber: 1, HasFile: true}, nil
 }
 
@@ -116,7 +116,7 @@ func (a *historyArr) exclude(seriesID int) {
 	a.excluded = seriesID
 }
 
-func (a *historyArr) RescanSeries(context.Context, int) error { return nil }
+func (*historyArr) RescanSeries(context.Context, int) error { return nil }
 
 // holdEngine records the paths it searched and how many targets each search
 // asked for; fail decides a path's result.

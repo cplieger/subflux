@@ -64,11 +64,11 @@ type httpStubProvider struct {
 
 func (p *httpStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -244,7 +244,7 @@ func TestHandleManualDownload_provider_not_found(t *testing.T) {
 // dlFailingProvider returns an error from Download.
 type dlFailingProvider struct{ httpStubProvider }
 
-func (p *dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, errHTTPFake
 }
 
@@ -381,7 +381,7 @@ func TestHandleClearLock_success(t *testing.T) {
 // clearLockErrorStore is a minimal store whose ClearManualLock fails.
 type clearLockErrorStore struct{ testsupport.NopStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
+func (*clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
 	return errHTTPFake
 }
 
@@ -524,7 +524,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 // searchFailingProvider returns an error from Search.
 type searchFailingProvider struct{ httpStubProvider }
 
-func (p *searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, errHTTPFake
 }
 

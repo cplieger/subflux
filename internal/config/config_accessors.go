@@ -73,7 +73,7 @@ func (c *Config) LanguageCodes() []string {
 }
 
 // ProvidersForTarget returns which providers to use for a subtitle target.
-func (c *Config) ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []subflux.ProviderID) []subflux.ProviderID {
+func (*Config) ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []subflux.ProviderID) []subflux.ProviderID {
 	if len(t.Providers) > 0 {
 		slog.Debug("ProvidersForTarget: using include list",
 			"lang", t.Code, "providers", t.Providers)

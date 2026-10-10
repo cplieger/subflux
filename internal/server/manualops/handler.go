@@ -182,7 +182,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		"variant", key.Variant)
 
 	h.deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
-		MediaType: key.MediaType, MediaID: key.MediaID,
+		MediaType: key.MediaType, MediaID: key.MediaID, Language: key.Language,
 	})
 
 	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})

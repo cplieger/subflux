@@ -127,10 +127,10 @@ func FuzzValidateScoreRange(f *testing.F) {
 		if err != nil {
 			var ve *validationError
 			if !errors.As(err, &ve) {
-				t.Fatalf("error is not *ValidationError: %v", err)
+				t.Fatalf("error is not *validationError: %v", err)
 			}
 			if !strings.HasPrefix(ve.Message, field+" ") {
-				t.Fatalf("ValidationError.Message = %q, want it to start with %q", ve.Message, field)
+				t.Fatalf("validationError.Message = %q, want it to start with %q", ve.Message, field)
 			}
 		}
 	})

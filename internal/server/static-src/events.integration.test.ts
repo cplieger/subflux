@@ -261,6 +261,9 @@ async function healFrame(tvdb: number, offset: number): Promise<void> {
     {
       media_type: "episode",
       media_id: `tvdb-${String(tvdb)}-s01e01`,
+      language: "en",
+      variant: "standard",
+      source: "auto",
     },
     `${EPOCH_A}:${String(offset)}`,
   );
@@ -386,6 +389,9 @@ describe("tombstones over both writers", () => {
     healFromCoverageEvent({
       media_type: "episode",
       media_id: "tvdb-42-s01e01",
+      language: "en",
+      variant: "standard",
+      source: "auto",
     });
     await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
     await settle();
@@ -446,6 +452,9 @@ describe("tombstones over both writers", () => {
     healFromCoverageEvent({
       media_type: "episode",
       media_id: "tvdb-42-s01e01",
+      language: "en",
+      variant: "standard",
+      source: "auto",
     });
     await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
     await settle();

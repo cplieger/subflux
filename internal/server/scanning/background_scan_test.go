@@ -91,7 +91,7 @@ func (e *fakeEngine) lastRequest() subflux.SearchRequest {
 	return e.requests[len(e.requests)-1]
 }
 
-func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
+func (*fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
 	return false
 }
 

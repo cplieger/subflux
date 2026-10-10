@@ -217,7 +217,7 @@ providers:` + tt.block + `
 				t.Fatal("LoadFromBytes() = nil error, want targeted providers.embedded rejection")
 			}
 			if !errors.Is(err, errEmbeddedProviderRemoved) {
-				t.Errorf("error = %v, want errors.Is(ErrEmbeddedProviderRemoved)", err)
+				t.Errorf("error = %v, want errors.Is(errEmbeddedProviderRemoved)", err)
 			}
 			if !strings.Contains(err.Error(), "providers.embedded has been replaced by the top-level embedded_subtitles section") {
 				t.Errorf("error text = %q, want the targeted guidance message", err)
@@ -279,7 +279,7 @@ providers:
 				t.Fatal("LoadFromBytes() = nil error, want targeted filter-list rejection")
 			}
 			if !errors.Is(err, errEmbeddedProviderRemoved) {
-				t.Errorf("error = %v, want errors.Is(ErrEmbeddedProviderRemoved)", err)
+				t.Errorf("error = %v, want errors.Is(errEmbeddedProviderRemoved)", err)
 			}
 		})
 	}

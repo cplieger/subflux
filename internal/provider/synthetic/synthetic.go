@@ -113,7 +113,7 @@ type syntheticProvider struct {
 	forced      bool
 }
 
-func (p *syntheticProvider) Name() subflux.ProviderID { return providerName }
+func (*syntheticProvider) Name() subflux.ProviderID { return providerName }
 
 // Search returns results based on the configured mode.
 func (p *syntheticProvider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {

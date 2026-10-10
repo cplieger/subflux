@@ -16,6 +16,7 @@ type transformKind uint8
 const (
 	// transformNone marks a result that carries no transform descriptor
 	// (results that never enter the vote, and no-op placeholders).
+	//deadset:ignore DS1302 -- The zero value every unset result carries; without it transformShift becomes the zero value.
 	transformNone transformKind = iota
 	// transformShift is a single constant time shift of all cues.
 	transformShift

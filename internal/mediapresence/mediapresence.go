@@ -133,7 +133,7 @@ type timeoutError struct {
 
 func (e *timeoutError) Error() string { return fmt.Sprintf("%v after %s", errTimeout, e.after) }
 
-func (e *timeoutError) Unwrap() error { return errTimeout }
+func (*timeoutError) Unwrap() error { return errTimeout }
 
 // New builds a Checker; it fails only when Metrics or Alerts is missing, a
 // nil pointer in either interface included.

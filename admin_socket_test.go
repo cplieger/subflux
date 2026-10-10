@@ -259,7 +259,7 @@ type fakeAdminHost struct {
 	alerts   atomic.Int32
 }
 
-func (f *fakeAdminHost) AdminHandler() http.Handler {
+func (*fakeAdminHost) AdminHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

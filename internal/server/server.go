@@ -5,7 +5,7 @@
 //   - server_types.go — Server struct, embedded dep groups, Option functions
 //   - server_init.go  — initHandlers (handler family construction)
 //   - middleware.go   — requireAuth / requireRole / requireConfigured
-//   - routes.go       — routeGroup + registerRoutes + permission model
+//   - routes.go       — route table + registerRoutes + permission model
 //   - poller.go       — Sonarr/Radarr history polling + import processing
 //   - scheduler.go    — full-scan pipeline + DB maintenance + auth cleanup
 //   - *_handlers.go   — per-concern HTTP handler families

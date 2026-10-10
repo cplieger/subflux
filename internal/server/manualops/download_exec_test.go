@@ -244,9 +244,9 @@ type recordingActivity struct {
 	details map[string]string
 }
 
-func (r *recordingActivity) Start(string, string, activity.Source) string { return "act-9" }
-func (r *recordingActivity) End(string)                                   {}
-func (r *recordingActivity) Fail(string)                                  {}
+func (*recordingActivity) Start(string, string, activity.Source) string { return "act-9" }
+func (*recordingActivity) End(string)                                   {}
+func (*recordingActivity) Fail(string)                                  {}
 func (r *recordingActivity) Progress(id string, _, _ int, detail string) {
 	r.details[id] = detail
 }
@@ -706,7 +706,7 @@ type recCoverage struct {
 	events []events.CoverageEvent
 }
 
-func (r *recCoverage) PublishNotify(events.NotifyLevel, string) {}
+func (*recCoverage) PublishNotify(events.NotifyLevel, string) {}
 
 func (r *recCoverage) PublishCoverageUpdate(ev *events.CoverageEvent) {
 	r.events = append(r.events, *ev)

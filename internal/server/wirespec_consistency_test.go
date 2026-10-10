@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -39,27 +38,26 @@ func wirespecPattern(name, method, path string) string {
 	return method + " " + path
 }
 
-// TestWirespec_matches_registerRoutes is the endpoint-table consistency gate:
+// TestWirespec_matches_routes is the endpoint-table consistency gate:
 // every wirespec endpoint must correspond to a route registration with the
 // same auth group, and every registration must be described by the table.
 // routes.go stays authoritative for permissions — a mismatch is fixed by
 // correcting the TABLE unless the route change itself was intended.
-func TestWirespec_matches_registerRoutes(t *testing.T) {
+func TestWirespec_matches_routes(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, &qhMockStore{})
-	mux := http.NewServeMux()
-	s.registerRoutes(mux)
+	routes := s.routes()
 
-	if len(s.routeRegs) == 0 {
-		t.Fatal("registerRoutes recorded no registrations")
+	if len(routes) == 0 {
+		t.Fatal("the route table is empty")
 	}
 
-	regGroup := make(map[string]string, len(s.routeRegs))
-	for _, reg := range s.routeRegs {
-		if prev, dup := regGroup[reg.Pattern]; dup {
-			t.Errorf("pattern %q registered twice (groups %s and %s)", reg.Pattern, prev, reg.Group)
+	regGroup := make(map[string]string, len(routes))
+	for _, r := range routes {
+		if prev, dup := regGroup[r.pattern]; dup {
+			t.Errorf("pattern %q registered twice (groups %s and %s)", r.pattern, prev, r.group)
 		}
-		regGroup[reg.Pattern] = reg.Group
+		regGroup[r.pattern] = string(r.group)
 	}
 
 	eps := wirespec.Endpoints()
@@ -93,11 +91,11 @@ func TestWirespec_matches_registerRoutes(t *testing.T) {
 	// Routes → table: every registration is described by an endpoint. The
 	// SPA catch-all is the only registration outside the API contract.
 	skip := map[string]bool{"/": true}
-	for _, reg := range s.routeRegs {
-		if skip[reg.Pattern] || matched[reg.Pattern] {
+	for _, r := range routes {
+		if skip[r.pattern] || matched[r.pattern] {
 			continue
 		}
-		t.Errorf("route %q (group %s) has no wirespec endpoint entry", reg.Pattern, reg.Group)
+		t.Errorf("route %q (group %s) has no wirespec endpoint entry", r.pattern, r.group)
 	}
 }
 

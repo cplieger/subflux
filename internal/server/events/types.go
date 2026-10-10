@@ -48,6 +48,9 @@ const (
 type CoverageEvent struct {
 	MediaType subflux.MediaType `json:"media_type"`
 	MediaID   string            `json:"media_id"`
+	Language  string            `json:"language"`
+	Variant   string            `json:"variant"`
+	Source    string            `json:"source"`
 }
 
 func (CoverageEvent) eventData() {}

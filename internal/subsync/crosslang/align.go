@@ -40,7 +40,6 @@ var defaultConfig = config{
 const MinCuesForSync = 5
 
 // cuePair holds a matched pair of cues with their similarity score.
-// Exported for test compatibility with the parent subsync package.
 type cuePair struct {
 	IncIdx   int
 	RefIdx   int

@@ -161,6 +161,9 @@ function ev(mediaId: string, mediaType: MediaType = "episode"): CoverageEvent {
   return {
     media_type: mediaType,
     media_id: mediaId,
+    language: "en",
+    variant: "standard",
+    source: "opensubtitles",
   };
 }
 

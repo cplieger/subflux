@@ -59,7 +59,7 @@ type source struct {
 }
 
 // Name returns the provider identifier for SubSource.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // langEntry pairs a requested ISO language code with its SubSource language name.
 type langEntry struct {

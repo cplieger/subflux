@@ -73,7 +73,7 @@ type recorderTB struct {
 
 type recorderFatal struct{}
 
-func (r *recorderTB) Helper() {}
+func (*recorderTB) Helper() {}
 
 func (r *recorderTB) Errorf(string, ...any) { r.failed = true }
 

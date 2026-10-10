@@ -187,6 +187,9 @@ export interface ConnTestResponse {
 export interface CoverageEvent {
   media_type: MediaType;
   media_id: string;
+  language: string;
+  variant: string;
+  source: string;
 }
 
 /** TargetCoverage tracks coverage for a single expected subtitle target. */

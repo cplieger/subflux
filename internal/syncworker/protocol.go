@@ -25,7 +25,7 @@ import (
 // with an error response rather than guessing.
 const protocolVersion = 1
 
-// Op names for Request.Op.
+// Op names for request.Op.
 const (
 	// opReference aligns subtitle data against an embedded reference track
 	// (syncing.SyncAgainstReference).

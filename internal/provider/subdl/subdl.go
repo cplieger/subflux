@@ -55,7 +55,7 @@ type source struct {
 }
 
 // Name returns the provider identifier for SubDL.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles matching the request via IMDB/TMDB ID or title.
 func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {

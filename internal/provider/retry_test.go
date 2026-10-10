@@ -29,7 +29,7 @@ type dlResult struct {
 
 func (f *retryFakeProvider) Name() subflux.ProviderID { return subflux.ProviderID(f.name) }
 
-func (f *retryFakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*retryFakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 

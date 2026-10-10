@@ -682,11 +682,11 @@ type schemaStubProvider struct {
 
 func (p *schemaStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

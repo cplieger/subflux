@@ -110,6 +110,8 @@ func runDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
 		MediaType: mediaType,
 		MediaID:   effectiveMediaID,
+		Language:  req.Language,
+		Source:    string(req.Provider),
 	})
 
 	return true

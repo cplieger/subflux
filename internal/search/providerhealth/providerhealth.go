@@ -38,8 +38,6 @@ type Config struct {
 const DefaultThreshold = 5
 
 // defaultWindow is the sliding window duration for failure counting.
-// Exported so callers can rely on the package default without repeating
-// the magic number.
 const defaultWindow = 10 * time.Minute
 
 // OnChange observes a provider's timeout transitions: raised=true when the

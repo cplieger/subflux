@@ -54,10 +54,10 @@ func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 		t.Fatal("bootstrap handler reachable over TCP")
 	}
 
-	// The route table records no bootstrap registration in any group.
-	for _, reg := range s.routeRegs {
-		if strings.Contains(reg.Pattern, "/api/admin/bootstrap") {
-			t.Fatalf("registerRoutes still registers %q in group %q", reg.Pattern, reg.Group)
+	// The route table holds no bootstrap route in any group.
+	for _, r := range s.routes() {
+		if strings.Contains(r.pattern, "/api/admin/bootstrap") {
+			t.Fatalf("the route table still holds %q in group %q", r.pattern, r.group)
 		}
 	}
 }

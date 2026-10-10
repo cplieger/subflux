@@ -117,7 +117,7 @@ func TestWireFormat(t *testing.T) {
 	waitClients(t, bus, 1)
 
 	bus.Publish(Event{Type: CoverageUpdate, Data: CoverageEvent{
-		MediaType: "episode", MediaID: "tt1-s01e01",
+		MediaType: "episode", MediaID: "tt1-s01e01", Language: "fr", Variant: "forced", Source: "auto",
 	}})
 
 	lines := readUntil(t, st.sc, func(l string) bool { return strings.HasPrefix(l, "data: ") })
@@ -125,8 +125,13 @@ func TestWireFormat(t *testing.T) {
 	if !strings.Contains(joined, "event: coverage") {
 		t.Errorf("missing named event field: %v", lines)
 	}
-	if !strings.Contains(joined, `"type":"coverage"`) || !strings.Contains(joined, `"media_id":"tt1-s01e01"`) {
-		t.Errorf("payload not the JSON-encoded Event: %v", lines)
+	for _, want := range []string{
+		`"type":"coverage"`, `"media_type":"episode"`, `"media_id":"tt1-s01e01"`,
+		`"language":"fr"`, `"variant":"forced"`, `"source":"auto"`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("payload lacks %s: %v", want, lines)
+		}
 	}
 }
 

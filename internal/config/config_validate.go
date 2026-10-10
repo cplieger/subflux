@@ -53,9 +53,8 @@ var (
 	errMissingAPIKey = errors.New("API key required")
 )
 
-// fieldDependencyError is a typed error for config field-requires-field
-// constraint violations. Callers can use errors.As to programmatically
-// identify which field combinations are invalid.
+// fieldDependencyError reports a config field that requires another field;
+// its message names both and the reason.
 type fieldDependencyError struct {
 	Field     string // the field that has the constraint
 	DependsOn string // the field it depends on
@@ -94,13 +93,8 @@ func hasEnabledProvider(providers map[subflux.ProviderID]yamlProviderCfg) bool {
 	return false
 }
 
-// validate checks that cfg has the minimum required configuration:
-// at least one arr endpoint, at least one language rule or default,
-// non-empty codes in all rules, and at least one enabled provider.
-// Accumulates all validation errors and returns them joined.
-
 // validationErrors accumulates multiple validation errors from config
-// checking. Sub-validators append directly via Add, eliminating the
+// checking. Sub-validators append directly via add, eliminating the
 // repeated if-err-append boilerplate.
 type validationErrors struct {
 	errs []error
@@ -118,16 +112,15 @@ func (ve *validationErrors) err() error {
 	return errors.Join(ve.errs...)
 }
 
+// validate runs each check over cfg and returns their errors joined: one
+// result per check, each of which may stop at its own first violation.
 func validate(ctx context.Context, cfg *Config) error {
 	var ve validationErrors
 	ve.add(validateArrs(cfg))
 	ve.add(validateLanguages(&cfg.Languages))
 	ve.add(validateEmbeddedCutover(cfg))
-	// Zero enabled acquisition providers is a VALID configuration (embedded
-	// detection and coverage only), not an error: the former ErrNoProvider
-	// guard was dead code while the fake embedded provider was force-enabled
-	// pre-validation, and enforcing it after the detector separation would
-	// suddenly reject embedded-only setups.
+	// Zero enabled acquisition providers is valid (embedded detection and
+	// coverage only), so it warns instead of failing.
 	if !hasEnabledProvider(cfg.ProvidersCfg) {
 		slog.Warn("no acquisition providers enabled; embedded detection and coverage only")
 	}

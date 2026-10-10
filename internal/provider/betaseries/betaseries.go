@@ -49,7 +49,7 @@ type source struct {
 }
 
 // Name returns the provider identifier for BetaSeries.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search queries BetaSeries for TV episode subtitles using the TVDB ID.
 // Only episode requests are handled; movies are skipped.

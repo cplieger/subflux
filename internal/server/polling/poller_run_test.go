@@ -83,8 +83,8 @@ func (m *mockHistoryPoller) MovieByID(_ context.Context, id int) (arrapi.Movie, 
 func (m *mockHistoryPoller) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return m.excludeIDs
 }
-func (m *mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { return nil }
-func (m *mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
+func (*mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { return nil }
+func (*mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
 
 type mockCfg struct {
 	targets   []subflux.SubtitleTarget
@@ -93,9 +93,9 @@ type mockCfg struct {
 	scanDelay time.Duration
 }
 
-func (m *mockCfg) PollInterval() time.Duration                    { return m.interval }
-func (m *mockCfg) Search() subflux.SearchConfig                   { return subflux.SearchConfig{ScanDelay: m.scanDelay} }
-func (m *mockCfg) ValidatePath(_ context.Context, _ string) error { return nil }
+func (m *mockCfg) PollInterval() time.Duration                  { return m.interval }
+func (m *mockCfg) Search() subflux.SearchConfig                 { return subflux.SearchConfig{ScanDelay: m.scanDelay} }
+func (*mockCfg) ValidatePath(_ context.Context, _ string) error { return nil }
 func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []subflux.SubtitleTarget {
 	return m.targets
 }

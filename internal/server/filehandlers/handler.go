@@ -285,6 +285,7 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		Data: events.CoverageEvent{
 			MediaType: ref.MediaType,
 			MediaID:   ref.MediaID,
+			Language:  ref.Language,
 		},
 	})
 

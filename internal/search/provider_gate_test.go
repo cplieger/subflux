@@ -51,10 +51,10 @@ func (m *gateMetrics) SetProviderDisabled(id subflux.ProviderID, v bool) {
 	m.disabled[id] = v
 	m.mu.Unlock()
 }
-func (m *gateMetrics) DeleteProviderDisabled(subflux.ProviderID)                   {}
-func (m *gateMetrics) IncProviderAuthFailure(subflux.ProviderID)                   {}
-func (m *gateMetrics) IncProviderRateLimited(subflux.ProviderID, providergate.Op)  {}
-func (m *gateMetrics) SetProviderSettingRejected(subflux.ProviderID, string, bool) {}
+func (*gateMetrics) DeleteProviderDisabled(subflux.ProviderID)                   {}
+func (*gateMetrics) IncProviderAuthFailure(subflux.ProviderID)                   {}
+func (*gateMetrics) IncProviderRateLimited(subflux.ProviderID, providergate.Op)  {}
+func (*gateMetrics) SetProviderSettingRejected(subflux.ProviderID, string, bool) {}
 func (m *gateMetrics) isDisabled(id subflux.ProviderID) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()

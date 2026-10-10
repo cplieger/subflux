@@ -45,7 +45,7 @@ type source struct {
 }
 
 // Name returns the provider identifier for YIFY Subtitles.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search finds movie subtitles by scraping the YIFY Subtitles HTML page for the
 // given IMDB ID. Only movie requests are handled; episodes are skipped.

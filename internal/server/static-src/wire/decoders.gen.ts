@@ -160,6 +160,9 @@ export const decodeCoverageEvent: Decoder<CoverageEvent> = (v) => {
   const out: CoverageEvent = {
     media_type: reqOneOf(o, "media_type", MEDIA_TYPES, "$.coverage_event"),
     media_id: reqStr(o, "media_id", "$.coverage_event"),
+    language: reqStr(o, "language", "$.coverage_event"),
+    variant: reqStr(o, "variant", "$.coverage_event"),
+    source: reqStr(o, "source", "$.coverage_event"),
   };
   return out;
 };

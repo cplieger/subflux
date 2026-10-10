@@ -24,15 +24,15 @@ type recordingMetrics struct {
 }
 
 func (m *recordingMetrics) RecordSSEConnect(string, bool) { m.connects.Add(1) }
-func (m *recordingMetrics) RecordSSEDisconnect(string)    {}
+func (*recordingMetrics) RecordSSEDisconnect(string)      {}
 func (m *recordingMetrics) RecordSSEPresenceTransition(kind string) {
 	m.mu.Lock()
 	m.transitions = append(m.transitions, kind)
 	m.mu.Unlock()
 }
-func (m *recordingMetrics) SetSSEClients(int)      {}
-func (m *recordingMetrics) SetSSEQueuedFrames(int) {}
-func (m *recordingMetrics) SetSSEHead(uint64)      {}
+func (*recordingMetrics) SetSSEClients(int)      {}
+func (*recordingMetrics) SetSSEQueuedFrames(int) {}
+func (*recordingMetrics) SetSSEHead(uint64)      {}
 
 func (m *recordingMetrics) snapshot() []string {
 	m.mu.Lock()

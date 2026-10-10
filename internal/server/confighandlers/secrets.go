@@ -18,12 +18,6 @@ import (
 // secretKeyNames lists YAML keys that typically contain secrets.
 var secretKeyNames = []string{"api_key", "password", "passkey", "token", "secret", "client_key", "anidb_client_key", "client_secret"}
 
-// SecretKeyNames returns the list of YAML keys treated as secrets. The
-// provider registry test asserts every secret provider field has an entry.
-//
-//deadset:ignore DS1004 -- The provider registry test reads it to fail when a new secret provider field is missing from the redaction list.
-func SecretKeyNames() []string { return secretKeyNames }
-
 // secretKeyRe matches YAML keys that typically contain secrets.
 var secretKeyRe = regexp.MustCompile(
 	`(?im)^(\s*(?:` + strings.Join(secretKeyNames, "|") + `)\s*:\s*)(.+)$`,

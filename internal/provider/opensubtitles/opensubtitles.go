@@ -94,7 +94,7 @@ type source struct {
 }
 
 // Name returns the provider identifier for OpenSubtitles.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // numberingResult holds the outcome of searching one numbering scheme.
 type numberingResult struct {

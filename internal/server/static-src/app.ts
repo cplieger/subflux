@@ -30,7 +30,6 @@ import { viewTransition, debounce } from "./utils.js";
 // Initialize store.
 store.batch(() => {
   store.set("config", null);
-  store.set("configChecked", false);
   store.set("ignoredCodecs", new Set<string>());
   store.set("detailCtx", null);
   store.set("currentPage", "library");
@@ -111,7 +110,6 @@ if (footerYear) {
 // Check if the server is configured; auto-open settings if not.
 void configParsed().then((pc) => {
   store.batch(() => {
-    store.set("configChecked", true);
     if (pc) {
       store.set("config", pc);
       store.set("ignoredCodecs", new Set(pc.ignored_codecs ?? []));

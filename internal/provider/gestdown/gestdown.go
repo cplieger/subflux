@@ -49,7 +49,7 @@ func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 }
 
 // Name returns the provider identifier for Gestdown.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
 // gestdown's rate-limit signal (Addic7ed throttle) with Retry-After parsed

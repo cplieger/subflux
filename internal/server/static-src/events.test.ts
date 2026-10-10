@@ -267,6 +267,9 @@ describe("events: SSE handlers (the replay table)", () => {
     const payload = {
       media_type: "episode",
       media_id: "tvdb-81189-s01e01",
+      language: "en",
+      variant: "standard",
+      source: "opensubtitles",
     };
     server.current!.last().frame("coverage", payload, id(1));
     await settle();
@@ -349,6 +352,9 @@ describe("events: SSE handlers (the replay table)", () => {
       {
         media_type: "episode",
         media_id: "tvdb-42-s01e01",
+        language: "en",
+        variant: "standard",
+        source: "opensubtitles",
       },
       id(5),
     );

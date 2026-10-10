@@ -59,7 +59,7 @@ type mockStoreLockErr struct {
 	testsupport.NopStore
 }
 
-func (m *mockStoreLockErr) IsManuallyLocked(_ context.Context, _ subflux.ManualLockKey) (bool, error) {
+func (*mockStoreLockErr) IsManuallyLocked(_ context.Context, _ subflux.ManualLockKey) (bool, error) {
 	return false, errors.New("lock check failed")
 }
 
@@ -72,19 +72,19 @@ type mockConfig struct {
 	minScore    int
 }
 
-func (m *mockConfig) Scores() subflux.Scores { return subflux.DefaultScores }
-func (m *mockConfig) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
+func (*mockConfig) Scores() subflux.Scores { return subflux.DefaultScores }
+func (*mockConfig) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	return all
 }
 
 func (m *mockConfig) MinScoreForTarget(_ *subflux.SubtitleTarget, _ subflux.MediaType) int {
 	return m.minScore
 }
-func (m *mockConfig) Adaptive() subflux.AdaptiveConfig          { return m.adaptiveCfg }
-func (m *mockConfig) Search() subflux.SearchConfig              { return m.searchCfg }
-func (m *mockConfig) EmbeddedPolicy() subflux.EmbeddedPolicy    { return m.embedded }
-func (m *mockConfig) ProviderPriority(_ subflux.ProviderID) int { return 99 }
-func (m *mockConfig) PostProcess() subflux.PostProcessConfig {
+func (m *mockConfig) Adaptive() subflux.AdaptiveConfig        { return m.adaptiveCfg }
+func (m *mockConfig) Search() subflux.SearchConfig            { return m.searchCfg }
+func (m *mockConfig) EmbeddedPolicy() subflux.EmbeddedPolicy  { return m.embedded }
+func (*mockConfig) ProviderPriority(_ subflux.ProviderID) int { return 99 }
+func (*mockConfig) PostProcess() subflux.PostProcessConfig {
 	return subflux.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,
@@ -94,7 +94,7 @@ func (m *mockConfig) PostProcess() subflux.PostProcessConfig {
 	}
 }
 
-func (m *mockConfig) Sync() subflux.SyncConfig {
+func (*mockConfig) Sync() subflux.SyncConfig {
 	return subflux.SyncConfig{SyncSubtitles: true}
 }
 
@@ -160,7 +160,7 @@ type mockFilterConfig struct {
 	mockConfig
 }
 
-func (m *mockFilterConfig) ProvidersForTarget(target *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
+func (*mockFilterConfig) ProvidersForTarget(target *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	if len(target.Providers) > 0 {
 		return target.Providers
 	}

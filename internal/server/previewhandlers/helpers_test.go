@@ -193,9 +193,9 @@ type fakeResponseWriter struct {
 
 func (f *fakeResponseWriter) Header() http.Header { return http.Header(f.headers) }
 
-func (f *fakeResponseWriter) Write(_ []byte) (int, error) { return 0, nil }
+func (*fakeResponseWriter) Write(_ []byte) (int, error) { return 0, nil }
 
-func (f *fakeResponseWriter) WriteHeader(_ int) {}
+func (*fakeResponseWriter) WriteHeader(_ int) {}
 
 // --- classifyFFmpegError ---
 

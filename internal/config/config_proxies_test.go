@@ -55,7 +55,7 @@ func TestParseTrustedProxies(t *testing.T) {
 				// Invalid CIDRs must surface as a field-tagged validation error.
 				var ve *validationError
 				if !errors.As(err, &ve) || !strings.Contains(ve.Message, "trusted_proxies") {
-					t.Errorf("error = %v, want *ValidationError naming trusted_proxies", err)
+					t.Errorf("error = %v, want *validationError naming trusted_proxies", err)
 				}
 				return
 			}
@@ -131,7 +131,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 		}
 		var ve *validationError
 		if !errors.As(err, &ve) || !strings.Contains(ve.Message, "trusted_proxies") {
-			t.Errorf("Validate() error = %v, want *ValidationError naming trusted_proxies", err)
+			t.Errorf("Validate() error = %v, want *validationError naming trusted_proxies", err)
 		}
 	})
 

@@ -35,11 +35,6 @@ const panel = el("div", {
   "aria-label": "User menu",
 });
 
-// deadset:ignore DS1004 -- The user-menu tests read the private menu element.
-export function _userMenuPanelForTest(): HTMLElement {
-  return panel;
-}
-
 export function initUserMenu(): void {
   void fetchMe();
   wireUserButton();

@@ -17,7 +17,6 @@ import {
   triggerMovieScan,
   registerScanButton,
   initScanButtons,
-  _scanButtonCountForTest,
 } from "./detail-scan.js";
 import { seriesScopeKey, seasonScopeKey, movieScopeKey } from "./scan-scope.js";
 import {
@@ -353,14 +352,16 @@ describe("the mounted-button registry (R8.5)", () => {
     // Every repaint of a row rebuilds its cells, so each paint registers a NEW
     // button and abandons the last. Re-opening the row's scope is what keeps
     // the registry from growing once per repaint forever.
-    scanButton(seriesScopeKey(1), testView.child("row-1"));
-    scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const first = scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const second = scanButton(seriesScopeKey(1), testView.child("row-1"));
     const last = scanButton(seriesScopeKey(1), testView.child("row-1"));
-
-    expect(_scanButtonCountForTest()).toBe(1);
 
     initScanButtons();
     running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
+    // A publish paints every registered button, so an abandoned one left
+    // idle is one the registry no longer holds.
+    expect(first.disabled).toBe(false);
+    expect(second.disabled).toBe(false);
     expect(last.disabled).toBe(true);
   });
 
@@ -377,7 +378,6 @@ describe("the mounted-button registry (R8.5)", () => {
 
     expect(removed.disabled).toBe(false);
     expect(kept.disabled).toBe(true);
-    expect(_scanButtonCountForTest()).toBe(1);
   });
 
   it("a route leave releases the buttons the departed view registered", () => {
@@ -394,7 +394,6 @@ describe("the mounted-button registry (R8.5)", () => {
 
     expect(departed.disabled).toBe(false);
     expect(departed.querySelector(".spinner")).toBeNull();
-    expect(_scanButtonCountForTest()).toBe(0);
   });
 
   it("registers nothing when the scope is already disposed", () => {
@@ -408,6 +407,5 @@ describe("the mounted-button registry (R8.5)", () => {
     running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
 
     expect(btn.disabled).toBe(false);
-    expect(_scanButtonCountForTest()).toBe(0);
   });
 });

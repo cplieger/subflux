@@ -23,9 +23,9 @@ func loudFrame() []int16 {
 // FramesBinary polls the cancellation guard.
 type cancelAfterFirstCheckCtx struct{ n int }
 
-func (c *cancelAfterFirstCheckCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
-func (c *cancelAfterFirstCheckCtx) Done() <-chan struct{}       { return nil }
-func (c *cancelAfterFirstCheckCtx) Value(any) any               { return nil }
+func (*cancelAfterFirstCheckCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (*cancelAfterFirstCheckCtx) Done() <-chan struct{}       { return nil }
+func (*cancelAfterFirstCheckCtx) Value(any) any               { return nil }
 func (c *cancelAfterFirstCheckCtx) Err() error {
 	c.n++
 	if c.n == 1 {

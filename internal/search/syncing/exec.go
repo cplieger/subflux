@@ -39,6 +39,6 @@ func (e InProcessExec) Reference(ctx context.Context, data []byte, videoPath, la
 }
 
 // Audio implements SyncExec in-process.
-func (e InProcessExec) Audio(ctx context.Context, data []byte, videoPath, subtitlePath string) subsync.SyncResult {
+func (InProcessExec) Audio(ctx context.Context, data []byte, videoPath, subtitlePath string) subsync.SyncResult {
 	return SyncFromAudio(ctx, data, videoPath, subtitlePath)
 }

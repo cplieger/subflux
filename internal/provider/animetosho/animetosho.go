@@ -84,7 +84,7 @@ func (p *source) SettingVerdict() (setting string, refusal error) {
 func (p *source) ForgetSettingVerdict() { p.anidbMapper.ForgetClientKeyVerdict() }
 
 // Name returns the provider identifier for AnimeTosho.
-func (p *source) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search tries AniDB episode ID lookup first (more precise for anime), then
 // falls back to title+season search.

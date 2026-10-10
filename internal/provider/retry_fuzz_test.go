@@ -49,10 +49,10 @@ type fakeWrapProvider struct {
 }
 
 func (f *fakeWrapProvider) Name() subflux.ProviderID { return f.name }
-func (f *fakeWrapProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*fakeWrapProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *fakeWrapProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*fakeWrapProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }

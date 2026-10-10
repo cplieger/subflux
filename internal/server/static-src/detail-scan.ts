@@ -126,12 +126,6 @@ export function registerScanButton(btn: HTMLButtonElement, scope: Scope): void {
   patchScanButton(btn, runningMap());
 }
 
-/** Registry population, for the registry-hygiene tests. */
-// deadset:ignore DS1004 -- The registry-hygiene tests read the size of the private scan-button registry.
-export function _scanButtonCountForTest(): number {
-  return scanButtons.size;
-}
-
 /** Sync every registered scan button with the shared store. */
 function syncScanButtons(): void {
   const running = runningMap();
