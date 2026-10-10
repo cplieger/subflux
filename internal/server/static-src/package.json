@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@cplieger/actions": "3.2.0-dev.2",
-    "@cplieger/fetch": "2.2.1",
+    "@cplieger/fetch": "2.2.2",
     "@cplieger/keyenc": "1.1.0-dev.1",
     "@cplieger/reactive": "2.1.2",
     "@cplieger/sse": "1.1.1",
