@@ -198,11 +198,11 @@ ARG CPLIEGER_REACTIVE_VERSION=2.1.2
 # renovate: datasource=npm depName=@cplieger/ui-primitives
 ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.1.1
 # renovate: datasource=npm depName=@cplieger/fetch
-ARG CPLIEGER_FETCH_VERSION=2.2.1
+ARG CPLIEGER_FETCH_VERSION=2.2.2
 # renovate: datasource=npm depName=@cplieger/keyenc
-ARG CPLIEGER_KEYENC_VERSION=1.0.9
+ARG CPLIEGER_KEYENC_VERSION=1.0.11
 # renovate: datasource=npm depName=@cplieger/sse
-ARG CPLIEGER_SSE_VERSION=1.1.1
+ARG CPLIEGER_SSE_VERSION=1.2.0
 
 # Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
 # client compiles from the ARG-pinned npm tarballs below, while
