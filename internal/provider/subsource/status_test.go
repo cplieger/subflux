@@ -15,8 +15,8 @@ const statusAPIKey = "placeholder-subsource-key"
 
 // pathProvider answers the title search and the subtitle list with their own
 // canned 200 bodies.
-func pathProvider(searchBody, subtitlesBody string) *Provider {
-	return &Provider{
+func pathProvider(searchBody, subtitlesBody string) *source {
+	return &source{
 		apiKey:     statusAPIKey,
 		titleCache: cache.New[int](0),
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {

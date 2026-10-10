@@ -153,14 +153,13 @@ async function openMovieSettled(m: MovieDetail): Promise<void> {
 /** Build the index.html slice the detail views render into: a real `.card`
  *  container section. `width` pins the card's inline size so the container
  *  query resolves the chosen breakpoint (>=700px desktop, <700px mobile). */
-function mountPanel(width?: string): HTMLElement {
+function mountPanel(width?: string): void {
   _resetPanelsForTest();
   const panel = libraryPanel().root;
   document.body.replaceChildren(panel);
   if (width) {
     panel.style.width = width;
   }
-  return panel;
 }
 
 /** Two rendering opportunities: content-visibility relevancy is determined

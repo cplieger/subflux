@@ -261,7 +261,7 @@ func (t *readTable) admit(ks *keyState, key string, fetch fetchFn) *wave {
 // detach removes one waiter. Before read-begin, the last waiter's departure
 // discards the wave unexecuted; after read-begin the pass proceeds
 // regardless (a waiter's cancellation never cancels the pass).
-func (t *readTable) detach(ks *keyState, w *wave) {
+func (*readTable) detach(ks *keyState, w *wave) {
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
 	if w.started || w.discarded {
@@ -281,7 +281,7 @@ func (t *readTable) detach(ks *keyState, w *wave) {
 // settleUnstarted settles a wave that never reached read-begin (refusal or
 // shutdown), closing the join window first so no later arrival joins a
 // settled wave.
-func (t *readTable) settleUnstarted(ks *keyState, w *wave, err error) {
+func (*readTable) settleUnstarted(ks *keyState, w *wave, err error) {
 	ks.mu.Lock()
 	if ks.live == w {
 		ks.live = nil

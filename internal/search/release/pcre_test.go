@@ -31,14 +31,6 @@ func TestCompilePCRE_alternation_branches(t *testing.T) {
 	}
 }
 
-func TestPattern_String_returns_source(t *testing.T) {
-	t.Parallel()
-	const pat = `a(?=b)|c`
-	if got := mustCompilePCRE(t, pat).String(); got != pat {
-		t.Errorf("String() = %q, want %q", got, pat)
-	}
-}
-
 // --- MatchString (contract pins, unchanged) ---
 
 func TestPattern_MatchString(t *testing.T) {
@@ -1008,7 +1000,7 @@ func TestCompilePCRE_unterminated_repetition_is_a_literal(t *testing.T) {
 // an assertion inside a quantified group).
 func TestCompilePCRE_all_shipped_formats(t *testing.T) {
 	t.Parallel()
-	tables := [][]Format{SonarrSources, TrashVideoCodecs, TrashHDRFormats, TrashStreamingServices}
+	tables := [][]Format{sonarrSources, trashVideoCodecs, trashHDRFormats, trashStreamingServices}
 	count := 0
 	for _, tbl := range tables {
 		for _, f := range tbl {

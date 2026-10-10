@@ -254,7 +254,7 @@ func putStateRow(t *testing.T, db *DB, mt subflux.MediaType, mid, lang string, s
 func deleteStateRow(t *testing.T, db *DB, id int64) {
 	t.Helper()
 	if err := db.db.Update(func(tx *bolt.Tx) error {
-		_, err := deleteState(tx, id)
+		err := deleteState(tx, id)
 		return err
 	}); err != nil {
 		t.Fatalf("deleteStateRow: %v", err)

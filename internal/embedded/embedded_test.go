@@ -80,7 +80,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		lang      string
 		trackName string
 		wantLang  string
-		index     int
 		forced    bool
 		hi        bool
 		wantForce bool
@@ -88,7 +87,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 	}{
 		{
 			name:      "alpha3_to_alpha2",
-			index:     1,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English",
@@ -96,7 +94,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "alpha2_passthrough",
-			index:     2,
 			codec:     "ass",
 			lang:      "fr",
 			trackName: "French",
@@ -104,7 +101,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "forced_from_flag",
-			index:     3,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English",
@@ -114,7 +110,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "forced_from_name",
-			index:     4,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English Forced",
@@ -123,7 +118,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "hi_from_flag",
-			index:     5,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English",
@@ -133,7 +127,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "hi_from_name_sdh",
-			index:     6,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English SDH",
@@ -142,7 +135,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "hi_from_name_hearing_impaired",
-			index:     7,
 			codec:     "srt",
 			lang:      "eng",
 			trackName: "English (Hearing Impaired)",
@@ -151,7 +143,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		},
 		{
 			name:      "bcp47_extracts_primary_subtag",
-			index:     9,
 			codec:     "srt",
 			lang:      "en-US",
 			trackName: "English US",
@@ -162,7 +153,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			// Portuguese, so the region has to be read before it is dropped.
 			// Truncating at the hyphen reported this track as "pt".
 			name:      "bcp47_region_selects_brazilian_portuguese",
-			index:     10,
 			codec:     "srt",
 			lang:      "por-BR",
 			trackName: "Portuguese BR",
@@ -171,7 +161,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 		{
 			// A region that names no separate target is dropped once read.
 			name:      "bcp47_european_region_stays_pt",
-			index:     11,
 			codec:     "srt",
 			lang:      "por-PT",
 			trackName: "Portuguese PT",
@@ -181,10 +170,10 @@ func TestNormalizeTrack_valid(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := normalizeTrack(tt.index, tt.codec, tt.lang, tt.trackName, tt.forced, tt.hi)
+			got := normalizeTrack(tt.codec, tt.lang, tt.trackName, tt.forced, tt.hi)
 			if got == nil {
-				t.Fatalf("normalizeTrack(%d, %q, %q, %q, %v, %v) = nil, want non-nil",
-					tt.index, tt.codec, tt.lang, tt.trackName, tt.forced, tt.hi)
+				t.Fatalf("normalizeTrack(%q, %q, %q, %v, %v) = nil, want non-nil",
+					tt.codec, tt.lang, tt.trackName, tt.forced, tt.hi)
 			}
 			if got.lang != tt.wantLang {
 				t.Errorf("lang = %q, want %q", got.lang, tt.wantLang)
@@ -197,9 +186,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			}
 			if got.codec != tt.codec {
 				t.Errorf("codec = %q, want %q", got.codec, tt.codec)
-			}
-			if got.index != tt.index {
-				t.Errorf("index = %d, want %d", got.index, tt.index)
 			}
 		})
 	}
@@ -226,9 +212,9 @@ func TestNormalizeTrack_returns_nil(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := normalizeTrack(1, "srt", tt.lang, "Test", false, false)
+			got := normalizeTrack("srt", tt.lang, "Test", false, false)
 			if got != nil {
-				t.Errorf("normalizeTrack(1, \"srt\", %q, ...) = %+v, want nil",
+				t.Errorf("normalizeTrack(\"srt\", %q, ...) = %+v, want nil",
 					tt.lang, got)
 			}
 		})
@@ -299,31 +285,27 @@ func TestNormalizeTrack_valid_output_invariants(t *testing.T) {
 		}).Draw(t, "lang")
 		codec := rapid.StringMatching(`[a-z]{2,6}`).Draw(t, "codec")
 		name := rapid.StringMatching(`[A-Za-z ]{0,30}`).Draw(t, "name")
-		index := rapid.IntRange(1, 100).Draw(t, "index")
 		forced := rapid.Bool().Draw(t, "forced")
 		hi := rapid.Bool().Draw(t, "hi")
 
-		got := normalizeTrack(index, codec, lang, name, forced, hi)
+		got := normalizeTrack(codec, lang, name, forced, hi)
 		if got == nil {
-			t.Fatalf("normalizeTrack(%d, %q, %q, ...) = nil, want non-nil for a real language",
-				index, codec, lang)
+			t.Fatalf("normalizeTrack(%q, %q, ...) = nil, want non-nil for a real language",
+				codec, lang)
 			return
 		}
 		// The language becomes a filename segment and part of the bbolt state
 		// key, so it has to be in the two-letter internal space.
 		if len(got.lang) != 2 {
-			t.Errorf("normalizeTrack(%d, %q, %q, ...).lang = %q (len %d), want len 2",
-				index, codec, lang, got.lang, len(got.lang))
+			t.Errorf("normalizeTrack(%q, %q, ...).lang = %q (len %d), want len 2",
+				codec, lang, got.lang, len(got.lang))
 		}
 		if got.lang == "und" {
-			t.Errorf("normalizeTrack(%d, %q, %q, ...).lang = %q, want a real language",
-				index, codec, lang, got.lang)
+			t.Errorf("normalizeTrack(%q, %q, ...).lang = %q, want a real language",
+				codec, lang, got.lang)
 		}
 		if got.codec != codec {
 			t.Errorf("codec = %q, want %q", got.codec, codec)
-		}
-		if got.index != index {
-			t.Errorf("index = %d, want %d", got.index, index)
 		}
 		if forced && !got.forced {
 			t.Error("forced = false, want true")
@@ -338,7 +320,7 @@ func TestNormalizeTrack_nil_for_invalid_lang(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		lang := rapid.SampledFrom([]string{"", "und"}).Draw(t, "lang")
-		got := normalizeTrack(1, "srt", lang, "Test", false, false)
+		got := normalizeTrack("srt", lang, "Test", false, false)
 		if got != nil {
 			t.Errorf("normalizeTrack(lang=%q) = %+v, want nil", lang, got)
 		}

@@ -22,9 +22,9 @@ func queriedResult(n int) subflux.SearchResult {
 // An import reports queried=true only when the engine's search
 // actually issued provider queries; every skip path reports false.
 func TestImport_queried_follows_engine(t *testing.T) {
-	buildOK := func(req *subflux.SearchRequest) func() (*ImportResult, error) {
-		return func() (*ImportResult, error) {
-			return &ImportResult{Req: req, Source: PollSourceSonarr, Label: "x"}, nil
+	buildOK := func(req *subflux.SearchRequest) func() (*resolvedImport, error) {
+		return func() (*resolvedImport, error) {
+			return &resolvedImport{Req: req, Source: pollSourceSonarr, Label: "x"}, nil
 		}
 	}
 
@@ -46,7 +46,7 @@ func TestImport_queried_follows_engine(t *testing.T) {
 		ls := &LiveState{
 			Cfg: &mockCfg{langs: []string{"en"}},
 			Engine: &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{
-				Lang: "en", Kind: subflux.LangSkipped, Skipped: 1,
+				Lang: "en", Kind: subflux.LangSkipped,
 			}}}},
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}

@@ -17,13 +17,3 @@ type TrackDetector interface {
 	// persisted rows. (nil, nil) means "no tracks", distinct from an error.
 	DetectTracks(ctx context.Context, videoPath string) ([]subflux.EmbeddedTrack, error)
 }
-
-// NoopDetector is an explicit no-detection TrackDetector for callers that
-// have no use for embedded track inspection (search.New requires a detector,
-// so "none" must be said out loud rather than left nil).
-type NoopDetector struct{}
-
-// DetectTracks always returns no tracks and no error.
-func (NoopDetector) DetectTracks(_ context.Context, _ string) ([]subflux.EmbeddedTrack, error) {
-	return nil, nil
-}

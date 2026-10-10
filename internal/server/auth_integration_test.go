@@ -51,7 +51,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	// Extract session cookie.
 	var sessionCookie *http.Cookie
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == cookieNameSecure {
 			sessionCookie = c
 			break
 		}
@@ -168,7 +168,6 @@ func (noopMetrics) RecordDownload(_ subflux.ProviderID, _ error)                
 func (noopMetrics) AdaptiveSkip()                                               {}
 func (noopMetrics) RecordEmbeddedDetectorError()                                {}
 func (noopMetrics) RecordSubtitleSaved(subflux.ProviderID)                      {}
-func (noopMetrics) IncSubtitleWriteError()                                      {}
 func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                        {}
 func (noopMetrics) RecordImport(_ subflux.PollKey)                              {}
 func (noopMetrics) TotalSearches() int64                                        { return 0 }
@@ -631,8 +630,8 @@ func TestSecurity_CookieFallback(t *testing.T) {
 	tlsReq := httptest.NewRequest(http.MethodGet, "https://localhost/", http.NoBody)
 	tlsReq.Header.Set("X-Forwarded-Proto", "https")
 	tlsName := authhandlers.SessionCookie.CookieName(tlsReq)
-	if tlsName != authhandlers.CookieNameSecure {
-		t.Errorf("TLS cookie name = %q, want %q", tlsName, authhandlers.CookieNameSecure)
+	if tlsName != cookieNameSecure {
+		t.Errorf("TLS cookie name = %q, want %q", tlsName, cookieNameSecure)
 	}
 
 	rec = httptest.NewRecorder()
@@ -640,7 +639,7 @@ func TestSecurity_CookieFallback(t *testing.T) {
 	tlsCookies := rec.Result().Cookies()
 	foundSecure := false
 	for _, c := range tlsCookies {
-		if c.Name == authhandlers.CookieNameSecure {
+		if c.Name == cookieNameSecure {
 			foundSecure = true
 			if !c.Secure {
 				t.Error("TLS cookie should have Secure flag")

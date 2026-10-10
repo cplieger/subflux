@@ -112,7 +112,7 @@ func (a *recordingAlerts) RecordPersistent(_, msg string) { a.msgs = append(a.ms
 // and must still record the loud operator alert. applyConfig is driven
 // directly (under saveMu, per its contract) because the HTTP entry points
 // pre-check the raw body size; only merge growth can reach the write over
-// cap, and simulating the merge here would test MergeSecrets, not the map.
+// cap, and simulating the merge here would test mergeSecrets, not the map.
 func TestApplyConfig_over_cap_payload_maps_to_413(t *testing.T) {
 	t.Parallel()
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")

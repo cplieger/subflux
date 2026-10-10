@@ -125,35 +125,35 @@ func TestNormalize_never_contains_BOM(t *testing.T) {
 	})
 }
 
-// --- Detect ---
+// --- detect ---
 
 func TestDetect(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name  string
 		input []byte
-		want  Encoding
+		want  encoding
 	}{
-		{"UTF-16LE BOM", []byte{0xFF, 0xFE, 'H', 0x00}, UTF16LE},
-		{"UTF-16BE BOM", []byte{0xFE, 0xFF, 0x00, 'H'}, UTF16BE},
-		{"UTF-16LE no BOM", []byte{'H', 0x00, 'i', 0x00}, UTF16LE},
-		{"UTF-16BE no BOM", []byte{0x00, 'H', 0x00, 'i'}, UTF16BE},
-		{"plain ASCII", []byte("1\n00:00:01,000 --> 00:00:02,000\n"), UTF8},
-		{"UTF-8 BOM", append([]byte{0xEF, 0xBB, 0xBF}, "Hello"...), UTF8},
-		{"UTF-8 multibyte", []byte("caf\u00e9 \u4e16\u754c"), UTF8},
+		{"UTF-16LE BOM", []byte{0xFF, 0xFE, 'H', 0x00}, encUTF16LE},
+		{"UTF-16BE BOM", []byte{0xFE, 0xFF, 0x00, 'H'}, encUTF16BE},
+		{"UTF-16LE no BOM", []byte{'H', 0x00, 'i', 0x00}, encUTF16LE},
+		{"UTF-16BE no BOM", []byte{0x00, 'H', 0x00, 'i'}, encUTF16BE},
+		{"plain ASCII", []byte("1\n00:00:01,000 --> 00:00:02,000\n"), encUTF8},
+		{"UTF-8 BOM", append([]byte{0xEF, 0xBB, 0xBF}, "Hello"...), encUTF8},
+		{"UTF-8 multibyte", []byte("caf\u00e9 \u4e16\u754c"), encUTF8},
 		// A lone 0xE9 is Windows-1252 'é' and not valid UTF-8, so nothing names
-		// it: only the fallback would read it, which is the case Detect withholds.
-		{"invalid UTF-8", []byte("caf\xe9"), Unknown},
-		{"too short for the NUL pattern", []byte{'H', 0x00}, UTF8},
-		{"empty", nil, UTF8},
+		// it: only the fallback would read it, which is the case detect withholds.
+		{"invalid UTF-8", []byte("caf\xe9"), encUnknown},
+		{"too short for the NUL pattern", []byte{'H', 0x00}, encUTF8},
+		{"empty", nil, encUTF8},
 		// NUL padding is valid UTF-8 and does NOT match the alternating pattern,
 		// so it is named UTF8 and probed raw rather than NUL-stripped into text.
-		{"NUL run", append(make([]byte, 8), " --> "...), UTF8},
+		{"NUL run", append(make([]byte, 8), " --> "...), encUTF8},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := Detect(tt.input); got != tt.want {
+			if got := detect(tt.input); got != tt.want {
 				t.Errorf("Detect(%x) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
@@ -200,7 +200,7 @@ func TestTextView_decodes_only_what_detection_named(t *testing.T) {
 
 	t.Run("property: an unnamed encoding is never decoded", rapid.MakeCheck(func(t *rapid.T) {
 		data := rapid.SliceOfN(rapid.Byte(), 0, 512).Draw(t, "data")
-		if Detect(data) != Unknown {
+		if detect(data) != encUnknown {
 			return
 		}
 		if got := TextView(data); !bytes.Equal(got, data) {

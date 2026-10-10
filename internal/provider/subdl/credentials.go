@@ -14,7 +14,7 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // CheckCredentials reports whether SubDL accepts the configured API key.
 //
@@ -24,7 +24,7 @@ var _ provider.CredentialChecker = (*Provider)(nil)
 // `{"status":false,"error":"Not Authorized"}`. The verdict is the status and the
 // body is never read, because every field in it is upstream-controlled and none
 // of it changes the answer.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	params := url.Values{"api_key": {p.apiKey}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		apiURL+"/me?"+params.Encode(), http.NoBody)

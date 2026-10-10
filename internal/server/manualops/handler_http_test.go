@@ -35,7 +35,7 @@ import (
 
 var errHTTPFake = errors.New("mock error")
 
-// fakeActivity satisfies ActivityTracker with no-op lifecycle tracking.
+// fakeActivity satisfies activityTracker with no-op lifecycle tracking.
 type fakeActivity struct{}
 
 func (fakeActivity) Start(string, string, activity.Source) string { return "act-1" }
@@ -43,7 +43,7 @@ func (fakeActivity) End(string)                                   {}
 func (fakeActivity) Fail(string)                                  {}
 func (fakeActivity) Progress(string, int, int, string)            {}
 
-// fakeEvents satisfies EventPublisher with no-ops.
+// fakeEvents satisfies eventPublisher with no-ops.
 type fakeEvents struct{}
 
 func (fakeEvents) PublishNotify(events.NotifyLevel, string)    {}
@@ -64,11 +64,11 @@ type httpStubProvider struct {
 
 func (p *httpStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -244,7 +244,7 @@ func TestHandleManualDownload_provider_not_found(t *testing.T) {
 // dlFailingProvider returns an error from Download.
 type dlFailingProvider struct{ httpStubProvider }
 
-func (p *dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, errHTTPFake
 }
 
@@ -381,7 +381,7 @@ func TestHandleClearLock_success(t *testing.T) {
 // clearLockErrorStore is a minimal store whose ClearManualLock fails.
 type clearLockErrorStore struct{ testsupport.NopStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
+func (*clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
 	return errHTTPFake
 }
 
@@ -524,7 +524,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 // searchFailingProvider returns an error from Search.
 type searchFailingProvider struct{ httpStubProvider }
 
-func (p *searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, errHTTPFake
 }
 
@@ -776,7 +776,7 @@ func TestRunManualDownload_reports_a_shutdown_interruption(t *testing.T) {
 		Provider: "os", SubtitleID: "sub-1", Language: "en",
 		MediaType: subflux.MediaTypeMovie, ArrID: 42,
 	}
-	req.SetVideoPath("/media/movie.mkv")
+	req.setVideoPath("/media/movie.mkv")
 
 	h.runManualDownload(h.deps.StateFunc(), req, "act-1")
 

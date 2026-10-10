@@ -97,7 +97,7 @@ func (a *historyArr) SeriesByID(_ context.Context, id int) (arrapi.Series, error
 	return s, a.seriesErr
 }
 
-func (a *historyArr) EpisodeByID(context.Context, int) (arrapi.Episode, error) {
+func (*historyArr) EpisodeByID(context.Context, int) (arrapi.Episode, error) {
 	return arrapi.Episode{ID: 1, SeasonNumber: 1, EpisodeNumber: 1, HasFile: true}, nil
 }
 
@@ -116,7 +116,7 @@ func (a *historyArr) exclude(seriesID int) {
 	a.excluded = seriesID
 }
 
-func (a *historyArr) RescanSeries(context.Context, int) error { return nil }
+func (*historyArr) RescanSeries(context.Context, int) error { return nil }
 
 // holdEngine records the paths it searched and how many targets each search
 // asked for; fail decides a path's result.
@@ -236,7 +236,7 @@ func newHoldRig(t *testing.T) *holdRig {
 	deps := fullDeps(&mockStore{})
 	deps.Alerts = r.alerts
 	deps.Media = mw
-	deps.PollCache.Set(t.Context(), subflux.PollKeySonarr, holdT0)
+	deps.PollCache.set(t.Context(), subflux.PollKeySonarr, holdT0)
 	ls := &LiveState{
 		Cfg: validatingCfg{mockCfg: &mockCfg{
 			interval: time.Hour, langs: []string{"en"}, targets: []subflux.SubtitleTarget{{Code: "en"}},
@@ -299,7 +299,7 @@ func (r *holdRig) setInterval(d time.Duration) {
 
 func (r *holdRig) cursor(t *testing.T) time.Time {
 	t.Helper()
-	return r.p.deps.PollCache.Get(t.Context(), subflux.PollKeySonarr)
+	return r.p.deps.PollCache.get(t.Context(), subflux.PollKeySonarr)
 }
 
 func (r *holdRig) detectHigh() (time.Time, uint64, bool) {
@@ -330,7 +330,7 @@ func TestPoller_a_failed_write_test_holds_the_batch_until_recovery(t *testing.T)
 	r.setHistory(e1)
 	r.setBad("Bad", true)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if r.engine.total() != 0 {
 		t.Fatalf("engine searches = %d, want 0 for a held batch", r.engine.total())
@@ -346,7 +346,7 @@ func TestPoller_a_failed_write_test_holds_the_batch_until_recovery(t *testing.T)
 	}
 
 	r.recover(t, "Bad")
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	if got := r.arr.lastSince(); !got.Equal(e1.Date) {
 		t.Errorf("re-fetch since = %v, want the held cursor %v", got, e1.Date)
 	}
@@ -368,11 +368,11 @@ func TestPoller_a_save_learning_a_fault_holds_mid_batch(t *testing.T) {
 		if path != pathOf(e2) {
 			return subflux.SearchResult{}, nil
 		}
-		uerr := &mediawrite.UnwritableError{Folder: filepath.Dir(path), Root: r.root, Op: "write", Err: syscall.EROFS}
+		uerr := &mediawrite.UnwritableError{Folder: filepath.Dir(path), Op: "write", Err: syscall.EROFS}
 		return subflux.SearchResult{WriteFailure: uerr}, uerr
 	})
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if a, b, c := r.engine.count(pathOf(e1)), r.engine.count(pathOf(e2)), r.engine.count(pathOf(e3)); a != 1 || b != 1 || c != 0 {
 		t.Fatalf("searches E1 %d, E2 %d, E3 %d; want 1, 1, 0 (stopped at E2)", a, b, c)
@@ -385,7 +385,7 @@ func TestPoller_a_save_learning_a_fault_holds_mid_batch(t *testing.T) {
 	}
 
 	r.engine.setFail(nil)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if a, b, c := r.engine.count(pathOf(e1)), r.engine.count(pathOf(e2)), r.engine.count(pathOf(e3)); a != 1 || b != 2 || c != 1 {
 		t.Errorf("searches after recovery E1 %d, E2 %d, E3 %d; want 1, 2, 1", a, b, c)
@@ -404,10 +404,10 @@ func TestPoller_a_later_unwritable_folder_holds_the_whole_batch_until_it_recover
 	r.setHistory(e1, e2, e3)
 	r.setBad("Bad", true)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	for range 2 {
-		r.p.PollOnce(t.Context())
+		r.p.pollOnce(t.Context())
 	}
 	if got := r.cursor(t); !got.Equal(e1.Date) {
 		t.Errorf("durable cursor = %v, want at the batch's first entry E1 (%v)", got, e1.Date)
@@ -427,7 +427,7 @@ func TestPoller_a_later_unwritable_folder_holds_the_whole_batch_until_it_recover
 	}
 
 	r.recover(t, "Bad")
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	for _, e := range []arrapi.HistoryRecord{e1, e2, e3} {
 		if n := r.engine.count(pathOf(e)); n != 1 {
@@ -455,7 +455,7 @@ func TestPoller_a_fault_learned_mid_batch_holds_the_entry_before_it_searches(t *
 		return subflux.SearchResult{}, nil
 	})
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if a, b, c := r.engine.count(pathOf(e1)), r.engine.count(pathOf(e2)), r.engine.count(pathOf(e3)); a != 1 || b != 0 || c != 0 {
 		t.Errorf("searches E1 %d, E2 %d, E3 %d; want 1, 0, 0", a, b, c)
@@ -463,7 +463,7 @@ func TestPoller_a_fault_learned_mid_batch_holds_the_entry_before_it_searches(t *
 	if got := r.cursor(t); !got.Equal(e2.Date) {
 		t.Errorf("durable cursor = %v, want at the held E2 (%v)", got, e2.Date)
 	}
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	if fetches, _ := r.arr.reads(); len(fetches) != 1 || len(r.p.work) != 0 {
 		t.Errorf("history fetches %d, queued batches %d after the hold; want 1 and 0 while E2's folder stays marked",
 			len(fetches), len(r.p.work))
@@ -477,10 +477,10 @@ func TestPoller_a_released_source_ignores_a_later_mark_on_its_old_folder(t *test
 	e1, e2 := r.video(t, "Bad", 1), r.video(t, "Other", 2)
 	r.setHistory(e1)
 	r.setBad("Bad", true)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	r.recover(t, "Bad")
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 
 	r.setBad("Bad", true)
@@ -488,7 +488,7 @@ func TestPoller_a_released_source_ignores_a_later_mark_on_its_old_folder(t *test
 		t.Fatalf("Setup: a scan's save into the unwritable folder = %v, want ErrUnwritable", err)
 	}
 	r.setHistory(e1, e2)
-	if n := r.p.PollOnce(t.Context()); n != 1 || len(r.p.work) != 1 {
+	if n := r.p.pollOnce(t.Context()); n != 1 || len(r.p.work) != 1 {
 		t.Errorf("PollOnce after the release = %d new, %d queued batches; want E2 fetched (1 and 1)", n, len(r.p.work))
 	}
 }
@@ -522,9 +522,9 @@ func TestPoller_a_hold_a_save_learned_waits_for_the_folder(t *testing.T) {
 				return tc.reported(werr)
 			})
 
-			r.p.PollOnce(t.Context())
+			r.p.pollOnce(t.Context())
 			drainOne(t, r.p)
-			r.p.PollOnce(t.Context())
+			r.p.pollOnce(t.Context())
 			if fetches, _ := r.arr.reads(); len(fetches) != 1 || len(r.p.work) != 0 {
 				t.Errorf("history fetches %d, queued batches %d after the hold; want 1 and 0 while the folder stays marked",
 					len(fetches), len(r.p.work))
@@ -532,7 +532,7 @@ func TestPoller_a_hold_a_save_learned_waits_for_the_folder(t *testing.T) {
 
 			r.recover(t, "A")
 			r.engine.setFail(nil)
-			r.p.PollOnce(t.Context())
+			r.p.pollOnce(t.Context())
 			drainOne(t, r.p)
 			if n := r.engine.count(pathOf(e1)); n != 2 {
 				t.Errorf("E1 searches = %d, want 2 (held once, run once after recovery)", n)
@@ -551,16 +551,16 @@ func TestPoller_a_recovered_lone_entry_is_not_searched_again(t *testing.T) {
 	e1 := r.video(t, "A", 1)
 	r.setHistory(e1)
 	r.arr.setSeriesErr(errors.New("sonarr restarting"))
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	r.arr.setSeriesErr(nil)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if got := r.cursor(t); !got.Equal(past(e1)) {
 		t.Errorf("durable cursor = %v, want past E1 (%v)", got, past(e1))
 	}
-	if n := r.p.PollOnce(t.Context()); n != 0 {
+	if n := r.p.pollOnce(t.Context()); n != 0 {
 		t.Errorf("a third poll fetched %d entries, want none", n)
 	}
 	if n := r.engine.count(pathOf(e1)); n != 1 {
@@ -577,11 +577,11 @@ func TestPoller_a_hold_keeps_an_earlier_dated_unprocessed_entry(t *testing.T) {
 		if path != pathOf(e3) {
 			return subflux.SearchResult{}, nil
 		}
-		uerr := &mediawrite.UnwritableError{Folder: filepath.Dir(path), Root: r.root, Op: "write", Err: syscall.EROFS}
+		uerr := &mediawrite.UnwritableError{Folder: filepath.Dir(path), Op: "write", Err: syscall.EROFS}
 		return subflux.SearchResult{WriteFailure: uerr}, uerr
 	})
 	r.p.enqueue(&sourceBatch{
-		source: PollSourceSonarr, key: subflux.PollKeySonarr, since: holdT0,
+		source: pollSourceSonarr, key: subflux.PollKeySonarr, since: holdT0,
 		entries: []arrapi.HistoryRecord{e1, e3, e2},
 	})
 
@@ -599,9 +599,9 @@ func TestPoller_a_queued_batch_does_not_overtake_a_hold(t *testing.T) {
 	e1, e2 := r.video(t, "Bad", 1), r.video(t, "Good", 2)
 	r.setBad("Bad", true)
 	r.setHistory(e1)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	r.setHistory(e1, e2)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	if n := len(r.p.work); n != 2 {
 		t.Fatalf("Setup: queued batches = %d, want 2", n)
 	}
@@ -616,7 +616,7 @@ func TestPoller_a_queued_batch_does_not_overtake_a_hold(t *testing.T) {
 	}
 
 	r.recover(t, "Bad")
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if a, b := r.engine.count(pathOf(e1)), r.engine.count(pathOf(e2)); a != 1 || b != 1 {
 		t.Errorf("searches E1 %d, E2 %d; want 1 and 1", a, b)
@@ -630,9 +630,9 @@ func TestPoller_a_queued_batch_does_not_overtake_a_transient_failure(t *testing.
 	r := newHoldRig(t)
 	e1, e2 := r.video(t, "A", 1), r.video(t, "B", 2)
 	r.setHistory(e1)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	r.setHistory(e1, e2)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 
 	r.arr.setSeriesErr(errors.New("sonarr restarting"))
 	drainOne(t, r.p)
@@ -645,7 +645,7 @@ func TestPoller_a_queued_batch_does_not_overtake_a_transient_failure(t *testing.
 		t.Errorf("durable cursor = %v, want held at E1 (%v)", got, e1.Date)
 	}
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if a, b := r.engine.count(pathOf(e1)), r.engine.count(pathOf(e2)); a != 1 || b != 1 {
 		t.Errorf("searches E1 %d, E2 %d; want 1 and 1", a, b)
@@ -664,7 +664,7 @@ func TestPoller_an_excluded_entry_in_an_unwritable_folder_does_not_hold(t *testi
 	r.arr.exclude(e1.SeriesID)
 	r.setHistory(e1)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if n := len(r.probeWrites()); n != 0 {
 		t.Errorf("probe writes = %d, want 0 for an excluded entry", n)
@@ -697,7 +697,7 @@ func TestPoller_an_entry_whose_rule_asks_for_no_subtitle_does_not_hold(t *testin
 	ls.Cfg = ruleCfg{validatingCfg{mockCfg: &mockCfg{interval: time.Hour, langs: []string{"en"}}, cfg: cfg}}
 	r.setHistory(e1)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if n := len(r.probeWrites()); n != 0 {
 		t.Errorf("probe writes = %d, want 0 for an entry with no targets", n)
@@ -725,7 +725,7 @@ func TestPoller_a_batch_cut_by_shutdown_leaves_the_cursor_and_holds_nothing(t *t
 	r := newHoldRig(t)
 	e1 := r.video(t, "Show", 1)
 	r.setHistory(e1)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -751,7 +751,7 @@ func TestPoller_an_out_of_root_entry_probes_nothing(t *testing.T) {
 	e := arrapi.HistoryRecord{ID: 1, Date: holdT0.Add(time.Second), Data: map[string]string{"importedPath": outside}}
 	r.setHistory(e)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if n := len(r.probeWrites()); n != 0 {
 		t.Errorf("probe writes = %d, want 0 for a folder outside the root", n)
@@ -768,7 +768,7 @@ func TestPoller_a_vanished_folder_does_not_hold(t *testing.T) {
 	r.setHistory(e)
 	store := r.p.deps.Store.(*mockStore)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if len(store.deletedPaths) != 1 {
 		t.Errorf("gone-file cleanups = %d, want 1 (the entry took the gone-file path)", len(store.deletedPaths))
@@ -784,14 +784,14 @@ func TestPoller_a_detection_in_flight_across_a_hold_does_not_stall_the_source(t 
 	e1, e2 := r.video(t, "Bad", 1), r.video(t, "Good", 2)
 	r.setBad("Bad", true)
 	r.setHistory(e1)
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 
 	r.setHistory(e1, e2)
 	r.arr.mu.Lock()
 	r.arr.gate = true
 	r.arr.mu.Unlock()
 	done := make(chan struct{})
-	go func() { r.p.PollOnce(t.Context()); close(done) }()
+	go func() { r.p.pollOnce(t.Context()); close(done) }()
 	<-r.arr.entered
 	drainOne(t, r.p)
 	close(r.arr.release)
@@ -806,7 +806,7 @@ func TestPoller_a_detection_in_flight_across_a_hold_does_not_stall_the_source(t 
 	}
 
 	r.recover(t, "Bad")
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	if got := r.arr.lastSince(); !got.Equal(e1.Date) {
 		t.Fatalf("next detection since = %v, want the durable cursor at E1 (%v)", got, e1.Date)
 	}
@@ -860,7 +860,7 @@ func TestPoller_a_per_target_write_refusal_advances_the_cursor(t *testing.T) {
 	r.setHistory(e)
 
 	for range 2 {
-		r.p.PollOnce(t.Context())
+		r.p.pollOnce(t.Context())
 		select {
 		case b := <-r.p.work:
 			r.p.executeBatch(t.Context(), &b)
@@ -894,9 +894,9 @@ func TestPoller_a_discard_never_erases_a_valid_mark(t *testing.T) {
 	r.setBad("Bad", true)
 	r.setHistory(e1, e2, e3)
 	key := subflux.PollKeySonarr
-	r.p.enqueue(&sourceBatch{source: PollSourceSonarr, key: key, since: holdT0, entries: []arrapi.HistoryRecord{e1}})
-	r.p.enqueue(&sourceBatch{source: PollSourceSonarr, key: key, since: past(e1), entries: []arrapi.HistoryRecord{e2}})
-	r.p.enqueue(&sourceBatch{source: PollSourceSonarr, key: key, since: past(e2), entries: []arrapi.HistoryRecord{e3}})
+	r.p.enqueue(&sourceBatch{source: pollSourceSonarr, key: key, since: holdT0, entries: []arrapi.HistoryRecord{e1}})
+	r.p.enqueue(&sourceBatch{source: pollSourceSonarr, key: key, since: past(e1), entries: []arrapi.HistoryRecord{e2}})
+	r.p.enqueue(&sourceBatch{source: pollSourceSonarr, key: key, since: past(e2), entries: []arrapi.HistoryRecord{e3}})
 
 	drainOne(t, r.p)
 	_, genAfterHold, _ := r.detectHigh()

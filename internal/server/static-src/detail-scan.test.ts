@@ -17,7 +17,6 @@ import {
   triggerMovieScan,
   registerScanButton,
   initScanButtons,
-  _scanButtonCountForTest,
 } from "./detail-scan.js";
 import { seriesScopeKey, seasonScopeKey, movieScopeKey } from "./scan-scope.js";
 import {
@@ -33,7 +32,6 @@ import type { SeriesItem, MovieDetail } from "./api-types.js";
 
 interface ScanArgs {
   url: string;
-  scopeKey: string;
 }
 interface ActionConfig {
   name: string;
@@ -132,31 +130,25 @@ describe("scan start endpoints", () => {
   it("posts the series scan path for a series", async () => {
     await triggerSeriesScan(series(42));
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/series/42", scopeKey: seriesScopeKey(42) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/series/42" }]);
   });
 
   it("posts the season scan path with both ids", async () => {
     await triggerSeasonScan(series(42), 3);
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/season/42/3", scopeKey: seasonScopeKey(42, 3) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/season/42/3" }]);
   });
 
   it("posts the movie scan path for a movie", async () => {
     await triggerMovieScan(movie(7));
 
-    expect(action.dispatched).toStrictEqual([
-      { url: "/api/scan/movie/7", scopeKey: movieScopeKey(7) },
-    ]);
+    expect(action.dispatched).toStrictEqual([{ url: "/api/scan/movie/7" }]);
   });
 
   it("builds a POST request from the dispatched url", async () => {
     await triggerSeriesScan(series(42));
 
-    expect(config().request({ url: "/api/scan/series/42", scopeKey: "x" })).toStrictEqual({
+    expect(config().request({ url: "/api/scan/series/42" })).toStrictEqual({
       method: "POST",
       path: "/api/scan/series/42",
     });
@@ -168,10 +160,8 @@ describe("scan start endpoints", () => {
       throw new Error("scan action declares no dedupe key");
     }
 
-    expect(dedupe({ url: "/api/scan/series/42", scopeKey: "a" })).toBe("scan:/api/scan/series/42");
-    expect(dedupe({ url: "/api/scan/series/42", scopeKey: "a" })).not.toBe(
-      dedupe({ url: "/api/scan/movie/42", scopeKey: "b" }),
-    );
+    expect(dedupe({ url: "/api/scan/series/42" })).toBe("scan:/api/scan/series/42");
+    expect(dedupe({ url: "/api/scan/series/42" })).not.toBe(dedupe({ url: "/api/scan/movie/42" }));
   });
 
   it("decodes the accepted response through the generated wire decoder", () => {
@@ -362,14 +352,16 @@ describe("the mounted-button registry (R8.5)", () => {
     // Every repaint of a row rebuilds its cells, so each paint registers a NEW
     // button and abandons the last. Re-opening the row's scope is what keeps
     // the registry from growing once per repaint forever.
-    scanButton(seriesScopeKey(1), testView.child("row-1"));
-    scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const first = scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const second = scanButton(seriesScopeKey(1), testView.child("row-1"));
     const last = scanButton(seriesScopeKey(1), testView.child("row-1"));
-
-    expect(_scanButtonCountForTest()).toBe(1);
 
     initScanButtons();
     running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
+    // A publish paints every registered button, so an abandoned one left
+    // idle is one the registry no longer holds.
+    expect(first.disabled).toBe(false);
+    expect(second.disabled).toBe(false);
     expect(last.disabled).toBe(true);
   });
 
@@ -386,7 +378,6 @@ describe("the mounted-button registry (R8.5)", () => {
 
     expect(removed.disabled).toBe(false);
     expect(kept.disabled).toBe(true);
-    expect(_scanButtonCountForTest()).toBe(1);
   });
 
   it("a route leave releases the buttons the departed view registered", () => {
@@ -403,7 +394,6 @@ describe("the mounted-button registry (R8.5)", () => {
 
     expect(departed.disabled).toBe(false);
     expect(departed.querySelector(".spinner")).toBeNull();
-    expect(_scanButtonCountForTest()).toBe(0);
   });
 
   it("registers nothing when the scope is already disposed", () => {
@@ -417,6 +407,5 @@ describe("the mounted-button registry (R8.5)", () => {
     running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
 
     expect(btn.disabled).toBe(false);
-    expect(_scanButtonCountForTest()).toBe(0);
   });
 });

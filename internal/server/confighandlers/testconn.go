@@ -33,9 +33,9 @@ type ConnTestResponse struct {
 	Valid   bool   `json:"valid"`
 }
 
-// ProviderAuthClearer clears a provider's credential disable when a passing
+// providerAuthClearer clears a provider's credential disable when a passing
 // check used the settings the disable was recorded under.
-type ProviderAuthClearer interface {
+type providerAuthClearer interface {
 	ClearIfMatches(ctx context.Context, id subflux.ProviderID, settings map[string]any) providergate.ClearResult
 }
 

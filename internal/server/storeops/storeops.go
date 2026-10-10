@@ -23,22 +23,22 @@ import (
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
-// StoreMetricsInterval is how often the store file-size and freelist gauges are
+// storeMetricsInterval is how often the store file-size and freelist gauges are
 // refreshed. 5 minutes keeps the /metrics scrape cheap (no per-request View tx)
 // while still catching file growth early enough for alerting.
-const StoreMetricsInterval = 5 * time.Minute
+const storeMetricsInterval = 5 * time.Minute
 
-// Store is the two methods these operations need of the store: snapshot the whole
+// store is the two methods these operations need of the store: snapshot the whole
 // file, and report its size. Both are whole-file concerns, which is why neither
 // appears in any row-level store interface.
-type Store interface {
+type store interface {
 	BackupInto(ctx context.Context, dest string) error
 	StoreFileStats() (fileBytes, freelistBytes int64)
 }
 
-// Metrics is the narrow observability surface for these operations. The concrete
+// metrics is the narrow observability surface for these operations. The concrete
 // *obs.Metrics satisfies it structurally.
-type Metrics interface {
+type metrics interface {
 	RecordBackupSuccess(dur time.Duration)
 	RecordStoreFileSize(bytes int64)
 	RecordStoreFreelistBytes(bytes int64)
@@ -46,8 +46,8 @@ type Metrics interface {
 
 // Deps is what the runners need.
 type Deps struct {
-	DB      Store
-	Metrics Metrics
+	DB      store
+	Metrics metrics
 	// Cfg resolves the LIVE config each cycle, so enable, frequency, retention
 	// and path changes take effect on the next iteration without a restart. It
 	// returns nil in unconfigured mode, which the backup loop treats as disabled.
@@ -127,7 +127,7 @@ func (r *Runner) runOnce(ctx context.Context) {
 func (r *Runner) RunMetrics(ctx context.Context) {
 	r.sample()
 
-	ticker := time.NewTicker(StoreMetricsInterval)
+	ticker := time.NewTicker(storeMetricsInterval)
 	defer ticker.Stop()
 	for {
 		select {

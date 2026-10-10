@@ -106,7 +106,7 @@ func waitForGateContention(t *testing.T, g *mediaGate) {
 	}
 }
 
-func (p *blockingProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
+func (*blockingProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

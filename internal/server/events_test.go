@@ -59,6 +59,6 @@ func TestEventBusConstruction(t *testing.T) {
 	}
 	// Publishing with no subscribers must be a safe no-op.
 	eb.Publish(events.Event{Type: events.Notify, Data: events.NotifyEvent{
-		Level: events.NotifyInfo, Text: "boot",
+		Level: events.NotifySuccess, Text: "boot",
 	}})
 }

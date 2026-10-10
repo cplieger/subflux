@@ -15,62 +15,62 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Reason names why a value cannot be a relying-party ID.
-type Reason string
+// reason names why a value cannot be a relying-party ID.
+type reason string
 
 // The refusal reasons, each carrying its own remedy in Error.Detail.
 const (
-	ReasonMalformedHost Reason = "malformed_host"
-	ReasonIPLiteral     Reason = "ip_literal"
-	ReasonSingleLabel   Reason = "single_label"
-	ReasonPublicSuffix  Reason = "public_suffix"
-	ReasonIllegalDomain Reason = "illegal_domain"
-	ReasonNotCanonical  Reason = "not_canonical"
-	ReasonNotServed     Reason = "not_served"
+	reasonMalformedHost reason = "malformed_host"
+	reasonIPLiteral     reason = "ip_literal"
+	reasonSingleLabel   reason = "single_label"
+	reasonPublicSuffix  reason = "public_suffix"
+	reasonIllegalDomain reason = "illegal_domain"
+	reasonNotCanonical  reason = "not_canonical"
+	reasonNotServed     reason = "not_served"
 )
 
-// Error names the offending value, why it was refused, and the remedy. The
+// refusal names the offending value, why it was refused, and the remedy. The
 // message carries no configuration key: every caller adds its own context.
-type Error struct {
+type refusal struct {
 	err    error
 	Value  string
 	Detail string
-	Reason Reason
+	Reason reason
 }
 
-func (e *Error) Error() string {
+func (e *refusal) Error() string {
 	return fmt.Sprintf("%q is not usable as a WebAuthn relying-party ID: %s; %s", e.Value, e.Reason.clause(), e.Detail)
 }
 
 // Unwrap exposes the library's refusal on the illegal_domain arm, so
 // errors.Is(err, authwebauthn.ErrIllegalRPID) reaches through.
-func (e *Error) Unwrap() error { return e.err }
+func (e *refusal) Unwrap() error { return e.err }
 
-func (r Reason) clause() string {
+func (r reason) clause() string {
 	switch r {
-	case ReasonMalformedHost:
+	case reasonMalformedHost:
 		return "the host is not a well-formed name or address"
-	case ReasonIPLiteral:
+	case reasonIPLiteral:
 		return "an IP address can never be a relying-party ID"
-	case ReasonSingleLabel:
+	case reasonSingleLabel:
 		return "a single-label hostname has no registrable domain"
-	case ReasonPublicSuffix:
+	case reasonPublicSuffix:
 		return "the host is itself a public suffix, which no relying party may claim"
-	case ReasonIllegalDomain:
+	case reasonIllegalDomain:
 		return "the registrable domain is not a legal relying-party ID"
-	case ReasonNotCanonical:
+	case reasonNotCanonical:
 		return "the value is not in canonical form"
-	case ReasonNotServed:
+	case reasonNotServed:
 		return "the host this save comes from is not inside it"
 	default:
 		return string(r)
 	}
 }
 
-// Normalize returns the canonical spelling of an operator-typed value: trimmed,
+// normalize returns the canonical spelling of an operator-typed value: trimmed,
 // ASCII-lowercased, without a trailing dot. A port is not stripped; Validate
 // refuses it.
-func Normalize(raw string) string {
+func normalize(raw string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(raw)), ".")
 }
 
@@ -79,12 +79,12 @@ func Normalize(raw string) string {
 func Derive(host string) (string, error) {
 	canon := webhttp.CanonicalHost(host)
 	if canon == "" {
-		return "", &Error{Value: host, Reason: ReasonMalformedHost, Detail: "reach subflux at a DNS name"}
+		return "", &refusal{Value: host, Reason: reasonMalformedHost, Detail: "reach subflux at a DNS name"}
 	}
 	// Before the suffix lookup: PublicSuffix("10.0.0.5") is "10.0.0.5", so an
 	// address reaching it would be reported as a bare public suffix.
 	if net.ParseIP(canon) != nil {
-		return "", &Error{Value: canon, Reason: ReasonIPLiteral, Detail: "reach subflux at a domain name over HTTPS, or at http://localhost"}
+		return "", &refusal{Value: canon, Reason: reasonIPLiteral, Detail: "reach subflux at a domain name over HTTPS, or at http://localhost"}
 	}
 	if canon == "localhost" {
 		return canon, nil
@@ -94,7 +94,7 @@ func Derive(host string) (string, error) {
 		return "", err
 	}
 	if err := authwebauthn.ValidateRPID(etld1); err != nil {
-		return "", &Error{err: err, Value: etld1, Reason: ReasonIllegalDomain, Detail: err.Error()}
+		return "", &refusal{err: err, Value: etld1, Reason: reasonIllegalDomain, Detail: err.Error()}
 	}
 	return etld1, nil
 }
@@ -110,9 +110,9 @@ func registrableDomain(canon string) (string, error) {
 		return etld1, nil
 	}
 	if strings.Count(canon, ".") == 0 {
-		return "", &Error{Value: canon, Reason: ReasonSingleLabel, Detail: "use a dotted name, or localhost"}
+		return "", &refusal{Value: canon, Reason: reasonSingleLabel, Detail: "use a dotted name, or localhost"}
 	}
-	return "", &Error{Value: canon, Reason: ReasonPublicSuffix, Detail: "reach subflux at a subdomain of " + canon}
+	return "", &refusal{Value: canon, Reason: reasonPublicSuffix, Detail: "reach subflux at a subdomain of " + canon}
 }
 
 // Validate judges an operator-typed value as written, without deriving: a
@@ -120,16 +120,16 @@ func registrableDomain(canon string) (string, error) {
 // accepted. The error is a *Error.
 func Validate(id string) error {
 	if id == "" {
-		return &Error{Value: id, Reason: ReasonMalformedHost, Detail: "set a domain name"}
+		return &refusal{Value: id, Reason: reasonMalformedHost, Detail: "set a domain name"}
 	}
-	if canon := Normalize(id); canon != id {
-		return &Error{Value: id, Reason: ReasonNotCanonical, Detail: fmt.Sprintf("spell it %q", canon)}
+	if canon := normalize(id); canon != id {
+		return &refusal{Value: id, Reason: reasonNotCanonical, Detail: fmt.Sprintf("spell it %q", canon)}
 	}
 	if webhttp.CanonicalHost(id) != id {
-		return &Error{Value: id, Reason: ReasonMalformedHost, Detail: "use a bare domain name, without a scheme, port or path"}
+		return &refusal{Value: id, Reason: reasonMalformedHost, Detail: "use a bare domain name, without a scheme, port or path"}
 	}
 	if net.ParseIP(id) != nil {
-		return &Error{Value: id, Reason: ReasonIPLiteral, Detail: "reach subflux at a domain name over HTTPS, or at http://localhost"}
+		return &refusal{Value: id, Reason: reasonIPLiteral, Detail: "reach subflux at a domain name over HTTPS, or at http://localhost"}
 	}
 	if id == "localhost" {
 		return nil
@@ -138,7 +138,7 @@ func Validate(id string) error {
 		return err
 	}
 	if err := authwebauthn.ValidateRPID(id); err != nil {
-		return &Error{err: err, Value: id, Reason: ReasonIllegalDomain, Detail: err.Error()}
+		return &refusal{err: err, Value: id, Reason: reasonIllegalDomain, Detail: err.Error()}
 	}
 	return nil
 }
@@ -158,5 +158,5 @@ func ValidateForHost(id, host string) error {
 	if derived, err := Derive(host); err == nil {
 		detail += fmt.Sprintf(", or use %q for the host you are on", derived)
 	}
-	return &Error{Value: id, Reason: ReasonNotServed, Detail: detail}
+	return &refusal{Value: id, Reason: reasonNotServed, Detail: detail}
 }

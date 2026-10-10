@@ -28,7 +28,7 @@ func Handle(bus *EventBus, w http.ResponseWriter, r *http.Request) {
 			if !legacy {
 				return nil
 			}
-			data, err := json.Marshal(Event{Type: Epoch, Data: EpochEvent{
+			data, err := json.Marshal(Event{Type: epoch, Data: EpochEvent{
 				BootID: h.Epoch,
 				Head:   h.Head,
 				Gap:    !h.Resumed,
@@ -36,7 +36,7 @@ func Handle(bus *EventBus, w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return err
 			}
-			return sw.Event(string(Epoch), data)
+			return sw.Event(string(epoch), data)
 		}),
 	)
 }

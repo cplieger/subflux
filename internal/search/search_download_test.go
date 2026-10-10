@@ -187,7 +187,7 @@ func TestDownloadFromProvider_not_found(t *testing.T) {
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error for unknown provider, got nil")
 	}
-	if !errors.Is(err, ErrProviderNotFound) {
+	if !errors.Is(err, errProviderNotFound) {
 		t.Errorf("downloadFromProvider() error = %q, want ErrProviderNotFound", err.Error())
 	}
 }
@@ -575,7 +575,7 @@ func (s *recordingSyncer) Sync(_ context.Context, data []byte, _, _ string) (syn
 	return append(bytes.Clone(data), []byte("2\n00:00:09,000 --> 00:00:10,000\nShifted\n\n")...), 4000
 }
 
-func (s *recordingSyncer) PostProcess(data []byte, _ subflux.PostProcessConfig) []byte { return data }
+func (*recordingSyncer) PostProcess(data []byte, _ subflux.PostProcessConfig) []byte { return data }
 
 // fixedScorer gives every candidate the same score, which is how a test puts a
 // candidate exactly on a threshold the download path reads.

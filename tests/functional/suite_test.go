@@ -70,7 +70,7 @@ func newSuite() *suite {
 
 // --- Output helpers (bash prefixes, no ANSI) --------------------------------
 
-func (s *suite) log(msg string) { fmt.Printf("[TEST] %s\n", msg) }
+func (*suite) log(msg string) { fmt.Printf("[TEST] %s\n", msg) }
 
 func (s *suite) logf(format string, args ...any) { s.log(fmt.Sprintf(format, args...)) }
 
@@ -143,13 +143,13 @@ func (s *suite) apiGet(path string) string {
 	return s.doRequest(defaultTimeout, http.MethodGet, s.baseURL+path, "", "")
 }
 
-func (s *suite) apiDelete(path string) string {
-	return s.doRequest(defaultTimeout, http.MethodDelete, s.baseURL+path, "", "")
+func (s *suite) apiDelete(path string) {
+	s.doRequest(defaultTimeout, http.MethodDelete, s.baseURL+path, "", "")
 }
 
 // apiDeleteJSON mirrors `_curl -X DELETE -H 'Content-Type: application/json' -d body`.
-func (s *suite) apiDeleteJSON(path, body string) string {
-	return s.doRequest(defaultTimeout, http.MethodDelete, s.baseURL+path, "application/json", body)
+func (s *suite) apiDeleteJSON(path, body string) {
+	s.doRequest(defaultTimeout, http.MethodDelete, s.baseURL+path, "application/json", body)
 }
 
 func (s *suite) apiPost(path, body string) string {
@@ -161,8 +161,8 @@ func (s *suite) apiPost(path, body string) string {
 
 // apiPostText mirrors `_curl -X POST -H 'Content-Type: text/plain' -d body`
 // (the alternate config-save method).
-func (s *suite) apiPostText(path, body string) string {
-	return s.doRequest(defaultTimeout, http.MethodPost, s.baseURL+path, "text/plain", body)
+func (s *suite) apiPostText(path, body string) {
+	s.doRequest(defaultTimeout, http.MethodPost, s.baseURL+path, "text/plain", body)
 }
 
 func (s *suite) apiPut(path, body string) string {

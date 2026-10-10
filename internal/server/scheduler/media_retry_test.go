@@ -35,7 +35,7 @@ func (m *scriptedMedia) Preflight(_ context.Context, req mediawrite.PreflightReq
 		m.retries++
 	}
 	if fail {
-		return &mediawrite.UnwritableError{Folder: "/media", Root: "/media", Op: "probe", Err: syscall.EROFS}
+		return &mediawrite.UnwritableError{Folder: "/media", Op: "probe", Err: syscall.EROFS}
 	}
 	return nil
 }

@@ -269,10 +269,6 @@ const LOGIN_ERROR_MAP: readonly {
     },
   },
   { code: ErrorCode.AuthAccountDisabled, msg: "This account has been disabled." },
-  {
-    code: ErrorCode.AuthAccountNotSetup,
-    msg: "Account setup is incomplete. Contact your administrator.",
-  },
 ];
 
 function loginErrorMessage(res: ApiResult<LoginSuccess>): string {

@@ -13,8 +13,8 @@ import (
 const credAPIKey = "subdl-test-key"
 
 // credProvider builds a provider whose transport answers one canned response.
-func credProvider(status int, transportErr error) *Provider {
-	return &Provider{
+func credProvider(status int, transportErr error) *source {
+	return &source{
 		apiKey: credAPIKey,
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			if transportErr != nil {
@@ -88,7 +88,7 @@ func TestCheckCredentials(t *testing.T) {
 func TestCheckCredentials_asks_the_account_endpoint(t *testing.T) {
 	t.Parallel()
 	var got *http.Request
-	p := &Provider{
+	p := &source{
 		apiKey: credAPIKey,
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			got = r

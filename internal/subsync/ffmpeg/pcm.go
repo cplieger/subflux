@@ -19,11 +19,11 @@ const PCMSampleRate = 8000
 // ExtractSegmentPCM extracts raw PCM audio from a time range.
 // Returns int16 samples at PCMSampleRate. durationMs=0 means no limit.
 func ExtractSegmentPCM(ctx context.Context, path string, startMs, durationMs int64) ([]int16, error) {
-	return ExtractPCMWithFilter(ctx, path, startMs, durationMs, "aresample=async=1")
+	return extractPCMWithFilter(ctx, path, startMs, durationMs, "aresample=async=1")
 }
 
-// ExtractPCMWithFilter extracts PCM audio with a custom ffmpeg audio filter.
-func ExtractPCMWithFilter(ctx context.Context, path string, startMs, durationMs int64, af string) ([]int16, error) {
+// extractPCMWithFilter extracts PCM audio with a custom ffmpeg audio filter.
+func extractPCMWithFilter(ctx context.Context, path string, startMs, durationMs int64, af string) ([]int16, error) {
 	maxSamples := 100_000_000 // ~3.5 hours at 8 kHz
 	if durationMs > 0 {
 		maxSamples = int(durationMs) * PCMSampleRate / 1000

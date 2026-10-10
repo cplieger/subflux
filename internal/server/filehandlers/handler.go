@@ -44,13 +44,13 @@ type Deps struct {
 	Store     FileStore
 	Resolve   *resolve.Resolver
 	StateFunc func() *LiveState
-	Events    EventPublisher
-	Presence  Presence
+	Events    eventPublisher
+	Presence  presence
 }
 
-// Presence decides whether a manual subtitle is gone from disk;
+// presence decides whether a manual subtitle is gone from disk;
 // *mediapresence.Checker satisfies it.
-type Presence interface {
+type presence interface {
 	Gone(ctx context.Context, path string) (bool, error)
 }
 
@@ -94,8 +94,8 @@ type LiveState struct {
 	Radarr FileRadarrClient
 }
 
-// EventPublisher is the narrow interface for publishing events.
-type EventPublisher interface {
+// eventPublisher is the narrow interface for publishing events.
+type eventPublisher interface {
 	Publish(e events.Event)
 }
 

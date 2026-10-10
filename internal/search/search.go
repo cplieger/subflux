@@ -139,6 +139,8 @@ func WithMediaWriter(w MediaWriter) Option { return func(e *Engine) { e.media = 
 
 // WithTimeout sets the provider health tracker. When not set, the engine
 // constructs one from config (or uses noopHealth if disabled).
+//
+//deadset:ignore DS1004 -- The server's provider-gate tests inject the health tracker they observe through it.
 func WithTimeout(h providerHealth) Option { return func(e *Engine) { e.timeout = h } }
 
 // providerHealth is what the engine asks of a provider-health tracker, declared
@@ -203,7 +205,7 @@ func (e *Engine) requireDeps() {
 		{v: e.cfg, option: "WithConfig"},
 		{v: e.scorer, option: "WithScorer"},
 		{v: e.syncer, option: "WithSyncer"},
-		{v: e.tracks, option: "WithTracks (use embedded.Detector{} or search.NoopDetector{})"},
+		{v: e.tracks, option: "WithTracks (use embedded.Detector{})"},
 		{v: e.providerGate, option: "WithProviderGate"},
 		{v: e.media, option: "WithMediaWriter"},
 	} {
@@ -499,17 +501,16 @@ func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
 	return result, nil
 }
 
-// hashVideo fills the request's hash and size from the video file; a file
-// that cannot be hashed is searched without them.
+// hashVideo fills the request's hash from the video file; a file that cannot
+// be hashed is searched without it.
 func (e *Engine) hashVideo(ctx context.Context, req *subflux.SearchRequest, videoPath string) {
-	hash, size, err := e.HashFile(ctx, videoPath)
+	hash, _, err := e.HashFile(ctx, videoPath)
 	if err != nil {
 		slog.Debug("video hash failed, searching without hash",
 			"path", videoPath, "error", err)
 		return
 	}
 	req.VideoHash = hash
-	req.VideoSize = size
 }
 
 // unfinished reports whether a search left work the next pass must redo: a

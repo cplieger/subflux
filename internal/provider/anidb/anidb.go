@@ -79,9 +79,7 @@ func NewMapper(clientKey string) *Mapper {
 
 // EpisodeResult holds the resolved AniDB IDs.
 type EpisodeResult struct {
-	AniDBSeriesID  int
 	AniDBEpisodeID int // 0 if API key not configured or lookup failed
-	AniDBEpisodeNo int // episode number within the AniDB entry
 }
 
 // Resolve maps a TVDB series ID + season + episode to AniDB IDs.
@@ -100,10 +98,7 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 		return nil
 	}
 
-	result := &EpisodeResult{
-		AniDBSeriesID:  seriesID,
-		AniDBEpisodeNo: epNo,
-	}
+	result := &EpisodeResult{}
 
 	if m.clientKey != "" && seriesID > 0 && epNo > 0 {
 		epID, epErr := m.episodeID(ctx, seriesID, epNo)

@@ -540,9 +540,11 @@ func TestRun_clears_a_recovered_folder_without_a_scan(t *testing.T) {
 		outside := t.TempDir()
 		h.setWrite(failUnder(outside, erofs))
 		err := h.w.WriteFile(t.Context(), filepath.Join(outside, "a.srt"), []byte("1\n"))
-		var uerr *UnwritableError
-		if !errors.As(err, &uerr) || uerr.Root != unconfiguredRoot {
-			t.Fatalf("WriteFile outside every root = %v, want root %q", err, unconfiguredRoot)
+		if _, ok := errors.AsType[*UnwritableError](err); !ok {
+			t.Fatalf("WriteFile outside every root = %v, want an *UnwritableError", err)
+		}
+		if u := h.gauge(t, unconfiguredRoot); u != 1 {
+			t.Fatalf("unconfigured gauge = %v, want 1", u)
 		}
 		h.setWrite(nil)
 		time.Sleep(defaultRecheckInterval + time.Second)

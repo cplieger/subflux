@@ -35,10 +35,6 @@ const panel = el("div", {
   "aria-label": "User menu",
 });
 
-export function _userMenuPanelForTest(): HTMLElement {
-  return panel;
-}
-
 export function initUserMenu(): void {
   void fetchMe();
   wireUserButton();

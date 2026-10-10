@@ -675,7 +675,7 @@ func CompilePCRE(pat string) (*Pattern, error) {
 	}
 	assignAssertInnerGroups(alts, &ps.nSrc)
 
-	p := &Pattern{original: pat, nSrcGroups: ps.nSrc}
+	p := &Pattern{nSrcGroups: ps.nSrc}
 	for _, sq := range alts {
 		b, err := compileBranch(sq, ps.nSrc, pat)
 		if err != nil {

@@ -37,15 +37,15 @@ type retryProvider struct {
 func WrapRetryAll(providers []Provider, maxAttempts int, initBackoff time.Duration) []Provider {
 	wrapped := make([]Provider, len(providers))
 	for i, p := range providers {
-		wrapped[i] = WrapRetry(p, maxAttempts, initBackoff)
+		wrapped[i] = wrapRetry(p, maxAttempts, initBackoff)
 	}
 	return wrapped
 }
 
-// WrapRetry wraps a provider with download retry logic.
+// wrapRetry wraps a provider with download retry logic.
 // If the inner provider implements ShowSubtitleCounter, the wrapper
 // preserves that interface.
-func WrapRetry(p Provider, maxAttempts int, initBackoff time.Duration) Provider {
+func wrapRetry(p Provider, maxAttempts int, initBackoff time.Duration) Provider {
 	rp := &retryProvider{inner: p, maxAttempts: maxAttempts, initBackoff: initBackoff}
 	if c, ok := p.(ShowSubtitleCounter); ok {
 		return &retryCounterProvider{retryProvider: rp, counter: c}

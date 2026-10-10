@@ -218,7 +218,7 @@ describe("files: loading skeleton", () => {
   it("paints four skeleton rows only after the show delay and keeps them their minimum", async () => {
     const settle = pendingListing();
 
-    openFileManager("movie", "tmdb-51", "Movie", "/");
+    openFileManager("movie", "tmdb-51", "Movie");
     await drain();
 
     // A listing that answers inside the show-delay window paints no skeleton.
@@ -262,7 +262,7 @@ describe("files: install over a painted skeleton", () => {
   it("CONTROL a listing that beats the show delay: no placeholder once rows exist", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-201", "en"), extFile("tmdb-201", "fr")]);
 
-    openFileManager("movie", "tmdb-201", "Movie", "/");
+    openFileManager("movie", "tmdb-201", "Movie");
     await drain();
 
     expect(skeletonRows()).toHaveLength(0);
@@ -276,7 +276,7 @@ describe("files: install over a painted skeleton", () => {
   it("reconciles the table into the installed list, over a container holding the skeleton", async () => {
     const settle = pendingListing();
 
-    openFileManager("movie", "tmdb-203", "Movie", "/");
+    openFileManager("movie", "tmdb-203", "Movie");
     await drain();
     vi.advanceTimersByTime(150);
     expect(skeletonRows()).toHaveLength(4);
@@ -295,11 +295,11 @@ describe("files: install over a painted skeleton", () => {
   // binding and paints a skeleton over the mounted table.
   it("a second open leaves no skeleton timer to paint over the mounted table", async () => {
     pendingListing();
-    openFileManager("movie", "tmdb-205", "Movie", "/");
+    openFileManager("movie", "tmdb-205", "Movie");
     await drain();
 
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-205", "en")]);
-    openFileManager("movie", "tmdb-205", "Movie", "/");
+    openFileManager("movie", "tmdb-205", "Movie");
     await drain();
     const tbody = reqTbody();
 
@@ -319,7 +319,7 @@ describe("files: card-head bulk button", () => {
 
   it("leaves the card head when another view takes the pane", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-209", "en")]);
-    openFileManager("movie", "tmdb-209", "Movie", "/");
+    openFileManager("movie", "tmdb-209", "Movie");
     await tick();
     expect(bulkButton()).not.toBeNull();
 
@@ -345,7 +345,7 @@ describe("files: sorted view", () => {
       extFile("tvdb-71-s01e99", "en"),
     ]);
 
-    openFileManager("episode", "tvdb-71-", "Long Show", "/series/71", 7);
+    openFileManager("episode", "tvdb-71-", "Long Show", 7);
     await tick();
 
     expect(firstCol(0)).toBe("S01E99");
@@ -354,7 +354,7 @@ describe("files: sorted view", () => {
 
   it("repaints a refresh that swaps only a later row for a different file", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-67", "en"), extFile("tmdb-67", "fr")]);
-    openFileManager("movie", "tmdb-67", "Movie", "/");
+    openFileManager("movie", "tmdb-67", "Movie");
     await tick();
     expect(firstCol(1)).toBe("French");
 
@@ -363,7 +363,7 @@ describe("files: sorted view", () => {
     // satisfied by one matching index would call the two lists equal and the
     // structural render would never learn the row changed.
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-67", "en"), extFile("tmdb-67", "ja")]);
-    openFileManager("movie", "tmdb-67", "Movie", "/");
+    openFileManager("movie", "tmdb-67", "Movie");
     await tick();
 
     expect(reqTbody().children.length).toBe(2);
@@ -383,7 +383,7 @@ describe("files: page state", () => {
       seenWithPageFlip.push(store.get("detailCtx"));
     });
 
-    openFileManager("movie", "tmdb-73", "Movie", "/");
+    openFileManager("movie", "tmdb-73", "Movie");
     stop();
 
     // Anything reacting to the page flip reads detailCtx as it does; a stale
@@ -402,7 +402,7 @@ describe("files: render disposal", () => {
 
   it("a view taking the pane leaves the predecessor's bindings disposed", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-63", "en"), extFile("tmdb-63", "fr")]);
-    openFileManager("movie", "tmdb-63", "Movie", "/");
+    openFileManager("movie", "tmdb-63", "Movie");
     await tick();
     const discarded = bulkLabel();
     expect(discarded.textContent).toBe(" Delete all (2)");
@@ -417,12 +417,12 @@ describe("files: render disposal", () => {
       extFile("tmdb-63", "en"),
       extFile("tmdb-63", "fr"),
     ]);
-    openFileManager("movie", "tmdb-63", "Movie", "/");
+    openFileManager("movie", "tmdb-63", "Movie");
     await tick();
     expect(bulkLabel()).not.toBe(discarded);
 
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-63", "en")]);
-    openFileManager("movie", "tmdb-63", "Movie", "/");
+    openFileManager("movie", "tmdb-63", "Movie");
     await tick();
 
     // Only the live render tracks the collection now.
@@ -432,18 +432,18 @@ describe("files: render disposal", () => {
 
   it("a failed listing leaves the render it replaced disposed", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-65", "en"), extFile("tmdb-65", "fr")]);
-    openFileManager("movie", "tmdb-65", "Movie", "/");
+    openFileManager("movie", "tmdb-65", "Movie");
     await tick();
     const discarded = bulkLabel();
     expect(discarded.textContent).toBe(" Delete all (2)");
 
     mockListFiles.mockResolvedValueOnce(null);
-    openFileManager("movie", "tmdb-65", "Movie", "/");
+    openFileManager("movie", "tmdb-65", "Movie");
     await tick();
     expect(document.querySelector('#coverageContent [data-status="err"]')).not.toBeNull();
 
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-65", "en")]);
-    openFileManager("movie", "tmdb-65", "Movie", "/");
+    openFileManager("movie", "tmdb-65", "Movie");
     await tick();
 
     expect(bulkLabel().textContent).toBe(" Delete all (1)");
@@ -459,7 +459,7 @@ describe("files: row controls contain their click", () => {
   it("sync and delete both act without letting the click reach the row", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tvdb-79-s01e01", "en")]);
 
-    openFileManager("episode", "tvdb-79-", "Show", "/series/79", 7);
+    openFileManager("episode", "tvdb-79-", "Show", 7);
     await tick();
     const row = reqRow(0);
     let rowClicks = 0;
@@ -491,7 +491,7 @@ describe("files: delete rollback", () => {
 
   it("a delete of a file the collection no longer holds cannot resurrect its row", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-61", "en"), extFile("tmdb-61", "fr")]);
-    openFileManager("movie", "tmdb-61", "Movie", "/");
+    openFileManager("movie", "tmdb-61", "Movie");
     await tick();
     const delBtn = reqRow(0).querySelector<HTMLButtonElement>("button.btn-delete");
     if (!delBtn) {
@@ -522,7 +522,7 @@ describe("files: bulk delete", () => {
   it("empties the table optimistically while the confirming refresh is still in flight", async () => {
     actionCalls.results["files.delete_bulk"] = { deleted: 2 };
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-75", "en"), extFile("tmdb-75", "fr")]);
-    openFileManager("movie", "tmdb-75", "Movie", "/");
+    openFileManager("movie", "tmdb-75", "Movie");
     await tick();
 
     // The refresh stays pending, so what these assertions read is the
@@ -543,7 +543,7 @@ describe("files: bulk delete", () => {
   it("a failed bulk delete restores every row it cleared", async () => {
     actionCalls.failing["files.delete_bulk"] = true;
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-77", "en"), extFile("tmdb-77", "fr")]);
-    openFileManager("movie", "tmdb-77", "Movie", "/");
+    openFileManager("movie", "tmdb-77", "Movie");
     await tick();
 
     reqBulkButton().click();

@@ -14,7 +14,7 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // unmatchedIMDB is a syntactically valid IMDb id no title carries, so the title
 // lookup below is an indexed miss rather than a search.
@@ -33,7 +33,7 @@ const unmatchedIMDB = "tt0000000"
 // not 401 or 403 means the key was accepted whatever the router then made of the
 // request. A 5xx is the one arm that cannot say either way, so it reports as an
 // incomplete check rather than as a verdict.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	params := url.Values{
 		paramAPIKey:     {p.apiKey},
 		paramSearchType: {string(matchedByIMDB)},

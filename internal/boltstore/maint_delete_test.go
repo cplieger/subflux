@@ -73,7 +73,7 @@ func TestDeleteStateByPaths_noMatch(t *testing.T) {
 	if len(res.Paths) != 0 {
 		t.Errorf("Paths = %d, want 0", len(res.Paths))
 	}
-	downloads, _, _ := mustStats(t, db)
+	downloads, _ := mustStats(t, db)
 	if downloads != 1 {
 		t.Errorf("downloads = %d, want 1 (row preserved)", downloads)
 	}
@@ -126,7 +126,7 @@ func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 		t.Errorf("Paths = %v, want 3 entries", res.Paths)
 	}
 
-	downloads, attempts, _ := mustStats(t, db)
+	downloads, attempts := mustStats(t, db)
 	if downloads != 0 {
 		t.Errorf("downloads = %d, want 0 (all rows removed)", downloads)
 	}
@@ -252,7 +252,7 @@ func TestDeleteStateByPaths_idempotent(t *testing.T) {
 		t.Errorf("second Paths = %d, want 0 (no-op re-run)", len(second.Paths))
 	}
 
-	downloads, attempts, _ := mustStats(t, db)
+	downloads, attempts := mustStats(t, db)
 	if downloads != 0 || attempts != 0 {
 		t.Errorf("counters after re-run = (%d,%d), want (0,0)", downloads, attempts)
 	}
@@ -288,7 +288,7 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	}
 
 	// Unrelated state row, backoff, and coverage all survive.
-	downloads, attempts, _ := mustStats(t, db)
+	downloads, attempts := mustStats(t, db)
 	if downloads != 1 {
 		t.Errorf("downloads = %d, want 1 (unrelated row kept)", downloads)
 	}
@@ -369,11 +369,11 @@ func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 }
 
 // mustStats reads Stats and fails the test on error.
-func mustStats(t *testing.T, db *DB) (downloads, attempts int, _ error) {
+func mustStats(t *testing.T, db *DB) (downloads, attempts int) {
 	t.Helper()
 	d, a, err := db.Stats(t.Context())
 	if err != nil {
 		t.Fatalf("Stats: %v", err)
 	}
-	return d, a, nil
+	return d, a
 }

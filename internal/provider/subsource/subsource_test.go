@@ -74,9 +74,9 @@ func TestMatchTitle(t *testing.T) {
 	t.Parallel()
 
 	data := []searchResult{
-		{MovieID: 100, Title: "Breaking Bad", ReleaseYear: FlexInt(2008)},
-		{MovieID: 200, Title: "The Wire", ReleaseYear: FlexInt(2002)},
-		{MovieID: 300, Title: "Better Call Saul", ReleaseYear: FlexInt(2015)},
+		{MovieID: 100, Title: "Breaking Bad", ReleaseYear: flexInt(2008)},
+		{MovieID: 200, Title: "The Wire", ReleaseYear: flexInt(2002)},
+		{MovieID: 300, Title: "Better Call Saul", ReleaseYear: flexInt(2015)},
 	}
 
 	tests := []struct {
@@ -111,9 +111,9 @@ func TestMatchTitle_year_disambiguates(t *testing.T) {
 	t.Parallel()
 
 	data := []searchResult{
-		{MovieID: 1, Title: "The Matrix", ReleaseYear: FlexInt(1999)},
-		{MovieID: 2, Title: "The Matrix Reloaded", ReleaseYear: FlexInt(2003)},
-		{MovieID: 3, Title: "The Matrix Resurrections", ReleaseYear: FlexInt(2021)},
+		{MovieID: 1, Title: "The Matrix", ReleaseYear: flexInt(1999)},
+		{MovieID: 2, Title: "The Matrix Reloaded", ReleaseYear: flexInt(2003)},
+		{MovieID: 3, Title: "The Matrix Resurrections", ReleaseYear: flexInt(2021)},
 	}
 
 	tests := []struct {
@@ -144,10 +144,10 @@ func TestMatchTitle_nil_release_year(t *testing.T) {
 	t.Parallel()
 
 	data := []searchResult{
-		{MovieID: 5, Title: "Test Movie", ReleaseYear: FlexInt(0)},
+		{MovieID: 5, Title: "Test Movie", ReleaseYear: flexInt(0)},
 	}
 
-	// With year=0, zero ReleaseYear should still match (FlexInt(0) == 0).
+	// With year=0, zero ReleaseYear should still match (flexInt(0) == 0).
 	if got := matchTitle(data, "Test", 0); got != 5 {
 		t.Errorf("matchTitle(nil year, year=0) = %d, want 5", got)
 	}
@@ -176,7 +176,7 @@ func TestFlexInt_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		want  FlexInt
+		want  flexInt
 	}{
 		{"number", `2024`, 2024},
 		{"string", `"2015"`, 2015},
@@ -189,7 +189,7 @@ func TestFlexInt_UnmarshalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var got FlexInt
+			var got flexInt
 			if err := got.UnmarshalJSON([]byte(tt.input)); err != nil {
 				t.Fatalf("UnmarshalJSON(%q) error: %v", tt.input, err)
 			}
@@ -384,7 +384,7 @@ func TestBuildSubtitles(t *testing.T) {
 func TestRedactAPIKey_strips_secret_from_error_message(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{apiKey: "supersecret32hex"}
+	p := &source{apiKey: "supersecret32hex"}
 	in := fmt.Errorf("Get https://api.subsource.net/api/v1/subtitles?api_key=%s: dial tcp: i/o timeout", p.apiKey)
 	got := httpx.RedactSecret(in, p.apiKey)
 	if got == nil {
@@ -401,7 +401,7 @@ func TestRedactAPIKey_strips_secret_from_error_message(t *testing.T) {
 func TestRedactAPIKey_pass_through_when_apikey_absent_from_message(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{apiKey: "supersecret32hex"}
+	p := &source{apiKey: "supersecret32hex"}
 	in := errors.New("some error that does not leak the secret")
 	got := httpx.RedactSecret(in, p.apiKey)
 	if got.Error() != in.Error() {
@@ -412,7 +412,7 @@ func TestRedactAPIKey_pass_through_when_apikey_absent_from_message(t *testing.T)
 func TestRedactAPIKey_nil_and_empty_apikey(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{apiKey: ""}
+	p := &source{apiKey: ""}
 	if got := httpx.RedactSecret(nil, p.apiKey); got != nil {
 		t.Errorf("redactAPIKey(nil) = %v, want nil", got)
 	}

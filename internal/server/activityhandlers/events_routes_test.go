@@ -24,15 +24,15 @@ type recordingMetrics struct {
 }
 
 func (m *recordingMetrics) RecordSSEConnect(string, bool) { m.connects.Add(1) }
-func (m *recordingMetrics) RecordSSEDisconnect(string)    {}
+func (*recordingMetrics) RecordSSEDisconnect(string)      {}
 func (m *recordingMetrics) RecordSSEPresenceTransition(kind string) {
 	m.mu.Lock()
 	m.transitions = append(m.transitions, kind)
 	m.mu.Unlock()
 }
-func (m *recordingMetrics) SetSSEClients(int)      {}
-func (m *recordingMetrics) SetSSEQueuedFrames(int) {}
-func (m *recordingMetrics) SetSSEHead(uint64)      {}
+func (*recordingMetrics) SetSSEClients(int)      {}
+func (*recordingMetrics) SetSSEQueuedFrames(int) {}
+func (*recordingMetrics) SetSSEHead(uint64)      {}
 
 func (m *recordingMetrics) snapshot() []string {
 	m.mu.Lock()
@@ -53,10 +53,8 @@ func newEventsHandler(t *testing.T, m events.Metrics) (*activityhandlers.Handler
 }
 
 type digestReply struct {
-	Epoch   string `json:"epoch"`
 	Changed []struct {
 		Kind    string `json:"kind"`
-		Ref     string `json:"ref"`
 		Version string `json:"version"`
 	} `json:"changed"`
 	Checked     int  `json:"checked"`

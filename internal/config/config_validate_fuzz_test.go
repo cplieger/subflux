@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,7 +36,7 @@ func FuzzValidateBackup(f *testing.F) {
 		cfg := &yamlBackupConfig{
 			Enabled:   enabled,
 			Path:      path,
-			Frequency: Duration{D: time.Duration(freqNs)},
+			Frequency: duration{D: time.Duration(freqNs)},
 			Retention: retention,
 		}
 
@@ -70,7 +71,7 @@ func FuzzValidateBackup(f *testing.F) {
 
 // FuzzValidateLogging exercises validateLogging with arbitrary level/format
 // strings, checking that valid combinations pass and that every failure wraps
-// ErrLoggingConfig.
+// errLoggingConfig.
 func FuzzValidateLogging(f *testing.F) {
 	f.Add("info", "json")
 	f.Add("debug", "text")
@@ -80,7 +81,7 @@ func FuzzValidateLogging(f *testing.F) {
 	f.Add("WARN", "JSON")
 
 	f.Fuzz(func(t *testing.T, level, format string) {
-		cfg := &LoggingConfig{Level: LogLevel(level), Format: LogFormat(format)}
+		cfg := &loggingConfig{Level: logLevel(level), Format: logFormat(format)}
 		err := validateLogging(cfg)
 
 		// Invariant 1: empty level and format always passes.
@@ -89,19 +90,19 @@ func FuzzValidateLogging(f *testing.F) {
 		}
 
 		// Invariant 2: valid level+format never errors.
-		if ValidLogLevel(LogLevel(level)) && ValidLogFormat(LogFormat(format)) && err != nil {
+		if validLogLevel(logLevel(level)) && validLogFormat(logFormat(format)) && err != nil {
 			t.Fatalf("valid logging config (%q, %q) should pass, got: %v", level, format, err)
 		}
 
-		// Invariant 3: if error, it wraps ErrLoggingConfig.
-		if err != nil && !errors.Is(err, ErrLoggingConfig) {
+		// Invariant 3: if error, it wraps errLoggingConfig.
+		if err != nil && !errors.Is(err, errLoggingConfig) {
 			t.Fatalf("logging validation error should wrap ErrLoggingConfig, got: %v", err)
 		}
 	})
 }
 
 // FuzzValidateScoreRange exercises validateScoreRange boundaries: values in
-// [0,100] pass, everything else fails with a *ValidationError carrying the
+// [0,100] pass, everything else fails with a *validationError carrying the
 // queried field.
 func FuzzValidateScoreRange(f *testing.F) {
 	f.Add(0, "search.min_score")
@@ -122,14 +123,14 @@ func FuzzValidateScoreRange(f *testing.F) {
 			t.Fatalf("validateScoreRange(%d, %q) = nil, want error", value, field)
 		}
 
-		// If error, it should be a *ValidationError naming the field.
+		// If error, it should be a *validationError naming the field.
 		if err != nil {
-			var ve *ValidationError
+			var ve *validationError
 			if !errors.As(err, &ve) {
-				t.Fatalf("error is not *ValidationError: %v", err)
+				t.Fatalf("error is not *validationError: %v", err)
 			}
-			if ve.Field != field {
-				t.Fatalf("ValidationError.Field = %q, want %q", ve.Field, field)
+			if !strings.HasPrefix(ve.Message, field+" ") {
+				t.Fatalf("validationError.Message = %q, want it to start with %q", ve.Message, field)
 			}
 		}
 	})

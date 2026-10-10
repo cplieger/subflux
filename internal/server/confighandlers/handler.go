@@ -30,8 +30,8 @@ import (
 // config.LoadFromBytes; the server carries the func and never calls it.
 type ConfigLoader func(data []byte) (*config.Config, error)
 
-// AlertLog is the narrow interface for alert operations.
-type AlertLog interface {
+// alertLog is the narrow interface for alert operations.
+type alertLog interface {
 	RecordPersistent(source, msg string)
 }
 
@@ -53,8 +53,8 @@ const (
 // ArrPinger is the only thing this package asks of an arr client: can it be
 // reached. A config save pings Sonarr or Radarr before activating a changed
 // endpoint, so a bad URL or key is reported on the save rather than discovered
-// by the next scan. ONE method, against the 19 exported methods
-// *arrsvc.Sonarr offers and the 16 on *arrsvc.Radarr — nothing here reads a
+// by the next scan. ONE method, against the 19 exported methods of the
+// arrsvc Sonarr client and the 16 of its Radarr one — nothing here reads a
 // series, a movie or a history event.
 //
 // Exported because the composition root embeds it: server.SonarrClient and
@@ -68,8 +68,8 @@ type ArrPinger interface {
 // Deps holds all dependencies for the config handler family.
 type Deps struct {
 	Registry      SchemaRegistry
-	Alerts        AlertLog
-	ProviderAuth  ProviderAuthClearer
+	Alerts        alertLog
+	ProviderAuth  providerAuthClearer
 	LoadConfig    ConfigLoader
 	SchemaFunc    subflux.SchemaFunc
 	NewSonarr     func(baseURL, apiKey string) (ArrPinger, error)
@@ -97,8 +97,8 @@ type StateView struct {
 // Handler holds all dependencies for the config handler family.
 type Handler struct {
 	registry      SchemaRegistry
-	alerts        AlertLog
-	providerAuth  ProviderAuthClearer
+	alerts        alertLog
+	providerAuth  providerAuthClearer
 	loadConfig    ConfigLoader
 	schemaFunc    subflux.SchemaFunc
 	newSonarr     func(baseURL, apiKey string) (ArrPinger, error)
@@ -154,7 +154,7 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "read config", "path", configPath)
 		return
 	}
-	data = RedactSecrets(data)
+	data = redactSecrets(data)
 	w.Header().Set("Content-Type", "text/yaml")
 	if _, err := w.Write(data); err != nil { // nosemgrep: no-direct-write-to-responsewriter -- raw YAML config, not HTML
 		slog.Debug("write response failed", "error", err)
@@ -182,7 +182,7 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	// Merge secrets from the existing config file (textual, key-name
 	// driven: this is the raw-YAML compatibility path; the structured save
 	// merges by schema metadata instead — see structured.go).
-	data, err = MergeSecrets(data, h.configPath())
+	data, err = mergeSecrets(data, h.configPath())
 	if err != nil {
 		// Not the client's fault: the payload relies on keep-semantics
 		// secrets and the server could not read its own existing config.
@@ -354,7 +354,7 @@ func closeArrPinger(p ArrPinger) {
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.
 // WithMaxBytes mirrors the read bound: every config read in this package
 // (HandleGetConfig, the structured GET, the secret-merge baseline) caps at
-// maxBodySize, and MergeSecrets can grow a payload past the request-body
+// maxBodySize, and mergeSecrets can grow a payload past the request-body
 // pre-check, so a file the package's own reads would refuse to load must
 // fail the write (ErrFileTooLarge) instead of landing on disk.
 func atomicWriteConfig(ctx context.Context, path string, data []byte) error {

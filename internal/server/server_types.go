@@ -63,7 +63,7 @@ import (
 // the poller, which is the only one that both polls history and looks items
 // up by ID.
 //
-// An interface rather than the concrete *arrsvc.Sonarr, which is the opposite
+// An interface rather than the concrete *arrsvc.CachedSonarr, which is the opposite
 // call from cfg, and the difference is what the type is: the arr client is this
 // process's only network boundary to Sonarr and Radarr, and this field is the
 // one seam where it enters. internal/server's own suite drives handler behaviour
@@ -260,8 +260,7 @@ type Server struct {
 	// that happened to carry the first successful config save. Reach it
 	// through workerLaunchSignal, never directly: a nil channel would make
 	// the signal vanish into the select's default arm.
-	workerLaunch  chan struct{}
-	defaultConfig []byte
+	workerLaunch chan struct{}
 	// hostGateInner is the middleware chain INSIDE the Host allowlist gate,
 	// assembled once by buildHandler before the listener opens;
 	// applyHostAllowlist re-wraps it with the live config's HostPolicy.
@@ -270,14 +269,11 @@ type Server struct {
 	// atomically by applyHostAllowlist on every activation (an immutable
 	// webhttp.HostPolicy cannot be mutated in place, so hot reload re-wraps)
 	// and read locklessly per request by the handler buildHandler returns.
-	hostGated atomic.Pointer[http.Handler]
-	// routeRegs records every route registration (group + pattern) made by
-	// registerRoutes; the wirespec consistency test compares it against the
-	// endpoint table.
-	routeRegs  []routeReg
-	bgWg       sync.WaitGroup
-	serverPort int
-	reloadMu   sync.Mutex
+	hostGated     atomic.Pointer[http.Handler]
+	defaultConfig []byte
+	bgWg          sync.WaitGroup
+	serverPort    int
+	reloadMu      sync.Mutex
 	// workersOnce is the background-worker latch: the worker set launches at
 	// most once per process, after the first successful activation.
 	workersOnce sync.Once

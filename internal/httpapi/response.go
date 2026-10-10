@@ -58,23 +58,7 @@ import (
 const (
 	keyError         = "error"
 	msgInternalError = "internal error"
-
-	// contentTypeJSON is the MIME type for JSON responses. Matches
-	// httpwire.ContentTypeJSON but defined locally: that package is the
-	// outbound client policy and this one is the inbound server policy, so
-	// neither imports the other.
-	contentTypeJSON = "application/json"
 )
-
-// errorResponse is the canonical JSON error envelope every helper in this file
-// puts on the wire (via webhttp.WriteError) and the named shape the package's
-// tests decode into. It aliases webhttp.ErrorResponse so the wire format
-// ({"error": msg, "code": ..., "request_id": ...}) is defined once, in the
-// library, and stays byte-identical across every consumer. `error` is always
-// populated; `code` and `request_id` are emitted only when set (omitempty),
-// preserving the legacy error-only shape for callers that pass no code and run
-// without the request-id middleware.
-type errorResponse = webhttp.ErrorResponse
 
 // jsonHeaders sets the standard JSON response headers (application/json +
 // nosniff) via webhttp.JSONHeaders, so the header set matches every other
@@ -122,8 +106,7 @@ func Ok(w http.ResponseWriter) {
 
 // writeError is the single place all named error helpers funnel through. It
 // delegates to webhttp.WriteError, which builds the {error,code,request_id}
-// envelope and pulls the request id from r's context (nil-safe on r). The wire
-// shape is identical to the previous hand-built errorResponse.
+// envelope and pulls the request id from r's context (nil-safe on r).
 func writeError(w http.ResponseWriter, r *http.Request, status int, code subflux.ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }

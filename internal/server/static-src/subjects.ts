@@ -25,7 +25,7 @@ export function detailSubject(root: string): Subject {
   return { kind: "detail", ref: root };
 }
 
-export interface Stamp {
+interface Stamp {
   readonly kind: string;
   readonly ref: string;
   readonly version: string;
@@ -95,6 +95,7 @@ export function forgetSubject(subject: Subject): void {
 }
 
 /** Test-only: a fresh, unbound map. */
+// deadset:ignore DS1004 -- Tests start each case on a fresh, unbound version map.
 export function _resetSubjectsForTest(): void {
   versions = createVersionMap();
 }

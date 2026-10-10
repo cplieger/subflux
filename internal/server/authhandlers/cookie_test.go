@@ -27,14 +27,14 @@ func TestSessionCookie_name_selects_by_scheme(t *testing.T) {
 		t.Errorf("HTTP request: cookie name = %q, want %q", got, CookieNameHTTP)
 	}
 
-	if got := SessionCookie.CookieName(httpsRequest()); got != CookieNameSecure {
-		t.Errorf("TLS request: cookie name = %q, want %q (__Host- prefix)", got, CookieNameSecure)
+	if got := SessionCookie.CookieName(httpsRequest()); got != cookieNameSecure {
+		t.Errorf("TLS request: cookie name = %q, want %q (__Host- prefix)", got, cookieNameSecure)
 	}
 
 	proxied := httptest.NewRequest(http.MethodGet, "/", nil)
 	proxied.Header.Set("X-Forwarded-Proto", "https")
-	if got := SessionCookie.CookieName(proxied); got != CookieNameSecure {
-		t.Errorf("X-Forwarded-Proto=https: cookie name = %q, want %q", got, CookieNameSecure)
+	if got := SessionCookie.CookieName(proxied); got != cookieNameSecure {
+		t.Errorf("X-Forwarded-Proto=https: cookie name = %q, want %q", got, cookieNameSecure)
 	}
 }
 
@@ -75,8 +75,8 @@ func TestSessionCookie_https_sets_secure_host_cookie(t *testing.T) {
 		t.Fatalf("want exactly 1 Set-Cookie, got %d", len(cookies))
 	}
 	c := cookies[0]
-	if c.Name != CookieNameSecure {
-		t.Errorf("name = %q, want %q (__Host- prefix over HTTPS)", c.Name, CookieNameSecure)
+	if c.Name != cookieNameSecure {
+		t.Errorf("name = %q, want %q (__Host- prefix over HTTPS)", c.Name, cookieNameSecure)
 	}
 	if !c.Secure {
 		t.Error("Secure must be set over HTTPS")
@@ -94,7 +94,7 @@ func TestSessionCookie_roundtrip(t *testing.T) {
 		wantName string
 	}{
 		{"http", func() *http.Request { return httptest.NewRequest(http.MethodGet, "/", nil) }, CookieNameHTTP},
-		{"https", httpsRequest, CookieNameSecure},
+		{"https", httpsRequest, cookieNameSecure},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -213,3 +213,6 @@ func TestSanitizeForwardedProto_default_trusts_nothing(t *testing.T) {
 		t.Errorf("header with no trusted proxies = %q, want stripped", got)
 	}
 }
+
+// cookieNameSecure is the session cookie name over HTTPS.
+const cookieNameSecure = "__Host-sfx_session"

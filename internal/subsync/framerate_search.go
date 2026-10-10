@@ -63,13 +63,13 @@ func goldenSectionSearch(ctx context.Context, reference, incorrect []Cue, observ
 	bestRatio := (lo + hi) / 2
 	if math.Abs(bestRatio-1.0) < 1e-5 {
 		// Ratio is essentially 1.0; no framerate correction needed.
-		return SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate, Source: SourceFramerate}
+		return SyncResult{Rate: 1.0, Confidence: confidenceNone, Method: methodFramerate, Source: SourceFramerate}
 	}
 
 	corrected := scaleCues(incorrect, bestRatio)
 
-	// Confidence is lower for GSS than known ratios (capped via ForMethod).
-	confidence := Confidence(min(r2, float64(DefaultConfidenceCaps.ForMethod(MethodFramerate))))
+	// Confidence is lower for GSS than known ratios (capped via forMethod).
+	confidence := Confidence(min(r2, float64(defaultConfidenceCaps.forMethod(methodFramerate))))
 
 	slog.Info("framerate correction: golden-section search",
 		"ratio", bestRatio,
@@ -79,9 +79,9 @@ func goldenSectionSearch(ctx context.Context, reference, incorrect []Cue, observ
 		Cues:       corrected,
 		Rate:       bestRatio,
 		Confidence: confidence,
-		Method:     MethodFramerate,
+		Method:     methodFramerate,
 		Source:     SourceFramerate,
-		Transform:  Transform{Kind: TransformFramerate, Ratio: bestRatio},
+		Transform:  transform{Kind: transformFramerate, Ratio: bestRatio},
 	}
 }
 
@@ -108,7 +108,7 @@ func verifyFramerateCorrection(ctx context.Context, reference, corrected []Cue) 
 // alignmentScore computes the total overlap score between reference and
 // shifted incorrect spans using a two-pointer sweep. Higher is better.
 // Both ref and inc must be sorted by Start (which CuesToSpans guarantees).
-func alignmentScore(ref, inc []TimeSpan, offset int64) float64 {
+func alignmentScore(ref, inc []timeSpan, offset int64) float64 {
 	var total float64
 	j := 0
 	for _, r := range ref {
@@ -118,7 +118,7 @@ func alignmentScore(ref, inc []TimeSpan, offset int64) float64 {
 		}
 		// Check all inc spans that could overlap with r.
 		for k := j; k < len(inc); k++ {
-			shifted := TimeSpan{Start: inc[k].Start + offset, End: inc[k].End + offset}
+			shifted := timeSpan{Start: inc[k].Start + offset, End: inc[k].End + offset}
 			if shifted.Start >= r.End {
 				break
 			}
@@ -132,7 +132,7 @@ func alignmentScore(ref, inc []TimeSpan, offset int64) float64 {
 }
 
 // overlapMs returns the overlap duration in milliseconds between two spans.
-func overlapMs(a, b TimeSpan) float64 {
+func overlapMs(a, b timeSpan) float64 {
 	start := max(a.Start, b.Start)
 	end := min(a.End, b.End)
 	if end <= start {

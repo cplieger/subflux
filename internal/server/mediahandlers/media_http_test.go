@@ -132,7 +132,7 @@ func TestHandleMediaSeries_returns_series_with_statistics(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var got []SeriesItem
+	var got []seriesItem
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestHandleMediaMovies_returns_movies_with_file_info(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var got []MovieItem
+	var got []movieItem
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}

@@ -75,7 +75,7 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 		return nil, errors.New("hdbits: username and passkey required")
 	}
 	slog.Debug("hdbits provider initialized", settingUsername, ps.Username)
-	return &Provider{
+	return &source{
 		client:       provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		username:     ps.Username,
 		passkey:      ps.Passkey,
@@ -87,8 +87,8 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 
 // (download cache types + lifecycle methods live in cache.go / dlcache.go.)
 
-// Provider implements the HDBits subtitle API.
-type Provider struct {
+// source implements the HDBits subtitle API.
+type source struct {
 	dlSfg        singleflight.Group
 	client       *http.Client
 	torrentCache *cache.Cache[[]int]
@@ -100,16 +100,16 @@ type Provider struct {
 
 // Compile-time check on the CacheClearer opt-in: discovered by type
 // assertion in provider.ClearCaches, so nothing else would catch a rename.
-var _ provider.CacheClearer = (*Provider)(nil)
+var _ provider.CacheClearer = (*source)(nil)
 
 // --- Provider API (Name, Search, Download) ---
 
 // Name returns the provider identifier for HDBits.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles for the given request by resolving torrent IDs via the
 // HDBits API and inspecting each torrent's subtitle metadata.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits searching",
 		"media_type", req.MediaType, "title", req.Title,
 		"season", req.Season, "episode", req.Episode,
@@ -140,7 +140,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 // skipped, except a refused credential or a rate limit: those stop the
 // remaining lookups and are returned, because every later call would get the
 // same answer.
-func (p *Provider) collectSubtitles(ctx context.Context, ids []int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) collectSubtitles(ctx context.Context, ids []int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	var (
 		mu      sync.Mutex
 		results []subflux.Subtitle
@@ -170,7 +170,7 @@ func (p *Provider) collectSubtitles(ctx context.Context, ids []int, req *subflux
 
 // lookupTorrent passes torrent id's subtitles to add. It returns only a stop
 // error; any other failure is logged and skipped.
-func (p *Provider) lookupTorrent(ctx context.Context, id int, req *subflux.SearchRequest, add func([]subflux.Subtitle)) error {
+func (p *source) lookupTorrent(ctx context.Context, id int, req *subflux.SearchRequest, add func([]subflux.Subtitle)) error {
 	// A slot freed by a stopping lookup is handed over after the group is
 	// cancelled, so this lookup would only repeat its answer.
 	if ctx.Err() != nil {
@@ -214,7 +214,7 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 // Download fetches the subtitle content for the given search result.
 // Season pack archives are cached per subtitle ID and reused across
 // episodes; the target episode is extracted by S##E## filename match.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if _, err := strconv.Atoi(sub.ID); err != nil {
 		return nil, fmt.Errorf("invalid subtitle ID %q: %w", sub.ID, err)
 	}
@@ -244,7 +244,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 // buildLookup constructs the HDBits API search parameters and cache key
 // from the search request. Returns nil params when the request lacks the
 // required ID for the media type.
-func (p *Provider) buildLookup(req *subflux.SearchRequest) (params map[string]any, cacheKey string) {
+func (p *source) buildLookup(req *subflux.SearchRequest) (params map[string]any, cacheKey string) {
 	if req.MediaType == subflux.MediaTypeEpisode {
 		if req.TvdbID <= 0 {
 			return nil, ""
@@ -271,7 +271,7 @@ func (p *Provider) buildLookup(req *subflux.SearchRequest) (params map[string]an
 // resolveTorrentIDs returns the torrent IDs to iterate for a search,
 // serving from cache when available and capping the list at
 // maxTorrentsPerSearch so long-running series don't stall the scan.
-func (p *Provider) resolveTorrentIDs(ctx context.Context, lookup map[string]any, cacheKey string) ([]int, error) {
+func (p *source) resolveTorrentIDs(ctx context.Context, lookup map[string]any, cacheKey string) ([]int, error) {
 	if cached, ok := p.torrentCache.Get(cacheKey); ok {
 		return capTorrentIDs(cached, p.cfg.MaxTorrentsPerSearch, cacheKey), nil
 	}
@@ -301,8 +301,8 @@ func capTorrentIDs(ids []int, maxCap int, cacheKey string) []int {
 // fetchOrCached returns cached download data for a subtitle ID, or fetches
 // and caches it. Concurrent requests for the same ID are deduplicated via
 // singleflight.
-func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, error) {
-	if cached, ok := p.dlCache.Get(subID); ok {
+func (p *source) fetchOrCached(ctx context.Context, subID string) ([]byte, error) {
+	if cached, ok := p.dlCache.get(subID); ok {
 		slog.Debug("hdbits: serving from download cache",
 			"subtitle_id", subID, "bytes", len(cached))
 		return cached, nil
@@ -311,7 +311,7 @@ func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, err
 	v, err, _ := p.dlSfg.Do(subID, func() (any, error) {
 		// Re-check inside singleflight in case a concurrent caller
 		// already populated it.
-		if cached, ok := p.dlCache.Get(subID); ok {
+		if cached, ok := p.dlCache.get(subID); ok {
 			return cached, nil
 		}
 		return p.doFetch(ctx, subID)
@@ -324,7 +324,7 @@ func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, err
 }
 
 // doFetch performs the actual HTTP download and caches the result.
-func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
+func (p *source) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	// Build URL via url.Values so a non-hex character in the passkey
 	// cannot corrupt the request-line or split the secret across bogus
 	// query params.
@@ -358,7 +358,7 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 		return nil, err
 	}
 
-	p.dlCache.Put(subID, data, func() {
+	p.dlCache.put(subID, data, func() {
 		slog.Warn("hdbits: download too large or cache full, will re-fetch for each episode",
 			"subtitle_id", subID, "bytes", len(data))
 	})
@@ -369,7 +369,7 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 // findTorrentIDs searches the HDBits API for torrents matching the given
 // parameters and returns their IDs. debugKey is a redacted cache key for
 // logging; params contains the passkey and must never be logged.
-func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, debugKey string) ([]int, error) {
+func (p *source) findTorrentIDs(ctx context.Context, params map[string]any, debugKey string) ([]int, error) {
 	body, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 
 // fetchSubtitles fetches subtitle metadata for a single torrent and filters
 // by language and content type (excludes commentary/extras).
-func (p *Provider) fetchSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) fetchSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits fetching subtitles for torrent", "torrent_id", torrentID)
 
 	params := map[string]any{
@@ -463,7 +463,7 @@ func (p *Provider) fetchSubtitles(ctx context.Context, torrentID int, searchReq 
 
 // downloadVerdict reads an API verdict out of a getdox body that is a JSON
 // object carrying a status, which a subtitle or archive body never is.
-func (p *Provider) downloadVerdict(data []byte) error {
+func (p *source) downloadVerdict(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	if len(trimmed) == 0 || trimmed[0] != '{' {
 		return nil
@@ -480,6 +480,6 @@ func (p *Provider) downloadVerdict(data []byte) error {
 
 // redact prepares upstream text for an error: the request carried the
 // username and passkey, so the text may echo either.
-func (p *Provider) redact(s string) string {
+func (p *source) redact(s string) string {
 	return logsafe.RedactedField(s, httpx.Secret(p.username), httpx.Secret(p.passkey))
 }

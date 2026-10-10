@@ -50,7 +50,7 @@ func TestWireConversion_roundtrip(t *testing.T) {
 }
 
 // runWorkerOn feeds a marshaled request to RunWorker and decodes the response.
-func runWorkerOn(t *testing.T, req any) (Response, int) {
+func runWorkerOn(t *testing.T, req any) (response, int) {
 	t.Helper()
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -58,7 +58,7 @@ func runWorkerOn(t *testing.T, req any) (Response, int) {
 	}
 	var out bytes.Buffer
 	code := RunWorker(t.Context(), bytes.NewReader(payload), &out)
-	var resp Response
+	var resp response
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v (raw %q)", err, out.String())
 	}
@@ -67,8 +67,8 @@ func runWorkerOn(t *testing.T, req any) (Response, int) {
 
 func TestRunWorker_reference_no_video_returns_no_change(t *testing.T) {
 	t.Parallel()
-	resp, code := runWorkerOn(t, &Request{
-		Version: ProtocolVersion, Op: OpReference,
+	resp, code := runWorkerOn(t, &request{
+		Version: protocolVersion, Op: opReference,
 		Data: []byte(tinySRT), VideoPath: "", Lang: "fr",
 	})
 	if code != 0 {
@@ -85,7 +85,7 @@ func TestRunWorker_reference_no_video_returns_no_change(t *testing.T) {
 
 func TestRunWorker_version_mismatch_errors(t *testing.T) {
 	t.Parallel()
-	resp, code := runWorkerOn(t, &Request{Version: ProtocolVersion + 7, Op: OpReference})
+	resp, code := runWorkerOn(t, &request{Version: protocolVersion + 7, Op: opReference})
 	if resp.Error == "" || !strings.Contains(resp.Error, "protocol version") {
 		t.Errorf("response error = %q, want protocol version complaint", resp.Error)
 	}
@@ -96,7 +96,7 @@ func TestRunWorker_version_mismatch_errors(t *testing.T) {
 
 func TestRunWorker_unknown_op_errors(t *testing.T) {
 	t.Parallel()
-	resp, _ := runWorkerOn(t, &Request{Version: ProtocolVersion, Op: "transmogrify"})
+	resp, _ := runWorkerOn(t, &request{Version: protocolVersion, Op: "transmogrify"})
 	if resp.Error == "" || !strings.Contains(resp.Error, "unknown op") {
 		t.Errorf("response error = %q, want unknown-op complaint", resp.Error)
 	}
@@ -109,7 +109,7 @@ func TestRunWorker_garbage_stdin_errors(t *testing.T) {
 	if code == 0 {
 		t.Errorf("exit code = 0, want nonzero for undecodable request")
 	}
-	var resp Response
+	var resp response
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil || resp.Error == "" {
 		t.Errorf("want decodable error response, got %q (err %v)", out.String(), err)
 	}
@@ -132,13 +132,13 @@ func TestReadRequest_accepts_a_payload_filling_the_bound_exactly(t *testing.T) {
 		t.Fatalf("readRequest(%d-byte payload, maxBytes=%d) error = %v, want nil",
 			len(minimalRequestJSON), atBound, err)
 	}
-	if req.Version != ProtocolVersion {
+	if req.Version != protocolVersion {
 		t.Errorf("readRequest(%d-byte payload, maxBytes=%d) version = %d, want %d",
-			len(minimalRequestJSON), atBound, req.Version, ProtocolVersion)
+			len(minimalRequestJSON), atBound, req.Version, protocolVersion)
 	}
-	if req.Op != OpReference {
+	if req.Op != opReference {
 		t.Errorf("readRequest(%d-byte payload, maxBytes=%d) op = %q, want %q",
-			len(minimalRequestJSON), atBound, req.Op, OpReference)
+			len(minimalRequestJSON), atBound, req.Op, opReference)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestReadRequest_refuses_a_payload_one_byte_past_the_bound(t *testing.T) {
 
 // --- client behavior (spawn seam) ---
 
-func newSeamClient(spawn func(ctx context.Context, req *Request) (*Response, error)) *Client {
+func newSeamClient(spawn func(ctx context.Context, req *request) (*response, error)) *Client {
 	c := &Client{sem: make(chan struct{}, 1), exe: "unused", args: nil}
 	c.spawn = spawn
 	return c
@@ -171,7 +171,7 @@ func newSeamClient(spawn func(ctx context.Context, req *Request) (*Response, err
 func TestClient_concurrency_one(t *testing.T) {
 	t.Parallel()
 	var inFlight, maxSeen atomic.Int32
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		cur := inFlight.Add(1)
 		defer inFlight.Add(-1)
 		for {
@@ -181,7 +181,7 @@ func TestClient_concurrency_one(t *testing.T) {
 			}
 		}
 		time.Sleep(30 * time.Millisecond)
-		return &Response{Version: ProtocolVersion}, nil
+		return &response{Version: protocolVersion}, nil
 	})
 
 	var wg sync.WaitGroup
@@ -198,7 +198,7 @@ func TestClient_concurrency_one(t *testing.T) {
 
 func TestClient_spawn_error_degrades_to_no_change(t *testing.T) {
 	sink := capture.Default(t)
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		return nil, errors.New("signal: killed") // the OOM-kill shape
 	})
 	result := c.Reference(t.Context(), []byte(tinySRT), "/v.mkv", "fr", 0)
@@ -212,8 +212,8 @@ func TestClient_spawn_error_degrades_to_no_change(t *testing.T) {
 
 func TestClient_response_error_degrades_to_no_change(t *testing.T) {
 	sink := capture.Default(t)
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
-		return &Response{Version: ProtocolVersion, Error: "boom"}, nil
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
+		return &response{Version: protocolVersion, Error: "boom"}, nil
 	})
 	result := c.Audio(t.Context(), []byte(tinySRT), "/v.mkv", "")
 	if result.Applied() {
@@ -229,13 +229,13 @@ func TestClient_cancelled_while_queued_returns_no_change(t *testing.T) {
 	release := make(chan struct{})
 	occupied := make(chan struct{})
 	var once sync.Once
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		// Signalled from INSIDE the seam, which run() reaches only after it
 		// holds the single slot. sync.Once because a regression that lets the
 		// cancelled call through would call the seam twice.
 		once.Do(func() { close(occupied) })
 		<-release
-		return &Response{Version: ProtocolVersion}, nil
+		return &response{Version: protocolVersion}, nil
 	})
 	// Occupy the slot, then wait for proof it is held. Without the wait the
 	// cancelled call below can win the free slot, and the test would exercise

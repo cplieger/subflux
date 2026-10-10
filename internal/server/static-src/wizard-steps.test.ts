@@ -162,11 +162,10 @@ async function boot(
 }
 
 /** Render a step into a fresh container — the Back/Next revisit path. */
-function rerender(step: WizardStep): HTMLElement {
+function rerender(step: WizardStep): void {
   const host = document.createElement("div");
   document.body.appendChild(host);
   step.render(host);
-  return host;
 }
 
 function input(id: string): HTMLInputElement {

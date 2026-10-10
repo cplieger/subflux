@@ -17,7 +17,7 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // testURL is HDBits' own credential-validation endpoint: it takes the
 // username/passkey pair and nothing else, so no torrent or subtitle lookup
@@ -53,7 +53,7 @@ func apiStatusError(status int, message string) error {
 // CheckCredentials reports whether HDBits accepts the configured username and
 // passkey. A refusal is *subflux.AuthError; every other failure means the check
 // did not complete.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	body, err := json.Marshal(map[string]string{
 		settingUsername: p.username,
 		settingPasskey:  p.passkey,

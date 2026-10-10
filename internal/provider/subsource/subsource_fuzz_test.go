@@ -14,7 +14,7 @@ func FuzzMatchTitle(f *testing.F) {
 			return
 		}
 		data := []searchResult{
-			{Title: resTitle, ReleaseYear: FlexInt(resYear), MovieID: resID},
+			{Title: resTitle, ReleaseYear: flexInt(resYear), MovieID: resID},
 		}
 		// Must not panic.
 		got := matchTitle(data, title, year)
@@ -56,7 +56,6 @@ func FuzzBuildSubtitles(f *testing.F) {
 		}
 		items := []subtitleItem{
 			{
-				Language:     lang,
 				Commentary:   commentary,
 				ReleaseInfo:  releases,
 				SubtitleID:   subID,

@@ -48,10 +48,8 @@ func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.E
 	result := make([]subflux.EmbeddedTrack, len(tracks))
 	for i, st := range tracks {
 		result[i] = subflux.EmbeddedTrack{
-			Index:           st.index,
 			Codec:           st.codec,
 			Lang:            st.lang,
-			Name:            st.name,
 			Forced:          st.forced,
 			HearingImpaired: st.hearingImpaired,
 		}
@@ -65,8 +63,6 @@ func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.E
 type subTrack struct {
 	codec           string
 	lang            string
-	name            string
-	index           int
 	forced          bool
 	hearingImpaired bool
 }
@@ -80,7 +76,7 @@ func allTracks(ctx context.Context, path string) ([]subTrack, error) {
 	var tracks []subTrack
 	for _, t := range ffTracks {
 		codec := normalizeCodecName(t.CodecName)
-		st := normalizeTrack(t.Index, codec, t.Language, t.Title, t.Forced, t.HearingImpaired)
+		st := normalizeTrack(codec, t.Language, t.Title, t.Forced, t.HearingImpaired)
 		if st == nil {
 			continue
 		}
@@ -94,7 +90,7 @@ func allTracks(ctx context.Context, path string) ([]subTrack, error) {
 
 // normalizeTrack converts ffprobe track metadata into a subTrack.
 // Returns nil if the track should be skipped (undefined language).
-func normalizeTrack(index int, codec, lang, name string, forced, hi bool) *subTrack {
+func normalizeTrack(codec, lang, name string, forced, hi bool) *subTrack {
 	// Delegate to the canonical ffprobe-tag normalizer (lowercasing,
 	// "und"/"undetermined" → empty, BCP 47 primary subtag, alpha3→alpha2)
 	// rather than comparing "und" before lowercasing, which lets tags like
@@ -112,10 +108,8 @@ func normalizeTrack(index int, codec, lang, name string, forced, hi bool) *subTr
 	}
 
 	return &subTrack{
-		index:           index,
 		codec:           codec,
 		lang:            lang2,
-		name:            name,
 		forced:          forced,
 		hearingImpaired: hi,
 	}

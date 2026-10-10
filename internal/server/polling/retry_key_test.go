@@ -9,14 +9,14 @@ import (
 
 // oldRetryKey is the fmt.Sprintf form retryKey replaced, kept as the
 // byte-identity oracle.
-func oldRetryKey(source PollSource, entryID int) string {
+func oldRetryKey(source pollSource, entryID int) string {
 	return fmt.Sprintf("%s:%d", source, entryID)
 }
 
 // TestRetryKeyIsInjectiveAndUnchanged covers the importRetries key.
 //
 // No tuple pair the old form collapsed exists at this site, and none is
-// asserted: source is one of two PollSource constants and entryID is an int, so
+// asserted: source is one of two pollSource constants and entryID is an int, so
 // even a hostile source string could not forge a boundary — the int tail pins
 // the last ':' and the head absorbs the rest. What the test pins is that the
 // shared grammar left the bytes exactly as they were, and that distinct
@@ -30,13 +30,13 @@ func TestRetryKeyIsInjectiveAndUnchanged(t *testing.T) {
 	t.Parallel()
 
 	type pair struct {
-		source  PollSource
+		source  pollSource
 		entryID int
 	}
 	ordinary := []pair{
-		{PollSourceSonarr, 0},
-		{PollSourceSonarr, 991},
-		{PollSourceRadarr, 12345},
+		{pollSourceSonarr, 0},
+		{pollSourceSonarr, 991},
+		{pollSourceRadarr, 12345},
 	}
 	for _, p := range ordinary {
 		got := retryKey(p.source, p.entryID)
@@ -49,22 +49,22 @@ func TestRetryKeyIsInjectiveAndUnchanged(t *testing.T) {
 	}
 
 	// The two sources must never share a counter, and neither must two entries.
-	if a, b := retryKey(PollSourceSonarr, 7), retryKey(PollSourceRadarr, 7); a == b {
+	if a, b := retryKey(pollSourceSonarr, 7), retryKey(pollSourceRadarr, 7); a == b {
 		t.Errorf("sonarr and radarr entry 7 share the retry key %q", a)
 	}
-	if a, b := retryKey(PollSourceSonarr, 1), retryKey(PollSourceSonarr, 11); a == b {
+	if a, b := retryKey(pollSourceSonarr, 1), retryKey(pollSourceSonarr, 11); a == b {
 		t.Errorf("two entry ids share the retry key %q", a)
 	}
 
 	// A source carrying the separator cannot merge with a plain one.
 	forged := map[string][2]pair{
 		"separator in the source": {
-			{PollSource("sonarr:1"), 2},
-			{PollSourceSonarr, 12},
+			{pollSource("sonarr:1"), 2},
+			{pollSourceSonarr, 12},
 		},
 		"escape character in the source": {
-			{PollSource(`sonarr\`), 1},
-			{PollSource("sonarr"), 1},
+			{pollSource(`sonarr\`), 1},
+			{pollSource("sonarr"), 1},
 		},
 	}
 	for name, fp := range forged {
@@ -88,7 +88,7 @@ func TestImportRetryBudget_abandons_the_entry_on_its_last_attempt(t *testing.T) 
 	t.Parallel()
 
 	p := &Poller{importRetries: make(map[string]int)}
-	key := retryKey(PollSourceSonarr, 7)
+	key := retryKey(pollSourceSonarr, 7)
 
 	for attempt := 1; attempt < maxImportRetries; attempt++ {
 		if !p.noteImportFailure(key, "/media/a.mkv") {
@@ -114,10 +114,10 @@ func TestImportRetryCounterIsPerEntry(t *testing.T) {
 	p := &Poller{importRetries: make(map[string]int)}
 
 	// One failure each for two entries that differ only in the source.
-	if !p.noteImportFailure(retryKey(PollSourceSonarr, 5), "/media/a.mkv") {
+	if !p.noteImportFailure(retryKey(pollSourceSonarr, 5), "/media/a.mkv") {
 		t.Fatal("first sonarr failure should be retried")
 	}
-	if !p.noteImportFailure(retryKey(PollSourceRadarr, 5), "/media/b.mkv") {
+	if !p.noteImportFailure(retryKey(pollSourceRadarr, 5), "/media/b.mkv") {
 		t.Fatal("first radarr failure should be retried")
 	}
 	if len(p.importRetries) != 2 {
@@ -125,8 +125,8 @@ func TestImportRetryCounterIsPerEntry(t *testing.T) {
 	}
 
 	// Clearing one must leave the other's counter intact.
-	p.clearImportRetry(retryKey(PollSourceSonarr, 5))
-	if got := p.importRetries[retryKey(PollSourceRadarr, 5)]; got != 1 {
+	p.clearImportRetry(retryKey(pollSourceSonarr, 5))
+	if got := p.importRetries[retryKey(pollSourceRadarr, 5)]; got != 1 {
 		t.Errorf("radarr entry counter = %d after clearing the sonarr entry, want 1", got)
 	}
 }

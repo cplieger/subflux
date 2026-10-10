@@ -19,9 +19,8 @@ const maxCorrelationFrames = 500_000
 
 // correlationResult holds the output of cross-correlation.
 type correlationResult struct {
-	OffsetFrames int     // best offset in frames (positive = subtitle is early)
-	OffsetMs     int64   // best offset in milliseconds
-	Peak         float64 // normalized correlation peak (0.0 to 1.0)
+	OffsetMs int64   // best offset in milliseconds (positive = subtitle is early)
+	Peak     float64 // normalized correlation peak (0.0 to 1.0)
 }
 
 // crossCorrelateEdges correlates two float64 signals (typically GMM VAD
@@ -109,9 +108,8 @@ func correlateFloat(ctx context.Context, fa, fb []float64) correlationResult {
 	fft.WorkspacePool.Put(ws)
 
 	return correlationResult{
-		OffsetFrames: offset,
-		OffsetMs:     int64(math.Round(offsetMs)),
-		Peak:         peak,
+		OffsetMs: int64(math.Round(offsetMs)),
+		Peak:     peak,
 	}
 }
 

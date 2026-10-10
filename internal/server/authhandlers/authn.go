@@ -18,18 +18,13 @@ import (
 // runner, session verifier, API-key verifier, bypass, and activity throttling
 // all come from the library.
 
-// Session cookie names as they appear on the wire: the bare base name over
-// plain HTTP (LAN, ip:port) and the __Host--prefixed Secure form over HTTPS.
-// These are the two names SessionCookie's per-request posture alternates
-// between; tests assert against them as subflux's observable cookie contract.
-const (
-	CookieNameHTTP   = "sfx_session"
-	CookieNameSecure = "__Host-" + CookieNameHTTP
-)
+// CookieNameHTTP is the session cookie's base name, sent as is over plain
+// HTTP; over HTTPS the auth library sends it with the __Host- prefix.
+const CookieNameHTTP = "sfx_session"
 
 // SessionCookie is subflux's session-cookie configuration. Subflux serves both
 // HTTP (LAN, ip:port) and HTTPS (behind a reverse proxy) from a single
-// instance, so PosturePerRequest selects CookieNameSecure with the Secure flag
+// instance, so PosturePerRequest selects the __Host- name with the Secure flag
 // over HTTPS and CookieNameHTTP without it over plain HTTP, per request.
 // TrustForwardedHeaders honors X-Forwarded-Proto for the HTTPS decision; it is
 // safe only because SanitizeForwardedProto strips that header from any request

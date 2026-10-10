@@ -35,8 +35,8 @@ func crossLangAlign(ctx context.Context, reference, incorrect []Cue) SyncResult 
 		Offset:     result.Offset,
 		Rate:       result.Rate,
 		Confidence: Confidence(result.Confidence),
-		Method:     MethodCrosslang,
+		Method:     methodCrosslang,
 		Source:     SourceCrosslang,
-		Transform:  Transform{Kind: TransformShift, Shift: result.Offset},
+		Transform:  transform{Kind: transformShift, Shift: result.Offset},
 	}
 }

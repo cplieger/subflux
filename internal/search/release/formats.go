@@ -10,101 +10,101 @@ type Format struct {
 	Normalize string   // Normalized label for scoring (e.g. "h265", "bluray")
 }
 
-// NormRemux and its siblings are the normalized source labels used for scoring.
+// normRemux and its siblings are the normalized source labels used for scoring.
 const (
-	NormRemux    = "remux"
-	NormBluray   = "bluray"
-	NormWebDL    = "webdl"
-	NormWebRip   = "webrip"
-	NormHDTV     = "hdtv"
-	NormSDTV     = "sdtv"
-	NormDVD      = "dvd"
-	NormCam      = "cam"
-	NormTelesync = "telesync"
-	NormTelecine = "telecine"
-	NormHDRip    = "hdrip"
+	normRemux    = "remux"
+	normBluray   = "bluray"
+	normWebDL    = "webdl"
+	normWebRip   = "webrip"
+	normHDTV     = "hdtv"
+	normSDTV     = "sdtv"
+	normDVD      = "dvd"
+	normCam      = "cam"
+	normTelesync = "telesync"
+	normTelecine = "telecine"
+	normHDRip    = "hdrip"
 )
 
-// SonarrSources are source patterns ported from Sonarr QualityParser.cs.
-var SonarrSources = []Format{
+// sonarrSources are source patterns ported from Sonarr QualityParser.cs.
+var sonarrSources = []Format{
 	{
-		Name: "Remux", Normalize: NormRemux,
+		Name: "Remux", Normalize: normRemux,
 		Regex: `(?:[_. ]|\d{4}p-|\bHybrid-)(?:(BD|UHD)[-_. ]?)?Remux\b|(?:(BD|UHD)[-_. ]?)?Remux[_. ]\d{4}p`,
 	},
 	{
-		Name: "BluRay", Normalize: NormBluray,
+		Name: "BluRay", Normalize: normBluray,
 		Regex: `\b(?:BluRay|Blu-Ray|HD-?DVD|BDMux|BD(?!$))\b`,
 	},
 	{
-		Name: "WEB-DL", Normalize: NormWebDL,
+		Name: "WEB-DL", Normalize: normWebDL,
 		Regex: `WEB[-_. ]DL(?:mux)?|WEBDL|AmazonHD|AmazonSD|iTunesHD|MaxdomeHD|NetflixU?HD|WebHD|HBOMaxHD|DisneyHD|[. ]WEB[. ](?:[xh][ .]?26[45]|AVC|HEVC|DDP?5[. ]1)|[. ](?-i:WEB)$|(?:720|1080|2160)p[-. ]WEB[-. ]|[-. ]WEB[-. ](?:720|1080|2160)p|\b\s/\sWEB\s/\s\b|(?:AMZN|NF|DP)[. -]WEB[. -](?!Rip)`,
 	},
 	{
-		Name: "WEBRip", Normalize: NormWebRip,
+		Name: "WEBRip", Normalize: normWebRip,
 		Regex: `\b(?:WebRip|Web-Rip|WEBMux)\b`,
 	},
 	{
-		Name: "HDTV", Normalize: NormHDTV,
+		Name: "HDTV", Normalize: normHDTV,
 		Regex: `\b(?:HDTV)\b`,
 	},
 	{
-		Name: "BDRip", Normalize: NormBluray,
+		Name: "BDRip", Normalize: normBluray,
 		Regex: `\b(?:BDRip|BDLight)\b`,
 	},
 	{
-		Name: "BRRip", Normalize: NormBluray,
+		Name: "BRRip", Normalize: normBluray,
 		Regex: `\b(?:BRRip)\b`,
 	},
 	{
-		Name: "DVD", Normalize: NormDVD,
+		Name: "DVD", Normalize: normDVD,
 		Regex: `\b(?:DVD|DVDRip|NTSC|PAL|xvidvd)\b`,
 	},
 	{
-		Name: "DSR", Normalize: NormSDTV,
+		Name: "DSR", Normalize: normSDTV,
 		Regex: `\b(?:WS[-_. ]DSR|DSR)\b`,
 	},
 	{
-		Name: "PDTV", Normalize: NormSDTV,
+		Name: "PDTV", Normalize: normSDTV,
 		Regex: `\b(?:PDTV)\b`,
 	},
 	{
-		Name: "SDTV", Normalize: NormSDTV,
+		Name: "SDTV", Normalize: normSDTV,
 		Regex: `\b(?:SDTV)\b`,
 	},
 	{
-		Name: "TVRip", Normalize: NormSDTV,
+		Name: "TVRip", Normalize: normSDTV,
 		Regex: `\b(?:TVRip)\b`,
 	},
 	{
-		Name: "HD-TV", Normalize: NormHDTV,
+		Name: "HD-TV", Normalize: normHDTV,
 		Regex: `HD[-_. ]TV`,
 	},
 	{
-		Name: "SD-TV", Normalize: NormSDTV,
+		Name: "SD-TV", Normalize: normSDTV,
 		Regex: `SD[-_. ]TV`,
 	},
 	{
-		Name: "Anime BD", Normalize: NormBluray,
+		Name: "Anime BD", Normalize: normBluray,
 		Regex: `bd(?:720|1080|2160)|(?<=[-_. (\[])bd(?=[-_. )\]])`,
 	},
 	{
-		Name: "Anime WEB", Normalize: NormWebDL,
+		Name: "Anime WEB", Normalize: normWebDL,
 		Regex: `\[WEB\]|[\[\(]WEB[ .]`,
 	},
 	{
-		Name: "CAM", Normalize: NormCam,
+		Name: "CAM", Normalize: normCam,
 		Regex: `\b(?:CAM|HDCAM)\b`,
 	},
 	{
-		Name: "Telesync", Normalize: NormTelesync,
+		Name: "Telesync", Normalize: normTelesync,
 		Regex: `\b(?:Telesync|TS|PDVD)\b`,
 	},
 	{
-		Name: "Telecine", Normalize: NormTelecine,
+		Name: "Telecine", Normalize: normTelecine,
 		Regex: `\b(?:Telecine|TC)\b`,
 	},
 	{
-		Name: "HDRip", Normalize: NormHDRip,
+		Name: "HDRip", Normalize: normHDRip,
 		Regex: `\b(?:HDRip)\b`,
 	},
 }
@@ -116,16 +116,16 @@ const sonarrReleaseGroupRegex = `-([a-z0-9]+(-[a-z0-9]+)?(?!.+?(?:480p|576p|720p
 
 const sonarrAnimeReleaseGroupRegex = `^\[(\S.+?\S)\](?:_|-|\s|\.)?`
 
-// CompiledReleaseGroup is the compiled PCRE pattern for extracting release group
+// compiledReleaseGroup is the compiled PCRE pattern for extracting release group
 // tags from release names (e.g. "-GROUP" or ".[GROUP]").
 var (
-	CompiledReleaseGroup      *Pattern
-	CompiledAnimeReleaseGroup *regexp.Regexp
-	FileExtRe                 = regexp.MustCompile(`(?i)\.[a-z0-9]{2,4}$`)
+	compiledReleaseGroup      *Pattern
+	compiledAnimeReleaseGroup *regexp.Regexp
+	fileExtRe                 = regexp.MustCompile(`(?i)\.[a-z0-9]{2,4}$`)
 )
 
-// TrashVideoCodecs defines TRaSH video codec patterns.
-var TrashVideoCodecs = []Format{
+// trashVideoCodecs defines TRaSH video codec patterns.
+var trashVideoCodecs = []Format{
 	{Name: "x264", Regex: `[xh][ ._-]?264|\bAVC(\b|\d)`, Normalize: "h264"},
 	{Name: "x265", Regex: `[xh][ ._-]?265|\bHEVC(\b|\d)`, Normalize: "h265"},
 	{Name: "x266", Regex: `[xh][ ._-]?266|\bVVC(\b|\d)`, Normalize: "h266"},
@@ -137,8 +137,8 @@ var TrashVideoCodecs = []Format{
 	{Name: "DivX", Regex: `\b[Dd][Ii][Vv][Xx]\b`, Normalize: "divx"},
 }
 
-// TrashHDRFormats defines TRaSH HDR patterns.
-var TrashHDRFormats = []Format{
+// trashHDRFormats defines TRaSH HDR patterns.
+var trashHDRFormats = []Format{
 	{Name: "HDR10+", Regex: `\b(HDR10(?=[+]|P(lus)?))`, Normalize: "hdr10+"},
 	{Name: "HDR10", Regex: `\b(HDR10(?![+]|P(lus)?))`, Normalize: "hdr10"},
 	{Name: "HDR", Regex: `\b(HDR)\b`, Normalize: "hdr"},
@@ -148,8 +148,8 @@ var TrashHDRFormats = []Format{
 	{Name: "WCG", Regex: `\b(WCG)\b`, Normalize: "wcg"},
 }
 
-// TrashStreamingServices defines TRaSH streaming service patterns.
-var TrashStreamingServices = []Format{
+// trashStreamingServices defines TRaSH streaming service patterns.
+var trashStreamingServices = []Format{
 	{Name: "AMZN", Regex: `\b(amzn|amazon(hd)?)\b`, Normalize: "AMZN"},
 	{Name: "NF", Regex: `\b(nf|netflix(u?hd)?)\b`, Normalize: "NF"},
 	{Name: "DSNP", Regex: `\b(dsnp|dsny|disney|Disney\+)\b`, Normalize: "DSNP"},
@@ -216,17 +216,17 @@ var (
 )
 
 func init() {
-	CompiledSources = compileFormats(SonarrSources)
-	CompiledVideoCodecs = compileFormats(TrashVideoCodecs)
-	CompiledHDR = compileFormats(TrashHDRFormats)
-	CompiledStreaming = compileFormats(TrashStreamingServices)
+	CompiledSources = compileFormats(sonarrSources)
+	CompiledVideoCodecs = compileFormats(trashVideoCodecs)
+	CompiledHDR = compileFormats(trashHDRFormats)
+	CompiledStreaming = compileFormats(trashStreamingServices)
 
 	var err error
-	CompiledReleaseGroup, err = CompilePCRE(sonarrReleaseGroupRegex)
+	compiledReleaseGroup, err = CompilePCRE(sonarrReleaseGroupRegex)
 	if err != nil {
 		panic("formats: release group: " + err.Error())
 	}
-	CompiledAnimeReleaseGroup = regexp.MustCompile(`(?i)` + sonarrAnimeReleaseGroupRegex)
+	compiledAnimeReleaseGroup = regexp.MustCompile(`(?i)` + sonarrAnimeReleaseGroupRegex)
 }
 
 func compileFormats(formats []Format) []Format {

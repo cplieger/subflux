@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as bus from "./bus.js";
 import * as store from "./store.js";
-import { initUserMenu, _userMenuPanelForTest } from "./user-menu.js";
+import { initUserMenu } from "./user-menu.js";
 import type { MeResponse } from "./api-types.js";
 
 const wire = vi.hoisted(() => ({
@@ -29,12 +29,16 @@ vi.mock("@cplieger/actions", () => ({
   apiAction: () => ({ dispatch: () => Promise.resolve(null), cancel: () => undefined }),
 }));
 
+// panel is the module's own menu node, handed to the popover once per init and
+// kept across tests, because the module creates it once at import.
 const menu = vi.hoisted(() => ({
   options: null as { haspopup?: string; onOpen?: () => void } | null,
   calls: [] as string[],
+  panel: null as HTMLElement | null,
 }));
 vi.mock("./popover-menu.js", () => ({
-  createMenuPopover: (_anchor: unknown, _panel: unknown, opts: unknown) => {
+  createMenuPopover: (_anchor: unknown, panel: unknown, opts: unknown) => {
+    menu.panel = panel as HTMLElement;
     menu.options = opts as { haspopup?: string; onOpen?: () => void };
     return {
       toggle: () => menu.calls.push("toggle"),
@@ -72,18 +76,25 @@ vi.mock("./events.js", () => ({
 }));
 
 /** The header markup app.ts ships: the trigger alone. The menu panel is
- *  user-menu.ts's own node and never in the document, so the fixture empties it
- *  instead of re-authoring it. */
+ *  user-menu.ts's own node and never in the document, so the fixture empties the
+ *  one the module handed its popover instead of re-authoring it. */
 function mountHeader(): void {
   document.body.innerHTML = `
     <header>
       <button type="button" id="userBtn">user</button>
     </header>`;
-  _userMenuPanelForTest().replaceChildren();
+  menu.panel?.replaceChildren();
+}
+
+function panel(): HTMLElement {
+  if (!menu.panel) {
+    throw new Error("initUserMenu has not handed its panel to the popover");
+  }
+  return menu.panel;
 }
 
 function items(): HTMLButtonElement[] {
-  return [..._userMenuPanelForTest().querySelectorAll<HTMLButtonElement>(".um-item")];
+  return [...panel().querySelectorAll<HTMLButtonElement>(".um-item")];
 }
 
 function labels(): string[] {
@@ -174,7 +185,7 @@ describe("user menu content", () => {
   it("lists the username, Security, Settings, the theme and Logout for an admin", async () => {
     await boot();
 
-    expect(_userMenuPanelForTest().querySelector(".um-name")?.textContent).toBe("cplieger");
+    expect(panel().querySelector(".um-name")?.textContent).toBe("cplieger");
     expect(labels()).toStrictEqual(["Security", "Settings", "System theme", "Logout"]);
   });
 
@@ -190,7 +201,7 @@ describe("user menu content", () => {
     await boot();
 
     // role="none" keeps a non-focusable div out of the role="menu" item set.
-    expect(_userMenuPanelForTest().querySelector(".um-user")?.getAttribute("role")).toBe("none");
+    expect(panel().querySelector(".um-user")?.getAttribute("role")).toBe("none");
   });
 
   it("gives every actionable row role=menuitem", async () => {

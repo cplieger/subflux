@@ -228,7 +228,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		Transport: passkey.Transport,
 		CreatedAt: passkey.CreatedAt,
 	})
-	Audit(r, slog.LevelInfo, AuditPasskeyAdd, true, user.Username,
+	audit(r, slog.LevelInfo, auditPasskeyAdd, true, user.Username,
 		slog.Int64("passkey_id", passkey.ID),
 		slog.String("name", passkey.Name))
 }
@@ -279,7 +279,7 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 		"username", user.Username, "passkey_id", passkeyID, "ip", ClientIP(r))
 
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditPasskeyDelete, true, user.Username,
+	audit(r, slog.LevelInfo, auditPasskeyDelete, true, user.Username,
 		slog.Int64("passkey_id", passkeyID))
 }
 
@@ -318,7 +318,7 @@ func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditPasskeyRename, true, user.Username,
+	audit(r, slog.LevelInfo, auditPasskeyRename, true, user.Username,
 		slog.Int64("passkey_id", passkeyID),
 		slog.String("name", req.Name))
 }

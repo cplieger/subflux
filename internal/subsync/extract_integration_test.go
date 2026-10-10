@@ -55,7 +55,7 @@ func TestIntegration_MKV_SyncFromEmbedded(t *testing.T) {
 	}
 
 	// Shift by 3 seconds and sync back.
-	shifted := ShiftCues(ref, 3*time.Second)
+	shifted := shiftCues(ref, 3*time.Second)
 	syncOpts := DefaultSyncOptions()
 	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
@@ -84,7 +84,7 @@ func TestIntegration_MKV_AudioSync(t *testing.T) {
 		t.Skipf("insufficient embedded cues: %d", len(ref))
 	}
 
-	shifted := ShiftCues(ref, 2*time.Second)
+	shifted := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		VideoPath:   mkvPath,
 		EnableAudio: true,
@@ -142,7 +142,7 @@ func TestIntegration_MP4_SyncFromEmbedded(t *testing.T) {
 		t.Skipf("insufficient MP4 embedded cues: %d, err=%v", len(ref), err)
 	}
 
-	shifted := ShiftCues(ref, 3*time.Second)
+	shifted := shiftCues(ref, 3*time.Second)
 	syncOpts := DefaultSyncOptions()
 	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
@@ -171,7 +171,7 @@ func TestIntegration_MP4_AudioSync(t *testing.T) {
 		t.Skipf("insufficient MP4 embedded cues: %d", len(ref))
 	}
 
-	shifted := ShiftCues(ref, 2*time.Second)
+	shifted := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		VideoPath:   mp4Path,
 		EnableAudio: true,

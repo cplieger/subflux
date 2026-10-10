@@ -36,24 +36,24 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	if ps.Token == "" {
 		return nil, errors.New("betaseries: token required")
 	}
-	return &Provider{
+	return &source{
 		client: provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		token:  ps.Token,
 	}, nil
 }
 
-// Provider implements the BetaSeries subtitle API.
-type Provider struct {
+// source implements the BetaSeries subtitle API.
+type source struct {
 	client *http.Client
 	token  string // API key for X-BetaSeries-Key header.
 }
 
 // Name returns the provider identifier for BetaSeries.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search queries BetaSeries for TV episode subtitles using the TVDB ID.
 // Only episode requests are handled; movies are skipped.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.MediaType != subflux.MediaTypeEpisode {
 		slog.Debug("betaseries: not an episode, skipping",
 			"media_type", req.MediaType)
@@ -107,7 +107,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 }
 
 // Download fetches the subtitle content for the given search result.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validates against SSRF via a malicious API response supplying an internal URL.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("betaseries: %w", err)
@@ -147,7 +147,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 // doGet returns a synthetic empty episodes response for BetaSeries' 400/4001
 // "not found" answer rather than an error, so Search sees zero results.
-func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, error) {
+func (p *source) doGet(ctx context.Context, reqURL string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
 		return nil, err

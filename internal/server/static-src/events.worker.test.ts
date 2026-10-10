@@ -224,14 +224,14 @@ describe("events: what a tab does with the worker's messages", () => {
       type: "frame",
       frame: {
         type: "notify",
-        data: JSON.stringify({ data: { level: "info", text: "hi" } }),
+        data: JSON.stringify({ data: { level: "success", text: "hi" } }),
         id: null,
       },
       generation: 1,
     });
     await messageTick();
 
-    expect(notify.info).toHaveBeenCalledWith("hi");
+    expect(notify.success).toHaveBeenCalledWith("hi");
   });
 
   it("a state change from the worker drives the degraded poll with the transition", async () => {

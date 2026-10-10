@@ -221,7 +221,6 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
     detail: {
       title: s.title,
       info,
-      backPath: "/",
       arrLink: buildArrLink(s),
       arrName: "Sonarr",
     },
@@ -774,13 +773,7 @@ export function renderSeriesDetail(
         className: "ghost",
         "data-nav": "files",
         onclick: () => {
-          openFileManager(
-            "episode",
-            `tvdb-${series.tvdb_id}-`,
-            series.title,
-            `/series/${series.tvdb_id}`,
-            series.id,
-          );
+          openFileManager("episode", `tvdb-${series.tvdb_id}-`, series.title, series.id);
         },
       },
       icon("file"),
@@ -983,7 +976,6 @@ function configureMovieHeader(m: MovieDetail): void {
     detail: {
       title: m.title,
       info,
-      backPath: "/",
       arrLink: buildRadarrLink(m),
       arrName: "Radarr",
     },
@@ -1133,7 +1125,7 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
         "data-nav": "files",
         "data-tip": "Manage subtitle files",
         onclick: () => {
-          openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
+          openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, m.id);
         },
       },
       icon("file"),

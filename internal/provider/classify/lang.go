@@ -61,14 +61,14 @@ var LangRegistry = map[string]string{
 	langcode.BrazilianPortuguese: "Brazilian Portuguese",
 }
 
-// LangNameToISO2 is the reverse of LangRegistry: English name → ISO-2 code.
+// langNameToISO2 is the reverse of LangRegistry: English name → ISO-2 code.
 // Built once at init time from LangRegistry.
-var LangNameToISO2 map[string]string
+var langNameToISO2 map[string]string
 
 func init() {
-	LangNameToISO2 = make(map[string]string, len(LangRegistry))
+	langNameToISO2 = make(map[string]string, len(LangRegistry))
 	for code, name := range LangRegistry {
-		LangNameToISO2[name] = code
+		langNameToISO2[name] = code
 	}
 }
 
@@ -97,7 +97,7 @@ func LookupLangCode(name string, overrides map[string]string) string {
 			return v
 		}
 	}
-	if v, ok := LangNameToISO2[name]; ok {
+	if v, ok := langNameToISO2[name]; ok {
 		return v
 	}
 	return ""

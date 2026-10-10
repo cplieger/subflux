@@ -437,11 +437,11 @@ type fakeProvider struct {
 
 func (f *fakeProvider) Name() subflux.ProviderID { return subflux.ProviderID(f.name) }
 
-func (f *fakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*fakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *fakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*fakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

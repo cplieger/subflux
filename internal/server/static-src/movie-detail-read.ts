@@ -19,7 +19,7 @@ export interface MovieDetailReads {
   readonly historyIDs: string[];
 }
 
-export interface MovieDetailRead {
+interface MovieDetailRead {
   /** Per-read results, for a caller that judges failure (a 404 is a
    *  definitive answer — the item vanished — every other non-2xx is not). */
   readonly subs: ApiResult<SubtitleEntry[]>;

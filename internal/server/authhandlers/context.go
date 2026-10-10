@@ -48,12 +48,12 @@ func NewSessionHashContext(ctx context.Context, sessHash string) context.Context
 	return context.WithValue(ctx, sessHashContextKey, sessHash)
 }
 
-// SessionHashFromContext returns the session token hash for the current
+// sessionHashFromContext returns the session token hash for the current
 // request, or "" if the request was authenticated via API key (no session).
 // Handlers that need to touch the current session (delete on logout,
 // exclude from bulk session invalidation) read it here instead
 // of re-parsing the cookie.
-func SessionHashFromContext(ctx context.Context) string {
+func sessionHashFromContext(ctx context.Context) string {
 	h, ok := ctx.Value(sessHashContextKey).(string)
 	if !ok {
 		return ""

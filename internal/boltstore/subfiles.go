@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/cplieger/subflux/internal/store/kv"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -112,12 +111,11 @@ func deleteStaleFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID strin
 // returns whether any insert or codec update happened.
 func applyWantedFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
 	changed := false
-	now := time.Now().UTC()
 	for k, codec := range want {
 		old, exists := have[k]
 		switch {
 		case !exists, old.Codec != codec:
-			rec := fileRec{Codec: codec, UpdatedAt: now}
+			rec := fileRec{Codec: codec}
 			if perr := putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
 				return false, perr
 			}
@@ -187,7 +185,7 @@ func parseSubFileKey(key []byte) (subFileKey, bool) {
 func (d *DB) UpsertSubtitleFile(_ context.Context, mediaType subflux.MediaType, mediaID string, f *subflux.SubtitleFile) error {
 	key := subtitleFileKey(mediaType, mediaID, f.Language, f.Variant, f.Source, f.Path)
 	return d.db.Update(func(tx *bolt.Tx) error {
-		rec := fileRec{Codec: f.Codec, UpdatedAt: time.Now().UTC()}
+		rec := fileRec{Codec: f.Codec}
 		return putSubtitleFile(tx, key, &rec)
 	})
 }

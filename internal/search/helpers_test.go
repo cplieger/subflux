@@ -3,7 +3,6 @@ package search
 import (
 	"context"
 	"errors"
-	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -19,7 +18,11 @@ type Syncer = syncing.Syncer
 // --- Mock implementations ---
 
 // noopDetector implements TrackDetector with no results.
-type noopDetector = NoopDetector
+type noopDetector struct{}
+
+func (noopDetector) DetectTracks(context.Context, string) ([]subflux.EmbeddedTrack, error) {
+	return nil, nil
+}
 
 // errDetector implements TrackDetector with a fixed probe failure, for the
 // detector-error fail-open + coverage-retention fixtures.
@@ -56,7 +59,7 @@ type mockStoreLockErr struct {
 	testsupport.NopStore
 }
 
-func (m *mockStoreLockErr) IsManuallyLocked(_ context.Context, _ subflux.ManualLockKey) (bool, error) {
+func (*mockStoreLockErr) IsManuallyLocked(_ context.Context, _ subflux.ManualLockKey) (bool, error) {
 	return false, errors.New("lock check failed")
 }
 
@@ -69,19 +72,19 @@ type mockConfig struct {
 	minScore    int
 }
 
-func (m *mockConfig) Scores() subflux.Scores { return subflux.DefaultScores }
-func (m *mockConfig) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
+func (*mockConfig) Scores() subflux.Scores { return subflux.DefaultScores }
+func (*mockConfig) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	return all
 }
 
 func (m *mockConfig) MinScoreForTarget(_ *subflux.SubtitleTarget, _ subflux.MediaType) int {
 	return m.minScore
 }
-func (m *mockConfig) Adaptive() subflux.AdaptiveConfig          { return m.adaptiveCfg }
-func (m *mockConfig) Search() subflux.SearchConfig              { return m.searchCfg }
-func (m *mockConfig) EmbeddedPolicy() subflux.EmbeddedPolicy    { return m.embedded }
-func (m *mockConfig) ProviderPriority(_ subflux.ProviderID) int { return 99 }
-func (m *mockConfig) PostProcess() subflux.PostProcessConfig {
+func (m *mockConfig) Adaptive() subflux.AdaptiveConfig        { return m.adaptiveCfg }
+func (m *mockConfig) Search() subflux.SearchConfig            { return m.searchCfg }
+func (m *mockConfig) EmbeddedPolicy() subflux.EmbeddedPolicy  { return m.embedded }
+func (*mockConfig) ProviderPriority(_ subflux.ProviderID) int { return 99 }
+func (*mockConfig) PostProcess() subflux.PostProcessConfig {
 	return subflux.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,
@@ -91,7 +94,7 @@ func (m *mockConfig) PostProcess() subflux.PostProcessConfig {
 	}
 }
 
-func (m *mockConfig) Sync() subflux.SyncConfig {
+func (*mockConfig) Sync() subflux.SyncConfig {
 	return subflux.SyncConfig{SyncSubtitles: true}
 }
 
@@ -111,10 +114,6 @@ func (m *mockMetrics) AdaptiveSkip() { m.adaptiveSkips.Add(1) }
 
 func (m *mockMetrics) RecordEmbeddedDetectorError()           { m.detectorErrs.Add(1) }
 func (m *mockMetrics) RecordSubtitleSaved(subflux.ProviderID) { m.saved.Add(1) }
-func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration)   {}
-func (m *mockMetrics) RecordImport(_ subflux.PollKey)         {}
-func (m *mockMetrics) TotalSearches() int64                   { return m.searches.Load() }
-func (m *mockMetrics) Handler() http.HandlerFunc              { return nil }
 
 type mockProvider struct {
 	name        string
@@ -161,7 +160,7 @@ type mockFilterConfig struct {
 	mockConfig
 }
 
-func (m *mockFilterConfig) ProvidersForTarget(target *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
+func (*mockFilterConfig) ProvidersForTarget(target *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	if len(target.Providers) > 0 {
 		return target.Providers
 	}
@@ -175,4 +174,15 @@ func newEngine(providers []provider.Provider, db Store, cfg Cfg,
 	return New(providers, WithStore(db), WithConfig(cfg),
 		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks),
 		WithProviderGate(testsupport.ProviderGateBinding()), WithMediaWriter(testsupport.MediaWriter()))
+}
+
+// errored lists the providers whose search returned an error.
+func (o searchOutcome) errored() []subflux.ProviderID {
+	var names []subflux.ProviderID
+	for _, p := range o.providers {
+		if p.outcome == providerError {
+			names = append(names, p.name)
+		}
+	}
+	return names
 }

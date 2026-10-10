@@ -75,7 +75,7 @@ func SyncWithOptions(ctx context.Context, reference, incorrect []Cue, opts *Sync
 	if len(incorrect) == 0 {
 		return SyncResult{
 			Cues:       incorrect,
-			Confidence: ConfidenceNone,
+			Confidence: confidenceNone,
 			Method:     MethodNone,
 		}
 	}
@@ -170,9 +170,9 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 			Cues:       cues,
 			Offset:     offset.Milliseconds(),
 			Rate:       1.0,
-			Method:     MethodOffset,
+			Method:     methodOffset,
 			Source:     SourceOffset,
-			Transform:  Transform{Kind: TransformShift, Shift: offset.Milliseconds()},
+			Transform:  transform{Kind: transformShift, Shift: offset.Milliseconds()},
 			Confidence: constantOffsetConfidence(reference, incorrect, offset),
 		}
 		return nil
@@ -195,7 +195,7 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 	// (nil, wrong-length, or non-monotonic corrected cues) before arbitration.
 	live := candidates[:0]
 	for _, c := range candidates {
-		if c.Confidence > ConfidenceNone {
+		if c.Confidence > confidenceNone {
 			live = append(live, c)
 		}
 	}
@@ -209,7 +209,7 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 			"splits_enabled", opts.EnableSplits)
 		return SyncResult{
 			Cues:       incorrect,
-			Confidence: ConfidenceNone,
+			Confidence: confidenceNone,
 			Method:     MethodNone,
 		}
 	}
@@ -222,7 +222,7 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 		"winner", winner.Method,
 		"offset_ms", winner.Offset,
 		"confidence", float64(winner.Confidence),
-		"transform", winner.Transform.Digest(),
+		"transform", winner.Transform.digest(),
 		"rating", alignmentRating(reference, winner.Cues))
 
 	return winner
@@ -232,11 +232,11 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 // by measuring how well the shifted subtitles overlap with the reference.
 func constantOffsetConfidence(reference, incorrect []Cue, offset time.Duration) Confidence {
 	if len(reference) == 0 || len(incorrect) == 0 {
-		return ConfidenceNone
+		return confidenceNone
 	}
 
 	refSpans := cuesToSpans(reference)
-	shifted := ShiftCues(incorrect, offset)
+	shifted := shiftCues(incorrect, offset)
 	shiftedSpans := cuesToSpans(shifted)
 
 	// Two-pointer overlap computation. Both span slices are sorted by time
@@ -263,12 +263,12 @@ func constantOffsetConfidence(reference, incorrect []Cue, offset time.Duration) 
 	}
 
 	if totalRef == 0 {
-		return ConfidenceNone
+		return confidenceNone
 	}
 
 	ratio := totalOverlap / totalRef
 	if ratio > 1.0 {
 		ratio = 1.0
 	}
-	return Confidence(ratio * float64(DefaultConfidenceCaps.ForMethod(MethodOffset))) // cap at offset confidence for offset-only sync
+	return Confidence(ratio * float64(defaultConfidenceCaps.forMethod(methodOffset))) // cap at offset confidence for offset-only sync
 }

@@ -24,7 +24,7 @@ type fakeMapper struct {
 }
 
 func (fakeMapper) Resolve(context.Context, int, int, int) *anidb.EpisodeResult {
-	return &anidb.EpisodeResult{AniDBSeriesID: 7}
+	return &anidb.EpisodeResult{}
 }
 func (fakeMapper) CheckClientKey(context.Context) error { return nil }
 func (f fakeMapper) ClientKeyVerdict() (bool, error)    { return f.answered, f.rejected }
@@ -38,8 +38,8 @@ func (m *forgettingMapper) ForgetClientKeyVerdict()         { m.answered, m.reje
 
 // feedProvider answers the entry search with two complete entries and each
 // entry's detail with detail(id).
-func feedProvider(detail func(id string) (int, string), mapper episodeMapper) *Provider {
-	return &Provider{
+func feedProvider(detail func(id string) (int, string), mapper episodeMapper) *source {
+	return &source{
 		anidbMapper: mapper,
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			status, body := http.StatusOK, `[{"title":"[Grp] Show - 01","status":"complete","id":11},{"title":"[Grp] Show - 01 v2","status":"complete","id":12}]`

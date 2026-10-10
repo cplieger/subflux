@@ -75,7 +75,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	if errParam := q.Get("error"); errParam != "" {
 		desc := q.Get("error_description")
-		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
+		audit(r, slog.LevelWarn, auditOIDCCallback, false, "",
 			slog.String("reason", "provider_error"),
 			slog.String("error", errParam),
 			slog.String("description", desc))
@@ -92,7 +92,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	nonce, codeVerifier, redirectURI, err := h.OidcDB.ConsumeOIDCState(ctx, stateParam)
 	if err != nil {
-		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
+		audit(r, slog.LevelWarn, auditOIDCCallback, false, "",
 			slog.String("reason", "invalid_state"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeOIDCStateInvalid, "invalid or expired state")
 		return
@@ -100,7 +100,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	claims, oidcExpiry, err := oidcProv.Exchange(ctx, code, codeVerifier, nonce)
 	if err != nil {
-		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
+		audit(r, slog.LevelWarn, auditOIDCCallback, false, "",
 			slog.String("reason", "exchange_failed"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeOIDCExchangeFailed, "authentication failed")
 		return
@@ -109,7 +109,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	user, linkToken, err := h.resolveOrLinkOIDC(ctx, claims)
 	if err != nil {
 		if errors.Is(err, errOIDCLinkNoPassword) {
-			Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
+			audit(r, slog.LevelWarn, auditOIDCCallback, false, "",
 				slog.String("reason", "username_conflict_no_password"))
 			httpapi.ConflictC(w, r, subflux.CodeConflict, "an account with this username already exists")
 			return
@@ -120,7 +120,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if linkToken != "" {
 		// Username collides with a password-protected local account. Redirect
 		// to the login page to prove ownership and link (link-on-login).
-		Audit(r, slog.LevelInfo, AuditOIDCCallback, true, "",
+		audit(r, slog.LevelInfo, auditOIDCCallback, true, "",
 			slog.String("stage", "link_required"))
 		//nolint:gosec // G710: linkToken is a server-generated hex token, not user input
 		http.Redirect(w, r, "/login.html?oidc_link="+linkToken, http.StatusFound)
@@ -128,7 +128,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.Enabled {
-		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
+		audit(r, slog.LevelWarn, auditOIDCCallback, false, user.Username,
 			slog.String("reason", "account_disabled"))
 		httpapi.ForbiddenC(w, r, subflux.CodeAuthAccountDisabled, "account disabled")
 		return
@@ -141,7 +141,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectURI = auth.ValidateRedirectURI(redirectURI)
-	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
+	audit(r, slog.LevelInfo, auditLoginSuccess, true, user.Username,
 		slog.String("method", string(auth.MethodOIDC)))
 	http.Redirect(w, r, redirectURI, http.StatusFound) //nolint:gosec // G710: redirectURI validated above
 }
@@ -225,7 +225,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pending, ok := h.Ceremonies.Link.LoadAndDelete(req.LinkToken)
-	if !ok || time.Since(pending.CreatedAt) > CeremonyTTL {
+	if !ok || time.Since(pending.CreatedAt) > ceremonyTTL {
 		httpapi.UnauthorizedC(w, r, subflux.CodeAuthSessionInvalid, "invalid or expired link token")
 		return
 	}
@@ -251,7 +251,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !okPass {
 		h.RateLimiter.Record(rlIP, rlUser)
-		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
+		audit(r, slog.LevelWarn, auditOIDCCallback, false, user.Username,
 			slog.String("reason", "link_password_invalid"))
 		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
@@ -291,7 +291,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("oidc: account linked", "username", user.Username)
-	Audit(r, slog.LevelInfo, AuditOIDCCallback, true, user.Username,
+	audit(r, slog.LevelInfo, auditOIDCCallback, true, user.Username,
 		slog.String("stage", "linked"))
 }
 

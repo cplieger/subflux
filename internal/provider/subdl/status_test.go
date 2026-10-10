@@ -14,7 +14,7 @@ import (
 func TestCheckAPIStatus_classifies_a_refused_key_as_auth(t *testing.T) {
 	t.Parallel()
 	for _, msg := range []string{"Not Authorized", "Invalid API key", "invalid key", "API key not found"} {
-		_, err := (&Provider{}).checkAPIStatus(&apiResponse{Status: false, Error: runesafe.Untrusted(msg)}, "Movie (2024)")
+		_, err := (&source{}).checkAPIStatus(&apiResponse{Status: false, Error: runesafe.Untrusted(msg)}, "Movie (2024)")
 		if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
 			t.Errorf("checkAPIStatus(%q) = %v, want *subflux.AuthError", msg, err)
 		}
@@ -24,7 +24,7 @@ func TestCheckAPIStatus_classifies_a_refused_key_as_auth(t *testing.T) {
 func TestCheckAPIStatus_keeps_other_failures_out_of_auth(t *testing.T) {
 	t.Parallel()
 	for _, msg := range []string{"Daily quota exceeded", "something broke"} {
-		_, err := (&Provider{}).checkAPIStatus(&apiResponse{Status: false, Error: runesafe.Untrusted(msg)}, "Movie (2024)")
+		_, err := (&source{}).checkAPIStatus(&apiResponse{Status: false, Error: runesafe.Untrusted(msg)}, "Movie (2024)")
 		if err == nil {
 			t.Fatalf("checkAPIStatus(%q) = nil, want an error", msg)
 		}
@@ -39,7 +39,7 @@ func TestCheckAPIStatus_keeps_other_failures_out_of_auth(t *testing.T) {
 
 func TestSearch_reports_a_refused_key_answered_with_http_200(t *testing.T) {
 	t.Parallel()
-	p := &Provider{
+	p := &source{
 		apiKey: "placeholder-api-key",
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return &http.Response{

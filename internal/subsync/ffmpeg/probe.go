@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
-	"strconv"
 	"time"
 )
 
@@ -18,7 +17,6 @@ const maxProbeOutputBytes = 10 << 20
 // Track holds metadata for a single stream from ffprobe output.
 type Track struct {
 	CodecName       string
-	CodecType       string
 	Language        string // extracted from tags
 	Title           string // extracted from tags
 	RFrameRate      string // raw r_frame_rate from ffprobe (e.g. "24000/1001")
@@ -36,7 +34,6 @@ type probeStream struct {
 	Tags        map[string]string `json:"tags"`
 	Disposition map[string]int    `json:"disposition"`
 	CodecName   string            `json:"codec_name"`
-	CodecType   string            `json:"codec_type"`
 	RFrameRate  string            `json:"r_frame_rate"`
 	Index       int               `json:"index"`
 }
@@ -44,7 +41,7 @@ type probeStream struct {
 // ProbeStreams runs ffprobe and returns parsed stream metadata.
 // Filters by codec_type if filterType is non-empty (e.g. "subtitle", "audio").
 func ProbeStreams(ctx context.Context, path, filterType string) ([]Track, error) {
-	if !ProbeAvailable() {
+	if !probeAvailable() {
 		return nil, errors.New("ffprobe not available")
 	}
 
@@ -71,55 +68,6 @@ func ProbeStreams(ctx context.Context, path, filterType string) ([]Track, error)
 	}
 
 	return ParseProbeOutput(stdout.Bytes())
-}
-
-// ProbeDuration returns the duration of a media file in milliseconds.
-func ProbeDuration(ctx context.Context, path string) (int64, error) {
-	if !ProbeAvailable() {
-		return 0, errors.New("ffprobe not available")
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "ffprobe", //nolint:gosec // G204: args from validated config
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-print_format", "json",
-		"file:"+path,
-	)
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return 0, fmt.Errorf("ffprobe duration %s: %w: %s", path, err, stderr.String())
-	}
-
-	var out struct {
-		Format struct {
-			Duration string `json:"duration"`
-		} `json:"format"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
-		return 0, err
-	}
-
-	if out.Format.Duration == "" {
-		slog.Debug("ffprobe returned empty duration", "path", path)
-		return 0, fmt.Errorf("ffprobe returned no duration for %s", path)
-	}
-
-	dur, err := strconv.ParseFloat(out.Format.Duration, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	ms := int64(dur * float64(time.Second/time.Millisecond))
-	slog.Debug("ffprobe duration", "path", path, "duration_ms", ms)
-
-	return ms, nil
 }
 
 // ProbeVideoFPS returns the video stream's frame rate, or 0 if unavailable.
@@ -152,7 +100,6 @@ func ParseProbeOutput(data []byte) ([]Track, error) {
 		t := Track{
 			Index:      s.Index,
 			CodecName:  s.CodecName,
-			CodecType:  s.CodecType,
 			RFrameRate: s.RFrameRate,
 		}
 

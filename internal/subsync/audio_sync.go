@@ -21,9 +21,6 @@ type AudioSyncHints struct {
 	// because style-based classification is more accurate than text patterns.
 	DialogueCues []Cue
 
-	// DurationSec is the total media duration in seconds.
-	DurationSec int
-
 	// IsASS indicates the subtitle was ASS-extracted (clean cues, no tag remnants).
 	IsASS bool
 }
@@ -66,13 +63,13 @@ var defaultAudioSyncConfig = audioSyncConfig{
 func audioSync(ctx context.Context, incorrect []Cue, videoPath string, hints AudioSyncHints) SyncResult {
 	if len(incorrect) < MinCuesForSync {
 		slog.Debug("audio sync: skipped, too few cues", "cues", len(incorrect), "min", MinCuesForSync)
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	pcm, err := ffmpeg.ExtractSegmentPCM(ctx, videoPath, 0, 0)
 	if err != nil {
 		slog.Warn("audio sync: extraction failed", "path", videoPath, "error", err)
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	return audioSyncFromPCM(ctx, incorrect, pcm, hints)
@@ -86,7 +83,7 @@ func audioSync(ctx context.Context, incorrect []Cue, videoPath string, hints Aud
 // If both agree within 500ms, uses the precise result.
 func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints AudioSyncHints) SyncResult {
 	if len(incorrect) < MinCuesForSync {
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	samplesPerFrame := ffmpeg.PCMSampleRate * frameMs / 1000
@@ -95,7 +92,7 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 		slog.Debug("audio sync: insufficient PCM samples for one frame",
 			"pcm_samples", len(pcm),
 			"samples_per_frame", samplesPerFrame)
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 	audioDurMs := int64(numFrames) * frameMs
 
@@ -109,13 +106,13 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 		slog.Debug("audio sync: no dialogue cues after filtering",
 			"original_cues", len(incorrect),
 			"hints_dialogue", len(hints.DialogueCues))
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	// Build bipolar subtitle signal from cleaned cues.
 	vadSubSignal := buildVADSubSignal(analysisCues, numFrames)
 	if len(vadSubSignal) == 0 {
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	// 2-step GMM: run once, threshold at two levels.
@@ -131,7 +128,7 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 		return gctx.Err()
 	})
 	if err := g.Wait(); err != nil {
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 
 	safeLen := min(len(safeSig), len(vadSubSignal))
@@ -139,7 +136,7 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 
 	safeCorr := crossCorrelateEdges(ctx, safeSig[:safeLen], vadSubSignal[:safeLen])
 	if err := ctx.Err(); err != nil {
-		return SyncResult{Cues: incorrect, Confidence: ConfidenceNone, Method: MethodAudio}
+		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
 	}
 	precCorr := crossCorrelateEdges(ctx, preciseSig[:precLen], vadSubSignal[:precLen])
 
@@ -168,7 +165,7 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 		"prec_peak", precCorr.Peak,
 		"audio_dur_s", audioDurMs/1000)
 
-	conf := Confidence(corr.Peak * float64(DefaultConfidenceCaps.ForMethod(MethodAudio)))
+	conf := Confidence(corr.Peak * float64(defaultConfidenceCaps.forMethod(MethodAudio)))
 	if corr.OffsetMs == 0 {
 		return SyncResult{
 			Cues: incorrect, Offset: 0, Rate: 1.0,
@@ -189,13 +186,13 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 			"limit_ms", limit)
 		return SyncResult{
 			Cues: incorrect, Offset: 0, Rate: 1.0,
-			Confidence: ConfidenceNone, Method: MethodAudio,
+			Confidence: confidenceNone, Method: MethodAudio,
 		}
 	}
 
 	offset := time.Duration(corr.OffsetMs) * time.Millisecond
 	return SyncResult{
-		Cues: ShiftCues(incorrect, offset), Offset: corr.OffsetMs,
+		Cues: shiftCues(incorrect, offset), Offset: corr.OffsetMs,
 		Rate: 1.0, Confidence: conf, Method: MethodAudio,
 	}
 }

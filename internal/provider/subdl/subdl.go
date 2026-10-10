@@ -40,25 +40,25 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	if ps.APIKey == "" {
 		return nil, errors.New("subdl: api_key is required")
 	}
-	return &Provider{
+	return &source{
 		apiKey:    ps.APIKey,
 		dlBaseURL: dlBaseURL,
 		client:    provider.NewHTTPClient(provider.HTTPTimeoutExtended),
 	}, nil
 }
 
-// Provider implements the SubDL API client.
-type Provider struct {
+// source implements the SubDL API client.
+type source struct {
 	client    *http.Client
 	apiKey    string
 	dlBaseURL string
 }
 
 // Name returns the provider identifier for SubDL.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles matching the request via IMDB/TMDB ID or title.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.ImdbID == "" && req.TmdbID == 0 && req.Title == "" {
 		slog.Debug("subdl: no IMDB ID, TMDB ID, or title, skipping")
 		return nil, nil
@@ -176,7 +176,7 @@ func containsAny(msg string, patterns []string) bool {
 // items on success, nil on "not found", *subflux.AuthError for a refused key,
 // or an error for other API failures. The upstream text can echo the request,
 // so it is redacted of the API key before it reaches either error.
-func (p *Provider) checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
+func (p *source) checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
 	if result.Status {
 		return result.Subtitles, nil
 	}
@@ -235,7 +235,7 @@ func filterResults(items []subtitleItem, isEpisode bool, matchedBy subflux.Match
 
 // Download fetches the subtitle content for the given search result.
 // SubDL download URLs are relative paths; absolute URLs are rejected.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// DownloadURL is a relative path (e.g. "/sd/..."); reject absolute
 	// URLs to prevent injection via a crafted API response.
 	if !strings.HasPrefix(sub.DownloadURL, "/") {
@@ -274,7 +274,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 // returns the decoded response. Transport errors are wrapped and any
 // api_key embedded in them is redacted. Caller inspects result.Status via
 // checkAPIStatus.
-func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiResponse, error) {
+func (p *source) doAPIRequest(ctx context.Context, params url.Values) (*apiResponse, error) {
 	u := apiURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {

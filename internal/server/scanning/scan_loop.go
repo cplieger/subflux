@@ -265,22 +265,22 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 		return true, false, nil
 	}
 
-	scan := ScanEpisode(ctx, deps, ls, series, ep)
+	scan := scanEpisode(ctx, deps, ls, series, ep)
 
 	seasonEpCount := arrsvc.SeasonEpisodeFileCount(series, ep.SeasonNumber)
 	recordEpisodeOutcomes(ctx, tracker, series, ep.SeasonNumber,
 		scan.Langs, seasonEpCount)
 
 	switch scan.Outcome {
-	case ScanFound:
+	case scanFound:
 		stats.EpisodesFound++
-	case ScanSkipped:
+	case scanSkipped:
 		stats.EpisodesSkipped++
-	case ScanBackedOff:
+	case scanBackedOff:
 		stats.EpisodesBackedOff++
-	case ScanDownloadFailed:
+	case scanDownloadFailed:
 		stats.EpisodesDownloadFailed++
-	case ScanWriteBlocked:
+	case scanWriteBlocked:
 		stats.EpisodesWriteBlocked++
 	default:
 		stats.EpisodesNoResult++
@@ -296,7 +296,7 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 // trackerSkips reports whether the season tracker writes the episode off at
 // show or season level, counting the skip. An episode in a folder already
 // known to refuse writes is never written off: the show-level check asks a
-// provider and a skip stamps the item, where ScanEpisode reports it
+// provider and a skip stamps the item, where scanEpisode reports it
 // write-blocked and leaves it unstamped.
 func trackerSkips(ctx context.Context, deps *Deps, series *arrapi.Series, ep *arrapi.Episode,
 	tracker *seasonTracker, langs []string,
@@ -337,16 +337,16 @@ func recordEpisodeOutcomes(ctx context.Context, tracker *seasonTracker,
 		if o.Kind != subflux.LangSearched {
 			continue
 		}
-		var kind ScanOutcome
+		var kind scanOutcome
 		switch {
 		case o.WriteBlocked > 0:
 			continue
 		case o.Found():
-			kind = ScanFound
+			kind = scanFound
 		case o.Failed > 0, o.Answered == 0:
 			continue
 		default:
-			kind = ScanNoResult
+			kind = scanNoResult
 		}
 		tracker.recordOutcome(ctx, series.ImdbID, season, o.Lang,
 			seasonIDPrefix, kind, seasonEpCount)
@@ -381,15 +381,15 @@ func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
 ) (queried bool, writeFailure *mediawrite.UnwritableError) {
 	scan := scanMovieDetail(ctx, deps, ls, m)
 	switch scan.Outcome {
-	case ScanFound:
+	case scanFound:
 		stats.MoviesFound++
-	case ScanSkipped:
+	case scanSkipped:
 		stats.MoviesSkipped++
-	case ScanBackedOff:
+	case scanBackedOff:
 		stats.MoviesBackedOff++
-	case ScanDownloadFailed:
+	case scanDownloadFailed:
 		stats.MoviesDownloadFailed++
-	case ScanWriteBlocked:
+	case scanWriteBlocked:
 		stats.MoviesWriteBlocked++
 	default:
 		stats.MoviesNoResult++

@@ -320,10 +320,8 @@ function onFrame(frame: Frame): void {
 function showNotifyToast(payload: NotifyEvent): void {
   if (payload.level === "error") {
     notify.error(payload.text || "");
-  } else if (payload.level === "success") {
-    notify.success(payload.text || "");
   } else {
-    notify.info(payload.text || "");
+    notify.success(payload.text || "");
   }
 }
 

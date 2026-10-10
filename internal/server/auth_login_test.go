@@ -28,7 +28,7 @@ func TestLogin_ValidCredentials(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	found := false
 	for _, c := range cookies {
-		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == cookieNameSecure {
 			found = true
 			if !c.HttpOnly {
 				t.Error("session cookie missing HttpOnly flag")
@@ -197,7 +197,7 @@ func TestLogout_Success(t *testing.T) {
 
 	// Verify cookie was cleared (MaxAge < 0).
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == cookieNameSecure {
 			if c.MaxAge >= 0 {
 				t.Errorf("cookie MaxAge = %d, want < 0 (cleared)", c.MaxAge)
 			}
@@ -218,3 +218,6 @@ func TestLogout_NoCookie(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+// cookieNameSecure is the session cookie name over HTTPS.
+const cookieNameSecure = "__Host-sfx_session"

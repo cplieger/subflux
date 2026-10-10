@@ -33,10 +33,10 @@ const (
 // malformed id names no root and bumps nothing.
 var detailRootRe = regexp.MustCompile(`^(tvdb|tmdb)-([1-9]\d*)(?:-s\d+e\d+)?$`)
 
-// ErrUnknownSubject is returned by Resolve for a held key outside the
+// errUnknownSubject is returned by resolve for a held key outside the
 // registry (an unknown kind, a non-empty ref on a ref-less kind, or a detail
 // ref that is not a root); the digest answers must_refetch.
-var ErrUnknownSubject = errors.New("events: unknown digest subject")
+var errUnknownSubject = errors.New("events: unknown digest subject")
 
 // Versions is the per-subject version table the digest compares against.
 // Counters live in process memory and restart from zero with the epoch:
@@ -93,15 +93,15 @@ func (v *Versions) Stamp(kind, ref string) (Stamp, bool) {
 	return Stamp{Kind: kind, Ref: ref, Version: v.Current(kind, ref), Epoch: v.epoch}, true
 }
 
-// Resolve is the sse.Resolver over this table: one current State per held
-// subject, in order, or ErrUnknownSubject for a key outside the registry.
+// resolve is the sse.Resolver over this table: one current State per held
+// subject, in order, or errUnknownSubject for a key outside the registry.
 // It takes no I/O lock, so a vanished detail root is never reported gone
 // here; its refetch answers 404 and the client already treats that as gone.
-func (v *Versions) Resolve(_ context.Context, held []sse.Held) ([]sse.State, error) {
+func (v *Versions) resolve(_ context.Context, held []sse.Held) ([]sse.State, error) {
 	out := make([]sse.State, 0, len(held))
 	for _, h := range held {
 		if !validSubject(h.Kind, h.Ref) {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownSubject, h.Kind)
+			return nil, fmt.Errorf("%w: %s", errUnknownSubject, h.Kind)
 		}
 		out = append(out, sse.State{Subject: h.Subject, Version: v.Current(h.Kind, h.Ref), Status: sse.StatusCurrent})
 	}
@@ -146,11 +146,11 @@ func (v *Versions) bumpFor(e Event) {
 		v.bumpCoverage(&ev)
 	case ActivityDelta:
 		v.Bump(SubjectActivity, "")
-	case AlertDelta:
+	case alertDelta:
 		v.Bump(SubjectAlerts, "")
-	case ProviderDelta:
+	case providerDelta:
 		v.Bump(SubjectProviders, "")
-	case Notify, ScanStart, ScanDone, SyncDone, Epoch:
+	case Notify, scanStart, scanDone, syncDone, epoch:
 	}
 }
 

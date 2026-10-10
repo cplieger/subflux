@@ -17,7 +17,7 @@ func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
 		{name: "verbatim", secret: "placeholder-key", in: "invalid key placeholder-key"},
 		{name: "assembled_by_the_normalization", secret: "placeholder key", in: "invalid key placeholder\nkey"},
 		{name: "rewritten_by_the_normalization", secret: "placeholder\u202ekey", in: "invalid key placeholder\u202ekey"},
-		{name: "cut_by_the_cap", secret: "placeholder key", in: strings.Repeat("x", MaxFieldBytes-6) + "placeholder\nkey"},
+		{name: "cut_by_the_cap", secret: "placeholder key", in: strings.Repeat("x", maxFieldBytes-6) + "placeholder\nkey"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -29,8 +29,8 @@ func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
 			if strings.ContainsAny(got, "\n\u202e") {
 				t.Errorf("RedactedField(%q) = %q, want a single line with no unsafe rune", tt.in, got)
 			}
-			if len(got) > MaxFieldBytes+len("...") {
-				t.Errorf("RedactedField(%q) is %d bytes, want at most %d", tt.in, len(got), MaxFieldBytes+3)
+			if len(got) > maxFieldBytes+len("...") {
+				t.Errorf("RedactedField(%q) is %d bytes, want at most %d", tt.in, len(got), maxFieldBytes+3)
 			}
 		})
 	}
@@ -38,8 +38,8 @@ func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
 
 func TestRedactedField_marks_a_cut_value(t *testing.T) {
 	t.Parallel()
-	got := RedactedField(strings.Repeat("y", MaxFieldBytes+10), httpx.Secret("placeholder-key"))
-	if want := strings.Repeat("y", MaxFieldBytes) + "..."; got != want {
+	got := RedactedField(strings.Repeat("y", maxFieldBytes+10), httpx.Secret("placeholder-key"))
+	if want := strings.Repeat("y", maxFieldBytes) + "..."; got != want {
 		t.Errorf("RedactedField(long) = %q, want %q", got, want)
 	}
 }

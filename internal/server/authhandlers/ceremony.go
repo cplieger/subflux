@@ -15,20 +15,20 @@ import (
 )
 
 const (
-	// CeremonyTTL is the maximum age for a pending OIDC link ceremony. A
+	// ceremonyTTL is the maximum age for a pending OIDC link ceremony. A
 	// WebAuthn ceremony is not bounded by it: it carries the deadline its own
 	// authenticator was given (authwebauthn.Ceremony.Expires).
-	CeremonyTTL = authwebauthn.CeremonyTimeout
+	ceremonyTTL = authwebauthn.CeremonyTimeout
 
-	// MaxCeremonySessions caps the in-memory ceremony maps to prevent OOM
+	// maxCeremonySessions caps the in-memory ceremony maps to prevent OOM
 	// from unauthenticated flooding of /api/auth/login or /api/auth/webauthn/login/begin.
-	MaxCeremonySessions = 10000
+	maxCeremonySessions = 10000
 
-	// CeremonyShards is the number of shards for ceremony maps.
-	CeremonyShards = 16
+	// ceremonyShards is the number of shards for ceremony maps.
+	ceremonyShards = 16
 
-	// HeaderWebAuthnSession is the HTTP header carrying the WebAuthn session token.
-	HeaderWebAuthnSession = "X-WebAuthn-Session"
+	// headerWebAuthnSession is the HTTP header carrying the WebAuthn session token.
+	headerWebAuthnSession = "X-WebAuthn-Session"
 )
 
 // PendingLink holds state for an OIDC login that matched an existing local
@@ -42,37 +42,37 @@ type PendingLink struct {
 	UserID     int64
 }
 
-// ShardedCeremonyMap is a sharded map for ephemeral ceremony state.
+// shardedCeremonyMap is a sharded map for ephemeral ceremony state.
 // Sharding reduces lock contention under concurrent auth requests.
-type ShardedCeremonyMap[V any] struct {
-	shards [CeremonyShards]struct {
+type shardedCeremonyMap[V any] struct {
+	shards [ceremonyShards]struct {
 		m  map[string]V
 		mu sync.Mutex
 	}
 	count atomic.Int64
 }
 
-// NewShardedCeremonyMap creates a new sharded ceremony map.
-func NewShardedCeremonyMap[V any]() *ShardedCeremonyMap[V] {
-	sm := &ShardedCeremonyMap[V]{}
+// newShardedCeremonyMap creates a new sharded ceremony map.
+func newShardedCeremonyMap[V any]() *shardedCeremonyMap[V] {
+	sm := &shardedCeremonyMap[V]{}
 	for i := range sm.shards {
 		sm.shards[i].m = make(map[string]V)
 	}
 	return sm
 }
 
-func (sm *ShardedCeremonyMap[V]) shard(key string) *struct {
+func (sm *shardedCeremonyMap[V]) shard(key string) *struct {
 	m  map[string]V
 	mu sync.Mutex
 } {
 	h := fnv.New32a()
 	h.Write([]byte(key))
-	return &sm.shards[h.Sum32()%CeremonyShards]
+	return &sm.shards[h.Sum32()%ceremonyShards]
 }
 
 // Store adds a value to the map. Returns false if the session limit is reached.
-func (sm *ShardedCeremonyMap[V]) Store(key string, val V) bool {
-	if sm.count.Load() >= MaxCeremonySessions {
+func (sm *shardedCeremonyMap[V]) Store(key string, val V) bool {
+	if sm.count.Load() >= maxCeremonySessions {
 		return false
 	}
 	s := sm.shard(key)
@@ -86,7 +86,7 @@ func (sm *ShardedCeremonyMap[V]) Store(key string, val V) bool {
 }
 
 // LoadAndDelete atomically retrieves and removes a value from the map.
-func (sm *ShardedCeremonyMap[V]) LoadAndDelete(key string) (V, bool) {
+func (sm *shardedCeremonyMap[V]) LoadAndDelete(key string) (V, bool) {
 	s := sm.shard(key)
 	s.mu.Lock()
 	val, ok := s.m[key]
@@ -98,8 +98,8 @@ func (sm *ShardedCeremonyMap[V]) LoadAndDelete(key string) (V, bool) {
 	return val, ok
 }
 
-// Cleanup removes entries matching the isExpired predicate.
-func (sm *ShardedCeremonyMap[V]) Cleanup(isExpired func(V) bool) {
+// cleanup removes entries matching the isExpired predicate.
+func (sm *shardedCeremonyMap[V]) cleanup(isExpired func(V) bool) {
 	for i := range sm.shards {
 		s := &sm.shards[i]
 		s.mu.Lock()
@@ -116,15 +116,15 @@ func (sm *ShardedCeremonyMap[V]) Cleanup(isExpired func(V) bool) {
 // CeremonyStore holds ephemeral ceremony state for auth flows.
 // Owned by the Server struct to enable per-instance isolation in tests.
 type CeremonyStore struct {
-	WebAuthn *ShardedCeremonyMap[authwebauthn.Ceremony]
-	Link     *ShardedCeremonyMap[*PendingLink]
+	WebAuthn *shardedCeremonyMap[authwebauthn.Ceremony]
+	Link     *shardedCeremonyMap[*PendingLink]
 }
 
 // NewCeremonyStore creates a new ceremony store.
 func NewCeremonyStore() *CeremonyStore {
 	return &CeremonyStore{
-		WebAuthn: NewShardedCeremonyMap[authwebauthn.Ceremony](),
-		Link:     NewShardedCeremonyMap[*PendingLink](),
+		WebAuthn: newShardedCeremonyMap[authwebauthn.Ceremony](),
+		Link:     newShardedCeremonyMap[*PendingLink](),
 	}
 }
 
@@ -154,10 +154,10 @@ func GenerateCeremonyToken() (string, error) {
 // Called periodically by the server.
 func (cs *CeremonyStore) Cleanup() {
 	now := time.Now()
-	cs.WebAuthn.Cleanup(func(v authwebauthn.Ceremony) bool {
+	cs.WebAuthn.cleanup(func(v authwebauthn.Ceremony) bool {
 		return now.After(v.Expires())
 	})
-	cs.Link.Cleanup(func(v *PendingLink) bool {
-		return now.Sub(v.CreatedAt) > CeremonyTTL
+	cs.Link.cleanup(func(v *PendingLink) bool {
+		return now.Sub(v.CreatedAt) > ceremonyTTL
 	})
 }

@@ -2,7 +2,9 @@
 // count as subtitle files, exposed as capability-scoped views rather than one
 // flat union. Every accept path (archive extraction, on-disk scanning) and
 // the delete gate consume the same table, so accept and delete can never
-// disagree about what a subtitle file is.
+// disagree about what a subtitle file is. The table also records the
+// extensions subflux itself writes (.srt, see subtitlefile.ExtSRT), which
+// Delete covers.
 //
 // Capability views:
 //
@@ -10,8 +12,6 @@
 //     from provider archives (ZIP/RAR members).
 //   - OnDisk: extensions recognized as standalone subtitle files beside
 //     media files during library scans.
-//   - WriterOutput: extensions subflux itself writes (every writer emits
-//     .srt today; see subtitlefile.ExtSRT).
 //   - Delete: the union view — anything an accept path could have produced
 //     or recognized must be deletable through the subtitle delete gate.
 //
@@ -65,15 +65,6 @@ func ArchiveInput(ext string) bool { return table[norm(ext)].archiveInput }
 // OnDisk reports whether ext (an extension or a path) is recognized as a
 // standalone subtitle file on disk during library scans.
 func OnDisk(ext string) bool { return table[norm(ext)].onDisk }
-
-// WriterOutput reports whether ext (an extension or a path) is an extension
-// subflux's own writers emit.
-//
-// Reached only by tests today, and kept deliberately: the writerOutput capability
-// IS used in production, by Delete's union below, and these four accessors are one
-// per capability. Dropping the view whose callers happen to be absent would leave
-// an asymmetric vocabulary that the next writer path re-adds.
-func WriterOutput(ext string) bool { return table[norm(ext)].writerOutput }
 
 // Delete reports whether ext (an extension or a path) carries the delete
 // capability: the union of every accept view, since anything an accept path

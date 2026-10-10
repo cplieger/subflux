@@ -493,7 +493,7 @@ func (w *Writer) probeAll(ctx context.Context, plan []planned, limit int, quiet 
 	return outcomes, nil
 }
 
-func (w *Writer) verdict(plan []planned, outcomes []probeOutcome) error {
+func (*Writer) verdict(plan []planned, outcomes []probeOutcome) error {
 	accepted := map[string]bool{}
 	for i, p := range plan {
 		if p.requested && outcomes[i].kind != probeRefused && outcomes[i].kind != probeVanished {
@@ -515,10 +515,7 @@ func (w *Writer) verdict(plan []planned, outcomes []probeOutcome) error {
 	}
 	first := slices.MinFunc(failing, func(a, b int) int { return strings.Compare(plan[a].folder, plan[b].folder) })
 	o := outcomes[first]
-	w.mu.Lock()
-	root := w.labelLocked(plan[first].folder)
-	w.mu.Unlock()
-	return &UnwritableError{Folder: plan[first].folder, Root: root, Op: o.op, Err: o.err}
+	return &UnwritableError{Folder: plan[first].folder, Op: o.op, Err: o.err}
 }
 
 // Run re-probes the known-bad folders every RecheckInterval, at most eight

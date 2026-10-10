@@ -29,8 +29,8 @@ func loadedConfig(t *testing.T) *Config {
 			"test": {Enabled: true, Settings: map[string]any{"token": "live"}},
 		},
 		TrustedProxies:  []string{"10.0.0.0/8"},
-		PollIntervalCfg: Duration{D: 30 * time.Second},
-		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+		PollIntervalCfg: duration{D: 30 * time.Second},
+		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)

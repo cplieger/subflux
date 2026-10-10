@@ -123,7 +123,7 @@ func TestCrossLangStrategies(t *testing.T) {
 			// anchored by construction, so declining to align is a failure.
 			t.Run("crosslang", func(t *testing.T) {
 				result := crossLangAlign(t.Context(), ref, inc)
-				if result.Confidence <= ConfidenceNone {
+				if result.Confidence <= confidenceNone {
 					t.Fatalf("crossLangAlign confidence = %v, want > 0 on a fully anchored pair",
 						float64(result.Confidence))
 				}
@@ -136,7 +136,7 @@ func TestCrossLangStrategies(t *testing.T) {
 			t.Run("alass_offset", func(t *testing.T) {
 				shifted, offset := syncCues(t.Context(), ref, inc)
 				conf := constantOffsetConfidence(ref, inc, offset)
-				if conf <= ConfidenceNone {
+				if conf <= confidenceNone {
 					t.Fatalf("constantOffsetConfidence = %v, want > 0 for a constant displacement",
 						float64(conf))
 				}
@@ -167,7 +167,7 @@ func TestCrossLangStrategies(t *testing.T) {
 			// result.Offset would validate something this strategy never sets.
 			t.Run("splits", func(t *testing.T) {
 				result := alignWithSplits(t.Context(), ref, inc, 0)
-				if result.Confidence <= ConfidenceNone {
+				if result.Confidence <= confidenceNone {
 					t.Fatalf("alignWithSplits confidence = %v, want > 0", float64(result.Confidence))
 				}
 				assertCuesAlign(t, "alignWithSplits", ref, result.Cues)
@@ -265,10 +265,10 @@ func TestCrossLangAlign_early_returns(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := crossLangAlign(t.Context(), tt.ref, tt.inc)
-			if result.Confidence != ConfidenceNone {
+			if result.Confidence != confidenceNone {
 				t.Errorf("crossLangAlign(%s) confidence = %v, want ConfidenceNone", tt.name, result.Confidence)
 			}
-			if result.Method != MethodCrosslang {
+			if result.Method != methodCrosslang {
 				t.Errorf("crossLangAlign(%s) method = %v, want MethodCrosslang", tt.name, result.Method)
 			}
 		})

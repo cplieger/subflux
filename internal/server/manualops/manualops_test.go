@@ -34,32 +34,32 @@ func TestValidateDownloadRequest(t *testing.T) {
 		{
 			name:    "missing provider",
 			req:     DownloadRequest{SubtitleID: "1", ArrID: 42, Language: "en"},
-			wantErr: ErrMissingRequired,
+			wantErr: errMissingRequired,
 		},
 		{
 			name:    "missing subtitle_id",
 			req:     DownloadRequest{Provider: "os", ArrID: 42, Language: "en"},
-			wantErr: ErrMissingRequired,
+			wantErr: errMissingRequired,
 		},
 		{
 			name:    "missing media_id (arr ref replaces file_path)",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", Language: "en"},
-			wantErr: ErrMissingRequired,
+			wantErr: errMissingRequired,
 		},
 		{
 			name:    "missing language",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42},
-			wantErr: ErrMissingRequired,
+			wantErr: errMissingRequired,
 		},
 		{
 			name:    "invalid language code",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en/../.."},
-			wantErr: ErrInvalidLangCode,
+			wantErr: errInvalidLangCode,
 		},
 		{
 			name:    "language code outside the internal space",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "eng"},
-			wantErr: ErrInvalidLangCode,
+			wantErr: errInvalidLangCode,
 		},
 		{
 			name:    "subflux's own Brazilian Portuguese code is accepted",
@@ -70,19 +70,19 @@ func TestValidateDownloadRequest(t *testing.T) {
 		{
 			name:    "invalid media type",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: "invalid"},
-			wantErr: ErrInvalidMediaType,
+			wantErr: errInvalidMediaType,
 		},
 		{
 			name:    "episode without episode number",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: subflux.MediaTypeEpisode},
-			wantErr: ErrMissingEpisode,
+			wantErr: errMissingEpisode,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := tt.req
-			err := ValidateDownloadRequest(&req)
+			err := validateDownloadRequest(&req)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("ValidateDownloadRequest() error = %v, want %v", err, tt.wantErr)
 			}
@@ -115,7 +115,7 @@ func TestValidateDownloadRequest_rejectsLangCodesUnsafeInAFilename(t *testing.T)
 		t.Run(lang, func(t *testing.T) {
 			t.Parallel()
 			req := DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: lang}
-			if err := ValidateDownloadRequest(&req); !errors.Is(err, ErrInvalidLangCode) {
+			if err := validateDownloadRequest(&req); !errors.Is(err, errInvalidLangCode) {
 				t.Errorf("ValidateDownloadRequest(language=%q) error = %v, want ErrInvalidLangCode; "+
 					"it reaches the share as %q", lang, err,
 					subtitlefile.ManualPath("/media/movie.mkv", 1, subtitlefile.Tags{Lang: lang}))

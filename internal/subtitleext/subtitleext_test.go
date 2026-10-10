@@ -9,16 +9,15 @@ import (
 )
 
 // TestSeedTable pins the exact capability table from the design (S16): the
-// union of the two constants the package replaced, with .vtt archive-only
-// and .srt the only writer output.
+// union of the two constants the package replaced, with .vtt archive-only.
 func TestSeedTable(t *testing.T) {
 	t.Parallel()
-	want := map[string]struct{ archive, onDisk, writer, del bool }{
-		".srt": {true, true, true, true},
-		".ass": {true, true, false, true},
-		".ssa": {true, true, false, true},
-		".sub": {true, true, false, true},
-		".vtt": {true, false, false, true},
+	want := map[string]struct{ archive, onDisk, del bool }{
+		".srt": {true, true, true},
+		".ass": {true, true, true},
+		".ssa": {true, true, true},
+		".sub": {true, true, true},
+		".vtt": {true, false, true},
 	}
 	got := subtitleext.Extensions()
 	wantExts := make([]string, 0, len(want))
@@ -35,9 +34,6 @@ func TestSeedTable(t *testing.T) {
 		}
 		if g := subtitleext.OnDisk(ext); g != w.onDisk {
 			t.Errorf("OnDisk(%s) = %v, want %v", ext, g, w.onDisk)
-		}
-		if g := subtitleext.WriterOutput(ext); g != w.writer {
-			t.Errorf("WriterOutput(%s) = %v, want %v", ext, g, w.writer)
 		}
 		if g := subtitleext.Delete(ext); g != w.del {
 			t.Errorf("Delete(%s) = %v, want %v", ext, g, w.del)
@@ -57,29 +53,22 @@ func TestViewSubsets(t *testing.T) {
 		if subtitleext.OnDisk(ext) && !subtitleext.Delete(ext) {
 			t.Errorf("onDisk ext %s lacks delete capability", ext)
 		}
-		if subtitleext.WriterOutput(ext) && !subtitleext.Delete(ext) {
-			t.Errorf("writerOutput ext %s lacks delete capability", ext)
-		}
 	}
 }
 
-// TestWriterCoverage asserts every extension the writers emit is in the
-// writerOutput view: subtitlefile.Path / subtitlefile.ManualPath (the two path
-// builders every save path routes through) emit subtitlefile.ExtSRT, which
-// must carry writerOutput (and therefore delete).
+// TestWriterCoverage asserts every extension the writers emit is deletable:
+// subtitlefile.Path / subtitlefile.ManualPath (the two path builders every
+// save path routes through) emit subtitlefile.ExtSRT.
 func TestWriterCoverage(t *testing.T) {
 	t.Parallel()
-	if !subtitleext.WriterOutput(subtitlefile.ExtSRT) {
-		t.Errorf("subtitlefile.ExtSRT (%s) is not a writerOutput extension", subtitlefile.ExtSRT)
+	if !subtitleext.Delete(subtitlefile.ExtSRT) {
+		t.Errorf("subtitlefile.ExtSRT (%s) is not deletable", subtitlefile.ExtSRT)
 	}
 	// The path builders must produce writer-covered extensions.
 	for _, p := range []string{
 		subtitlefile.Path("/media/movie.mkv", subtitlefile.Tags{Lang: "fr"}),
 		subtitlefile.ManualPath("/media/movie.mkv", 2, subtitlefile.Tags{Lang: "fr", Forced: true}),
 	} {
-		if !subtitleext.WriterOutput(p) {
-			t.Errorf("writer-produced path %s not covered by writerOutput view", p)
-		}
 		if !subtitleext.Delete(p) {
 			t.Errorf("writer-produced path %s not deletable", p)
 		}

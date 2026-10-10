@@ -43,7 +43,7 @@ type testCeremonyVal struct {
 
 func TestShardedCeremonyMap_Store_Load_roundtrip(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[testCeremonyVal]()
+	sm := newShardedCeremonyMap[testCeremonyVal]()
 	val := testCeremonyVal{CreatedAt: time.Now(), UserID: 42, IP: "1.2.3.4"}
 	if !sm.Store("key1", val) {
 		t.Fatal("Store returned false")
@@ -59,7 +59,7 @@ func TestShardedCeremonyMap_Store_Load_roundtrip(t *testing.T) {
 
 func TestShardedCeremonyMap_Delete_removes(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[string]()
+	sm := newShardedCeremonyMap[string]()
 	sm.Store("k", "v")
 	sm.LoadAndDelete("k")
 	_, ok := sm.LoadAndDelete("k")
@@ -70,11 +70,11 @@ func TestShardedCeremonyMap_Delete_removes(t *testing.T) {
 
 func TestShardedCeremonyMap_max_capacity(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[int]()
+	sm := newShardedCeremonyMap[int]()
 	// Fill to capacity.
-	for i := range MaxCeremonySessions {
+	for i := range maxCeremonySessions {
 		if !sm.Store(fmt.Sprintf("k%d", i), i) {
-			t.Fatalf("Store failed at %d, expected success up to %d", i, MaxCeremonySessions)
+			t.Fatalf("Store failed at %d, expected success up to %d", i, maxCeremonySessions)
 		}
 	}
 	// Next store should fail.
@@ -85,7 +85,7 @@ func TestShardedCeremonyMap_max_capacity(t *testing.T) {
 
 func TestShardedCeremonyMap_concurrent(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[int]()
+	sm := newShardedCeremonyMap[int]()
 	var wg sync.WaitGroup
 	for i := range 200 {
 		wg.Go(func() {
@@ -102,10 +102,10 @@ func TestShardedCeremonyMap_concurrent(t *testing.T) {
 
 func TestShardedCeremonyMap_LoadAndDelete_frees_capacity(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[int]()
-	for i := range MaxCeremonySessions {
+	sm := newShardedCeremonyMap[int]()
+	for i := range maxCeremonySessions {
 		if !sm.Store(fmt.Sprintf("k%d", i), i) {
-			t.Fatalf("Store failed at %d, want success up to capacity %d", i, MaxCeremonySessions)
+			t.Fatalf("Store failed at %d, want success up to capacity %d", i, maxCeremonySessions)
 		}
 	}
 	// At capacity a new key is rejected.
@@ -124,11 +124,11 @@ func TestShardedCeremonyMap_LoadAndDelete_frees_capacity(t *testing.T) {
 
 func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[*PendingLink]()
+	sm := newShardedCeremonyMap[*PendingLink]()
 	sm.Store("fresh", &PendingLink{CreatedAt: time.Now()})
 	sm.Store("stale", &PendingLink{CreatedAt: time.Now().Add(-time.Hour)})
 
-	sm.Cleanup(func(v *PendingLink) bool {
+	sm.cleanup(func(v *PendingLink) bool {
 		return time.Since(v.CreatedAt) > time.Minute
 	})
 
@@ -146,18 +146,18 @@ func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 // while the map itself sat empty, locking users out of the login flow.
 func TestShardedCeremonyMap_Cleanup_frees_capacity(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[*PendingLink]()
+	sm := newShardedCeremonyMap[*PendingLink]()
 	expired := time.Now().Add(-time.Hour)
-	for i := range MaxCeremonySessions {
+	for i := range maxCeremonySessions {
 		if !sm.Store(fmt.Sprintf("k%d", i), &PendingLink{CreatedAt: expired}) {
-			t.Fatalf("Store failed at %d, want success up to capacity %d", i, MaxCeremonySessions)
+			t.Fatalf("Store failed at %d, want success up to capacity %d", i, maxCeremonySessions)
 		}
 	}
 	if sm.Store("overflow", &PendingLink{CreatedAt: time.Now()}) {
 		t.Fatal("Store at capacity should fail")
 	}
 
-	sm.Cleanup(func(v *PendingLink) bool {
+	sm.cleanup(func(v *PendingLink) bool {
 		return time.Since(v.CreatedAt) > time.Minute
 	})
 
@@ -248,7 +248,7 @@ func TestCeremonyStore_Cleanup_expires_both_maps(t *testing.T) {
 	cs.WebAuthn.Store("wa-fresh", liveCeremony(t))
 	cs.WebAuthn.Store("wa-stale", authwebauthn.Ceremony{})
 	cs.Link.Store("ln-fresh", &PendingLink{CreatedAt: time.Now()})
-	cs.Link.Store("ln-stale", &PendingLink{CreatedAt: time.Now().Add(-2 * CeremonyTTL)})
+	cs.Link.Store("ln-stale", &PendingLink{CreatedAt: time.Now().Add(-2 * ceremonyTTL)})
 
 	cs.Cleanup()
 

@@ -24,7 +24,7 @@ const (
 
 // ensureToken refreshes the API token if expired or missing, using
 // singleflight to deduplicate concurrent login attempts.
-func (p *Provider) ensureToken(ctx context.Context) error {
+func (p *source) ensureToken(ctx context.Context) error {
 	if p.tokenValid() {
 		return nil
 	}
@@ -41,7 +41,7 @@ func (p *Provider) ensureToken(ctx context.Context) error {
 }
 
 // tokenValid reports whether a cached, unexpired token is present.
-func (p *Provider) tokenValid() bool {
+func (p *source) tokenValid() bool {
 	p.tokenMu.RLock()
 	defer p.tokenMu.RUnlock()
 	return p.token != "" && time.Since(p.tokenTime) < tokenExpiry
@@ -50,7 +50,7 @@ func (p *Provider) tokenValid() bool {
 // login performs the unauthenticated /login round trip and stores the
 // returned token, server host, and VIP status. A suspicious base_url
 // redirect is dropped so a compromised response can't divert the token.
-func (p *Provider) login(ctx context.Context) error {
+func (p *source) login(ctx context.Context) error {
 	slog.Debug("opensubtitles logging in")
 	loginPayload, marshalErr := json.Marshal(map[string]string{
 		settingUsername: p.username, string(settingPassword): p.password,
@@ -92,7 +92,7 @@ func (p *Provider) login(ctx context.Context) error {
 	return nil
 }
 
-func (p *Provider) serverURL() string {
+func (p *source) serverURL() string {
 	p.tokenMu.RLock()
 	host := p.serverHost
 	p.tokenMu.RUnlock()
@@ -122,7 +122,7 @@ func isValidServerHost(host string) bool {
 // rateLimit enforces the per-account request rate (VIP: 5/s, free: 1/s) with
 // a channel-based token bucket, letting response parsing overlap the next
 // request's rate-limit wait instead of holding a lock during the sleep.
-func (p *Provider) rateLimit(ctx context.Context) error {
+func (p *source) rateLimit(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

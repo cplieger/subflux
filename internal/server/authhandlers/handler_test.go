@@ -105,12 +105,12 @@ func TestValidateAndHashPasswordResultsStayDistinctlyTyped(t *testing.T) {
 	// Read the two result types off the function itself rather than off a
 	// returned value: that pins the SIGNATURE, which is what a transposition
 	// needs in order to compile.
-	fn := reflect.TypeOf(ValidateAndHashPassword)
+	fn := reflect.TypeOf(validateAndHashPassword)
 	gotHash, gotMsg := fn.Out(0), fn.Out(1)
 	if gotHash == gotMsg {
 		t.Errorf("both results have type %s; a transposed assignment would compile and write the hash into a 400 body", gotHash)
 	}
-	if want := reflect.TypeFor[PasswordHash](); gotHash != want {
+	if want := reflect.TypeFor[passwordHash](); gotHash != want {
 		t.Errorf("first result is %s, want %s", gotHash, want)
 	}
 }
@@ -123,35 +123,35 @@ func TestValidateAndHashPassword(t *testing.T) {
 	)
 	tests := []struct {
 		name     string
-		check    PasswordCheck
+		check    passwordCheck
 		wantMsg  string // substring; "" means accepted
 		wantHash bool
 	}{
 		{
 			name:     "accepted",
-			check:    PasswordCheck{Password: password, Username: username},
+			check:    passwordCheck{Password: password, Username: username},
 			wantHash: true,
 		},
 		{
 			name:    "too_short",
-			check:   PasswordCheck{Password: "short", Username: username},
+			check:   passwordCheck{Password: "short", Username: username},
 			wantMsg: "characters",
 		},
 		{
 			name:    "contains_username",
-			check:   PasswordCheck{Password: "alice-in-wonderland-and-beyond", Username: username},
+			check:   passwordCheck{Password: "alice-in-wonderland-and-beyond", Username: username},
 			wantMsg: "username",
 		},
 		{
 			name:    "contains_app_name",
-			check:   PasswordCheck{Password: "my-subflux-password-here", Username: username},
+			check:   passwordCheck{Password: "my-subflux-password-here", Username: username},
 			wantMsg: "forbidden word",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			hash, userMsg, err := ValidateAndHashPassword(t.Context(), tc.check, nil)
+			hash, userMsg, err := validateAndHashPassword(t.Context(), tc.check, nil)
 			if err != nil {
 				t.Fatalf("ValidateAndHashPassword() err = %v, want nil", err)
 			}

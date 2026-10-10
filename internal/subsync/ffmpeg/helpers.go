@@ -10,8 +10,8 @@ import (
 const (
 	CodecASS    = "ass"
 	CodecSSA    = "ssa"
-	CodecSubrip = "subrip"
-	CodecSRT    = "srt"
+	codecSubrip = "subrip"
+	codecSRT    = "srt"
 )
 
 // streamTypeCodes maps codec_type names to ffprobe -select_streams codes.
@@ -38,13 +38,13 @@ func shortStreamType(codecType string) string {
 // found" and the subtitle is lost. The Dockerfile asserts the decoders below
 // are present; keep the two in step.
 var textSubtitleCodecs = map[string]bool{
-	CodecSubrip: true, CodecSRT: true, CodecASS: true, CodecSSA: true,
+	codecSubrip: true, codecSRT: true, CodecASS: true, CodecSSA: true,
 	"mov_text": true, "webvtt": true, "text": true,
 }
 
-// IsTextSubtitleCodec reports whether the ffprobe codec name is a text-based
+// isTextSubtitleCodec reports whether the ffprobe codec name is a text-based
 // subtitle format that can be converted to SRT.
-func IsTextSubtitleCodec(codec string) bool {
+func isTextSubtitleCodec(codec string) bool {
 	return textSubtitleCodecs[codec]
 }
 
@@ -59,7 +59,7 @@ func SelectBestSubTrack(tracks []Track, lang, excludeLang string, mapper LangMap
 
 	// Prefer SRT/subrip over ASS/SSA.
 	for i := range candidates {
-		if candidates[i].CodecName == CodecSubrip || candidates[i].CodecName == CodecSRT {
+		if candidates[i].CodecName == codecSubrip || candidates[i].CodecName == codecSRT {
 			return &candidates[i]
 		}
 	}
@@ -72,7 +72,7 @@ func SelectBestSubTrack(tracks []Track, lang, excludeLang string, mapper LangMap
 func gatherTextCandidates(tracks []Track, lang, excludeLang string, mapper LangMapper) []Track {
 	var candidates []Track
 	for _, t := range tracks {
-		if !IsTextSubtitleCodec(t.CodecName) {
+		if !isTextSubtitleCodec(t.CodecName) {
 			continue
 		}
 		trackLang := NormalizeFFprobeLang(t.Language, mapper)

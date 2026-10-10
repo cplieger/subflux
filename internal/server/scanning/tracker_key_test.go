@@ -28,16 +28,6 @@ func (c *exactShowCounter) CountShowSubtitles(_ context.Context, q subflux.ShowS
 	return c.counts[[2]string{imdbID, lang}], nil
 }
 
-func (c *exactShowCounter) Name() subflux.ProviderID { return "opensubtitles" }
-
-func (c *exactShowCounter) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	return nil, nil
-}
-
-func (c *exactShowCounter) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
-	return nil, nil
-}
-
 // TestShowSkipCacheKeyCannotBeForged pins that two DIFFERENT (series, language)
 // pre-checks never share one show-skip cache entry.
 //

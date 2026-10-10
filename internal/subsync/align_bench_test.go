@@ -5,11 +5,11 @@ import (
 	"time"
 )
 
-func makeSpans(n int, startOffset time.Duration) []TimeSpan {
-	spans := make([]TimeSpan, n)
+func makeSpans(n int, startOffset time.Duration) []timeSpan {
+	spans := make([]timeSpan, n)
 	ms := startOffset.Milliseconds()
 	for i := range spans {
-		spans[i] = TimeSpan{Start: ms, End: ms + 2000}
+		spans[i] = timeSpan{Start: ms, End: ms + 2000}
 		ms += 3000
 	}
 	return spans

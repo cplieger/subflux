@@ -47,9 +47,8 @@ func (c *Config) TrustedProxyNets() []*net.IPNet {
 func parseTrustedProxies(cidrs []string) ([]*net.IPNet, error) {
 	nets, invalid := webhttp.ParseCIDRs(cidrs)
 	if len(invalid) > 0 {
-		return nil, configFieldErr("trusted_proxies",
-			fmt.Sprintf("invalid trusted_proxies entries [%s]: each must be CIDR notation "+
-				"such as 10.0.0.0/8 or a bare IP such as 192.168.1.5", strings.Join(invalid, ", ")))
+		return nil, configFieldErr(fmt.Sprintf("invalid trusted_proxies entries [%s]: each must be CIDR notation "+
+			"such as 10.0.0.0/8 or a bare IP such as 192.168.1.5", strings.Join(invalid, ", ")))
 	}
 	return nets, nil
 }

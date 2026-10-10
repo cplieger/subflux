@@ -22,7 +22,7 @@ func (fx *effects) persist(id subflux.ProviderID) { fx.writes = append(fx.writes
 
 func (fx *effects) do(fn func()) { fx.after = append(fx.after, fn) }
 
-func (fx *effects) event(e Event) { fx.events = append(fx.events, e) } //nolint:gocritic // hugeParam: the event is queued by value
+func (fx *effects) event(e Event) { fx.events = append(fx.events, e) }
 
 // commit is one mutation's effects, held in mutation order until flush has
 // written its records.

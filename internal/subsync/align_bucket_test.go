@@ -6,11 +6,11 @@ import (
 
 func TestAlignBucketSort_zero_length_spans_skipped(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 1000, End: 1000}, // zero-length
 		{Start: 5000, End: 7000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 5000, End: 7000},
 	}
 	// Should not panic on zero-length spans.
@@ -54,11 +54,11 @@ func TestAddDelta_boundary_conditions(t *testing.T) {
 func TestAlignBucketSort_direct(t *testing.T) {
 	t.Parallel()
 	// Call alignBucketSort directly with a small range.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 1000, End: 3000},
 		{Start: 5000, End: 7000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 1000, End: 3000},
 		{Start: 5000, End: 7000},
 	}
@@ -71,11 +71,11 @@ func TestAlignBucketSort_direct(t *testing.T) {
 
 func TestAlignBucketSort_with_offset(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 5000, End: 7000},
 		{Start: 10000, End: 12000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 3000, End: 5000},
 		{Start: 8000, End: 10000},
 	}
@@ -89,8 +89,8 @@ func TestAlignBucketSort_with_offset(t *testing.T) {
 func TestAlignBucketSort_size_computation(t *testing.T) {
 	t.Parallel()
 	// Direct call to verify size computation is correct.
-	ref := []TimeSpan{{Start: 1000, End: 2000}}
-	inc := []TimeSpan{{Start: 1000, End: 2000}}
+	ref := []timeSpan{{Start: 1000, End: 2000}}
+	inc := []timeSpan{{Start: 1000, End: 2000}}
 	// minOffset = 1000-2000 = -1000, maxOffset = 2000-1000 = 1000
 	got := alignBucketSort(t.Context(), ref, inc, -1000, 1000)
 	// Should find offset ~0 for identical spans (bucket sort returns -1 due to discrete bins).
@@ -104,8 +104,8 @@ func TestAlignBucketSort_size_overflow_guard(t *testing.T) {
 	// Range > 100_000_000 triggers fallback to merge sort.
 	// Exact boundary (100M) would require ~800MB allocation, so we test
 	// a clearly-over-limit range and verify the fallback produces correct results.
-	ref := []TimeSpan{{Start: 0, End: 1000}}
-	inc := []TimeSpan{{Start: 0, End: 1000}}
+	ref := []timeSpan{{Start: 0, End: 1000}}
+	inc := []timeSpan{{Start: 0, End: 1000}}
 	got := alignBucketSort(t.Context(), ref, inc, 0, 200_000_000)
 	if got < -2 || got > 2 {
 		t.Errorf("alignBucketSort(huge range fallback) = %d, want ~0", got)
@@ -116,8 +116,8 @@ func TestAlignBucketSort_score_sign_matters(t *testing.T) {
 	t.Parallel()
 	// The four addDelta calls create a tent function. If signs are wrong,
 	// the peak moves to the wrong offset.
-	ref := []TimeSpan{{Start: 5000, End: 8000}}
-	inc := []TimeSpan{{Start: 2000, End: 5000}}
+	ref := []timeSpan{{Start: 5000, End: 8000}}
+	inc := []timeSpan{{Start: 2000, End: 5000}}
 	// Expected offset: +3000 (shift inc right by 3000 to align with ref).
 	got := alignBucketSort(t.Context(), ref, inc, -5000, 6000)
 	// Bucket sort may be off by 1 from continuous optimum.
@@ -130,11 +130,11 @@ func TestAlignBucketSort_addDelta_offsets(t *testing.T) {
 	t.Parallel()
 	// The fourth addDelta uses r.End-inc.Start. If this is wrong, the
 	// tent function shape changes and the peak offset shifts.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 4000},
 		{Start: 10000, End: 14000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 3000, End: 7000},
 		{Start: 13000, End: 17000},
 	}
@@ -150,11 +150,11 @@ func TestAlignBucketSort_score_formula(t *testing.T) {
 	// score = minF(rLen, iLen) / maxF(rLen, iLen)
 	// With different-length spans, the score < 1.0. If the formula is wrong,
 	// the relative weighting of span pairs changes.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 1000},    // length 1000
 		{Start: 5000, End: 9000}, // length 4000
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 2000, End: 3000},  // length 1000
 		{Start: 7000, End: 11000}, // length 4000
 	}
@@ -168,8 +168,8 @@ func TestAlignBucketSort_score_formula(t *testing.T) {
 func TestAlignBucketSort_bestRating_tracking(t *testing.T) {
 	t.Parallel()
 	// The bestOffset = i + minOffset computation. If wrong, the returned offset is wrong.
-	ref := []TimeSpan{{Start: 10000, End: 12000}}
-	inc := []TimeSpan{{Start: 5000, End: 7000}}
+	ref := []timeSpan{{Start: 10000, End: 12000}}
+	inc := []timeSpan{{Start: 5000, End: 7000}}
 	got := alignBucketSort(t.Context(), ref, inc, -7000, 7000)
 	// Expected: offset ~5000 (shift inc right by 5000).
 	if got < 4998 || got > 5002 {
@@ -183,8 +183,8 @@ func TestAlignBucketSort_zero_length_incorrect_span_skipped(t *testing.T) {
 	// sort path (range too large for bucket sort). This test calls
 	// alignBucketSort directly to cover the zero-length skip in the bucket sort
 	// inner loop.
-	ref := []TimeSpan{{Start: 1000, End: 3000}}
-	inc := []TimeSpan{
+	ref := []timeSpan{{Start: 1000, End: 3000}}
+	inc := []timeSpan{
 		{Start: 2000, End: 2000}, // zero-length — must be skipped
 		{Start: 1000, End: 3000}, // valid — drives the result
 	}
@@ -200,11 +200,11 @@ func TestAlignBucketSort_first_peak_wins_on_tie(t *testing.T) {
 	// The strict > comparison means the earlier offset wins when two offsets
 	// have equal rating; >= would let the later peak win instead. This
 	// symmetric setup places two ref spans equidistant from one inc span.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 1000},
 		{Start: 4000, End: 5000},
 	}
-	inc := []TimeSpan{
+	inc := []timeSpan{
 		{Start: 2000, End: 3000},
 	}
 	got := alignBucketSort(t.Context(), ref, inc, -3000, 3000)

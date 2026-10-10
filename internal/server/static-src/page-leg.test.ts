@@ -157,7 +157,8 @@ import {
   dispatchTransactionPageLeg,
   refreshCurrentPage,
 } from "./page-leg.js";
-import type { SeriesItem, SeasonGroup, MovieItem } from "./api-types.js";
+import type { SeriesItem, SeasonGroup } from "./api-types.js";
+import type { MovieItem } from "./wire/types.gen.js";
 import { contentView, ownedByRoute } from "./view-scope.js";
 
 const SERIES = { id: 1042, tvdb_id: 42, title: "Show" } as unknown as SeriesItem;

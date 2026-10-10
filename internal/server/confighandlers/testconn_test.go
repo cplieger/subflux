@@ -727,7 +727,7 @@ func TestHandleTestConnection_provider_check_clears_a_matching_disable(t *testin
 	t.Parallel()
 	recorded := map[string]any{"username": "u", "password": "p", "api_key": "k"}
 	const matching = `{"kind":"opensubtitles","settings":{"username":"u","password":"p","api_key":"k"}}`
-	check := func(t *testing.T, gate ProviderAuthClearer, body string) ConnTestResponse {
+	check := func(t *testing.T, gate providerAuthClearer, body string) ConnTestResponse {
 		t.Helper()
 		h := New(&Deps{
 			Registry:     opensubsRegistry(nil, nil, nil),

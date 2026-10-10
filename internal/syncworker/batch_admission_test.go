@@ -46,7 +46,7 @@ func newSlotProbe(keys ...string) *slotProbe {
 // single slot, so active/max measure real admitted concurrency. The key is
 // the subtitle path for batch items and the video path for the automatic
 // sync (whose request carries no subtitle path).
-func (p *slotProbe) spawn(ctx context.Context, req *Request) (*Response, error) {
+func (p *slotProbe) spawn(ctx context.Context, req *request) (*response, error) {
 	key := req.SubtitlePath
 	if key == "" {
 		key = req.VideoPath
@@ -72,7 +72,7 @@ func (p *slotProbe) spawn(ctx context.Context, req *Request) (*Response, error) 
 	p.mu.Lock()
 	p.active--
 	p.mu.Unlock()
-	return &Response{Version: ProtocolVersion, Result: wireFromResult(&subsync.SyncResult{
+	return &response{Version: protocolVersion, Result: wireFromResult(&subsync.SyncResult{
 		Method: subsync.MethodAudio, Offset: 500, Confidence: 0.9,
 	})}, nil
 }
@@ -201,7 +201,7 @@ func TestBatch_concurrency_exactly_one_and_automatic_interleaves(t *testing.T) {
 func TestBatch_wedged_item_consumes_its_ceiling_and_the_batch_proceeds(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		wedged := make(chan struct{}) // never closed: the wedge
-		client := newSeamClient(func(ctx context.Context, req *Request) (*Response, error) {
+		client := newSeamClient(func(ctx context.Context, req *request) (*response, error) {
 			if req.SubtitlePath == "/wedged.srt" {
 				select {
 				case <-wedged:
@@ -209,7 +209,7 @@ func TestBatch_wedged_item_consumes_its_ceiling_and_the_batch_proceeds(t *testin
 					return nil, ctx.Err()
 				}
 			}
-			return &Response{Version: ProtocolVersion, Result: wireFromResult(&subsync.SyncResult{
+			return &response{Version: protocolVersion, Result: wireFromResult(&subsync.SyncResult{
 				Method: subsync.MethodAudio, Offset: 500, Confidence: 0.9,
 			})}, nil
 		})

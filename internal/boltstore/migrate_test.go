@@ -68,7 +68,7 @@ func markerStep(from uint64) migration {
 			if mb == nil {
 				return errors.New("marker step: meta bucket missing")
 			}
-			v, _ := kv.GetUint64(mb, key)
+			v := kv.GetUint64(mb, key)
 			return kv.PutUint64(mb, key, v+1)
 		},
 	}

@@ -23,7 +23,6 @@ const (
 	CodeNotFound           ErrorCode = "not_found"
 	CodeMethodNotAllowed   ErrorCode = "method_not_allowed"
 	CodeConflict           ErrorCode = "conflict"
-	CodePayloadTooLarge    ErrorCode = "payload_too_large"
 	CodeRateLimited        ErrorCode = "rate_limited"
 	CodeBadGateway         ErrorCode = "bad_gateway"
 	CodeServiceUnavailable ErrorCode = "service_unavailable"
@@ -36,15 +35,9 @@ const (
 const (
 	CodeAuthInvalidCredentials ErrorCode = "auth_invalid_credentials"
 	CodeAuthAccountDisabled    ErrorCode = "auth_account_disabled"
-	CodeAuthAccountNotSetup    ErrorCode = "auth_account_not_setup"
-	CodeAuthPasswordTooShort   ErrorCode = "auth_password_too_short"
-	CodeAuthPasswordBreached   ErrorCode = "auth_password_breached"
 	CodeAuthSessionInvalid     ErrorCode = "auth_session_invalid"
 	CodeAuthSessionRequired    ErrorCode = "auth_session_required"
 	CodeAuthRoleRequired       ErrorCode = "auth_role_required"
-	CodeAuthAPIKeyInvalid      ErrorCode = "auth_apikey_invalid"
-	CodeAuthAPIKeyDisabled     ErrorCode = "auth_apikey_disabled"
-	CodeAuthCSRF               ErrorCode = "auth_csrf"
 )
 
 // WebAuthn codes.
@@ -59,24 +52,19 @@ const (
 
 // OIDC codes.
 const (
-	CodeOIDCStateInvalid          ErrorCode = "oidc_state_invalid"
-	CodeOIDCNonceInvalid          ErrorCode = "oidc_nonce_invalid"
-	CodeOIDCExchangeFailed        ErrorCode = "oidc_exchange_failed"
-	CodeOIDCUserInfoFailed        ErrorCode = "oidc_userinfo_failed"
-	CodeOIDCAccountNotProvisioned ErrorCode = "oidc_account_not_provisioned"
+	CodeOIDCStateInvalid   ErrorCode = "oidc_state_invalid"
+	CodeOIDCExchangeFailed ErrorCode = "oidc_exchange_failed"
 )
 
 // Setup codes.
 const (
 	CodeSetupAlreadyComplete ErrorCode = "setup_already_complete"
-	CodeSetupPasswordInvalid ErrorCode = "setup_password_invalid"
 )
 
 // Config codes.
 const (
 	CodeConfigInvalid        ErrorCode = "config_invalid"
 	CodeConfigUnreachableArr ErrorCode = "config_unreachable_arr"
-	CodeConfigYAMLParse      ErrorCode = "config_yaml_parse"
 	CodeConfigTooLarge       ErrorCode = "config_too_large"
 	CodeConfigReloadFailed   ErrorCode = "config_reload_failed"
 )
@@ -84,12 +72,7 @@ const (
 // Scan / search / manual ops codes.
 const (
 	CodeScanInProgress         ErrorCode = "scan_in_progress"
-	CodeScanNoTargets          ErrorCode = "scan_no_targets"
-	CodeSearchInProgress       ErrorCode = "search_in_progress"
 	CodeSearchProviderDisabled ErrorCode = "search_provider_disabled"
-	CodeSearchNoResults        ErrorCode = "search_no_results"
-	CodeDownloadFailed         ErrorCode = "download_failed"
-	CodeUnlockNotHeld          ErrorCode = "unlock_not_held"
 	// CodeMediaUnwritable: a media folder the work would write into failed
 	// its write test, so nothing was started.
 	CodeMediaUnwritable ErrorCode = "media_unwritable"
@@ -102,8 +85,6 @@ const (
 	CodeSubtitleNotFound      ErrorCode = "subtitle_not_found"
 	CodePreviewUnavailable    ErrorCode = "preview_unavailable"
 	CodeSyncUnsupportedFormat ErrorCode = "sync_unsupported_format"
-	CodeSyncNoReference       ErrorCode = "sync_no_reference"
-	CodeSyncLowConfidence     ErrorCode = "sync_low_confidence"
 	// CodeSubtitleExtensionNotAllowed is the 409 a delete answers when the
 	// target's extension lacks the delete capability in the subtitle
 	// extension authority (a server-derived stored-state disagreement, not
@@ -114,12 +95,9 @@ const (
 // Query codes.
 const (
 	CodeQueryInvalidFilter ErrorCode = "query_invalid_filter"
-	CodeQueryLimitExceeded ErrorCode = "query_limit_exceeded"
 )
 
 // Provider / arr action codes.
 const (
-	CodeProviderTimedOut      ErrorCode = "provider_timed_out"
-	CodeProviderNotConfigured ErrorCode = "provider_not_configured"
-	CodeArrUnreachable        ErrorCode = "arr_unreachable"
+	CodeArrUnreachable ErrorCode = "arr_unreachable"
 )

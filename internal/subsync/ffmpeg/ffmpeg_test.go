@@ -58,7 +58,7 @@ func TestIsTextSubtitleCodec(t *testing.T) {
 		"subrip", "srt", "ass", "ssa", "mov_text", "webvtt", "text",
 	}
 	for _, c := range text {
-		if !IsTextSubtitleCodec(c) {
+		if !isTextSubtitleCodec(c) {
 			t.Errorf("IsTextSubtitleCodec(%q) = false, want true", c)
 		}
 	}
@@ -68,7 +68,7 @@ func TestIsTextSubtitleCodec(t *testing.T) {
 		"unknown_codec", "",
 	}
 	for _, c := range bitmap {
-		if IsTextSubtitleCodec(c) {
+		if isTextSubtitleCodec(c) {
 			t.Errorf("IsTextSubtitleCodec(%q) = true, want false", c)
 		}
 	}
@@ -82,7 +82,7 @@ func TestIsTextSubtitleCodec(t *testing.T) {
 		"microdvd", "mpl2", "jacosub", "sami",
 	}
 	for _, c := range undecodable {
-		if IsTextSubtitleCodec(c) {
+		if isTextSubtitleCodec(c) {
 			t.Errorf("IsTextSubtitleCodec(%q) = true, want false: no decoder in the build", c)
 		}
 	}

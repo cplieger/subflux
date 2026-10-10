@@ -167,7 +167,7 @@ describe("files: renderFiles", () => {
     // key includes the manual-sibling ordinal, keeping both.
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-5", "fr"), extFile("tmdb-5", "fr", 1)]);
 
-    openFileManager("movie", "tmdb-5", "Movie", "/");
+    openFileManager("movie", "tmdb-5", "Movie");
     await tick();
 
     expect(reqTbody().children.length).toBe(2);
@@ -182,7 +182,7 @@ describe("files: renderFiles", () => {
       extFile("tmdb-7", "es"),
     ]);
 
-    openFileManager("movie", "tmdb-7", "Movie", "/");
+    openFileManager("movie", "tmdb-7", "Movie");
     await tick();
 
     const tbody = reqTbody();
@@ -222,7 +222,7 @@ describe("files: renderFiles", () => {
     expect(pipeJoined(a)).toBe(pipeJoined(b)); // the defect
 
     mockListFiles.mockResolvedValueOnce([a, b]);
-    openFileManager("movie", "tmdb-9", "Movie", "/");
+    openFileManager("movie", "tmdb-9", "Movie");
     await tick();
 
     expect(reqTbody().children.length).toBe(2);
@@ -238,7 +238,7 @@ describe("files: renderFiles", () => {
     expect(colonJoined(a)).toBe(colonJoined(b)); // naive form collapses
 
     mockListFiles.mockResolvedValueOnce([a, b]);
-    openFileManager("movie", "tmdb-11", "Movie", "/");
+    openFileManager("movie", "tmdb-11", "Movie");
     await tick();
 
     expect(reqTbody().children.length).toBe(2);
@@ -257,7 +257,7 @@ describe("files: renderFiles", () => {
   it("renders the empty state and no table when there are no external files", async () => {
     mockListFiles.mockResolvedValueOnce([]);
 
-    openFileManager("movie", "tmdb-13", "Movie", "/");
+    openFileManager("movie", "tmdb-13", "Movie");
     await tick();
 
     const empty = document.querySelector<HTMLElement>(".files-list .empty");
@@ -269,7 +269,7 @@ describe("files: renderFiles", () => {
   it("shows the table with a counted bulk-delete button once files exist", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-15", "en"), extFile("tmdb-15", "fr")]);
 
-    openFileManager("movie", "tmdb-15", "Movie", "/");
+    openFileManager("movie", "tmdb-15", "Movie");
     await tick();
 
     expect(document.querySelector(".files-list .empty")).toBeNull();
@@ -289,7 +289,7 @@ describe("files: renderFiles", () => {
       extFile("tvdb-81189-s01e02", "en"),
     ]);
 
-    openFileManager("episode", "tvdb-81189-", "Breaking Bad", "/series/81189", 7);
+    openFileManager("episode", "tvdb-81189-", "Breaking Bad", 7);
     await tick();
 
     expect(headerLabels()).toEqual(["Episode", "Language", "Format", "Offset", "Size", ""]);
@@ -307,7 +307,7 @@ describe("files: renderFiles", () => {
       extFile("tvdb-5-s01e01", "de"),
     ]);
 
-    openFileManager("episode", "tvdb-5-", "Show", "/series/5", 7);
+    openFileManager("episode", "tvdb-5-", "Show", 7);
     await tick();
 
     expect(cell(0, "size")).toBe("1.0 KB"); // de, ordinal 0
@@ -323,7 +323,7 @@ describe("files: renderFiles", () => {
       extFile("tmdb-17", "en"),
     ]);
 
-    openFileManager("movie", "tmdb-17", "Movie", "/");
+    openFileManager("movie", "tmdb-17", "Movie");
     await tick();
 
     expect(headerLabels()).toEqual(["Language", "Format", "Offset", "Size", ""]);
@@ -339,7 +339,7 @@ describe("files: renderFiles", () => {
       { ...extFile("tmdb-18", "fr", 0), size: 512 },
     ]);
 
-    openFileManager("movie", "tmdb-18", "Movie", "/");
+    openFileManager("movie", "tmdb-18", "Movie");
     await tick();
 
     expect(cell(0, "size")).toBe("512 B");
@@ -354,7 +354,7 @@ describe("files: renderFiles", () => {
       { ...extFile("tmdb-19", "fr"), size: 1024 * 1024 },
     ]);
 
-    openFileManager("movie", "tmdb-19", "Movie", "/");
+    openFileManager("movie", "tmdb-19", "Movie");
     await tick();
 
     expect(cell(0, "size")).toBe("512 B");
@@ -370,7 +370,7 @@ describe("files: renderFiles", () => {
       { ...extFile("tmdb-21", "fr"), offset_ms: 0 },
     ]);
 
-    openFileManager("movie", "tmdb-21", "Movie", "/");
+    openFileManager("movie", "tmdb-21", "Movie");
     await tick();
 
     expect(cell(0, "offset")).toBe("+1.5s");
@@ -381,7 +381,7 @@ describe("files: renderFiles", () => {
   it("labels a non-standard variant next to the language name", async () => {
     mockListFiles.mockResolvedValueOnce([{ ...extFile("tmdb-23", "fr"), variant: "forced" }]);
 
-    openFileManager("movie", "tmdb-23", "Movie", "/");
+    openFileManager("movie", "tmdb-23", "Movie");
     await tick();
 
     expect(reqRow(0).children.item(0)?.textContent).toBe("French (forced)");
@@ -392,7 +392,7 @@ describe("files: renderFiles", () => {
       { ...extFile("tmdb-25", "en"), codec: "", name: "movie.en.ASS" },
     ]);
 
-    openFileManager("movie", "tmdb-25", "Movie", "/");
+    openFileManager("movie", "tmdb-25", "Movie");
     await tick();
 
     expect(reqRow(0).querySelector("span.badge")?.textContent).toBe("ass: ext");
@@ -425,7 +425,7 @@ describe("files: renderFiles", () => {
     };
     mockListFiles.mockResolvedValueOnce([named, nameless]);
 
-    openFileManager("movie", "tmdb-27", "Movie", "/", 9);
+    openFileManager("movie", "tmdb-27", "Movie", 9);
     await tick();
 
     expect(reqRow(0).children.item(0)?.textContent).toBe("stray.srt");
@@ -443,7 +443,7 @@ describe("files: renderFiles", () => {
       { ...extFile("tmdb-29", "fr"), source: "embedded" },
     ]);
 
-    openFileManager("movie", "tmdb-29", "Movie", "/");
+    openFileManager("movie", "tmdb-29", "Movie");
     await tick();
 
     expect(reqTbody().children.length).toBe(1);
@@ -452,12 +452,12 @@ describe("files: renderFiles", () => {
 
   it("requests the listing for the open item, adding arr_id only when known", async () => {
     mockListFiles.mockResolvedValueOnce([]);
-    openFileManager("movie", "tmdb-31", "Movie", "/");
+    openFileManager("movie", "tmdb-31", "Movie");
     await tick();
     expect(mockListFiles).toHaveBeenCalledWith({ media_type: "movie", media_id: "tmdb-31" });
 
     mockListFiles.mockResolvedValueOnce([]);
-    openFileManager("episode", "tvdb-33-", "Show", "/series/33", 42);
+    openFileManager("episode", "tvdb-33-", "Show", 42);
     await tick();
     expect(mockListFiles).toHaveBeenLastCalledWith({
       media_type: "episode",
@@ -469,7 +469,7 @@ describe("files: renderFiles", () => {
   it("renders an error when the listing fails", async () => {
     mockListFiles.mockResolvedValueOnce(null);
 
-    openFileManager("movie", "tmdb-35", "Movie", "/");
+    openFileManager("movie", "tmdb-35", "Movie");
     await tick();
 
     const err = document.querySelector<HTMLElement>('#coverageContent [data-status="err"]');
@@ -478,7 +478,7 @@ describe("files: renderFiles", () => {
   });
 
   it("pushes the files URL and marks the page in the store", async () => {
-    openFileManager("movie", "tmdb-37", "Movie", "/");
+    openFileManager("movie", "tmdb-37", "Movie");
     await tick();
     expect(location.pathname).toBe("/movie/37/files");
 
@@ -489,24 +489,24 @@ describe("files: renderFiles", () => {
     // `depth + 1` assertion is a flake whose trigger is how many entries the
     // rest of the suite happened to add first.
     const stacked = history.length;
-    openFileManager("movie", "tmdb-37", "Movie", "/");
+    openFileManager("movie", "tmdb-37", "Movie");
     await tick();
     expect(history.length).toBe(stacked);
 
-    openFileManager("episode", "tvdb-81189-", "Breaking Bad", "/series/81189", 7);
+    openFileManager("episode", "tvdb-81189-", "Breaking Bad", 7);
     await tick();
     expect(location.pathname).toBe("/series/81189/files");
     expect(store.get("currentPage")).toBe("files");
     expect(store.get("detailCtx")).toEqual({ files: true });
   });
 
-  it("configures the panel with the caller's back path", async () => {
-    openFileManager("episode", "tvdb-81189-", "Breaking Bad", "", 7);
+  it("configures the panel for the file manager", async () => {
+    openFileManager("episode", "tvdb-81189-", "Breaking Bad", 7);
     await tick();
 
     expect(emit).toHaveBeenCalledWith(BusEvent.PanelConfigure, {
       visible: false,
-      detail: { title: "Breaking Bad", info: "Subtitle Files", backPath: "/" },
+      detail: { title: "Breaking Bad", info: "Subtitle Files" },
     });
   });
 
@@ -514,7 +514,7 @@ describe("files: renderFiles", () => {
     const f = extFile("tvdb-81189-s02e05", "en");
     mockListFiles.mockResolvedValueOnce([f]);
 
-    openFileManager("episode", "tvdb-81189-", "Breaking Bad", "/series/81189", 42);
+    openFileManager("episode", "tvdb-81189-", "Breaking Bad", 42);
     await tick();
 
     const syncBtn = reqRow(0).querySelector<HTMLButtonElement>(
@@ -532,7 +532,7 @@ describe("files: renderFiles", () => {
   it("offers no sync button when the arr id is unknown", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-39", "en")]);
 
-    openFileManager("movie", "tmdb-39", "Movie", "/");
+    openFileManager("movie", "tmdb-39", "Movie");
     await tick();
 
     expect(reqRow(0).querySelector("[data-tip='Adjust subtitle timing']")).toBeNull();
@@ -556,7 +556,7 @@ describe("files: renderFiles", () => {
     };
     mockListFiles.mockResolvedValueOnce([unnamed]);
 
-    openFileManager("movie", "tmdb-41", "Movie", "/");
+    openFileManager("movie", "tmdb-41", "Movie");
     await tick();
     const delBtn = reqRow(0).querySelector<HTMLButtonElement>("button.btn-delete");
     if (!delBtn) {
@@ -575,7 +575,7 @@ describe("files: renderFiles", () => {
     actionCalls.results["files.delete_bulk"] = { deleted: 2 };
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-43", "en"), extFile("tmdb-43", "fr")]);
 
-    openFileManager("movie", "tmdb-43", "Movie", "/");
+    openFileManager("movie", "tmdb-43", "Movie");
     await tick();
     // One file survived the sweep server-side (a partial delete).
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-43", "fr")]);
@@ -594,7 +594,7 @@ describe("files: renderFiles", () => {
     confirmState.answer = false;
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-44", "en"), extFile("tmdb-44", "fr")]);
 
-    openFileManager("movie", "tmdb-44", "Movie", "/");
+    openFileManager("movie", "tmdb-44", "Movie");
     await tick();
 
     reqBulkButton().click();
@@ -613,7 +613,7 @@ describe("files: renderFiles", () => {
       extFile("tmdb-46", "fr"),
     ]);
 
-    openFileManager("movie", "tmdb-46", "Movie", "/");
+    openFileManager("movie", "tmdb-46", "Movie");
     await tick();
     const delBtn = reqRow(1).querySelector<HTMLButtonElement>("button.btn-delete");
     if (!delBtn) {
@@ -642,7 +642,7 @@ describe("files: renderFiles", () => {
     };
     mockListFiles.mockResolvedValueOnce([orphan, extFile("tmdb-47", "fr", 2)]);
 
-    openFileManager("movie", "tmdb-47", "Movie", "/");
+    openFileManager("movie", "tmdb-47", "Movie");
     await tick();
     reqRow(0).querySelector<HTMLButtonElement>("button.btn-delete")?.click();
     await tick();
@@ -667,13 +667,13 @@ describe("files: renderFiles", () => {
 
   it("a refresh reuses the mounted table instead of rebuilding it", async () => {
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-45", "en")]);
-    openFileManager("movie", "tmdb-45", "Movie", "/");
+    openFileManager("movie", "tmdb-45", "Movie");
     await tick();
     const tbody = reqTbody();
     const row = reqRow(0);
 
     mockListFiles.mockResolvedValueOnce([extFile("tmdb-45", "en")]);
-    openFileManager("movie", "tmdb-45", "Movie", "/");
+    openFileManager("movie", "tmdb-45", "Movie");
     await tick();
 
     expect(document.querySelectorAll("table.files-table")).toHaveLength(1);

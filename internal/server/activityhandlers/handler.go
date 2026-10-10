@@ -230,7 +230,7 @@ func (h *Handler) HandleCancelActivity(w http.ResponseWriter, r *http.Request) {
 		slog.Info("activity cancel repeated: already stopping",
 			"activity_id", id, "user", username, "action", entry.Action)
 		w.WriteHeader(http.StatusNoContent)
-	default: // StopNotFound: entry exists but has no live stop registration.
+	default: // stopNotFound: entry exists but has no live stop registration.
 		slog.Info("activity cancel rejected: not cancellable",
 			"activity_id", id, "user", username, "action", entry.Action,
 			"done", entry.Done)

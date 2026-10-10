@@ -10,7 +10,7 @@ import { langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import type { SubtitleEntry } from "./api-types.js";
 
-export interface LabeledEntry {
+interface LabeledEntry {
   sub: SubtitleEntry;
   label: string;
 }

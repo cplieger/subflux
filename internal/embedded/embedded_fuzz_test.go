@@ -100,9 +100,9 @@ func FuzzDetectHIFromName(f *testing.F) {
 
 // FuzzDetectForcedFromName fuzzes forced-subtitle name classification. Its
 // contract is classify.IsForced: case-insensitive substring match over
-// ForcedRules, whose entries are ALL positive ("forced", "foreign") by
+// forcedRules, whose entries are ALL positive ("forced", "foreign") by
 // documented design. The same three property families as the HI target
-// apply; if ForcedRules ever gains a negative (denying) pattern, the
+// apply; if forcedRules ever gains a negative (denying) pattern, the
 // monotonicity property below encodes exactly the contract that changed and
 // must be revisited alongside it.
 func FuzzDetectForcedFromName(f *testing.F) {
@@ -156,8 +156,8 @@ func FuzzNormalizeTrack(f *testing.F) {
 	f.Add(3, "subrip", "und", "Forced", false, true)
 	f.Add(4, "dvd_subtitle", "fra-CA", "Commentary (Hearing Impaired)", false, false)
 
-	f.Fuzz(func(t *testing.T, index int, codec, lang, name string, forced, hi bool) {
-		track := normalizeTrack(index, codec, lang, name, forced, hi)
+	f.Fuzz(func(t *testing.T, _ int, codec, lang, name string, forced, hi bool) {
+		track := normalizeTrack(codec, lang, name, forced, hi)
 		if track == nil {
 			// nil is valid for empty/undefined lang.
 			return

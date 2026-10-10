@@ -53,19 +53,19 @@ type pollerCfg interface {
 	LanguageCodes() []string
 }
 
-// PollSource identifies the arr system that produced an import event.
-type PollSource string
+// pollSource identifies the arr system that produced an import event.
+type pollSource string
 
-// PollSourceSonarr and PollSourceRadarr are the two supported PollSource values.
+// pollSourceSonarr and pollSourceRadarr are the two supported pollSource values.
 const (
-	PollSourceSonarr PollSource = "sonarr"
-	PollSourceRadarr PollSource = "radarr"
+	pollSourceSonarr pollSource = "sonarr"
+	pollSourceRadarr pollSource = "radarr"
 )
 
-// ImportResult holds the resolved search parameters for a single arr import event.
-type ImportResult struct {
+// resolvedImport holds the resolved search parameters for a single arr import event.
+type resolvedImport struct {
 	Req       *subflux.SearchRequest
-	Source    PollSource
+	Source    pollSource
 	Label     string
 	Targets   []subflux.SubtitleTarget
 	RefreshID int

@@ -49,7 +49,7 @@ func (h *Handler) scanEpisodes(ctx context.Context, stop <-chan struct{}, actID 
 			"series_id", series.ID, "label", label, "outcome", outcome)
 		return outcome
 	}
-	defer h.deps.ScanGuard.Release()
+	defer h.deps.ScanGuard.release()
 
 	scanDelay := op.st.Cfg.Search().ScanDelay
 	found, searched, outcome := h.runEpisodeScans(ctx, stop, op, series, withFiles, actID, scanDelay)
@@ -88,10 +88,10 @@ func filterEpisodesWithFiles(episodes []arrapi.Episode,
 // the scan must not proceed: cancelled while queued (via the dismiss path's
 // activity.Cancel OR the stop signal), or shutdown. In those cases the slot
 // is not held. On an empty outcome the caller owns the slot and must
-// Release it.
+// release it.
 func (h *Handler) acquireScanSlot(ctx context.Context, actID string, stop <-chan struct{}) activity.Outcome {
 	h.deps.Activity.SetQueued(actID, true)
-	acquired := h.deps.ScanGuard.Acquire(ctx, stop)
+	acquired := h.deps.ScanGuard.acquire(ctx, stop)
 	h.deps.Activity.SetQueued(actID, false)
 	if !acquired {
 		// Gave up without the slot: shutdown wins over stop so a process
@@ -105,11 +105,11 @@ func (h *Handler) acquireScanSlot(ctx context.Context, actID string, stop <-chan
 	// dismiss path cancelled the queued entry, which has no signal to
 	// select on): re-check before running.
 	if h.deps.Activity.IsCancelled(actID) || stopRequested(stop) {
-		h.deps.ScanGuard.Release()
+		h.deps.ScanGuard.release()
 		return activity.OutcomeCancelled
 	}
 	if ctx.Err() != nil {
-		h.deps.ScanGuard.Release()
+		h.deps.ScanGuard.release()
 		return activity.OutcomeShutdown
 	}
 	return ""
@@ -133,9 +133,9 @@ func (h *Handler) runEpisodeScans(ctx context.Context, stop <-chan struct{},
 			fmt.Sprintf("%s S%02dE%02d (%d/%d)",
 				series.Title, ep.SeasonNumber, ep.EpisodeNumber,
 				i+1, len(withFiles)))
-		scan := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
+		scan := scanEpisode(ctx, op.deps, op.ls, series, ep, true)
 		searched++
-		if scan.Outcome == ScanFound {
+		if scan.Outcome == scanFound {
 			found++
 		}
 		if scan.WriteFailure != nil {
@@ -197,9 +197,9 @@ func (h *Handler) scanSingleEpisode(ctx context.Context, stop <-chan struct{}, a
 		slog.Debug("scan ended while queued", "media", label, "outcome", outcome)
 		return outcome
 	}
-	defer h.deps.ScanGuard.Release()
+	defer h.deps.ScanGuard.release()
 
-	scan := ScanEpisode(ctx, op.deps, op.ls, series, ep, true)
+	scan := scanEpisode(ctx, op.deps, op.ls, series, ep, true)
 	// For a single-item scope the in-flight item IS the whole scan: after it
 	// returns, check shutdown FIRST and stop SECOND before publishing
 	// success — a stop during the item must terminate as cancelled.
@@ -239,7 +239,7 @@ func (h *Handler) runMovieScan(ctx context.Context, stop <-chan struct{}, actID 
 		slog.Debug("movie scan ended while queued", "movie_id", movie.ID, "outcome", outcome)
 		return outcome
 	}
-	defer h.deps.ScanGuard.Release()
+	defer h.deps.ScanGuard.release()
 
 	origLang := arrsvc.OriginalLangCode(movie.OriginalLanguage)
 	audioLangs := arrsvc.AudioLanguages(movie.MovieFile.MediaInfo)
@@ -248,7 +248,7 @@ func (h *Handler) runMovieScan(ctx context.Context, stop <-chan struct{}, actID 
 
 	// Derive found from per-target outcomes: a movie with several language
 	// targets can download several subtitles in one scan, and reporting the
-	// single ScanFound outcome as 1/N understated that.
+	// single scanFound outcome as 1/N understated that.
 	scan := scanMovieDetail(ctx, op.deps, op.ls, movie, true)
 	found := scan.Found
 	// Single-item scope: the item in flight is the whole scan — shutdown

@@ -40,7 +40,6 @@ func (o providerOutcome) String() string {
 }
 
 type providerResult struct {
-	err     error
 	name    subflux.ProviderID
 	outcome providerOutcome
 }
@@ -78,16 +77,6 @@ func (o searchOutcome) timedOut() []subflux.ProviderID {
 	var names []subflux.ProviderID
 	for _, p := range o.providers {
 		if p.outcome == providerTimeout {
-			names = append(names, p.name)
-		}
-	}
-	return names
-}
-
-func (o searchOutcome) errored() []subflux.ProviderID {
-	var names []subflux.ProviderID
-	for _, p := range o.providers {
-		if p.outcome == providerError {
 			names = append(names, p.name)
 		}
 	}

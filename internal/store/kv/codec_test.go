@@ -78,7 +78,7 @@ func TestDecodeOrHandle_validNoSkip(t *testing.T) {
 	for _, mode := range []DecodeMode{FailClosed, TolerantSkip} {
 		skip, derr := DecodeOrHandle(mode, "b", []byte("k"), enc, &got)
 		if derr != nil || skip {
-			t.Errorf("mode %s on valid data: skip=%v err=%v, want skip=false err=nil", mode, skip, derr)
+			t.Errorf("mode %d on valid data: skip=%v err=%v, want skip=false err=nil", mode, skip, derr)
 		}
 	}
 	if got.Title != "ok" {

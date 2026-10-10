@@ -264,7 +264,7 @@ func TestScores_custom(t *testing.T) {
 	t.Parallel()
 	custom := subflux.Scores{Hash: 999}
 	cfg := &Config{
-		Scoring: ScoringConfig{
+		Scoring: scoringConfig{
 			Weights: &custom,
 		},
 	}

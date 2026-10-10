@@ -45,14 +45,14 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	if anidbKey == "" {
 		slog.Debug("animetosho: no anidb_client_key, episode ID resolution disabled")
 	}
-	return &Provider{
+	return &source{
 		client:      provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		anidbMapper: anidb.NewMapper(anidbKey),
 	}, nil
 }
 
-// Provider implements the AnimeTosho subtitle API.
-type Provider struct {
+// source implements the AnimeTosho subtitle API.
+type source struct {
 	client      *http.Client
 	anidbMapper episodeMapper
 }
@@ -66,12 +66,12 @@ type episodeMapper interface {
 	ForgetClientKeyVerdict()
 }
 
-var _ provider.SettingReporter = (*Provider)(nil)
+var _ provider.SettingReporter = (*source)(nil)
 
 // SettingVerdict names the AniDB client key once AniDB refused it or answered
 // a request carrying it with data, with the refusal or nil for an acceptance.
 // After a refusal searches run by title only.
-func (p *Provider) SettingVerdict() (setting string, refusal error) {
+func (p *source) SettingVerdict() (setting string, refusal error) {
 	answered, refusal := p.anidbMapper.ClientKeyVerdict()
 	if !answered {
 		return "", nil
@@ -81,14 +81,14 @@ func (p *Provider) SettingVerdict() (setting string, refusal error) {
 
 // ForgetSettingVerdict drops AniDB's answer about the client key, so the next
 // episode lookup asks AniDB again.
-func (p *Provider) ForgetSettingVerdict() { p.anidbMapper.ForgetClientKeyVerdict() }
+func (p *source) ForgetSettingVerdict() { p.anidbMapper.ForgetClientKeyVerdict() }
 
 // Name returns the provider identifier for AnimeTosho.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // Search tries AniDB episode ID lookup first (more precise for anime), then
 // falls back to title+season search.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.MediaType != subflux.MediaTypeEpisode {
 		slog.Debug("animetosho: not an episode, skipping",
 			"media_type", req.MediaType)
@@ -119,7 +119,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 // searchByAniDB searches by the AniDB episode id when one resolves. done
 // reports an answer the title search must not replace: results, or a rate
 // limit that would refuse the title search too.
-func (p *Provider) searchByAniDB(ctx context.Context, req *subflux.SearchRequest) (subs []subflux.Subtitle, done bool, err error) {
+func (p *source) searchByAniDB(ctx context.Context, req *subflux.SearchRequest) (subs []subflux.Subtitle, done bool, err error) {
 	result := p.anidbMapper.Resolve(ctx, req.TvdbID, req.Season, req.Episode)
 	if result == nil || result.AniDBEpisodeID <= 0 {
 		return nil, false, nil
@@ -146,7 +146,7 @@ func (p *Provider) searchByAniDB(ctx context.Context, req *subflux.SearchRequest
 }
 
 // Download fetches the subtitle content for the given search result.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("animetosho: %w", err)
@@ -191,7 +191,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	return result, nil
 }
 
-func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) searchByEpisodeID(ctx context.Context, anidbEpID int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	entries, err := p.searchEntriesByEID(ctx, anidbEpID)
 	if err != nil {
 		return nil, err
@@ -199,7 +199,7 @@ func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *su
 	return p.collectSubtitles(ctx, entries, req)
 }
 
-func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) searchByTitle(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	entries, err := p.searchEntries(ctx, req.Title, req.Season)
 	if err != nil {
 		return nil, fmt.Errorf("search entries: %w", err)
@@ -211,7 +211,7 @@ func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest
 // A failed entry is skipped, except a rate limit: it stops the remaining
 // fetches and is returned without the partial results, because every later
 // call would be refused too.
-func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	results := make([]entryResult, len(entries))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxSearchEntries)
@@ -274,7 +274,7 @@ func mergeEntryResults(results []entryResult, req *subflux.SearchRequest) []subf
 	return out
 }
 
-func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry, error) {
+func (p *source) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry, error) {
 	slog.Debug("animetosho searching by anidb eid", "eid", eid)
 
 	var entries []feedEntry
@@ -290,7 +290,7 @@ func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry
 
 // fetchJSON returns typed provider errors from CheckHTTPStatus so callers
 // preserve Retry-After hints for 429 responses.
-func (p *Provider) fetchJSON(ctx context.Context, reqURL string, v any) error {
+func (p *source) fetchJSON(ctx context.Context, reqURL string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ type feedEntry struct {
 
 // searchEntries uses a season-level query to catch both per-episode entries
 // and season packs.
-func (p *Provider) searchEntries(ctx context.Context,
+func (p *source) searchEntries(ctx context.Context,
 	title string, season int,
 ) ([]feedEntry, error) {
 	query := fmt.Sprintf("%s S%02d", title, season)
@@ -332,7 +332,7 @@ func (p *Provider) searchEntries(ctx context.Context,
 	return filtered, nil
 }
 
-func (p *Provider) fetchSubtitlesForEntry(ctx context.Context,
+func (p *source) fetchSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
 	season, episode, absEpisode int,
 ) ([]subflux.Subtitle, error) {

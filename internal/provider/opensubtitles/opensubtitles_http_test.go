@@ -19,7 +19,7 @@ func TestSetHeaders(t *testing.T) {
 
 	t.Run("sets required headers without token", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{apiKey: "test-api-key"}
+		p := &source{apiKey: "test-api-key"}
 		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://example.com", http.NoBody)
 
 		p.setHeaders(req)
@@ -38,7 +38,7 @@ func TestSetHeaders(t *testing.T) {
 
 	t.Run("sets authorization header with token", func(t *testing.T) {
 		t.Parallel()
-		p := &Provider{apiKey: "key", token: "my-token"}
+		p := &source{apiKey: "key", token: "my-token"}
 		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://example.com", http.NoBody)
 
 		p.setHeaders(req)
@@ -268,7 +268,7 @@ func TestInvalidateTokenOn401(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{token: tt.initialToken}
+			p := &source{token: tt.initialToken}
 			p.invalidateTokenOn401(tt.err)
 
 			p.tokenMu.Lock()

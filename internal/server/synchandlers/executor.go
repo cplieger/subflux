@@ -26,17 +26,17 @@ type AudioJobRunner interface {
 // dispatcher supplies — and on a result apply the correction (SRT write-back
 // plus cumulative offset bookkeeping, exactly the synchronous handler's old
 // apply path). It is constructed by the composition root and handed to the
-// dispatcher as its ExecFunc.
+// dispatcher as its execFunc.
 type AudioExecutor struct {
 	Store  SyncStore
 	Proc   SubtitleProcessor
-	Media  MediaWriter
+	Media  mediaWriter
 	Runner AudioJobRunner
 }
 
-// Execute implements syncjobs.ExecFunc.
+// Execute implements syncjobs.execFunc.
 func (e *AudioExecutor) Execute(ctx context.Context, in *syncjobs.ExecInput, hook func() bool) syncjobs.ExecResult {
-	data, err := atomicfile.ReadBounded(ctx, in.SubtitlePath, MaxSyncSubSize)
+	data, err := atomicfile.ReadBounded(ctx, in.SubtitlePath, maxSyncSubSize)
 	if err != nil {
 		if ctx.Err() != nil {
 			// A queued-DELETE race conversion cancels the job context during

@@ -49,7 +49,7 @@ func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []
 
 // EmbeddedPolicy answers the zero policy: no codec is ignored, so every
 // indexed track counts and the suite's arithmetic is over targets alone.
-func (m *countMissingConfig) EmbeddedPolicy() subflux.EmbeddedPolicy { return subflux.EmbeddedPolicy{} }
+func (*countMissingConfig) EmbeddedPolicy() subflux.EmbeddedPolicy { return subflux.EmbeddedPolicy{} }
 
 var errMock = errors.New("mock store failure")
 

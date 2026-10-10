@@ -774,22 +774,6 @@ describe("runPopupSearch: how failures are shown", () => {
     );
   });
 
-  it("treats a no-results failure as empty rather than as an error", async () => {
-    wire.searchResult = { ok: false, status: 404, code: "search_no_results" };
-
-    await openEpisodePopup();
-
-    expect(results().firstElementChild?.getAttribute("data-status")).toBeNull();
-  });
-
-  it("explains a provider cooldown", async () => {
-    wire.searchResult = { ok: false, status: 429, code: "provider_timed_out" };
-
-    await openEpisodePopup();
-
-    expect(results().textContent).toBe("This provider is in cooldown. Try again in a few minutes.");
-  });
-
   it("marks an unmapped failure as an error", async () => {
     wire.searchResult = { ok: false, status: 500, error: "provider exploded" };
 
@@ -1202,7 +1186,7 @@ describe("downloadFromPopup", () => {
     expect([btn.dataset["status"], btn.getAttribute("data-tip")]).toEqual(["err", "no route"]);
   });
 
-  it("keeps a rejected dispatch disabled unless the download itself failed", async () => {
+  it("keeps a rejected dispatch disabled", async () => {
     actions.outcomes = [
       { status: "error", error: { code: "provider_error", message: "no route" } },
     ];
@@ -1210,32 +1194,6 @@ describe("downloadFromPopup", () => {
     const btn = await clickDownload();
 
     expect(btn.disabled).toBe(true);
-  });
-
-  it("re-enables the button after a failed download so the user can retry", async () => {
-    actions.outcomes = [
-      { status: "error", error: { code: "download_failed", message: "timeout" } },
-    ];
-
-    const btn = await clickDownload();
-
-    expect(btn.disabled).toBe(false);
-  });
-
-  it("drops the failed status when that retry is dispatched", async () => {
-    actions.outcomes = [
-      { status: "error", error: { code: "download_failed", message: "timeout" } },
-      { status: "success", value: { activity_id: "act-1", status: "accepted" } },
-    ];
-    const btn = await clickDownload();
-
-    btn.click();
-    await settle();
-
-    // css/_shared-feedback.css paints button[data-status="err"] on --err-dim, so
-    // a status outliving its outcome renders the running download as failed.
-    expect(btn.dataset["status"]).toBeUndefined();
-    expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
   it("falls back to a generic tip when a cancelled dispatch carries no error", async () => {
@@ -1528,10 +1486,6 @@ describe("the download action's retry policy", () => {
     }
     return def.retryable(err);
   }
-
-  it("never retries a failed download, even on a transient status", () => {
-    expect(retryable({ code: "download_failed", status: 503 })).toBe(false);
-  });
 
   it("retries a network blip", () => {
     expect(retryable({ code: "network", status: 0 })).toBe(true);

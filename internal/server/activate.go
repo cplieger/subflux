@@ -44,8 +44,8 @@ const (
 	activateHot
 )
 
-// String labels the mode for logs.
-func (m activationMode) String() string {
+// label names the mode for logs.
+func (m activationMode) label() string {
 	if m == activateCold {
 		return "cold"
 	}
@@ -283,7 +283,7 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *conf
 	}
 
 	slog.Info("configuration activated",
-		"mode", mode.String(),
+		"mode", mode.label(),
 		"providers", len(cand.providers),
 		"languages", newCfg.LanguageCodes(),
 		"sonarr", cand.sonarr != nil,

@@ -48,8 +48,8 @@ func TestWriteFile_a_confirmed_fault_marks_the_folder_once(t *testing.T) {
 	if !errors.As(err, &uerr) || !errors.Is(err, ErrUnwritable) || !errors.Is(err, syscall.EROFS) {
 		t.Fatalf("WriteFile = %v, want an *UnwritableError matching ErrUnwritable and EROFS", err)
 	}
-	if uerr.Folder != show || uerr.Root != h.root || uerr.Op != opWrite {
-		t.Errorf("UnwritableError = %+v, want folder %s, root %s, op write", uerr, show, h.root)
+	if uerr.Folder != show || uerr.Op != opWrite {
+		t.Errorf("UnwritableError = %+v, want folder %s, op write", uerr, show)
 	}
 	if err := h.w.WriteFile(t.Context(), filepath.Join(show, "ep2.en.srt"), []byte("1\n")); !errors.Is(err, ErrUnwritable) {
 		t.Errorf("second WriteFile = %v, want ErrUnwritable", err)
@@ -184,12 +184,8 @@ func TestBind_a_nested_root_owns_its_folders(t *testing.T) {
 	h.setWrite(func(_ context.Context, p string, _ []byte) error { return erofs(p) })
 
 	err := h.w.WriteFile(t.Context(), filepath.Join(show, "ep.en.srt"), []byte("1\n"))
-	var uerr *UnwritableError
-	if !errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*UnwritableError](err); !ok {
 		t.Fatalf("WriteFile = %v, want an *UnwritableError", err)
-	}
-	if uerr.Root != nested {
-		t.Errorf("UnwritableError.Root = %q, want the nested root %q", uerr.Root, nested)
 	}
 	if g := h.gauge(t, nested); g != 1 {
 		t.Errorf("nested root gauge = %v, want 1", g)

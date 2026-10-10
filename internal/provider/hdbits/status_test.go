@@ -16,11 +16,11 @@ const testPasskey = "placeholder-passkey-0123456789ab"
 
 // routedProvider answers each HDBits API path with its own canned body and
 // counts the subtitle lookups it serves.
-func routedProvider(t *testing.T, bodies map[string]string, subtitleCalls *atomic.Int32) *Provider {
+func routedProvider(t *testing.T, bodies map[string]string, subtitleCalls *atomic.Int32) *source {
 	t.Helper()
 	cfg := defaultHDBitsConfig
 	cfg.TorrentLookupDelay = 0
-	return &Provider{
+	return &source{
 		username: "placeholder-user",
 		passkey:  testPasskey,
 		cfg:      cfg,
@@ -118,14 +118,14 @@ func TestDownload_reports_a_json_refusal_and_does_not_cache_it(t *testing.T) {
 	if strings.Contains(err.Error(), testPasskey) {
 		t.Errorf("Download() error leaked the passkey: %q", err.Error())
 	}
-	if _, cached := p.dlCache.Get("123"); cached {
+	if _, cached := p.dlCache.get("123"); cached {
 		t.Error("the refusal body was cached as a download")
 	}
 }
 
 func TestDownloadVerdict_ignores_a_subtitle_body(t *testing.T) {
 	t.Parallel()
-	p := &Provider{passkey: testPasskey}
+	p := &source{passkey: testPasskey}
 	for _, body := range []string{
 		"1\n00:00:01,000 --> 00:00:02,000\nHello\n",
 		"PK\x03\x04archive",

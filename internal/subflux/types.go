@@ -226,15 +226,14 @@ type SchemaOption struct {
 
 // SchemaSection describes a top-level config section.
 type SchemaSection struct {
-	Key              string           `json:"key"`
-	Title            string           `json:"title"`
-	Type             string           `json:"type"`
-	Help             string           `json:"help,omitempty"`
-	RequiredGroup    string           `json:"required_group,omitempty"`
-	EnableKey        string           `json:"enable_key,omitempty"`
-	Fields           []SchemaField    `json:"fields,omitempty"`
-	ProviderTemplate []SchemaField    `json:"provider_template,omitempty"`
-	Providers        []ProviderSchema `json:"providers,omitempty"`
+	Key           string           `json:"key"`
+	Title         string           `json:"title"`
+	Type          string           `json:"type"`
+	Help          string           `json:"help,omitempty"`
+	RequiredGroup string           `json:"required_group,omitempty"`
+	EnableKey     string           `json:"enable_key,omitempty"`
+	Fields        []SchemaField    `json:"fields,omitempty"`
+	Providers     []ProviderSchema `json:"providers,omitempty"`
 	// ConnTest marks a section that reaches a remote service and can be
 	// tested before saving: the settings dialog and the setup wizard render a
 	// "Test connection" control for it, keyed by the section's own Key. It is

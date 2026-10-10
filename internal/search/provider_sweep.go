@@ -167,7 +167,7 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 		}
 		slog.Debug("provider search completed", "provider", name, "outcome", outcome.String(), "results", len(subs))
 		mu.Lock()
-		provResults = append(provResults, providerResult{name: name, err: err, outcome: outcome})
+		provResults = append(provResults, providerResult{name: name, outcome: outcome})
 		if err == nil {
 			results = append(results, subs...)
 		}
@@ -221,7 +221,7 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 func (e *Engine) downloadFromProvider(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	p, ok := e.providersByName[sub.Provider]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrProviderNotFound, sub.Provider)
+		return nil, fmt.Errorf("%w: %s", errProviderNotFound, sub.Provider)
 	}
 	if ok, reason := e.admit(p, providergate.OpDownload); !ok {
 		return nil, fmt.Errorf("%w: %s: %s", ErrProviderGated, p.Name(), reason)

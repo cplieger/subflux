@@ -141,11 +141,11 @@ func (f *covSonarrFake) SeriesByTvdbID(_ context.Context, tvdbID int) (arrapi.Se
 	return arrapi.Series{}, false, nil
 }
 
-func (f *covSonarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
+func (*covSonarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return nil
 }
 
-func (f *covSonarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
+func (*covSonarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
 	return nil, nil
 }
 
@@ -171,11 +171,11 @@ func (f *covRadarrFake) MovieByTmdbID(_ context.Context, tmdbID int) (arrapi.Mov
 	return arrapi.Movie{}, false, nil
 }
 
-func (f *covRadarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
+func (*covRadarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return nil
 }
 
-func (f *covRadarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
+func (*covRadarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
 	return nil, nil
 }
 
@@ -477,7 +477,7 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 // coverage fetch surfaces the store error as a 500 (vs the arr 502).
 type seriesDBErrorStore struct{ mockCoverageStore }
 
-func (m *seriesDBErrorStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (*seriesDBErrorStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return nil, errMock
 }
 

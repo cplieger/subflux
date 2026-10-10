@@ -58,13 +58,13 @@ func FuzzParseGroup(f *testing.F) {
 	f.Add("no-group-here")
 
 	f.Fuzz(func(t *testing.T, name string) {
-		group := ParseGroup(name)
+		group := parseGroup(name)
 		if group == "" {
 			return
 		}
 		// Provenance: an extracted group is always a literal substring of the
 		// extension-stripped input, never fabricated or transformed.
-		stripped := FileExtRe.ReplaceAllString(name, "")
+		stripped := fileExtRe.ReplaceAllString(name, "")
 		if !strings.Contains(stripped, group) {
 			t.Errorf("ParseGroup(%q) = %q, not a substring of %q", name, group, stripped)
 		}
@@ -105,9 +105,9 @@ func FuzzSourceOrFamily(f *testing.F) {
 	f.Add("unknown_source")
 
 	f.Fuzz(func(t *testing.T, src string) {
-		result := SourceOrFamily(src)
+		result := sourceOrFamily(src)
 		// Idempotent: a family label maps to itself.
-		if result2 := SourceOrFamily(result); result != result2 {
+		if result2 := sourceOrFamily(result); result != result2 {
 			t.Fatalf("SourceOrFamily not idempotent: %q -> %q -> %q", src, result, result2)
 		}
 	})

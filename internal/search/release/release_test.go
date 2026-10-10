@@ -108,7 +108,7 @@ func TestParseGroup(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ParseGroup(tc.release); got != tc.want {
+			if got := parseGroup(tc.release); got != tc.want {
 				t.Errorf("ParseGroup(%q) = %q, want %q", tc.release, got, tc.want)
 			}
 		})
@@ -123,10 +123,10 @@ func TestCompareSource(t *testing.T) {
 		b    string
 		want bool
 	}{
-		{"same family (webdl/webrip)", NormWebDL, NormWebRip, true},
-		{"different family (webdl/bluray)", NormWebDL, NormBluray, false},
-		{"empty first operand", "", NormWebDL, false},
-		{"empty second operand", NormWebDL, "", false},
+		{"same family (webdl/webrip)", normWebDL, normWebRip, true},
+		{"different family (webdl/bluray)", normWebDL, normBluray, false},
+		{"empty first operand", "", normWebDL, false},
+		{"empty second operand", normWebDL, "", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

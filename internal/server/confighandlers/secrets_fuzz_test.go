@@ -21,8 +21,8 @@ func FuzzRedactSecrets_idempotent(f *testing.F) {
 	f.Add([]byte{})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		once := RedactSecrets(data)
-		twice := RedactSecrets(once)
+		once := redactSecrets(data)
+		twice := redactSecrets(once)
 		if !bytes.Equal(once, twice) {
 			t.Errorf("RedactSecrets not idempotent:\n  once=%q\n twice=%q", once, twice)
 		}
@@ -50,7 +50,7 @@ func FuzzRedactSecrets_secretNeverLeaks(f *testing.F) {
 		secret := "SX" + strings.NewReplacer("\n", "", "\r", "").Replace(raw)
 
 		doc := []byte("api_key: " + secret + "\n")
-		out := RedactSecrets(doc)
+		out := redactSecrets(doc)
 		if !bytes.Equal(out, []byte("api_key: \"********\"\n")) {
 			t.Fatalf("RedactSecrets(api_key: %q) = %q, want fully redacted line", secret, out)
 		}
@@ -72,11 +72,11 @@ func FuzzStripYAMLComment_idempotent(f *testing.F) {
 	f.Add([]byte(`"abc" # trailing`))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		once := StripYAMLComment(data)
+		once := stripYAMLComment(data)
 		if len(once) > len(data) {
 			t.Fatalf("StripYAMLComment grew input: in=%q out=%q", data, once)
 		}
-		twice := StripYAMLComment(once)
+		twice := stripYAMLComment(once)
 		if !bytes.Equal(once, twice) {
 			t.Errorf("StripYAMLComment not idempotent:\n  once=%q\n twice=%q", once, twice)
 		}
@@ -95,7 +95,7 @@ func FuzzFindClosingQuote(f *testing.F) {
 	f.Add([]byte(`"unterminated`), byte('"'))
 
 	f.Fuzz(func(t *testing.T, val []byte, q byte) {
-		idx := FindClosingQuote(val, q)
+		idx := findClosingQuote(val, q)
 		if idx < -1 || idx >= len(val) {
 			t.Fatalf("FindClosingQuote(%q, %q) = %d, out of range [-1, %d)", val, q, idx, len(val))
 		}
@@ -119,7 +119,7 @@ func FuzzSecretContextKey(f *testing.F) {
 			return
 		}
 		lineIdx := int(lineIdxRaw) % len(lines)
-		result := SecretContextKey(lines, lineIdx, key)
+		result := secretContextKey(lines, lineIdx, key)
 		// The key is always the last path segment, so it must be a suffix.
 		if !strings.HasSuffix(result, key) {
 			t.Fatalf("SecretContextKey(...) = %q does not end with key %q", result, key)
@@ -141,7 +141,7 @@ func FuzzExtractSecretValues(f *testing.F) {
 	f.Add([]byte("api_key: \"\"\n"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		secrets := ExtractSecretValues(data)
+		secrets := extractSecretValues(data)
 		for k, v := range secrets {
 			if k == "" {
 				t.Fatal("empty key in secrets map")

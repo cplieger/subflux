@@ -163,15 +163,15 @@ func TestParseResolveParams_season_zero_presence(t *testing.T) {
 	}
 }
 
-// --- ResolveQuery: movie arm ---
+// --- resolveQuery: movie arm ---
 
 func TestResolveQuery_movie_by_title(t *testing.T) {
 	t.Parallel()
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "fight club", Type: resolveTypeMovie})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "fight club", Type: resolveTypeMovie})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -199,8 +199,8 @@ func TestResolveQuery_movie_fileless_is_invisible(t *testing.T) {
 	// The fileless equal-titled movie neither resolves nor triggers
 	// ambiguity: only file-bearing movies participate (preserving the old
 	// resolver's first file-bearing match).
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "Fight Club", Type: resolveTypeMovie})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "Fight Club", Type: resolveTypeMovie})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -215,8 +215,8 @@ func TestResolveQuery_movie_year_disambiguation(t *testing.T) {
 		movieWithFile(1, "Dune", 1984, 841, "tt0087182"),
 		movieWithFile(2, "Dune", 2021, 438631, "tt1160419"),
 	}}
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "Dune", Type: resolveTypeMovie})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "Dune", Type: resolveTypeMovie})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -239,8 +239,8 @@ func TestResolveQuery_id_precedence_over_title(t *testing.T) {
 		movieWithFile(2, "Dune", 2021, 438631, "tt1160419"),
 	}}
 	// Title alone is ambiguous; the stable ID picks one.
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "Dune", Tmdb: 438631, Type: resolveTypeMovie})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "Dune", Tmdb: 438631, Type: resolveTypeMovie})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -256,8 +256,8 @@ func TestResolveQuery_unmatched_id_is_empty_despite_title_match(t *testing.T) {
 	}}
 	// A supplied stable ID that matches nothing is authoritative: the title
 	// match does not rescue the query.
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "Dune", Tmdb: 999999, Type: resolveTypeMovie})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "Dune", Tmdb: 999999, Type: resolveTypeMovie})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -273,8 +273,8 @@ func TestResolveQuery_conflicting_identifiers(t *testing.T) {
 		movieWithFile(2, "Alien", 1979, 348, "tt0078748"),
 	}}
 	// tmdb resolves to Dune, title to Alien: contradiction.
-	_, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Title: "Alien", Tmdb: 841, Type: resolveTypeMovie})
+	_, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Title: "Alien", Tmdb: 841, Type: resolveTypeMovie})
 	if !errors.Is(err, errResolveConflict) {
 		t.Fatalf("ResolveQuery(conflict) error = %v, want errResolveConflict", err)
 	}
@@ -286,14 +286,14 @@ func TestResolveQuery_two_ids_conflicting(t *testing.T) {
 		movieWithFile(1, "Dune", 1984, 841, "tt0087182"),
 		movieWithFile(2, "Alien", 1979, 348, "tt0078748"),
 	}}
-	_, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Imdb: "tt0078748", Tmdb: 841, Type: resolveTypeMovie})
+	_, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Imdb: "tt0078748", Tmdb: 841, Type: resolveTypeMovie})
 	if !errors.Is(err, errResolveConflict) {
 		t.Fatalf("ResolveQuery(imdb vs tmdb) error = %v, want errResolveConflict", err)
 	}
 }
 
-// --- ResolveQuery: series arm ---
+// --- resolveQuery: series arm ---
 
 func testSeries() []arrapi.Series {
 	return []arrapi.Series{
@@ -311,8 +311,8 @@ func TestResolveQuery_series_expands_file_bearing_episodes(t *testing.T) {
 			11: {epFile(1, 1), epFile(1, 2), noFile, epFile(2, 1)},
 		},
 	}
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, nil),
-		&ResolveQueryParams{Title: "breaking bad", Type: resolveTypeSeries})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, nil),
+		&resolveQueryParams{Title: "breaking bad", Type: resolveTypeSeries})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -358,8 +358,8 @@ func TestResolveQuery_series_season_episode_narrowing(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			res, err := ResolveQuery(t.Context(), resolveLS(sonarr, nil),
-				&ResolveQueryParams{
+			res, err := resolveQuery(t.Context(), resolveLS(sonarr, nil),
+				&resolveQueryParams{
 					Title: "Breaking Bad", Type: resolveTypeSeries,
 					Season: c.season, Episode: c.episode,
 				})
@@ -387,7 +387,7 @@ func TestResolveQuery_series_season_episode_narrowing(t *testing.T) {
 	}
 }
 
-// --- ResolveQuery: type fallback (series then movie) ---
+// --- resolveQuery: type fallback (series then movie) ---
 
 func TestResolveQuery_type_fallback_series_first(t *testing.T) {
 	t.Parallel()
@@ -400,8 +400,8 @@ func TestResolveQuery_type_fallback_series_first(t *testing.T) {
 	}}
 	// A title present in BOTH libraries resolves to the series (series arm
 	// runs first, matching the deleted resolver's order).
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Title: "Breaking Bad"})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Title: "Breaking Bad"})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -416,8 +416,8 @@ func TestResolveQuery_type_fallback_to_movie(t *testing.T) {
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Title: "Fight Club"})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Title: "Fight Club"})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -448,8 +448,8 @@ func TestResolveQuery_narrowing_suppresses_movie_fallback(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-				&ResolveQueryParams{Title: "Fight Club", Season: c.season, Episode: c.episode})
+			res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+				&resolveQueryParams{Title: "Fight Club", Season: c.season, Episode: c.episode})
 			if err != nil {
 				t.Fatalf("ResolveQuery() error = %v, want nil", err)
 			}
@@ -475,8 +475,8 @@ func TestResolveQuery_season_zero_with_tmdb_stays_series_only(t *testing.T) {
 	// The title matches the series; season 0 narrows to its specials. The
 	// tmdb id (which would resolve the movie) must not divert an episodic
 	// query to the movie arm.
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Title: "Breaking Bad", Tmdb: 550, Season: new(0)})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Title: "Breaking Bad", Tmdb: 550, Season: new(0)})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -507,8 +507,8 @@ func TestResolveQuery_tmdb_only_resolves_movie_first(t *testing.T) {
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Tmdb: 550})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Tmdb: 550})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -533,8 +533,8 @@ func TestResolveQuery_tmdb_outranks_conflicting_series_title(t *testing.T) {
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Tmdb: 550, Title: "Breaking Bad"})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Tmdb: 550, Title: "Breaking Bad"})
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
@@ -552,8 +552,8 @@ func TestResolveQuery_tmdb_title_conflict_without_type(t *testing.T) {
 		movieWithFile(1, "Dune", 1984, 841, "tt0087182"),
 		movieWithFile(2, "Alien", 1979, 348, "tt0078748"),
 	}}
-	_, err := ResolveQuery(t.Context(), resolveLS(nil, radarr),
-		&ResolveQueryParams{Tmdb: 841, Title: "Alien"})
+	_, err := resolveQuery(t.Context(), resolveLS(nil, radarr),
+		&resolveQueryParams{Tmdb: 841, Title: "Alien"})
 	if !errors.Is(err, errResolveConflict) {
 		t.Fatalf("ResolveQuery(no type, tmdb vs title) error = %v, want errResolveConflict", err)
 	}
@@ -574,8 +574,8 @@ func TestResolveQuery_unmatched_tmdb_never_title_rescued(t *testing.T) {
 	}}
 
 	// tmdb matches nothing + title matches a series: empty, not the series.
-	res, err := ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Tmdb: 999999, Title: "Breaking Bad"})
+	res, err := resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Tmdb: 999999, Title: "Breaking Bad"})
 	if err != nil {
 		t.Fatalf("ResolveQuery(unmatched tmdb + title) error = %v, want nil", err)
 	}
@@ -585,8 +585,8 @@ func TestResolveQuery_unmatched_tmdb_never_title_rescued(t *testing.T) {
 
 	// tmdb matches nothing but imdb matches the series: the series arm
 	// still answers by the matched stable ID.
-	res, err = ResolveQuery(t.Context(), resolveLS(sonarr, radarr),
-		&ResolveQueryParams{Tmdb: 999999, Imdb: "tt0903747"})
+	res, err = resolveQuery(t.Context(), resolveLS(sonarr, radarr),
+		&resolveQueryParams{Tmdb: 999999, Imdb: "tt0903747"})
 	if err != nil {
 		t.Fatalf("ResolveQuery(unmatched tmdb + imdb) error = %v, want nil", err)
 	}
@@ -595,7 +595,7 @@ func TestResolveQuery_unmatched_tmdb_never_title_rescued(t *testing.T) {
 	}
 }
 
-// --- ResolveQuery: partial arr failure + unconfigured arms ---
+// --- resolveQuery: partial arr failure + unconfigured arms ---
 
 func TestResolveQuery_partial_arr_failure(t *testing.T) {
 	t.Parallel()
@@ -605,8 +605,8 @@ func TestResolveQuery_partial_arr_failure(t *testing.T) {
 	}}
 
 	// Healthy arm satisfied the query: the downed arm is not an error.
-	res, err := ResolveQuery(t.Context(), resolveLS(downSonarr, radarr),
-		&ResolveQueryParams{Title: "Fight Club"})
+	res, err := resolveQuery(t.Context(), resolveLS(downSonarr, radarr),
+		&resolveQueryParams{Title: "Fight Club"})
 	if err != nil {
 		t.Fatalf("ResolveQuery(healthy arm satisfied) error = %v, want nil", err)
 	}
@@ -616,8 +616,8 @@ func TestResolveQuery_partial_arr_failure(t *testing.T) {
 
 	// Nothing matched and an arm was down: the emptiness is unprovable, so
 	// the failure surfaces.
-	_, err = ResolveQuery(t.Context(), resolveLS(downSonarr, radarr),
-		&ResolveQueryParams{Title: "Unknown Title"})
+	_, err = resolveQuery(t.Context(), resolveLS(downSonarr, radarr),
+		&resolveQueryParams{Title: "Unknown Title"})
 	if err == nil || !strings.Contains(err.Error(), "sonarr") {
 		t.Fatalf("ResolveQuery(down arm, no match) error = %v, want the sonarr failure", err)
 	}
@@ -625,13 +625,13 @@ func TestResolveQuery_partial_arr_failure(t *testing.T) {
 
 func TestResolveQuery_explicit_type_unconfigured_arm_errors(t *testing.T) {
 	t.Parallel()
-	_, err := ResolveQuery(t.Context(), resolveLS(nil, nil),
-		&ResolveQueryParams{Title: "x", Type: resolveTypeSeries})
+	_, err := resolveQuery(t.Context(), resolveLS(nil, nil),
+		&resolveQueryParams{Title: "x", Type: resolveTypeSeries})
 	if err == nil || !strings.Contains(err.Error(), "sonarr is not configured") {
 		t.Fatalf("ResolveQuery(type=series, no sonarr) error = %v, want not-configured error", err)
 	}
-	_, err = ResolveQuery(t.Context(), resolveLS(nil, nil),
-		&ResolveQueryParams{Title: "x", Type: resolveTypeMovie})
+	_, err = resolveQuery(t.Context(), resolveLS(nil, nil),
+		&resolveQueryParams{Title: "x", Type: resolveTypeMovie})
 	if err == nil || !strings.Contains(err.Error(), "radarr is not configured") {
 		t.Fatalf("ResolveQuery(type=movie, no radarr) error = %v, want not-configured error", err)
 	}
@@ -641,8 +641,8 @@ func TestResolveQuery_unconfigured_arms_fallback_empty(t *testing.T) {
 	t.Parallel()
 	// No type + neither arr configured: empty result, not an error (the
 	// deleted resolver skipped unconfigured arrs silently).
-	res, err := ResolveQuery(t.Context(), resolveLS(nil, nil),
-		&ResolveQueryParams{Title: "x"})
+	res, err := resolveQuery(t.Context(), resolveLS(nil, nil),
+		&resolveQueryParams{Title: "x"})
 	if err != nil {
 		t.Fatalf("ResolveQuery(unconfigured) error = %v, want nil", err)
 	}

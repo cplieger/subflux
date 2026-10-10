@@ -11,8 +11,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// SubtitleProcessor is the subtitle operations preview handlers need.
-type SubtitleProcessor interface {
+// subtitleProcessor is the subtitle operations preview handlers need.
+type subtitleProcessor interface {
 	NormalizeEncoding(data []byte) []byte
 	ParseSRT(data []byte) ([]subflux.SubtitleCue, error)
 }
@@ -23,8 +23,8 @@ type ArrConfig struct {
 	APIKey string
 }
 
-// StateFunc returns the current arr configuration for poster proxy.
-type StateFunc func() *LiveState
+// stateFunc returns the current arr configuration for poster proxy.
+type stateFunc func() *LiveState
 
 // LiveState holds the runtime state needed by preview handlers.
 type LiveState struct {
@@ -34,9 +34,9 @@ type LiveState struct {
 	HasRadarr    bool
 }
 
-// PosterFetcher performs the poster request. The server implementation owns
+// posterFetcher performs the poster request. The server implementation owns
 // the private-arr to public-CDN trust-boundary transition.
-type PosterFetcher interface {
+type posterFetcher interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
@@ -44,13 +44,12 @@ type PosterFetcher interface {
 // the S7 typed-reference resolver: preview endpoints accept FileRef /
 // MediaRef parameters and never a client-supplied path.
 type Deps struct {
-	SubtitleProc SubtitleProcessor
+	SubtitleProc subtitleProcessor
 	FFmpegSem    *semaphore.Weighted
-	PosterClient PosterFetcher
-	StateFunc    StateFunc
+	PosterClient posterFetcher
+	StateFunc    stateFunc
 	Resolve      *resolve.Resolver
 	ReadBounded  func(ctx context.Context, path string, maxBytes int64) ([]byte, error)
-	ServerCtx    func() context.Context
 }
 
 // Handler provides HTTP handlers for /api/preview/* endpoints.

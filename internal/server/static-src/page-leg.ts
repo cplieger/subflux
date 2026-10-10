@@ -38,7 +38,7 @@ import type { Subject } from "@cplieger/sse";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
  *  a route leave superseded it and the results were discarded. */
-export type PageLegResult = "applied" | "superseded";
+type PageLegResult = "applied" | "superseded";
 
 // Route key → newest generation. A landing run applies only while its
 // generation is still the newest for its route.
@@ -283,7 +283,7 @@ setDetailRefresher((root) => {
 
 /** How the transaction's page leg landed: this dispatch applied, or a newer
  *  same-route dispatch superseded it (whose own landing satisfies the leg). */
-export type TransactionLegOutcome = "applied" | "superseded";
+type TransactionLegOutcome = "applied" | "superseded";
 
 /** Dispatch the transaction's page leg. Differences from the plain
  *  dispatcher: the library arm is empty (the transaction's collection leg

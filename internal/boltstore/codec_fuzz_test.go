@@ -21,11 +21,11 @@ func sampleRecords() []any {
 			Language: "fr", Variant: subflux.VariantStandard,
 			Provider:    subflux.ProviderNameOpenSubtitles,
 			ReleaseName: "Show.S01E01.1080p.WEB-DL", Path: "/media/tv/Show/Show.S01E01.fr.srt",
-			Title: "Show", ImdbID: "tt0903747", ReleaseTag: "WEB-DL",
+			Title: "Show", ImdbID: "tt0903747",
 			Score: 92, Season: 1, Episode: 1, Manual: true,
 			VideoPath: "/media/tv/Show/Show.S01E01.mkv", MediaImported: base,
 		},
-		&fileRec{Codec: "subrip", UpdatedAt: base},
+		&fileRec{Codec: "subrip"},
 		&scanRec{Title: "Inception", AudioLang: "en", Season: 0, Episode: 0, ScannedAt: base},
 	}
 }
