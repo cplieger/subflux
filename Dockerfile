@@ -202,7 +202,7 @@ ARG CPLIEGER_FETCH_VERSION=2.2.2
 # renovate: datasource=npm depName=@cplieger/keyenc
 ARG CPLIEGER_KEYENC_VERSION=1.1.0-dev.1
 # renovate: datasource=npm depName=@cplieger/sse
-ARG CPLIEGER_SSE_VERSION=1.1.1
+ARG CPLIEGER_SSE_VERSION=1.2.0
 
 # Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
 # client compiles from the ARG-pinned npm tarballs below, while
