@@ -34,8 +34,8 @@ github.com/cplieger/ssrf/v4 v4.3.0-dev.1 h1:NUQyRnKsSrFk/jep5pdpOgFMaMN0CvwsuMFr
 github.com/cplieger/ssrf/v4 v4.3.0-dev.1/go.mod h1:zg7m/ya8SdAko8XjpxYY4hCOfuGJEmJSGjdEOCy3qHE=
 github.com/cplieger/webhttp/v3 v3.0.2 h1:4eAHYipBy/4tdGUM0S9shdvjkX97Lw2bhulJ3z94cZE=
 github.com/cplieger/webhttp/v3 v3.0.2/go.mod h1:pl50N8nFHBn/2Le+YTpXgSRdmtkS9dt26LRXl/X9uZc=
-github.com/cplieger/wiregen/v3 v3.3.0-dev.1 h1:naNItdQe4kWYrUogyTa6E8+Lc50nnGf981OZejnn90w=
-github.com/cplieger/wiregen/v3 v3.3.0-dev.1/go.mod h1:0KOdpwdCfLtoEAJfrvqZzfXG+xkC6CNPkTM8KGa5fMY=
+github.com/cplieger/wiregen/v3 v3.3.0-dev.2 h1:l9vrvXlaYjFj+81Vqmh3nHNrIfSsM4U0JfqZFKZPmn8=
+github.com/cplieger/wiregen/v3 v3.3.0-dev.2/go.mod h1:nkwt4FuC47/ZmDpuSRdkLTCm2VTZz6tmS56LkJ713y0=
 github.com/cplieger/xmlx v1.0.6 h1:oKsCEocYbKcWM/4+j+l+QlPv4Myvqj+HQ3X+j5naDns=
 github.com/cplieger/xmlx v1.0.6/go.mod h1:xEEyT298GrLxVQlpzActoEDfOQW0lwBuedrjXBc4cw4=
 github.com/evanw/esbuild v0.28.2 h1:A2uETn4jrQTcXaT/shwTDTYBxDjl7fV7nXmUrJxfA2w=
