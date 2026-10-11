@@ -16,10 +16,10 @@ github.com/cplieger/httpx/v5 v5.0.5 h1:A2h/B2WJfjdGsY+r/jTID3Y86vY7Dfyg1DV+p77il
 github.com/cplieger/httpx/v5 v5.0.5/go.mod h1:+oL1fPTCSNuzy7HZEC2eCSirL+D3fh/AblvN/nQPSt0=
 github.com/cplieger/jsonx/v2 v2.0.3 h1:YNHr4Roerfz9OBsURGBu8zjSE8NEJ2C+9itWIvnMA/Q=
 github.com/cplieger/jsonx/v2 v2.0.3/go.mod h1:AC0rhkItbc/mhWmiVaONr/Av6p1wjgqgOYbEn8AAqK4=
-github.com/cplieger/keyenc v1.0.11 h1:dt8+sEoBlQ1+mvID0NCr//RIhfqQM8mhcAg15kCrNeU=
-github.com/cplieger/keyenc v1.0.11/go.mod h1:Lg79aUqLICnRRroo2EDqZKoUTY24g7UcOdgMA8T2j2w=
-github.com/cplieger/langtag/v2 v2.0.5 h1:P0HkdKxFFJjwP+cQodwTc4iL+jE8emQzMJI5OZVsvrA=
-github.com/cplieger/langtag/v2 v2.0.5/go.mod h1:luyH0VSPShxtVR2WTgCok50fwXEHnzRlfF5IwqBYdho=
+github.com/cplieger/keyenc v1.1.0-dev.1 h1:RFFC6oeqHMAoBgfg/rvx3zjM90+a1Tg5ZeitWom4dTg=
+github.com/cplieger/keyenc v1.1.0-dev.1/go.mod h1:Lg79aUqLICnRRroo2EDqZKoUTY24g7UcOdgMA8T2j2w=
+github.com/cplieger/langtag/v2 v2.1.0-dev.1 h1:/1qoaCBkCWL3QeJ8Pybsa0Xed9FXdTD0fbMWt0vkfAA=
+github.com/cplieger/langtag/v2 v2.1.0-dev.1/go.mod h1:luyH0VSPShxtVR2WTgCok50fwXEHnzRlfF5IwqBYdho=
 github.com/cplieger/metrics/v4 v4.2.1 h1:u74oVTFEHO5ZzmpM/RsK14Ys8dKvZzhjl23gFIdxIsk=
 github.com/cplieger/metrics/v4 v4.2.1/go.mod h1:4sWjiJsxLhGyFLFZ0Y4/yRpzfZDss/4V6xTjb5X/pUY=
 github.com/cplieger/pathinside/v2 v2.0.3 h1:g7V1tj/OHvHIaB0W2rwS3HvoaK2Mv5sZWf++tbz9+Fk=
@@ -60,8 +60,8 @@ github.com/google/go-tpm-tools v0.3.13-0.20230620182252-4639ecce2aba h1:qJEJcuLz
 github.com/google/go-tpm-tools v0.3.13-0.20230620182252-4639ecce2aba/go.mod h1:EFYHy8/1y2KfgTAsx7Luu7NGhoxtuVHnNo8jE7FikKc=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/nwaples/rardecode/v2 v2.4.3 h1:sWxReIq8OoiZ170pIHMba7VHkkvJSo0pVQEENagQ444=
-github.com/nwaples/rardecode/v2 v2.4.3/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
+github.com/nwaples/rardecode/v2 v2.4.4 h1:6Pke+s1s4qnl1wnJF82C9a/DP4DvGRXZPaU2m9PKFSc=
+github.com/nwaples/rardecode/v2 v2.4.4/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
 github.com/philhofer/fwd v1.2.0 h1:e6DnBTl7vGY+Gz322/ASL4Gyp1FspeMvx1RNDoToZuM=
 github.com/philhofer/fwd v1.2.0/go.mod h1:RqIHx9QI14HlwKwm98g9Re5prTQ6LdeRQn+gXJFxsJM=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
