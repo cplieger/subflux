@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -427,7 +427,7 @@ func TestCheckAPIStatus_cant_find_returns_nil_no_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
+			resp := &apiResponse{Status: false, Error: runesafe.NewUntrusted(tt.errMsg)}
 
 			got, err := (&source{}).checkAPIStatus(resp, "Test Movie")
 			if err != nil {
@@ -453,7 +453,7 @@ func TestCheckAPIStatus_other_error_returns_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
+			resp := &apiResponse{Status: false, Error: runesafe.NewUntrusted(tt.errMsg)}
 
 			got, err := (&source{}).checkAPIStatus(resp, "Test Movie")
 			if err == nil {
@@ -479,7 +479,7 @@ func TestCheckAPIStatus_status_false_empty_error_returns_nil_no_error(t *testing
 
 	// Defensive branch: status=false with no error message is logged as a
 	// warning and treated as no-results rather than an error.
-	resp := &apiResponse{Status: false, Error: ""}
+	resp := &apiResponse{Status: false, Error: runesafe.Untrusted{}}
 
 	got, err := (&source{}).checkAPIStatus(resp, "Test Movie")
 	if err != nil {
@@ -497,7 +497,7 @@ func TestCheckAPIStatus_status_true_overrides_error_field(t *testing.T) {
 	// with warnings/metadata even on success). Items take precedence.
 	resp := &apiResponse{
 		Status:    true,
-		Error:     "non-fatal warning",
+		Error:     runesafe.NewUntrusted("non-fatal warning"),
 		Subtitles: []subtitleItem{{Name: "sub.srt", Language: "EN"}},
 	}
 

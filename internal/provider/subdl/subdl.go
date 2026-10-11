@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"

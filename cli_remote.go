@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/cplieger/envx/v2"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/subflux/internal/apipaths"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/subflux"

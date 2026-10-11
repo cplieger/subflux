@@ -281,13 +281,9 @@ store.subscribe("currentPage", (page) => {
  *  `anyFilterActive` does not know about makes `runReload` record a FILTERED
  *  read as the whole dataset. */
 interface HistoryFilters {
-  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly type: string;
-  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly lang: string;
-  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly provider: string;
-  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly search: string;
 }
 
@@ -785,6 +781,7 @@ on(BusEvent.LoadHistory, () => {
 
 /** Test-only: clear the collection, the ledger, the serializer state, and
  *  the generation counters. */
+// deadset:ignore DS1004 -- test seam: the history collection, ledger, serializer and generation counters.
 export function _resetHistoryForTest(): void {
   history.clear();
   settlements.clear();

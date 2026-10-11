@@ -155,6 +155,7 @@ export async function attachSyncJob(ref: FileRefArgs): Promise<SyncAttachState> 
 }
 
 /** Test-only: reset every piece of module state. */
+// deadset:ignore DS1004 -- test seam: the job watchers and settled set.
 export function _resetSyncJobsForTest(): void {
   watchers.clear();
   settled.clear();

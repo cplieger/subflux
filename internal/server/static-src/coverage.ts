@@ -69,6 +69,7 @@ const filteredItems = computed(() => {
 
 /** Recomputes of the filtered+sorted view since module load — a CACHED read is
  *  not one. _resetCoverageForTest() zeroes it. */
+// deadset:ignore DS1004 -- test seam: the filtered view's recompute count.
 export function _coverageDerivesForTest(): number {
   return derives;
 }
@@ -155,6 +156,7 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
 
 /** Test-only: clear the row store and abort the in-flight pair fetch — the
  *  two halves of a fresh tab, one call so no suite can reset only one. */
+// deadset:ignore DS1004 -- test seam: the row store, the in-flight pair fetch and the mounted library view.
 export function _resetCoverageForTest(): void {
   _resetCoverageStoreForTest();
   coverageAbort?.abort();

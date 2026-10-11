@@ -30,7 +30,7 @@ import (
 	"slices"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 )
 
 // maxFieldBytes bounds one sanitized attribute.

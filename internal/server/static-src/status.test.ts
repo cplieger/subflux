@@ -75,18 +75,21 @@ vi.mock("./wire/client.gen.js", () => ({
 // opens the panel the way a click does (the harness boots it closed); plain
 // functions keep it reset-proof. onOpen is never fired, so the skeleton
 // anti-flicker path stays disarmed and paints are synchronous.
-const popover = vi.hoisted(() => ({ isOpen: false }));
+const popover = vi.hoisted(() => ({ isOpen: false, panel: null as HTMLElement | null }));
 
 vi.mock("./popover-menu.js", () => ({
-  createMenuPopover: () => ({
-    toggle: () => undefined,
-    hide: () => undefined,
-    get isOpen(): boolean {
-      return popover.isOpen;
-    },
-    reposition: () => undefined,
-    dispose: () => undefined,
-  }),
+  createMenuPopover: (_anchor: HTMLElement, panel: HTMLElement) => {
+    popover.panel = panel;
+    return {
+      toggle: () => undefined,
+      hide: () => undefined,
+      get isOpen(): boolean {
+        return popover.isOpen;
+      },
+      reposition: () => undefined,
+      dispose: () => undefined,
+    };
+  },
 }));
 
 import * as store from "./store.js";
@@ -94,7 +97,6 @@ import {
   buildActivityItem,
   streamDegraded,
   initStatusPopover as staticInitStatusPopover,
-  _statusPanelForTest as staticStatusPanel,
   type StreamTransition,
 } from "./status.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
@@ -237,6 +239,13 @@ describe("status: buildActivityItem terminal renders", () => {
   });
 });
 
+function capturedPanel(): HTMLElement {
+  if (popover.panel === null) {
+    throw new Error("status panel not captured");
+  }
+  return popover.panel;
+}
+
 describe("status: stop control", () => {
   beforeEach(() => {
     // requestStopScan overlays the row inside the module's own panel, which is
@@ -272,7 +281,7 @@ describe("status: stop control", () => {
   it("clicking stop dispatches the cancel action and enters the optimistic stopping state", async () => {
     const e = entry({ id: "s1", cancellable: true, kind: "movie", media_id: 7 });
     const item = buildActivityItem(e);
-    staticStatusPanel().appendChild(item);
+    capturedPanel().appendChild(item);
 
     const btn = item.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]');
     expect(btn).not.toBeNull();
@@ -295,7 +304,7 @@ describe("status: stop control", () => {
     dispatchers.get("activity.cancel")?.mockResolvedValue(null);
     const e = entry({ id: "s2", cancellable: true, kind: "series", media_id: 9 });
     const item = buildActivityItem(e);
-    staticStatusPanel().appendChild(item);
+    capturedPanel().appendChild(item);
 
     item.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')?.click();
     await flush();
@@ -470,6 +479,7 @@ let bootCount = 0;
 async function freshPollHarness(): Promise<PollHarness> {
   vi.resetModules();
   popover.isOpen = false;
+  popover.panel = null;
   document.body.innerHTML =
     '<button id="statusBtn"><span class="nav-label"></span></button>' +
     '<span id="statusIcon"></span>';
@@ -481,7 +491,7 @@ async function freshPollHarness(): Promise<PollHarness> {
     /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
   )) as typeof StatusModule;
   status.initStatusPopover();
-  statusPanel = status._statusPanelForTest();
+  statusPanel = capturedPanel();
   const run = actionRuns.get("status.poll");
   if (!run) {
     throw new Error("status.poll run not captured");
