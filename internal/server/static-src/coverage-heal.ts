@@ -304,6 +304,7 @@ export function resetCoverageHeal(): void {
 }
 
 /** Test-only: abort/clear all coalescer state, callbacks included. */
+// deadset:ignore DS1004 -- test seam: the heal coalescer's dirty set, callbacks and in-flight heal.
 export function _resetHealForTest(): void {
   healResetCallbacks.clear();
   resetCoverageHeal();

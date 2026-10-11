@@ -89,10 +89,6 @@ function panel(): HTMLElement {
   return statusPanel;
 }
 
-export function _statusPanelForTest(): HTMLElement {
-  return panel();
-}
-
 // First-open anti-flicker controller: showDelay 0 (an empty popup at
 // min-height is worse than an instant skeleton) + 300ms min-visible.
 // deferredPaint holds the newest paint while a min-visible commit is

@@ -542,6 +542,7 @@ async function collectionLeg(signal: AbortSignal): Promise<boolean> {
 // --- Test seam ---
 
 /** Tear the connection down and reset EVERY piece of module state. */
+// deadset:ignore DS1004 -- test seam: the connection, the open transaction and the heal state.
 export function _resetEventsForTest(): void {
   disconnect();
   restartedFor = null;
@@ -551,6 +552,7 @@ export function _resetEventsForTest(): void {
 }
 
 /** Test-only accessor for the connection state and the epoch bookkeeping. */
+// deadset:ignore DS1004 -- test seam: the connection state and the known epoch.
 export function _stateForTest(): {
   mode: "worker" | "fallback" | null;
   stream: ClientState | null;
