@@ -11,8 +11,8 @@ require (
 	github.com/cplieger/health v1.8.2
 	github.com/cplieger/httpx/v5 v5.0.5
 	github.com/cplieger/jsonx/v2 v2.0.3
-	github.com/cplieger/keyenc v1.0.11
-	github.com/cplieger/langtag/v2 v2.0.5
+	github.com/cplieger/keyenc v1.1.0-dev.1
+	github.com/cplieger/langtag/v2 v2.1.0-dev.1
 	github.com/cplieger/metrics/v4 v4.1.0
 	github.com/cplieger/pathinside/v2 v2.0.3
 	github.com/cplieger/runesafe/v2 v2.1.1
