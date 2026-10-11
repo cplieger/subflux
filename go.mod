@@ -5,22 +5,22 @@ go 1.27.2
 require (
 	github.com/cplieger/arrapi/v2 v2.2.3
 	github.com/cplieger/atomicfile/v4 v4.1.0
-	github.com/cplieger/auth/v6 v6.2.0-dev.3
+	github.com/cplieger/auth/v6 v6.2.0
 	github.com/cplieger/envx/v2 v2.0.7
 	github.com/cplieger/envx/yamlenv/v2 v2.0.3
 	github.com/cplieger/health v1.8.2
 	github.com/cplieger/httpx/v5 v5.0.5
 	github.com/cplieger/jsonx/v2 v2.0.3
-	github.com/cplieger/keyenc v1.1.0-dev.1
-	github.com/cplieger/langtag/v2 v2.1.0-dev.1
+	github.com/cplieger/keyenc v1.0.11
+	github.com/cplieger/langtag/v2 v2.0.5
 	github.com/cplieger/metrics/v4 v4.1.0
 	github.com/cplieger/pathinside/v2 v2.0.3
 	github.com/cplieger/runesafe/v2 v2.1.1
 	github.com/cplieger/slogx v1.6.7
 	github.com/cplieger/sse v1.2.0
-	github.com/cplieger/ssrf/v4 v4.3.0-dev.2
+	github.com/cplieger/ssrf/v4 v4.3.0
 	github.com/cplieger/webhttp/v3 v3.0.2
-	github.com/cplieger/wiregen/v3 v3.3.0-dev.2
+	github.com/cplieger/wiregen/v3 v3.3.0
 	github.com/cplieger/xmlx v1.0.6
 	github.com/evanw/esbuild v0.28.2
 	github.com/nwaples/rardecode/v2 v2.4.2
