@@ -23,7 +23,7 @@ require (
 	github.com/cplieger/wiregen/v3 v3.3.0
 	github.com/cplieger/xmlx v1.0.6
 	github.com/evanw/esbuild v0.28.2
-	github.com/nwaples/rardecode/v2 v2.4.2
+	github.com/nwaples/rardecode/v2 v2.4.3
 	github.com/ulikunitz/xz v0.5.17
 	go.etcd.io/bbolt v1.5.0
 	go.yaml.in/yaml/v3 v3.0.5
