@@ -27,7 +27,7 @@ internal/server/static/vendor/
 
 internal/cache/testdata/rapid/
 
-# Kiro skill artifacts (app-review, judgement, steering-maintenance)
+# Local agent state
 **/.app-review/
 **/.judgement/
 **/.steering-maintenance/
