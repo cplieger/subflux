@@ -15,7 +15,7 @@ require (
 	github.com/cplieger/langtag/v2 v2.0.5
 	github.com/cplieger/metrics/v4 v4.1.0
 	github.com/cplieger/pathinside/v2 v2.0.3
-	github.com/cplieger/runesafe/v2 v2.1.1
+	github.com/cplieger/runesafe/v3 v3.0.0
 	github.com/cplieger/slogx v1.6.7
 	github.com/cplieger/sse v1.2.0
 	github.com/cplieger/ssrf/v4 v4.3.0
@@ -35,7 +35,7 @@ require (
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
-	github.com/cplieger/runesafe/v3 v3.0.0 // indirect
+	github.com/cplieger/runesafe/v2 v2.1.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.6 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
