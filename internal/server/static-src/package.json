@@ -33,12 +33,12 @@
     "vitest": "5.0.3"
   },
   "dependencies": {
-    "@cplieger/actions": "3.2.0-dev.2",
+    "@cplieger/actions": "3.2.0",
     "@cplieger/fetch": "2.2.2",
-    "@cplieger/keyenc": "1.1.0-dev.1",
+    "@cplieger/keyenc": "1.0.11",
     "@cplieger/reactive": "2.2.0",
     "@cplieger/sse": "1.2.0",
-    "@cplieger/ui-primitives": "3.2.0-dev.2"
+    "@cplieger/ui-primitives": "3.2.0"
   },
   "overrides": {
     "qs": "^6.15.2",
