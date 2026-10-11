@@ -3,7 +3,7 @@ module github.com/cplieger/subflux
 go 1.27.2
 
 require (
-	github.com/cplieger/arrapi/v2 v2.3.0-dev.1
+	github.com/cplieger/arrapi/v2 v2.3.0
 	github.com/cplieger/atomicfile/v4 v4.1.0
 	github.com/cplieger/auth/v6 v6.2.0
 	github.com/cplieger/envx/v2 v2.0.7
@@ -13,7 +13,7 @@ require (
 	github.com/cplieger/jsonx/v2 v2.0.3
 	github.com/cplieger/keyenc v1.1.0-dev.1
 	github.com/cplieger/langtag/v2 v2.1.0-dev.1
-	github.com/cplieger/metrics/v4 v4.2.0-dev.1
+	github.com/cplieger/metrics/v4 v4.2.1
 	github.com/cplieger/pathinside/v2 v2.0.3
 	github.com/cplieger/runesafe/v3 v3.0.0
 	github.com/cplieger/slogx v1.6.7
