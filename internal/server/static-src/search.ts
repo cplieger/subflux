@@ -169,6 +169,7 @@ function drainSearchState(): void {
   bootGeneration = 0;
 }
 
+// deadset:ignore DS1004 -- test seam: the in-flight search and tracked downloads.
 export function _resetSearchForTest(): void {
   drainSearchState();
 }

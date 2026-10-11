@@ -310,7 +310,10 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
     /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
   )) as typeof StatusModule;
   status.initStatusPopover();
-  statusPanel = status._statusPanelForTest();
+  if (popover.panel === null) {
+    throw new Error("status panel not captured");
+  }
+  statusPanel = popover.panel;
 
   const run = actions.runs.get("status.poll");
   if (!run) {

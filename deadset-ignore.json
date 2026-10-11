@@ -1,0 +1,17 @@
+{
+  "description": "Adjudications for subflux that an inline directive cannot carry.",
+  "ignore": [
+    {
+      "code": "DS1601",
+      "symbol": "ts://subflux-web/package.json#stylelint:dev-dependency",
+      "path": "internal/server/static-src/package.json",
+      "reason": "The CI web-lint step runs npx stylelint over the tracked CSS in internal/server/static-src."
+    },
+    {
+      "code": "DS1601",
+      "symbol": "ts://subflux-web/package.json#stylelint-config-standard:dev-dependency",
+      "path": "internal/server/static-src/package.json",
+      "reason": "The root .stylelintrc.json extends it, and the CI web-lint step resolves it from internal/server/static-src."
+    }
+  ]
+}
