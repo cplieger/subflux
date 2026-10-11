@@ -72,7 +72,7 @@ func TestCheckCredentials(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{
+			p := &source{
 				token: "tok",
 				client: &http.Client{Transport: bodyRoundTripper{
 					status: tt.status, body: tt.body, err: tt.transportErr,
@@ -99,7 +99,7 @@ func TestCheckCredentials(t *testing.T) {
 func TestCheckCredentials_asks_the_status_route(t *testing.T) {
 	t.Parallel()
 	var gotURL, gotKey string
-	p := &Provider{
+	p := &source{
 		token: "tok",
 		client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			gotURL = r.URL.String()

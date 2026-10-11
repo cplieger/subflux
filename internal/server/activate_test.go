@@ -789,7 +789,7 @@ func TestActivationMode_String(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.want, func(t *testing.T) {
 			t.Parallel()
-			if got := tc.mode.String(); got != tc.want {
+			if got := tc.mode.label(); got != tc.want {
 				t.Errorf("activationMode(%d).String() = %q, want %q", tc.mode, got, tc.want)
 			}
 		})

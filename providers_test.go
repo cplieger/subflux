@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -142,19 +143,25 @@ func TestSecretKeysCoverProviderSchemas(t *testing.T) {
 	t.Parallel()
 
 	r := newProviderRegistry()
-	knownKeys := make(map[string]bool)
-	for _, k := range confighandlers.SecretKeyNames() {
-		knownKeys[k] = true
-	}
-
+	const value = "do-not-leak-1234"
 	for _, name := range r.ProviderNames() {
 		_, fields := r.Schema(name)
 		for _, f := range fields {
-			if f.Secret && !knownKeys[f.Key] {
-				t.Errorf("provider %q has Secret field %q not in secretKeyNames; "+
-					"add it to secretKeyNames in confighandlers/secrets.go and "+
-					"secretKeyRe to prevent credential leakage via GET /api/config",
-					name, f.Key)
+			if !f.Secret {
+				continue
+			}
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			doc := "providers:\n  " + string(name) + ":\n    " + f.Key + ": " + value + "\n"
+			if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			h := confighandlers.New(&confighandlers.Deps{ConfigPath: func() string { return path }})
+			w := httptest.NewRecorder()
+			h.HandleGetConfig(w, httptest.NewRequest(http.MethodGet, "/api/config", http.NoBody))
+			if w.Code != http.StatusOK || strings.Contains(w.Body.String(), value) {
+				t.Errorf("provider %q Secret field %q: GET /api/config answered %d with the value unredacted; "+
+					"add the key to secretKeyNames in internal/server/confighandlers/secrets.go",
+					name, f.Key, w.Code)
 			}
 		}
 	}

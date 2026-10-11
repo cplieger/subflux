@@ -106,7 +106,7 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	// archive a provider returned as-is when zip extraction failed (e.g.
 	// RAR files from HDBits).
 	if err := subtitlefile.Validate(data); err != nil {
-		return "", fmt.Errorf("%w: %s: %w", ErrInvalidContent,
+		return "", fmt.Errorf("%w: %s: %w", errInvalidContent,
 			best.sub.Provider, err)
 	}
 
@@ -171,12 +171,11 @@ func (e *Engine) persistDownload(ctx context.Context, req *subflux.SearchRequest
 		Path:         subPath,
 		Score:        best.score,
 		Meta: &subflux.DownloadMeta{
-			Title:      req.Title,
-			ImdbID:     req.ImdbID,
-			Season:     req.Season,
-			Episode:    req.Episode,
-			ReleaseTag: req.ReleaseName,
-			VideoPath:  videoPath,
+			Title:     req.Title,
+			ImdbID:    req.ImdbID,
+			Season:    req.Season,
+			Episode:   req.Episode,
+			VideoPath: videoPath,
 		},
 	}); err != nil {
 		slog.Warn("failed to record success", "error", err)

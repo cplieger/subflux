@@ -30,21 +30,21 @@ var (
 	bomUTF16LE = []byte{0xFF, 0xFE}
 )
 
-// Encoding is what detection could positively conclude about a subtitle's bytes.
-type Encoding int
+// encoding is what detection could positively conclude about a subtitle's bytes.
+type encoding int
 
-// The encodings detection can name. Unknown means nothing identified the bytes
+// The encodings detection can name. encUnknown means nothing identified the bytes
 // and only the Windows-1252 catch-all would apply, which is a fallback rather
 // than a finding: that decoder maps every possible byte to some rune, so it
 // turns arbitrary binary into text-shaped output.
 const (
-	Unknown Encoding = iota
-	UTF8
-	UTF16LE
-	UTF16BE
+	encUnknown encoding = iota
+	encUTF8
+	encUTF16LE
+	encUTF16BE
 )
 
-// Detect reports the encoding it can positively identify, from a byte-order mark
+// detect reports the encoding it can positively identify, from a byte-order mark
 // or from the NUL-interleaving pattern of ASCII-dominant UTF-16.
 //
 // The pattern check must run before the utf8.Valid test, because NUL-interleaved
@@ -57,26 +57,26 @@ const (
 // produce something, so it ends at Windows-1252 and at NUL stripping. A caller
 // deciding whether bytes are TEXT must not lean on either, because both accept
 // anything, so it asks this instead.
-func Detect(data []byte) Encoding {
+func detect(data []byte) encoding {
 	if bytes.HasPrefix(data, bomUTF16BE) {
-		return UTF16BE
+		return encUTF16BE
 	}
 	if bytes.HasPrefix(data, bomUTF16LE) {
-		return UTF16LE
+		return encUTF16LE
 	}
 	body := bytes.TrimPrefix(data, bomUTF8)
 	if len(body) >= 4 {
 		if body[0] == 0 && body[1] != 0 && body[2] == 0 && body[3] != 0 {
-			return UTF16BE
+			return encUTF16BE
 		}
 		if body[0] != 0 && body[1] == 0 && body[2] != 0 && body[3] == 0 {
-			return UTF16LE
+			return encUTF16LE
 		}
 	}
 	if utf8.Valid(body) {
-		return UTF8
+		return encUTF8
 	}
-	return Unknown
+	return encUnknown
 }
 
 // TextView returns the bytes a text probe should judge, decoding first only when
@@ -92,10 +92,10 @@ func Detect(data []byte) Encoding {
 // The result is a view. It is never the bytes anyone persists; see the package
 // comment.
 func TextView(data []byte) []byte {
-	switch Detect(data) {
-	case UTF16LE, UTF16BE:
+	switch detect(data) {
+	case encUTF16LE, encUTF16BE:
 		return Normalize(data)
-	case Unknown, UTF8:
+	case encUnknown, encUTF8:
 		return data
 	}
 	return data
@@ -162,31 +162,31 @@ func stripNUL(b []byte) []byte {
 // decodeToUTF8 converts data to UTF-8 by detecting its encoding. The
 // leading-UTF-8-BOM strip is applied by Normalize on the result.
 //
-// The detection is Detect's, never a second copy of it: two detections that can
+// The detection is detect's, never a second copy of it: two detections that can
 // drift apart is precisely how a gate ends up refusing bytes the converter
-// would have read. What this adds is the fallback Detect withholds, because
+// would have read. What this adds is the fallback detect withholds, because
 // Normalize must always produce something while a text verdict must not rest on
 // a decoder that accepts every byte.
 func decodeToUTF8(data []byte) []byte {
 	body := bytes.TrimPrefix(data, bomUTF8)
-	switch Detect(data) {
-	case UTF16BE:
+	switch detect(data) {
+	case encUTF16BE:
 		// A BOM is consumed here; a stream identified by the NUL pattern has
 		// none, and TrimPrefix then leaves it whole.
 		return decodeUTF16BE(bytes.TrimPrefix(body, bomUTF16BE))
-	case UTF16LE:
+	case encUTF16LE:
 		return decodeUTF16LE(bytes.TrimPrefix(body, bomUTF16LE))
-	case UTF8:
+	case encUTF8:
 		// Valid UTF-8 with any BOM off the front. Stripping it here is what
 		// keeps a UTF-8 BOM followed by non-UTF-8 bytes from surviving as
 		// invalid bytes a second pass re-reads as Windows-1252, which would
 		// break idempotency.
 		return body
-	case Unknown:
+	case encUnknown:
 		return decodeWindows1252(body)
 	}
 
-	// Unreachable: Detect returns one of the four above.
+	// Unreachable: detect returns one of the four above.
 	return decodeWindows1252(data)
 }
 

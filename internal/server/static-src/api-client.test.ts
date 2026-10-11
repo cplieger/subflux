@@ -174,8 +174,8 @@ describe("clientRequestOK", () => {
 });
 
 describe("typed error envelope", () => {
-  it("exposes code and requestId on 4xx with full envelope", async () => {
-    expect.assertions(4);
+  it("exposes code on 4xx with full envelope", async () => {
+    expect.assertions(3);
     stubFetch(
       JSON.stringify({
         error: "invalid input",
@@ -188,11 +188,10 @@ describe("typed error envelope", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("invalid input");
     expect(r.code).toBe("config_invalid");
-    expect(r.requestId).toBe("req-abc-123");
   });
 
-  it("leaves code and requestId undefined on legacy error without those fields", async () => {
-    expect.assertions(4);
+  it("leaves code undefined on legacy error without that field", async () => {
+    expect.assertions(3);
     stubFetch(JSON.stringify({ error: "something went wrong" }), {
       status: 400,
       headers: JSON_HEADERS,
@@ -201,7 +200,6 @@ describe("typed error envelope", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("something went wrong");
     expect(r.code).toBeUndefined();
-    expect(r.requestId).toBeUndefined();
   });
 
   it("clientRequestRaw exposes the decode error in the envelope", async () => {
@@ -241,7 +239,7 @@ describe("fillPath", () => {
 // thing that proves the dispatch. A fresh Response per call because a Response
 // body can only be read once.
 function captureFetch(body: BodyInit | null = "{}", init: ResponseInit = { status: 200 }) {
-  const mock = vi.fn((_url: string, _init?: RequestInit) =>
+  const mock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(() =>
     Promise.resolve(new Response(body, init)),
   );
   vi.stubGlobal("fetch", mock);

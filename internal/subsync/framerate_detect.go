@@ -62,7 +62,7 @@ var defaultFramerateConfig = framerateConfig{
 // 3. Try known framerate ratios first (fast, high confidence)
 // 4. Fall back to golden-section search if no known ratio matches
 func correctFramerate(ctx context.Context, reference, incorrect []Cue, videoPath string) SyncResult {
-	noResult := SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate, Source: SourceFramerate}
+	noResult := SyncResult{Rate: 1.0, Confidence: confidenceNone, Method: methodFramerate, Source: SourceFramerate}
 
 	if len(reference) < defaultFramerateConfig.MinCues || len(incorrect) < defaultFramerateConfig.MinCues {
 		return noResult
@@ -202,9 +202,9 @@ func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2,
 
 	corrected := bestCues
 
-	maxConf := float64(DefaultConfidenceCaps.FramerateKnown)
+	maxConf := float64(defaultConfidenceCaps.FramerateKnown)
 	if videoFPS > 0 {
-		maxConf = float64(DefaultConfidenceCaps.FramerateFPS)
+		maxConf = float64(defaultConfidenceCaps.FramerateFPS)
 	}
 	confidence := Confidence(min(r2, maxConf))
 
@@ -221,9 +221,9 @@ func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2,
 		Cues:       corrected,
 		Rate:       bestPair.Ratio,
 		Confidence: confidence,
-		Method:     MethodFramerate,
+		Method:     methodFramerate,
 		Source:     SourceFramerate,
-		Transform:  Transform{Kind: TransformFramerate, Ratio: bestPair.Ratio},
+		Transform:  transform{Kind: transformFramerate, Ratio: bestPair.Ratio},
 	}, true
 }
 
@@ -259,7 +259,7 @@ func collectRatioCandidates(observed, videoFPS float64) []*framerate.RatioPair {
 // returns ctx.Err(), so the caller can tell "we were told to stop" from "we
 // looked and found nothing" — without the error result the two are the same
 // answer, and a cancelled scan would be reported as a clean no-match.
-func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, incorrect []Cue, refSpans []TimeSpan) (*framerate.RatioPair, []Cue, error) {
+func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, incorrect []Cue, refSpans []timeSpan) (*framerate.RatioPair, []Cue, error) {
 	var bestPair *framerate.RatioPair
 	var bestCues []Cue
 	bestScore := math.Inf(-1)

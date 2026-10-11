@@ -10,37 +10,37 @@ import (
 // trail from ordinary operational logs. slog rather than a DB table: a
 // self-hosted deployment already has Loki for container logs.
 
-// AuditEventKind is the fixed attribute value used to mark auth audit
+// auditEventKind is the fixed attribute value used to mark auth audit
 // records. Filter on `event_kind="auth"` in log queries.
-const AuditEventKind = "auth"
+const auditEventKind = "auth"
 
-// AuditEvent enumerates the security-relevant events captured in the
+// auditEvent enumerates the security-relevant events captured in the
 // audit trail. Add new events here when introducing new auth flows.
-type AuditEvent string
+type auditEvent string
 
-// AuditEvent constants enumerate the security-relevant events captured in the audit trail.
+// auditEvent constants enumerate the security-relevant events captured in the audit trail.
 const (
-	AuditLoginSuccess     AuditEvent = "login.success"
-	AuditLoginFailure     AuditEvent = "login.failure"
-	AuditLoginRateLimited AuditEvent = "login.rate_limited"
-	AuditLogout           AuditEvent = "logout"
-	AuditPasswordChange   AuditEvent = "password.change"
-	AuditProfileUpdate    AuditEvent = "profile.update"
-	AuditPasskeyAdd       AuditEvent = "passkey.add"
-	AuditPasskeyDelete    AuditEvent = "passkey.delete"
-	AuditPasskeyRename    AuditEvent = "passkey.rename"
-	AuditAPIKeyCreate     AuditEvent = "apikey.create"
-	AuditAPIKeyRevoke     AuditEvent = "apikey.revoke"
-	AuditOIDCCallback     AuditEvent = "oidc.callback"
+	auditLoginSuccess     auditEvent = "login.success"
+	auditLoginFailure     auditEvent = "login.failure"
+	auditLoginRateLimited auditEvent = "login.rate_limited"
+	auditLogout           auditEvent = "logout"
+	auditPasswordChange   auditEvent = "password.change"
+	auditProfileUpdate    auditEvent = "profile.update"
+	auditPasskeyAdd       auditEvent = "passkey.add"
+	auditPasskeyDelete    auditEvent = "passkey.delete"
+	auditPasskeyRename    auditEvent = "passkey.rename"
+	auditAPIKeyCreate     auditEvent = "apikey.create"
+	auditAPIKeyRevoke     auditEvent = "apikey.revoke"
+	auditOIDCCallback     auditEvent = "oidc.callback"
 )
 
-// Audit emits a structured auth audit record at the specified slog level.
+// audit emits a structured auth audit record at the specified slog level.
 // Failures should emit at WARN; successes at INFO. `user` is the username
 // when known; pass "" for failures on unknown usernames.
-func Audit(r *http.Request, level slog.Level, event AuditEvent, success bool, user string, kvs ...any) {
+func audit(r *http.Request, level slog.Level, event auditEvent, success bool, user string, kvs ...any) {
 	attrs := make([]any, 0, 6+len(kvs))
 	attrs = append(attrs,
-		slog.String("event_kind", AuditEventKind),
+		slog.String("event_kind", auditEventKind),
 		slog.String("event", string(event)),
 		slog.Bool("success", success),
 		slog.String("user", user),

@@ -271,7 +271,7 @@ func TestBuildSearchParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{
+			p := &source{
 				useHash:   tt.useHash,
 				includeAI: tt.includeAI,
 				includeMT: tt.includeMT,
@@ -392,7 +392,7 @@ func TestBuildQueryParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{includeAI: tt.includeAI, includeMT: tt.includeMT}
+			p := &source{includeAI: tt.includeAI, includeMT: tt.includeMT}
 			season := tt.season
 			if season == 0 && tt.req.Season > 0 {
 				season = tt.req.Season
@@ -460,7 +460,7 @@ func TestBuildSearchParams_skips_empty_sanitized_imdb(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{}
+			p := &source{}
 			req := &subflux.SearchRequest{
 				ImdbID:    tt.imdb,
 				MediaType: subflux.MediaType(tt.mediaType),
@@ -477,7 +477,7 @@ func TestBuildSearchParams_skips_empty_sanitized_imdb(t *testing.T) {
 
 func TestBuildSearchParams_episode_with_valid_imdb_sets_parent(t *testing.T) {
 	t.Parallel()
-	p := &Provider{}
+	p := &source{}
 	req := &subflux.SearchRequest{
 		ImdbID:    "tt1234567",
 		MediaType: "episode",

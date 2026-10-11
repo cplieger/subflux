@@ -23,11 +23,11 @@ type stubProvider struct {
 
 func (p *stubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *stubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*stubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *stubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*stubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

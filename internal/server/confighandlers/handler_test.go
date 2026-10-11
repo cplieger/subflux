@@ -36,7 +36,7 @@ func TestHandleSaveConfig_response_redacts_expanded_secret(t *testing.T) {
 		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
-		// Nonexistent path: a true empty baseline, MergeSecrets leaves the body as-is.
+		// Nonexistent path: a true empty baseline, mergeSecrets leaves the body as-is.
 		ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
 	})
 
@@ -682,11 +682,11 @@ type schemaStubProvider struct {
 
 func (p *schemaStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (*schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
+func (*schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

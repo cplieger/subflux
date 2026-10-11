@@ -38,9 +38,9 @@ type Store interface {
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 
-// Presence decides which files reconcile may treat as gone;
+// presence decides which files reconcile may treat as gone;
 // *mediapresence.Checker satisfies it.
-type Presence interface {
+type presence interface {
 	Gone(ctx context.Context, path string) (bool, error)
 	Unavailable(path string) (root string, unavailable bool)
 }
@@ -80,7 +80,7 @@ type Deps struct {
 	Stops               *activity.StopRegistry
 	ShowSkipCache       *showskip.Cache
 	Media               scanning.MediaGuard
-	Presence            Presence
+	Presence            presence
 	StateFunc           func() *LiveState
 	ScanningFlag        *atomic.Bool
 	DeleteSubtitleFiles func(paths []string, source string)

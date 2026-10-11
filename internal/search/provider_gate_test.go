@@ -51,10 +51,10 @@ func (m *gateMetrics) SetProviderDisabled(id subflux.ProviderID, v bool) {
 	m.disabled[id] = v
 	m.mu.Unlock()
 }
-func (m *gateMetrics) DeleteProviderDisabled(subflux.ProviderID)                   {}
-func (m *gateMetrics) IncProviderAuthFailure(subflux.ProviderID)                   {}
-func (m *gateMetrics) IncProviderRateLimited(subflux.ProviderID, providergate.Op)  {}
-func (m *gateMetrics) SetProviderSettingRejected(subflux.ProviderID, string, bool) {}
+func (*gateMetrics) DeleteProviderDisabled(subflux.ProviderID)                   {}
+func (*gateMetrics) IncProviderAuthFailure(subflux.ProviderID)                   {}
+func (*gateMetrics) IncProviderRateLimited(subflux.ProviderID, providergate.Op)  {}
+func (*gateMetrics) SetProviderSettingRejected(subflux.ProviderID, string, bool) {}
 func (m *gateMetrics) isDisabled(id subflux.ProviderID) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -549,7 +549,7 @@ func TestCountShowSubtitles_goes_through_the_gate(t *testing.T) {
 		if e.HasShowCounter() {
 			t.Error("HasShowCounter() = true with no counting provider")
 		}
-		if _, err := e.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{}); !errors.Is(err, ErrProviderNotFound) {
+		if _, err := e.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{}); !errors.Is(err, errProviderNotFound) {
 			t.Errorf("CountShowSubtitles() without a counter = %v, want ErrProviderNotFound", err)
 		}
 	})
@@ -614,7 +614,7 @@ func TestSearchProvidersFiltered_a_provider_waiting_for_a_slot_is_admitted_when_
 
 func TestMergeProviderStatus_combines_both_halves(t *testing.T) {
 	t.Parallel()
-	got := MergeProviderStatus(
+	got := mergeProviderStatus(
 		subflux.ProviderStatus{TimedOut: true, RecentFailures: 5, Threshold: 5, LastError: "HTTP 502"},
 		providergate.Status{Disabled: true, DisabledReason: "refused", AuthFailures: 3, PausedFor: time.Minute, RejectedSettings: []string{"anidb_client_key"}},
 	)

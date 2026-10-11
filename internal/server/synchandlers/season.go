@@ -40,10 +40,10 @@ type SeasonSyncAccepted struct {
 	ActivityID string `json:"activity_id"`
 }
 
-// SeasonSonarr is the Sonarr surface season enumeration reads: the cached
+// seasonSonarr is the Sonarr surface season enumeration reads: the cached
 // series list (series id → tvdb id, title, original language) and the
 // cached episodes-by-series read (task 1's wrapper serves both).
-type SeasonSonarr interface {
+type seasonSonarr interface {
 	Series(ctx context.Context) ([]arrapi.Series, error)
 	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
@@ -59,13 +59,13 @@ type seasonCfg interface {
 // dispatch. Sonarr is nil when not configured.
 type SeasonState struct {
 	Cfg    seasonCfg
-	Sonarr SeasonSonarr
+	Sonarr seasonSonarr
 }
 
-// SeasonFileStore is the subtitle-file inventory the season enumeration
+// seasonFileStore is the subtitle-file inventory the season enumeration
 // reads — the same store read the coverage detail endpoint served the
 // client pool from, so the batch selects from exactly the rows the pool saw.
-type SeasonFileStore interface {
+type seasonFileStore interface {
 	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 

@@ -5,7 +5,9 @@
  *  this module supplies: `id` is the username the credential is keyed by.
  *  https://w3c.github.io/webappsec-credential-management/#passwordcredential */
 interface PasswordCredentialData {
+  // deadset:ignore DS1301 -- The browser's PasswordCredential constructor reads it.
   id: string;
+  // deadset:ignore DS1301 -- The browser's PasswordCredential constructor reads it.
   password: string;
 }
 

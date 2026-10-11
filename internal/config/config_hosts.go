@@ -37,10 +37,9 @@ func parseAllowedHosts(entries []string) (*webhttp.HostPolicy, error) {
 		webhttp.WithHostAllowlistError("host_not_allowed",
 			"host not allowed. Add it to allowed_hosts in the server settings"))
 	if len(invalid) > 0 {
-		return policy, configFieldErr("allowed_hosts",
-			fmt.Sprintf("invalid allowed_hosts entries [%s]: each must be a bare hostname "+
-				"such as subflux.example.com or an IP such as 192.168.1.5 "+
-				"(no scheme, path, or port)", strings.Join(invalid, ", ")))
+		return policy, configFieldErr(fmt.Sprintf("invalid allowed_hosts entries [%s]: each must be a bare hostname "+
+			"such as subflux.example.com or an IP such as 192.168.1.5 "+
+			"(no scheme, path, or port)", strings.Join(invalid, ", ")))
 	}
 	return policy, nil
 }

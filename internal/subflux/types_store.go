@@ -75,13 +75,12 @@ type DownloadRecord struct {
 
 // DownloadMeta holds optional metadata for a subtitle state record.
 type DownloadMeta struct {
-	Title      string
-	ImdbID     string
-	ReleaseTag string
-	VideoPath  string // Path to the video file (for reconciliation and upgrades).
-	Season     int
-	Episode    int
-	Manual     bool // True if user manually selected this subtitle.
+	Title     string
+	ImdbID    string
+	VideoPath string // Path to the video file (for reconciliation and upgrades).
+	Season    int
+	Episode   int
+	Manual    bool // True if user manually selected this subtitle.
 }
 
 // DownloadedRef identifies a previously-downloaded subtitle by its
@@ -180,8 +179,6 @@ func (k PollKey) Valid() bool {
 type EmbeddedTrack struct {
 	Codec           string
 	Lang            string
-	Name            string
-	Index           int
 	Forced          bool
 	HearingImpaired bool
 }

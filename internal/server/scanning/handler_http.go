@@ -45,13 +45,13 @@ func (g *ScanGuard) sem() chan struct{} {
 	return g.token
 }
 
-// Acquire takes the scan slot, blocking until it is free — or gives up when
+// acquire takes the scan slot, blocking until it is free — or gives up when
 // the stop signal fires or ctx (the server context) is cancelled first, in
-// which case the slot is NOT held and the caller must not Release. It
+// which case the slot is NOT held and the caller must not release. It
 // reports whether the slot was acquired. When the slot frees at the same
 // instant a signal fires, either case may win; callers re-check the signals
 // after a successful acquisition.
-func (g *ScanGuard) Acquire(ctx context.Context, stop <-chan struct{}) bool {
+func (g *ScanGuard) acquire(ctx context.Context, stop <-chan struct{}) bool {
 	select {
 	case g.sem() <- struct{}{}:
 		return true
@@ -62,14 +62,14 @@ func (g *ScanGuard) Acquire(ctx context.Context, stop <-chan struct{}) bool {
 	}
 }
 
-// Release frees the scan slot. Only a successful Acquire may Release; a
+// release frees the scan slot. Only a successful acquire may release; a
 // release without a held slot is a programming error and panics (matching
 // sync.Mutex.Unlock semantics).
-func (g *ScanGuard) Release() {
+func (g *ScanGuard) release() {
 	select {
 	case <-g.sem():
 	default:
-		panic("scanning: ScanGuard.Release without a held slot")
+		panic("scanning: ScanGuard.release without a held slot")
 	}
 }
 
@@ -123,15 +123,15 @@ type HandlerDeps struct {
 	// InvalidateStats clears the stats cache after scan completion.
 	InvalidateStats func()
 	// BGTracker tracks background goroutine lifecycle for graceful shutdown.
-	BGTracker BGTracker
+	BGTracker bgTracker
 }
 
-// BGTracker registers a background goroutine with the server's WaitGroup for
+// bgTracker registers a background goroutine with the server's WaitGroup for
 // graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
 // launches and counts in one call: an Add/Done pair can leak a counter (an
 // early return or a panic before the defer is installed leaves the drain
 // hung), and a one-method surface makes that unrepresentable.
-type BGTracker interface {
+type bgTracker interface {
 	Go(f func())
 }
 
@@ -254,7 +254,7 @@ func (h *Handler) finishScan(unregister func(), actID, action, detail string, ou
 // written. A missing series is 404, any other lookup failure 502 (upstream
 // proxy failure), an unwritable folder 409. Runs on the REQUEST context —
 // the scan itself has not started.
-func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
+func (*Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 	op *opState, seriesID int,
 ) (arrapi.Series, bool) {
 	series, err := op.st.Sonarr.SeriesByID(r.Context(), seriesID)
@@ -275,7 +275,7 @@ func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 
 // preflightMovie is preflightSeries for Radarr movies; the folder tested is
 // the movie file's own, or the movie's folder when it has no file.
-func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
+func (*Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 	op *opState, movieID int,
 ) (arrapi.Movie, bool) {
 	movie, err := op.st.Radarr.MovieByID(r.Context(), movieID)
@@ -301,7 +301,7 @@ func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 // preflightFolder write-tests folder and its known-bad relatives, answering
 // 409 media_unwritable on a refusal; a request whose client left writes
 // nothing.
-func preflightFolder(w http.ResponseWriter, r *http.Request, media MediaPreflight, folder string) bool {
+func preflightFolder(w http.ResponseWriter, r *http.Request, media mediaPreflight, folder string) bool {
 	err := media.Preflight(r.Context(), mediawrite.PreflightRequest{Folders: []string{folder}, Raise: true})
 	switch {
 	case err == nil:

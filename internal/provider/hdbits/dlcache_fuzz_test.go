@@ -16,11 +16,11 @@ func FuzzDownloadCache_PutGet(f *testing.F) {
 		dc := newDownloadCache(4, 1024)
 
 		// Put first entry.
-		ok1 := dc.Put(k1, v1, nil)
+		ok1 := dc.put(k1, v1, nil)
 
 		// If stored, must be retrievable.
 		if ok1 {
-			got, found := dc.Get(k1)
+			got, found := dc.get(k1)
 			if !found {
 				t.Fatal("Get returned false after successful Put for k1")
 			}
@@ -30,10 +30,10 @@ func FuzzDownloadCache_PutGet(f *testing.F) {
 		}
 
 		// Put second entry.
-		ok2 := dc.Put(k2, v2, nil)
+		ok2 := dc.put(k2, v2, nil)
 
 		if ok2 {
-			got, found := dc.Get(k2)
+			got, found := dc.get(k2)
 			if !found {
 				t.Fatal("Get returned false after successful Put for k2")
 			}
@@ -48,10 +48,10 @@ func FuzzDownloadCache_PutGet(f *testing.F) {
 		}
 
 		// Clear never panics.
-		dc.Clear()
+		dc.clear()
 
 		// After clear, nothing is retrievable.
-		if _, found := dc.Get(k1); found {
+		if _, found := dc.get(k1); found {
 			t.Fatal("Get returned true after Clear for k1")
 		}
 	})

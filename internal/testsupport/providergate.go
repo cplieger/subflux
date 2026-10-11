@@ -52,7 +52,7 @@ func NewAuthRecordStore() *AuthRecordStore {
 
 // ProviderAuthRecords returns nothing, so a gate opened over the store starts
 // with every provider admitted.
-func (s *AuthRecordStore) ProviderAuthRecords(context.Context) ([]subflux.ProviderAuthRecord, error) {
+func (*AuthRecordStore) ProviderAuthRecords(context.Context) ([]subflux.ProviderAuthRecord, error) {
 	return nil, nil
 }
 

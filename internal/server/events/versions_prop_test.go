@@ -9,7 +9,7 @@ import (
 )
 
 // TestVersions_resolve_reports_the_bump_count_per_key is the model check:
-// over any sequence of bumps across the registry's keys, Resolve answers
+// over any sequence of bumps across the registry's keys, resolve answers
 // exactly the number of bumps each held key received.
 func TestVersions_resolve_reports_the_bump_count_per_key(t *testing.T) {
 	t.Parallel()
@@ -38,7 +38,7 @@ func TestVersions_resolve_reports_the_bump_count_per_key(t *testing.T) {
 		for i, k := range keys {
 			held[i] = sse.Held{Subject: k, Version: "0"}
 		}
-		states, err := v.Resolve(t.Context(), held)
+		states, err := v.resolve(t.Context(), held)
 		if err != nil {
 			rt.Fatalf("Resolve() error = %v", err)
 		}

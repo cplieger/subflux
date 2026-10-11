@@ -125,7 +125,7 @@ func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Factory() error = %v, want nil", err)
 		}
-		prov, ok := p.(*Provider)
+		prov, ok := p.(*source)
 		if !ok {
 			t.Fatalf("Factory() returned %T, want *Provider", p)
 		}
@@ -407,15 +407,15 @@ func TestFlexInt_round_trip(t *testing.T) {
 
 func TestClearCache_empties_both_caches(t *testing.T) {
 	t.Parallel()
-	p := &Provider{
+	p := &source{
 		torrentCache: cache.New[[]int](1 * time.Hour),
 		dlCache:      newDownloadCache(100, 2<<20),
 	}
-	p.dlCache.Put("1", []byte{0x50, 0x4b}, nil)
+	p.dlCache.put("1", []byte{0x50, 0x4b}, nil)
 	p.torrentCache.Set("key", []int{1, 2})
 	p.ClearCache()
 
-	if _, ok := p.dlCache.Get("1"); ok {
+	if _, ok := p.dlCache.get("1"); ok {
 		t.Error("dlCache still has entries after ClearCache")
 	}
 	if _, ok := p.torrentCache.Get("key"); ok {
@@ -523,7 +523,7 @@ func TestFactory_initializes_provider_correctly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory() error: %v", err)
 	}
-	hdb, ok := p.(*Provider)
+	hdb, ok := p.(*source)
 	if !ok {
 		t.Fatal("Factory() did not return *Provider")
 	}
@@ -603,7 +603,7 @@ func BenchmarkFilterSubtitleData(b *testing.B) {
 func TestBuildLookup(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{username: "user", passkey: "key"}
+	p := &source{username: "user", passkey: "key"}
 
 	tests := []struct {
 		req          *subflux.SearchRequest
@@ -828,7 +828,7 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
 	t.Parallel()
 	const passkey = "supersecret32hex"
-	p := &Provider{
+	p := &source{
 		passkey: passkey,
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, errors.New("dial tcp: i/o timeout")

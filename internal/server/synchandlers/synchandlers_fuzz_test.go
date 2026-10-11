@@ -56,7 +56,7 @@ func FuzzShiftAndFilterCues(f *testing.F) {
 			{Start: time.Duration(s2) * time.Millisecond, End: time.Duration(e2) * time.Millisecond, Text: "b"},
 		}
 		shift := time.Duration(shiftMs) * time.Millisecond
-		result := ShiftAndFilterCues(cues, shift)
+		result := shiftAndFilterCues(cues, shift)
 		if len(result) > len(cues) {
 			t.Fatalf("ShiftAndFilterCues returned %d cues, want <= %d", len(result), len(cues))
 		}

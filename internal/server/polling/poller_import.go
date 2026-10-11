@@ -63,7 +63,7 @@ type importResult struct {
 // entry that is skipped, retryable marks a transient arr failure, and heldOn
 // names the unreadable media root an entry waits on.
 type pendingImport struct {
-	result    *ImportResult
+	result    *resolvedImport
 	refresh   func(ctx context.Context, id int) error
 	path      string
 	heldOn    string
@@ -79,7 +79,7 @@ func (pi *pendingImport) asksForSubtitles() bool {
 
 func (p *Poller) resolveImport(
 	ctx context.Context, ls *LiveState, path string,
-	buildFn func() (*ImportResult, error),
+	buildFn func() (*resolvedImport, error),
 	refreshFn func(ctx context.Context, id int) error,
 ) pendingImport {
 	pi := pendingImport{path: path, refresh: refreshFn}
@@ -141,7 +141,7 @@ func refusedFolder(err error) string {
 // searchImport searches one import and publishes what it saved. A search cut
 // short by the poller stopping reports nothing.
 func (p *Poller) searchImport(ctx context.Context, ls *LiveState, path string,
-	result *ImportResult, refreshFn func(ctx context.Context, id int) error,
+	result *resolvedImport, refreshFn func(ctx context.Context, id int) error,
 ) importResult {
 	slog.Info("poll: import detected",
 		"media", result.Label, "path", path)
@@ -195,7 +195,7 @@ func (p *Poller) resolveSonarrImport(ctx context.Context, ls *LiveState, entry *
 
 	return p.resolveImport(
 		ctx, ls, path,
-		func() (*ImportResult, error) {
+		func() (*resolvedImport, error) {
 			series, err := ls.Sonarr.SeriesByID(ctx, entry.SeriesID)
 			if err != nil {
 				slog.Warn("poll: failed to get series", "series_id", entry.SeriesID, "error", err)
@@ -223,11 +223,11 @@ func (p *Poller) resolveSonarrImport(ctx context.Context, ls *LiveState, entry *
 
 			req := scanning.EpisodeSearchRequest(&series, &ep, ls.Cfg.LanguageCodes())
 
-			return &ImportResult{
+			return &resolvedImport{
 				Req:       &req,
 				Targets:   targets,
 				Label:     label,
-				Source:    PollSourceSonarr,
+				Source:    pollSourceSonarr,
 				RefreshID: series.ID,
 			}, nil
 		},
@@ -242,7 +242,7 @@ func (p *Poller) resolveRadarrImport(ctx context.Context, ls *LiveState, entry *
 
 	return p.resolveImport(
 		ctx, ls, path,
-		func() (*ImportResult, error) {
+		func() (*resolvedImport, error) {
 			movie, err := ls.Radarr.MovieByID(ctx, entry.MovieID)
 			if err != nil {
 				slog.Warn("poll: failed to get movie", "movie_id", entry.MovieID, "error", err)
@@ -264,11 +264,11 @@ func (p *Poller) resolveRadarrImport(ctx context.Context, ls *LiveState, entry *
 
 			req := scanning.MovieSearchRequest(&movie, ls.Cfg.LanguageCodes())
 
-			return &ImportResult{
+			return &resolvedImport{
 				Req:       &req,
 				Targets:   targets,
 				Label:     label,
-				Source:    PollSourceRadarr,
+				Source:    pollSourceRadarr,
 				RefreshID: movie.ID,
 			}, nil
 		},

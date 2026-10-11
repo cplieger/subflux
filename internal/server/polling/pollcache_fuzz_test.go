@@ -8,7 +8,7 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// FuzzPollCacheRoundtrip verifies that Set(k, t) followed by Get(k) returns
+// FuzzPollCacheRoundtrip verifies that set(k, t) followed by get(k) returns
 // t (write-through cache roundtrip invariant).
 func FuzzPollCacheRoundtrip(f *testing.F) {
 	f.Add(int64(1717500000), true)
@@ -34,7 +34,7 @@ func FuzzPollCacheRoundtrip(f *testing.F) {
 		)
 
 		ctx := t.Context()
-		cache.Set(ctx, key, ts)
+		cache.set(ctx, key, ts)
 
 		// Verify DB write-through.
 		if !stored.Equal(ts) {
@@ -42,7 +42,7 @@ func FuzzPollCacheRoundtrip(f *testing.F) {
 		}
 
 		// Verify in-memory roundtrip.
-		got := cache.Get(ctx, key)
+		got := cache.get(ctx, key)
 		if !got.Equal(ts) {
 			t.Fatalf("Get after Set: got=%v, want=%v", got, ts)
 		}

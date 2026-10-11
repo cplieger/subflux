@@ -12,7 +12,7 @@ import (
 )
 
 // byteLines converts string rows into the [][]byte shape the YAML scanners
-// (SecretContextKey, ExtractSecretValues) operate on.
+// (secretContextKey, extractSecretValues) operate on.
 func byteLines(ss ...string) [][]byte {
 	out := make([][]byte, len(ss))
 	for i, s := range ss {
@@ -55,7 +55,7 @@ func TestStripYAMLComment(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := string(StripYAMLComment([]byte(tc.in)))
+			got := string(stripYAMLComment([]byte(tc.in)))
 			if got != tc.want {
 				t.Errorf("StripYAMLComment(%q) = %q, want %q", tc.in, got, tc.want)
 			}
@@ -105,7 +105,7 @@ func TestRedactSecrets(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := string(RedactSecrets([]byte(tc.in)))
+			got := string(redactSecrets([]byte(tc.in)))
 			if got != tc.want {
 				t.Errorf("RedactSecrets(%q) = %q, want %q", tc.in, got, tc.want)
 			}
@@ -115,21 +115,21 @@ func TestRedactSecrets(t *testing.T) {
 
 func TestExtractSecretValues(t *testing.T) {
 	t.Run("records_non_empty_value", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("password: secret123"))
+		got := extractSecretValues([]byte("password: secret123"))
 		if len(got) != 1 || got["password"] != "secret123" {
 			t.Errorf("ExtractSecretValues(non-empty) = %v, want map[password:secret123]", got)
 		}
 	})
 
 	t.Run("skips_empty_quoted_value", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("password: ''"))
+		got := extractSecretValues([]byte("password: ''"))
 		if len(got) != 0 {
 			t.Errorf("ExtractSecretValues(empty quoted) = %v, want empty map", got)
 		}
 	})
 
 	t.Run("qualifies_key_with_parent_context", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("sonarr:\n  api_key: xyz"))
+		got := extractSecretValues([]byte("sonarr:\n  api_key: xyz"))
 		if len(got) != 1 || got["sonarr.api_key"] != "xyz" {
 			t.Errorf("ExtractSecretValues(nested) = %v, want map[sonarr.api_key:xyz]", got)
 		}
@@ -137,40 +137,40 @@ func TestExtractSecretValues(t *testing.T) {
 
 	// Migrated from the root server package's delegate-era tests.
 	t.Run("empty_input", func(t *testing.T) {
-		if got := ExtractSecretValues([]byte("")); len(got) != 0 {
+		if got := extractSecretValues([]byte("")); len(got) != 0 {
 			t.Errorf("ExtractSecretValues(empty) = %v, want empty map", got)
 		}
 	})
 
 	t.Run("no_secrets", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("url: http://example.com\nport: 8080"))
+		got := extractSecretValues([]byte("url: http://example.com\nport: 8080"))
 		if len(got) != 0 {
 			t.Errorf("ExtractSecretValues(no secrets) = %v, want empty map", got)
 		}
 	})
 
 	t.Run("multiple_secrets", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("sonarr:\n  api_key: key1\nradarr:\n  api_key: key2"))
+		got := extractSecretValues([]byte("sonarr:\n  api_key: key1\nradarr:\n  api_key: key2"))
 		if len(got) != 2 || got["sonarr.api_key"] != "key1" || got["radarr.api_key"] != "key2" {
 			t.Errorf("ExtractSecretValues(multiple) = %v, want sonarr.api_key:key1 + radarr.api_key:key2", got)
 		}
 	})
 
 	t.Run("strips_inline_comment", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("sonarr:\n  api_key: abc123 # my key"))
+		got := extractSecretValues([]byte("sonarr:\n  api_key: abc123 # my key"))
 		if len(got) != 1 || got["sonarr.api_key"] != "abc123" {
 			t.Errorf("ExtractSecretValues(comment) = %v, want map[sonarr.api_key:abc123]", got)
 		}
 	})
 
 	t.Run("skips_bare_empty_value", func(t *testing.T) {
-		if got := ExtractSecretValues([]byte("sonarr:\n  api_key: ")); len(got) != 0 {
+		if got := extractSecretValues([]byte("sonarr:\n  api_key: ")); len(got) != 0 {
 			t.Errorf("ExtractSecretValues(bare empty) = %v, want empty map", got)
 		}
 	})
 
 	t.Run("password_key_deeply_nested", func(t *testing.T) {
-		got := ExtractSecretValues([]byte("providers:\n  os:\n    password: hunter2"))
+		got := extractSecretValues([]byte("providers:\n  os:\n    password: hunter2"))
 		if len(got) != 1 || got["providers.os.password"] != "hunter2" {
 			t.Errorf("ExtractSecretValues(password) = %v, want map[providers.os.password:hunter2]", got)
 		}
@@ -247,7 +247,7 @@ func TestSecretContextKey(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := SecretContextKey(tc.lines, tc.lineIdx, tc.key)
+			got := secretContextKey(tc.lines, tc.lineIdx, tc.key)
 			if got != tc.want {
 				t.Errorf("SecretContextKey(key=%q, lineIdx=%d) = %q, want %q",
 					tc.key, tc.lineIdx, got, tc.want)
@@ -256,7 +256,7 @@ func TestSecretContextKey(t *testing.T) {
 	}
 }
 
-// --- IsRedactedPlaceholder ---
+// --- isRedactedPlaceholder ---
 //
 // Migrated from the root server package's delegate-era tests.
 
@@ -282,7 +282,7 @@ func TestIsRedactedPlaceholder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := IsRedactedPlaceholder([]byte(tt.input))
+			got := isRedactedPlaceholder([]byte(tt.input))
 			if got != tt.want {
 				t.Errorf("IsRedactedPlaceholder(%q) = %v, want %v",
 					tt.input, got, tt.want)
@@ -291,7 +291,7 @@ func TestIsRedactedPlaceholder(t *testing.T) {
 	}
 }
 
-// --- FindClosingQuote ---
+// --- findClosingQuote ---
 //
 // Migrated from the root server package's delegate-era tests.
 
@@ -320,7 +320,7 @@ func TestFindClosingQuote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := FindClosingQuote([]byte(tt.input), tt.quote)
+			got := findClosingQuote([]byte(tt.input), tt.quote)
 			if got != tt.want {
 				t.Errorf("FindClosingQuote(%q, %q) = %d, want %d",
 					tt.input, string(tt.quote), got, tt.want)
@@ -329,7 +329,7 @@ func TestFindClosingQuote(t *testing.T) {
 	}
 }
 
-// --- MergeSecrets ---
+// --- mergeSecrets ---
 //
 // Migrated from the root server package's delegate-era tests.
 
@@ -340,7 +340,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: real-secret-key\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("sonarr:\n  api_key: \"\"\n"), existingPath)
+		got, err := mergeSecrets([]byte("sonarr:\n  api_key: \"\"\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -358,7 +358,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: old-key\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("sonarr:\n  api_key: new-key\n"), existingPath)
+		got, err := mergeSecrets([]byte("sonarr:\n  api_key: new-key\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -372,7 +372,7 @@ func TestMergeSecrets(t *testing.T) {
 
 	t.Run("returns newData when no existing file", func(t *testing.T) {
 		newData := []byte("sonarr:\n  api_key: \"\"\n")
-		got, err := MergeSecrets(newData, "/nonexistent/config.yaml")
+		got, err := mergeSecrets(newData, "/nonexistent/config.yaml")
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -386,13 +386,13 @@ func TestMergeSecrets(t *testing.T) {
 		// fs.ErrNotExist (open+stat succeed, read fails EISDIR). The payload
 		// carries an empty secret (keep semantics), so silently proceeding
 		// would persist the empty value literally — the merge must refuse.
-		if _, err := MergeSecrets([]byte("sonarr:\n  api_key: \"\"\n"), t.TempDir()); !errors.Is(err, errBaselineUnavailable) {
+		if _, err := mergeSecrets([]byte("sonarr:\n  api_key: \"\"\n"), t.TempDir()); !errors.Is(err, errBaselineUnavailable) {
 			t.Errorf("MergeSecrets(unreadable baseline, keep secret) error = %v, want errBaselineUnavailable", err)
 		}
 	})
 
 	t.Run("fails closed on redacted placeholder with unreadable baseline", func(t *testing.T) {
-		if _, err := MergeSecrets([]byte("sonarr:\n  api_key: \"********\"\n"), t.TempDir()); !errors.Is(err, errBaselineUnavailable) {
+		if _, err := mergeSecrets([]byte("sonarr:\n  api_key: \"********\"\n"), t.TempDir()); !errors.Is(err, errBaselineUnavailable) {
 			t.Errorf("MergeSecrets(unreadable baseline, placeholder) error = %v, want errBaselineUnavailable", err)
 		}
 	})
@@ -401,7 +401,7 @@ func TestMergeSecrets(t *testing.T) {
 		// No keep-semantics secret: the baseline is never needed, so a
 		// complete payload can overwrite (and repair) an unreadable file.
 		newData := []byte("sonarr:\n  api_key: explicit-key\n")
-		got, err := MergeSecrets(newData, t.TempDir())
+		got, err := mergeSecrets(newData, t.TempDir())
 		if err != nil {
 			t.Fatalf("MergeSecrets(explicit secrets) error = %v", err)
 		}
@@ -417,7 +417,7 @@ func TestMergeSecrets(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 		newData := []byte("sonarr:\n  api_key: \"\"\n")
-		got, err := MergeSecrets(newData, existingPath)
+		got, err := mergeSecrets(newData, existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -432,7 +432,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: sonarr-key\nradarr:\n  api_key: radarr-key\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("sonarr:\n  api_key: \"\"\nradarr:\n  api_key: \"\"\n"), existingPath)
+		got, err := mergeSecrets([]byte("sonarr:\n  api_key: \"\"\nradarr:\n  api_key: \"\"\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -451,7 +451,7 @@ func TestMergeSecrets(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 		newData := []byte("sonarr:\n  api_key: \n")
-		got, err := MergeSecrets(newData, existingPath)
+		got, err := mergeSecrets(newData, existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -466,7 +466,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: real-key\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("sonarr:\n  api_key: ''\n"), existingPath)
+		got, err := mergeSecrets([]byte("sonarr:\n  api_key: ''\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -481,7 +481,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("providers:\n  os:\n    password: hunter2\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("providers:\n  os:\n    password: \"\"\n"), existingPath)
+		got, err := mergeSecrets([]byte("providers:\n  os:\n    password: \"\"\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -496,7 +496,7 @@ func TestMergeSecrets(t *testing.T) {
 		if err := os.WriteFile(existingPath, []byte("providers:\n  os:\n    settings:\n      api_key: deep-key\n"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := MergeSecrets([]byte("providers:\n  os:\n    settings:\n      api_key: \"\"\n"), existingPath)
+		got, err := mergeSecrets([]byte("providers:\n  os:\n    settings:\n      api_key: \"\"\n"), existingPath)
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
@@ -512,7 +512,7 @@ func TestMergeSecrets_restores_redacted_placeholder(t *testing.T) {
 	if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: real-secret-key\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := MergeSecrets([]byte("sonarr:\n  api_key: \"********\"\n"), existingPath)
+	got, err := mergeSecrets([]byte("sonarr:\n  api_key: \"********\"\n"), existingPath)
 	if err != nil {
 		t.Fatalf("MergeSecrets() error = %v", err)
 	}
@@ -532,7 +532,7 @@ func TestMergeSecrets_restores_REDACTED_tag(t *testing.T) {
 	if err := os.WriteFile(existingPath, []byte("sonarr:\n  api_key: real-secret-key\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := MergeSecrets([]byte("sonarr:\n  api_key: \"[REDACTED]\"\n"), existingPath)
+	got, err := mergeSecrets([]byte("sonarr:\n  api_key: \"[REDACTED]\"\n"), existingPath)
 	if err != nil {
 		t.Fatalf("MergeSecrets() error = %v", err)
 	}

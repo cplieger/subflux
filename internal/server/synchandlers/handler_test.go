@@ -9,14 +9,14 @@ import (
 	"pgregory.net/rapid"
 )
 
-// --- ShiftAndFilterCues ---
+// --- shiftAndFilterCues ---
 
 func TestShiftAndFilterCues_zero_shift_returns_original(t *testing.T) {
 	t.Parallel()
 	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 2 * time.Second, Text: "Hello"},
 	}
-	got := ShiftAndFilterCues(cues, 0)
+	got := shiftAndFilterCues(cues, 0)
 	if len(got) != 1 {
 		t.Fatalf("ShiftAndFilterCues(1 cue, 0) returned %d cues, want 1", len(got))
 	}
@@ -30,7 +30,7 @@ func TestShiftAndFilterCues_positive_shift(t *testing.T) {
 	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 3 * time.Second, Text: "A"},
 	}
-	got := ShiftAndFilterCues(cues, 500*time.Millisecond)
+	got := shiftAndFilterCues(cues, 500*time.Millisecond)
 	if len(got) != 1 {
 		t.Fatalf("ShiftAndFilterCues(shift +500ms) returned %d cues, want 1", len(got))
 	}
@@ -48,7 +48,7 @@ func TestShiftAndFilterCues_negative_shift_filters_ended_cues(t *testing.T) {
 		{Start: time.Second, End: 2 * time.Second, Text: "Early"},
 		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Late"},
 	}
-	got := ShiftAndFilterCues(cues, -3*time.Second)
+	got := shiftAndFilterCues(cues, -3*time.Second)
 	if len(got) != 1 {
 		t.Fatalf("ShiftAndFilterCues(shift -3s) returned %d cues, want 1", len(got))
 	}
@@ -65,7 +65,7 @@ func TestShiftAndFilterCues_start_clamped_to_zero(t *testing.T) {
 	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 5 * time.Second, Text: "Overlap"},
 	}
-	got := ShiftAndFilterCues(cues, -2*time.Second)
+	got := shiftAndFilterCues(cues, -2*time.Second)
 	if len(got) != 1 {
 		t.Fatalf("ShiftAndFilterCues(shift -2s) returned %d cues, want 1", len(got))
 	}
@@ -83,7 +83,7 @@ func TestShiftAndFilterCues_all_filtered(t *testing.T) {
 		{Start: time.Second, End: 2 * time.Second, Text: "A"},
 		{Start: 3 * time.Second, End: 4 * time.Second, Text: "B"},
 	}
-	got := ShiftAndFilterCues(cues, -5*time.Second)
+	got := shiftAndFilterCues(cues, -5*time.Second)
 	if len(got) != 0 {
 		t.Errorf("ShiftAndFilterCues(shift -5s) returned %d cues, want 0", len(got))
 	}
@@ -91,7 +91,7 @@ func TestShiftAndFilterCues_all_filtered(t *testing.T) {
 
 func TestShiftAndFilterCues_nil_input(t *testing.T) {
 	t.Parallel()
-	got := ShiftAndFilterCues(nil, time.Second)
+	got := shiftAndFilterCues(nil, time.Second)
 	if len(got) != 0 {
 		t.Errorf("ShiftAndFilterCues(nil, 1s) returned %d cues, want 0", len(got))
 	}
@@ -103,12 +103,12 @@ func TestShiftAndFilterCues_boundary_end_exactly_zero(t *testing.T) {
 		{Start: time.Second, End: 2 * time.Second, Text: "Exact"},
 	}
 
-	got := ShiftAndFilterCues(cues, -2*time.Second)
+	got := shiftAndFilterCues(cues, -2*time.Second)
 	if len(got) != 0 {
 		t.Errorf("ShiftAndFilterCues(End=2s, shift=-2s) returned %d cues, want 0 (newEnd=0 filtered)", len(got))
 	}
 
-	got = ShiftAndFilterCues(cues, -1999*time.Millisecond)
+	got = shiftAndFilterCues(cues, -1999*time.Millisecond)
 	if len(got) != 1 {
 		t.Fatalf("ShiftAndFilterCues(End=2s, shift=-1999ms) returned %d cues, want 1 (newEnd=1ms kept)", len(got))
 	}
@@ -119,7 +119,7 @@ func TestShiftAndFilterCues_boundary_end_exactly_zero(t *testing.T) {
 
 func TestShiftAndFilterCues_empty_input(t *testing.T) {
 	t.Parallel()
-	got := ShiftAndFilterCues([]subflux.SubtitleCue{}, time.Second)
+	got := shiftAndFilterCues([]subflux.SubtitleCue{}, time.Second)
 	if len(got) != 0 {
 		t.Errorf("ShiftAndFilterCues(empty, 1s) returned %d cues, want 0", len(got))
 	}
@@ -145,7 +145,7 @@ func TestShiftAndFilterCues_property_output_times_non_negative(t *testing.T) {
 		shiftMs := rapid.Int64Range(-300_000, 300_000).Draw(t, "shift")
 		shift := time.Duration(shiftMs) * time.Millisecond
 
-		result := ShiftAndFilterCues(cues, shift)
+		result := shiftAndFilterCues(cues, shift)
 
 		if len(result) > len(cues) {
 			t.Errorf("ShiftAndFilterCues(%d cues, %v) returned %d cues, want <= %d",

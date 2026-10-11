@@ -79,15 +79,15 @@ const (
 	Paused          Kind = "paused"
 )
 
-// Cause says why a provider was re-enabled.
-type Cause string
+// cause says why a provider was re-enabled.
+type cause string
 
 // Re-enable causes.
 const (
-	CauseSettingsChanged      Cause = "settings_changed"
-	CauseCredentialTestPassed Cause = "credential_test_passed" //nolint:gosec // G101: an event cause label, not a credential
-	CauseCredentialsAccepted  Cause = "credentials_accepted"
-	CauseReset                Cause = "reset"
+	causeSettingsChanged      cause = "settings_changed"
+	causeCredentialTestPassed cause = "credential_test_passed" //nolint:gosec // G101: an event cause label, not a credential
+	causeCredentialsAccepted  cause = "credentials_accepted"
+	causeReset                cause = "reset"
 )
 
 // Event is one state transition, delivered to the SetOnChange hook. Reason is
@@ -96,7 +96,6 @@ type Event struct {
 	Provider subflux.ProviderID
 	Kind     Kind
 	Reason   string
-	Cause    Cause
 	Setting  string
 }
 
@@ -105,8 +104,8 @@ type ClearResult int
 
 // ClearIfMatches results.
 const (
-	// NoRecord: nothing was recorded against the provider.
-	NoRecord ClearResult = iota
+	// noRecord: nothing was recorded against the provider.
+	noRecord ClearResult = iota
 	// Cleared: the recorded state matched the tested settings and was cleared.
 	Cleared
 	// Mismatch: a record exists for settings other than the tested ones.
@@ -358,7 +357,7 @@ func (g *Gate) settleLocked(fx *effects, pending []verdict, live *Binding) {
 				slog.Warn("provider credential record unreadable; deleting it", "provider", v.id)
 			})
 		}
-		g.dropRecord(fx, v.id, CauseSettingsChanged)
+		g.dropRecord(fx, v.id, causeSettingsChanged)
 	}
 }
 
@@ -390,7 +389,7 @@ func (g *Gate) reannounce(fx *effects, live *Binding) {
 	clear(g.retired)
 	for key, dig := range g.rejected {
 		if dig != live.digests[key.id] {
-			g.clearRejection(fx, key, "")
+			g.clearRejection(fx, key)
 		}
 	}
 	maps.DeleteFunc(g.pauses, func(key pauseKey, p pause) bool {
@@ -432,22 +431,22 @@ func (g *Gate) ClearIfMatches(ctx context.Context, id subflux.ProviderID, settin
 		matched, corrupt = g.matches(rec, canonical)
 		if corrupt {
 			slog.Warn("provider credential record unreadable; test cannot clear it", "provider", id)
-			return NoRecord
+			return noRecord
 		}
 	}
 
 	g.mu.Lock()
 	var fx effects
-	result := NoRecord
+	result := noRecord
 	switch current := g.records[id]; {
 	case current == nil:
 	case current != rec || !matched:
 		result = Mismatch
 	default:
-		g.dropRecord(&fx, id, CauseCredentialTestPassed)
+		g.dropRecord(&fx, id, causeCredentialTestPassed)
 		result = Cleared
 	}
-	if g.clearRejectionsLocked(&fx, id, dig) && result == NoRecord {
+	if g.clearRejectionsLocked(&fx, id, dig) && result == noRecord {
 		result = Cleared
 	}
 	g.commitLocked(ctx, &fx)
@@ -464,31 +463,31 @@ func (g *Gate) clearRejectionsLocked(fx *effects, id subflux.ProviderID, dig dig
 	cleared := false
 	for key := range g.rejected {
 		if key.id == id {
-			g.clearRejection(fx, key, CauseCredentialTestPassed)
+			g.clearRejection(fx, key)
 			cleared = true
 		}
 	}
 	return cleared
 }
 
-// ResetAll clears every record, pause and rejected setting.
-func (g *Gate) ResetAll(ctx context.Context) {
+// resetAll clears every record, pause and rejected setting.
+func (g *Gate) resetAll(ctx context.Context) {
 	g.mu.Lock()
 	var fx effects
 	cleared := make(map[subflux.ProviderID]struct{})
 	for id := range g.records {
-		g.dropRecord(&fx, id, CauseReset)
+		g.dropRecord(&fx, id, causeReset)
 		cleared[id] = struct{}{}
 	}
 	for key := range g.pauses {
 		if _, done := cleared[key.id]; !done {
 			cleared[key.id] = struct{}{}
-			fx.event(Event{Provider: key.id, Kind: Enabled, Cause: CauseReset})
+			fx.event(Event{Provider: key.id, Kind: Enabled})
 		}
 	}
 	clear(g.pauses)
 	for key := range g.rejected {
-		g.clearRejection(&fx, key, CauseReset)
+		g.clearRejection(&fx, key)
 	}
 	if g.live != nil {
 		for id := range g.live.digests {
@@ -499,7 +498,7 @@ func (g *Gate) ResetAll(ctx context.Context) {
 }
 
 // dropRecord deletes id's record and queues its re-enable. Callers hold g.mu.
-func (g *Gate) dropRecord(fx *effects, id subflux.ProviderID, cause Cause) {
+func (g *Gate) dropRecord(fx *effects, id subflux.ProviderID, cause cause) {
 	rec := g.records[id]
 	if rec == nil {
 		return
@@ -510,15 +509,15 @@ func (g *Gate) dropRecord(fx *effects, id subflux.ProviderID, cause Cause) {
 		fx.metric(func() { g.metrics.SetProviderDisabled(id, false) })
 	}
 	fx.do(func() { slog.Info("provider re-enabled", "provider", id, "cause", string(cause)) })
-	fx.event(Event{Provider: id, Kind: Enabled, Cause: cause})
+	fx.event(Event{Provider: id, Kind: Enabled})
 }
 
 // clearRejection drops one rejected setting and makes every instance of the
 // provider forget its upstream's answer before its next call. Callers hold
 // g.mu.
-func (g *Gate) clearRejection(fx *effects, key rejectKey, cause Cause) {
+func (g *Gate) clearRejection(fx *effects, key rejectKey) {
 	delete(g.rejected, key)
 	g.verdicts[key.id]++
 	fx.metric(func() { g.metrics.SetProviderSettingRejected(key.id, key.setting, false) })
-	fx.event(Event{Provider: key.id, Kind: SettingCleared, Setting: key.setting, Cause: cause})
+	fx.event(Event{Provider: key.id, Kind: SettingCleared, Setting: key.setting})
 }

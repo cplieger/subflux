@@ -19,24 +19,24 @@ import (
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
-// ProtocolVersion guards the parent/child JSON contract. Parent and child
+// protocolVersion guards the parent/child JSON contract. Parent and child
 // are the same binary, so a mismatch can only mean the executable was
 // replaced while a request was in flight (upgrade race); the child answers
 // with an error response rather than guessing.
-const ProtocolVersion = 1
+const protocolVersion = 1
 
-// Op names for Request.Op.
+// Op names for request.Op.
 const (
-	// OpReference aligns subtitle data against an embedded reference track
+	// opReference aligns subtitle data against an embedded reference track
 	// (syncing.SyncAgainstReference).
-	OpReference = "reference"
-	// OpAudio aligns subtitle data against the audio track
+	opReference = "reference"
+	// opAudio aligns subtitle data against the audio track
 	// (syncing.SyncFromAudio).
-	OpAudio = "audio"
+	opAudio = "audio"
 )
 
-// Request is the parent->child job description, one per process invocation.
-type Request struct {
+// request is the parent->child job description, one per process invocation.
+type request struct {
 	Op            string  `json:"op"`
 	VideoPath     string  `json:"video_path"`
 	SubtitlePath  string  `json:"subtitle_path,omitempty"`
@@ -46,43 +46,43 @@ type Request struct {
 	MinConfidence float64 `json:"min_confidence,omitempty"`
 }
 
-// Response is the child->parent result envelope. Error is set for protocol
+// response is the child->parent result envelope. Error is set for protocol
 // or infrastructure failures; strategy-level "no sync found" is NOT an error
 // (it travels as a MethodNone result, exactly like the in-process calls).
-type Response struct {
+type response struct {
 	Error   string         `json:"error,omitempty"`
-	Result  WireSyncResult `json:"result"`
+	Result  wireSyncResult `json:"result"`
 	Version int            `json:"version"`
 }
 
-// WireSyncResult is the JSON projection of subsync.SyncResult.
-type WireSyncResult struct {
+// wireSyncResult is the JSON projection of subsync.SyncResult.
+type wireSyncResult struct {
 	Method     string    `json:"method"`
-	Cues       []WireCue `json:"cues,omitempty"`
+	Cues       []wireCue `json:"cues,omitempty"`
 	OffsetMs   int64     `json:"offset_ms"`
 	Confidence float64   `json:"confidence"`
 	Rate       float64   `json:"rate"`
 }
 
-// WireCue is one subtitle cue on the wire (durations in nanoseconds).
-type WireCue struct {
+// wireCue is one subtitle cue on the wire (durations in nanoseconds).
+type wireCue struct {
 	Text    string `json:"t"`
 	StartNs int64  `json:"s"`
 	EndNs   int64  `json:"e"`
 }
 
 // wireFromResult projects a subsync.SyncResult onto the wire.
-func wireFromResult(r *subsync.SyncResult) WireSyncResult {
-	out := WireSyncResult{
+func wireFromResult(r *subsync.SyncResult) wireSyncResult {
+	out := wireSyncResult{
 		Method:     string(r.Method),
 		OffsetMs:   r.Offset,
 		Confidence: float64(r.Confidence),
 		Rate:       r.Rate,
 	}
 	if len(r.Cues) > 0 {
-		out.Cues = make([]WireCue, len(r.Cues))
+		out.Cues = make([]wireCue, len(r.Cues))
 		for i, c := range r.Cues {
-			out.Cues[i] = WireCue{Text: c.Text, StartNs: int64(c.Start), EndNs: int64(c.End)}
+			out.Cues[i] = wireCue{Text: c.Text, StartNs: int64(c.Start), EndNs: int64(c.End)}
 		}
 	}
 	return out
@@ -90,7 +90,7 @@ func wireFromResult(r *subsync.SyncResult) WireSyncResult {
 
 // resultFromWire reconstructs the subsync.SyncResult the parent's existing
 // Applied()/ShouldApply() logic operates on.
-func resultFromWire(w WireSyncResult) subsync.SyncResult {
+func resultFromWire(w wireSyncResult) subsync.SyncResult {
 	r := subsync.SyncResult{
 		Method:     subsync.SyncMethod(w.Method),
 		Offset:     w.OffsetMs,

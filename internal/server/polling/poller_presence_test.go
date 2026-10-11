@@ -85,7 +85,7 @@ func TestImport_an_unreadable_video_deletes_no_state_and_holds_on_its_root(t *te
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 			res := importOne(t.Context(), p, ls, video,
-				func() (*ImportResult, error) {
+				func() (*resolvedImport, error) {
 					t.Error("buildFn ran for a video whose root cannot be read")
 					return nil, nil
 				}, nil)
@@ -119,7 +119,7 @@ func TestImport_a_missing_video_under_a_mounted_root_deletes_its_state(t *testin
 	p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 	res := importOne(t.Context(), p, ls, video,
-		func() (*ImportResult, error) {
+		func() (*resolvedImport, error) {
 			t.Error("buildFn ran for a deleted video")
 			return nil, nil
 		}, nil)
@@ -140,7 +140,7 @@ func TestPoller_an_unreadable_root_holds_the_batch_until_it_reads_again(t *testi
 	r.p.deps.Presence = presence
 	r.setHistory(e1)
 
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if r.engine.total() != 0 {
 		t.Fatalf("engine searches = %d, want 0 while the root cannot be read", r.engine.total())
@@ -156,7 +156,7 @@ func TestPoller_an_unreadable_root_holds_the_batch_until_it_reads_again(t *testi
 	if _, err := presence.Gone(t.Context(), pathOf(e1)); err != nil {
 		t.Fatalf("Setup: recheck of the healed path = %v", err)
 	}
-	r.p.PollOnce(t.Context())
+	r.p.pollOnce(t.Context())
 	drainOne(t, r.p)
 	if n := r.engine.count(pathOf(e1)); n != 1 {
 		t.Errorf("E1 searches after the root reads again = %d, want 1", n)

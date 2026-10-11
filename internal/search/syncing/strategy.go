@@ -9,7 +9,6 @@ import (
 
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
-	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
@@ -29,7 +28,7 @@ func SyncAgainstReference(ctx context.Context, data []byte, videoPath, lang stri
 		Method: subsync.MethodNone,
 	}
 
-	refCues := ExtractEmbeddedReference(ctx, videoPath, lang, mapper)
+	refCues := extractEmbeddedReference(ctx, videoPath, lang, mapper)
 	if len(refCues) < subsync.MinCuesForSync {
 		return noChange
 	}
@@ -61,15 +60,11 @@ func SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath str
 	var isASS bool
 	if subtitlePath != "" {
 		ext := strings.ToLower(filepath.Ext(subtitlePath))
-		isASS = ext == ExtASS || ext == ExtSSA
+		isASS = ext == extASS || ext == extSSA
 	} else {
 		isASS = subsync.IsASSContent(data)
 	}
 	hints.IsASS = isASS
-
-	if durMs, err := ffmpeg.ProbeDuration(ctx, videoPath); err == nil {
-		hints.DurationSec = int(durMs / 1000)
-	}
 
 	var incCues []subsync.Cue
 	if isASS {
@@ -115,9 +110,9 @@ func SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath str
 	return result
 }
 
-// ExtractEmbeddedReference extracts an embedded subtitle track from the
+// extractEmbeddedReference extracts an embedded subtitle track from the
 // video container to use as a sync reference, excluding the target language.
-func ExtractEmbeddedReference(ctx context.Context, videoPath, excludeLang string, mapper subsync.LangMapper) []subsync.Cue {
+func extractEmbeddedReference(ctx context.Context, videoPath, excludeLang string, mapper subsync.LangMapper) []subsync.Cue {
 	if videoPath == "" {
 		return nil
 	}

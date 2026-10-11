@@ -39,7 +39,7 @@ func TestVersions_resolve_answers_one_state_per_held_key_in_order(t *testing.T) 
 		{Kind: SubjectSeries, Version: "1"},
 		{Kind: SubjectJobs, Version: "0"},
 	}
-	got, err := v.Resolve(t.Context(), held)
+	got, err := v.resolve(t.Context(), held)
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -76,8 +76,8 @@ func TestVersions_resolve_refuses_keys_outside_the_registry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			v := newVersions("0123456789abcdef")
-			_, err := v.Resolve(t.Context(), []sse.Held{{Kind: tc.kind, Ref: tc.ref, Version: "0"}})
-			if !errors.Is(err, ErrUnknownSubject) {
+			_, err := v.resolve(t.Context(), []sse.Held{{Kind: tc.kind, Ref: tc.ref, Version: "0"}})
+			if !errors.Is(err, errUnknownSubject) {
 				t.Errorf("Resolve(%s, %q) error = %v, want ErrUnknownSubject", tc.kind, tc.ref, err)
 			}
 		})
@@ -135,21 +135,21 @@ func TestPublish_mints_the_subjects_an_event_moved(t *testing.T) {
 		},
 		{
 			name:   "alert",
-			event:  Event{Type: AlertDelta, Data: AlertEvent{Op: AlertRaise}},
+			event:  Event{Type: alertDelta, Data: AlertEvent{Op: AlertRaise}},
 			bumped: []string{"alerts"},
 		},
 		{
 			name:   "provider",
-			event:  Event{Type: ProviderDelta, Data: ProviderEvent{Op: ProviderRaise}},
+			event:  Event{Type: providerDelta, Data: ProviderEvent{Op: ProviderRaise}},
 			bumped: []string{"providers"},
 		},
 		{
 			name:  "notify_mints_nothing",
-			event: Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "x"}},
+			event: Event{Type: Notify, Data: NotifyEvent{Level: NotifySuccess, Text: "x"}},
 		},
 		{
 			name:  "sync_done_mints_nothing",
-			event: Event{Type: SyncDone, Data: SyncDoneEvent{JobID: 1}},
+			event: Event{Type: syncDone, Data: SyncDoneEvent{JobID: 1}},
 		},
 	}
 	for _, tc := range cases {

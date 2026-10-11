@@ -55,6 +55,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // corpusManifestPath is the committed manifest location, relative to the
@@ -182,7 +184,7 @@ func runCorpusCase(t *testing.T, root string, c corpusCase) corpusRecord {
 		return corpusRecord{winnerSource: "none", transform: "none", trace: corpusRefNone}
 	}
 
-	incCues, err := ParseSRT(strings.NewReader(string(NormalizeEncoding(raw))))
+	incCues, err := ParseSRT(strings.NewReader(string(subtitleenc.Normalize(raw))))
 	if err != nil || len(incCues) < MinCuesForSync {
 		return errRecord(fmt.Sprintf("subtitle unusable: err=%v cues=%d", err, len(incCues)))
 	}
@@ -201,7 +203,7 @@ func runCorpusCase(t *testing.T, root string, c corpusCase) corpusRecord {
 
 	rec := corpusRecord{
 		winnerSource: winner.Source.String(),
-		transform:    winner.Transform.Digest(),
+		transform:    winner.Transform.digest(),
 		confidence:   float64(winner.Confidence),
 		rating:       alignmentRating(refCues, winner.Cues),
 		trace:        corpusTrace(ctx, refCues, incCues, &opts),
@@ -225,9 +227,9 @@ func corpusTrace(ctx context.Context, reference, incorrect []Cue, opts *SyncOpti
 				Cues:      cues,
 				Offset:    offset.Milliseconds(),
 				Rate:      1.0,
-				Method:    MethodOffset,
+				Method:    methodOffset,
 				Source:    SourceOffset,
-				Transform: Transform{Kind: TransformShift, Shift: offset.Milliseconds()},
+				Transform: transform{Kind: transformShift, Shift: offset.Milliseconds()},
 			}
 			r.Confidence = constantOffsetConfidence(reference, incorrect, offset)
 			return r
@@ -237,7 +239,7 @@ func corpusTrace(ctx context.Context, reference, incorrect []Cue, opts *SyncOpti
 
 	live := candidates[:0]
 	for _, c := range candidates {
-		if c.Confidence > ConfidenceNone {
+		if c.Confidence > confidenceNone {
 			live = append(live, c)
 		}
 	}

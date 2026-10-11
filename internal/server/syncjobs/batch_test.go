@@ -57,8 +57,14 @@ func awaitEntry(t *testing.T, log *activity.Log, id, want string, pred func(acti
 func TestDispatchBatch_reload_before_any_event_lists_all_items_queued(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	// Park item 1 BEFORE its admission hook: nothing has flipped to running
-	// and no sync:done exists — the reload window under test.
+	// The run loop clears the entry's Queued flag when it pops the batch,
+	// before any item's Exec, so only a running single ahead in the FIFO
+	// keeps the batch unpopped for the acceptance snapshot.
+	holdStarted, releaseHold := h.exec.blockOn("/hold.srt")
+	if _, err := h.d.Dispatch(input("/hold.srt")); err != nil {
+		t.Fatal(err)
+	}
+	<-holdStarted
 	gate := h.exec.gateHook("/e1.srt")
 
 	acc, err := h.d.DispatchBatch(batchInput(7, 1, "/e1.srt", "/e2.srt", "/e3.srt"))
@@ -95,6 +101,16 @@ func TestDispatchBatch_reload_before_any_event_lists_all_items_queued(t *testing
 	entry, ok := h.log.Get(acc.ActivityID)
 	if !ok || !entry.Queued || entry.Total != 3 || entry.Current != 0 {
 		t.Errorf("batch activity = %+v, want queued 0/3", entry)
+	}
+
+	// Once popped, item 1 is parked before its admission hook and items run
+	// in sequence: the entry has left queued while no item record has.
+	releaseHold <- syncjobs.ExecResult{Outcome: subflux.JobResult}
+	awaitEntry(t, h.log, acc.ActivityID, "popped", func(e activity.Entry) bool { return !e.Queued })
+	for _, j := range h.d.Jobs(acc.ActivityID) {
+		if j.State != syncjobs.StateQueued || j.StartedAt != nil {
+			t.Errorf("job %d = %q started=%t, want queued before its admission", j.JobID, j.State, j.StartedAt != nil)
+		}
 	}
 
 	close(gate)

@@ -34,7 +34,7 @@ func TestStopRegistry_requestStop_invokes_callback_once(t *testing.T) {
 func TestStopRegistry_unknown_id_not_found(t *testing.T) {
 	t.Parallel()
 	var r StopRegistry
-	if got := r.RequestStop("nope"); got != StopNotFound {
+	if got := r.RequestStop("nope"); got != stopNotFound {
 		t.Errorf("RequestStop(unknown) = %v, want StopNotFound", got)
 	}
 	if r.Cancellable("nope") {
@@ -56,7 +56,7 @@ func TestStopRegistry_unregister_releases(t *testing.T) {
 	}
 	// Cancel-vs-end race: RequestStop on a released registration is a no-op
 	// not_found (the composing endpoint maps it to 409 via the entry state).
-	if got := r.RequestStop("1"); got != StopNotFound {
+	if got := r.RequestStop("1"); got != stopNotFound {
 		t.Errorf("RequestStop(after unregister) = %v, want StopNotFound", got)
 	}
 	// Unregister is idempotent.

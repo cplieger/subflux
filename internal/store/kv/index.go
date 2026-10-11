@@ -215,14 +215,13 @@ func deleteIndexEntries[T any](tx *bolt.Tx, primaryBucket string, key, old []byt
 }
 
 // GetUint64 reads an 8-byte big-endian scalar (a counter or a schema version)
-// from bucket b. It returns (value, true) when the key holds an 8-byte value
-// and (0, false) otherwise.
-func GetUint64(b *bolt.Bucket, key []byte) (uint64, bool) {
+// from bucket b, or 0 when the key does not hold an 8-byte value.
+func GetUint64(b *bolt.Bucket, key []byte) uint64 {
 	raw := b.Get(key)
 	if len(raw) != 8 {
-		return 0, false
+		return 0
 	}
-	return binary.BigEndian.Uint64(raw), true
+	return binary.BigEndian.Uint64(raw)
 }
 
 // PutUint64 writes v as an 8-byte big-endian scalar at key in bucket b. It is
@@ -238,7 +237,7 @@ func PutUint64(b *bolt.Bucket, key []byte, v uint64) error {
 // ReadCounter returns the maintained counter at key in bucket b as a signed
 // int64 (counters are non-negative), or 0 when absent.
 func ReadCounter(b *bolt.Bucket, key []byte) int64 {
-	v, _ := GetUint64(b, key)
+	v := GetUint64(b, key)
 	return int64(v) //nolint:gosec // G115: counters are non-negative and bounded by row count
 }
 

@@ -63,7 +63,7 @@ func TestIntegration_ConstantOffset(t *testing.T) {
 	for _, offset := range offsets {
 		t.Run(offset.String(), func(t *testing.T) {
 			t.Parallel()
-			shifted := ShiftCues(ref, offset)
+			shifted := shiftCues(ref, offset)
 			opts := DefaultSyncOptions()
 			result := SyncWithOptions(t.Context(), ref, shifted, &opts)
 
@@ -110,7 +110,7 @@ func TestIntegration_FramerateCorrection(t *testing.T) {
 
 			result := correctFramerate(t.Context(), ref, drifted, "")
 
-			if result.Confidence <= ConfidenceNone {
+			if result.Confidence <= confidenceNone {
 				t.Fatalf("framerate correction failed: confidence=%.2f, method=%s",
 					float64(result.Confidence), result.Method)
 			}
@@ -156,11 +156,11 @@ func TestIntegration_SplitAlignment(t *testing.T) {
 
 	result := alignWithSplits(t.Context(), ref, modified, 0)
 
-	if result.Confidence <= ConfidenceNone {
+	if result.Confidence <= confidenceNone {
 		t.Errorf("split alignment failed: confidence=%.2f", float64(result.Confidence))
 	}
-	if result.Method != MethodSplit {
-		t.Errorf("method=%s, want %s", result.Method, MethodSplit)
+	if result.Method != methodSplit {
+		t.Errorf("method=%s, want %s", result.Method, methodSplit)
 	}
 
 	// Split alignment may not perfectly recover both offsets, especially
@@ -177,7 +177,7 @@ func TestIntegration_MultiStrategy_PicksBest(t *testing.T) {
 	ref := loadReference(t)
 
 	// Constant offset: should be detected by the offset strategy.
-	shifted := ShiftCues(ref, 2*time.Second)
+	shifted := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		EnableFramerate: true,
 		EnableSplits:    true,
@@ -224,11 +224,11 @@ func TestIntegration_FramerateCorrection_GoldenSection(t *testing.T) {
 	t.Logf("golden-section: ratio=%.6f (want ~%.6f), conf=%.2f, method=%s",
 		result.Rate, ratio, float64(result.Confidence), result.Method)
 
-	if result.Confidence <= ConfidenceNone {
+	if result.Confidence <= confidenceNone {
 		t.Fatalf("golden-section search failed: confidence=%.2f", float64(result.Confidence))
 	}
-	if result.Method != MethodFramerate {
-		t.Errorf("method=%s, want %s", result.Method, MethodFramerate)
+	if result.Method != methodFramerate {
+		t.Errorf("method=%s, want %s", result.Method, methodFramerate)
 	}
 
 	// The detected ratio should be close to the applied ratio.

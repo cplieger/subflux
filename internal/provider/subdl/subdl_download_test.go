@@ -18,7 +18,7 @@ import (
 func TestDownload_rejects_non_relative_path(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{apiKey: "test", client: http.DefaultClient}
+	p := &source{apiKey: "test", client: http.DefaultClient}
 
 	tests := []struct {
 		name string

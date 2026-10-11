@@ -54,8 +54,8 @@ func (s *seasonFakeStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, 
 	return out, nil
 }
 
-func (s *seasonFakeStore) SyncOffset(context.Context, string) (int64, error)  { return 0, nil }
-func (s *seasonFakeStore) SetSyncOffset(context.Context, string, int64) error { return nil }
+func (*seasonFakeStore) SyncOffset(context.Context, string) (int64, error)  { return 0, nil }
+func (*seasonFakeStore) SetSyncOffset(context.Context, string, int64) error { return nil }
 
 // seasonFakeSonarr answers the cached-wrapper surface from fixtures.
 type seasonFakeSonarr struct {

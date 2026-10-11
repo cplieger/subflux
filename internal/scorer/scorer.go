@@ -76,7 +76,7 @@ var tierThresholds = []tierThreshold{
 }
 
 // ScoreToTier returns the named tier for a given score.
-func (e *Engine) ScoreToTier(score int) subflux.ScoreTier {
+func (*Engine) ScoreToTier(score int) subflux.ScoreTier {
 	for _, t := range tierThresholds {
 		if score >= t.Min {
 			return t.Tier

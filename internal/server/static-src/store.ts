@@ -36,17 +36,22 @@ interface FilesContext {
 type DetailCtx = SeriesContext | MovieContext | FilesContext | null;
 
 export interface StoreMap {
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   config: ParsedConfig | null;
-  configChecked: boolean;
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   ignoredCodecs: Set<string>;
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   detailCtx: DetailCtx;
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   currentPage: string;
   // Running/queued background scans keyed by scope, derived from the
   // activity feed by the status poll (scan-scope.ts). Scan buttons key off
   // this shared map — never a local in-flight flag.
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   runningScansByScope: RunningScansByScope;
+  // deadset:ignore DS1003 -- Read through get and defined through computed, destructured from createStore<StoreMap>().
   isUnconfigured: boolean;
-  isReady: boolean;
+  // deadset:ignore DS1003 -- Keyed by name through get and set, destructured from createStore<StoreMap>().
   isAdmin: boolean;
   // Allow arbitrary keys for test usage.
   [key: string]: unknown;

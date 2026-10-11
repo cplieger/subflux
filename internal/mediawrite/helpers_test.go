@@ -311,7 +311,7 @@ func captureLogs(t *testing.T) *logCapture {
 	return c
 }
 
-func (c *logCapture) Enabled(context.Context, slog.Level) bool { return true }
+func (*logCapture) Enabled(context.Context, slog.Level) bool { return true }
 
 func (c *logCapture) Handle(_ context.Context, r slog.Record) error {
 	rec := logRecord{level: r.Level, msg: r.Message, attrs: map[string]string{}}

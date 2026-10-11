@@ -15,12 +15,12 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// ItemScan is one item's scan result.
-type ItemScan struct {
+// itemScan is one item's scan result.
+type itemScan struct {
 	// WriteFailure is set when the item's save learned that its folder
 	// refuses writes; the scan stops after this item.
 	WriteFailure *mediawrite.UnwritableError
-	Outcome      ScanOutcome
+	Outcome      scanOutcome
 	// Langs are the engine's per-language outcomes; the season tracker
 	// records evidence only for subflux.LangSearched entries.
 	Langs   []subflux.LangOutcome
@@ -28,8 +28,8 @@ type ItemScan struct {
 	Queried bool // a provider was queried: the inter-item pacing signal
 }
 
-// ScanEpisode searches for subtitles for a single episode.
-func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) ItemScan {
+// scanEpisode searches for subtitles for a single episode.
+func scanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) itemScan {
 	label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 	slog.Debug("scan: processing episode",
 		"media", label, "imdb", series.ImdbID,
@@ -44,7 +44,7 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	req.ForceUpgrade = len(forceUpgrade) > 0 && forceUpgrade[0]
 
 	result, err := ls.Engine.SearchTargets(ctx, &req, ep.EpisodeFile.Path, targets)
-	scan := ItemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
+	scan := itemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
 	if !errors.As(err, &scan.WriteFailure) && err != nil {
 		slog.Warn("episode search failed", "media", label, "error", err)
 	}
@@ -65,30 +65,30 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	return scan
 }
 
-func itemOutcome(result *subflux.SearchResult) ScanOutcome {
+func itemOutcome(result *subflux.SearchResult) scanOutcome {
 	switch {
 	case len(result.Paths()) > 0:
-		return ScanFound
+		return scanFound
 	case result.WriteBlocked() > 0:
-		return ScanWriteBlocked
+		return scanWriteBlocked
 	case result.TargetsFailed() > 0:
-		return ScanDownloadFailed
+		return scanDownloadFailed
 	case result.TargetsSearched() > 0:
-		return ScanNoResult
+		return scanNoResult
 	case result.TargetsBackedOff() > 0:
 		// Every language needing a search had all providers in adaptive
 		// backoff: no query ran, so this is neither skipped-as-covered nor
 		// searched-with-no-result.
-		return ScanBackedOff
+		return scanBackedOff
 	default:
-		return ScanSkipped
+		return scanSkipped
 	}
 }
 
 // scanMovieDetail searches for subtitles for a single movie. Found counts
 // the targets saved (one file each), for callers that report per-target
 // found counts.
-func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) ItemScan {
+func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) itemScan {
 	label := fmt.Sprintf("%s (%d)", m.Title, m.Year)
 	slog.Debug("scan: processing movie",
 		"media", label, "imdb", m.ImdbID, "tmdb", m.TmdbID,
@@ -103,7 +103,7 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	req.ForceUpgrade = len(forceUpgrade) > 0 && forceUpgrade[0]
 
 	result, err := ls.Engine.SearchTargets(ctx, &req, m.MovieFile.Path, targets)
-	scan := ItemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
+	scan := itemScan{Langs: result.Langs, Queried: result.ProviderQueried()}
 	if !errors.As(err, &scan.WriteFailure) && err != nil {
 		slog.Warn("movie search failed", "media", label, "error", err)
 	}

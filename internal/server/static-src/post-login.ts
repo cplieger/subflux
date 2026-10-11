@@ -2,7 +2,7 @@
 // so the login page can route a session without pulling in the wizard's chunk.
 
 /** PostLoginDestination is where a successful login lands. */
-export type PostLoginDestination = "app" | "wizard" | "admin_needed_notice";
+type PostLoginDestination = "app" | "wizard" | "admin_needed_notice";
 
 /** postLoginDestination routes a fresh login: a valid config goes to the
  *  app; an invalid one sends admins into the wizard and non-admins to the

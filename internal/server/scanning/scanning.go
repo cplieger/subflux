@@ -37,9 +37,9 @@ type Deps struct {
 	ClearCaches func(providers []provider.Provider)
 }
 
-// MediaPreflight write-tests the folders a scan will write into before any
+// mediaPreflight write-tests the folders a scan will write into before any
 // provider work; *mediawrite.Writer satisfies it.
-type MediaPreflight interface {
+type mediaPreflight interface {
 	Preflight(ctx context.Context, req mediawrite.PreflightRequest) error
 }
 
@@ -47,7 +47,7 @@ type MediaPreflight interface {
 // consults before any provider work of its own; *mediawrite.Writer
 // satisfies it.
 type MediaGuard interface {
-	MediaPreflight
+	mediaPreflight
 	Blocked(path string) (folder string, blocked bool)
 }
 
@@ -82,7 +82,6 @@ type EventPublisher interface {
 
 // ActivityTracker manages scan activity lifecycle.
 type ActivityTracker interface {
-	Start(action, detail string, source activity.Source) string
 	StartScan(action, detail string, source activity.Source,
 		scope activity.ScanScope, role auth.Role) (id string, existing bool)
 	End(id string)
@@ -240,15 +239,15 @@ type LiveState struct {
 	Providers   []provider.Provider
 }
 
-// ScanOutcome is a type alias for subflux.ScanOutcome.
-type ScanOutcome = subflux.ScanOutcome
+// scanOutcome is a type alias for subflux.ScanOutcome.
+type scanOutcome = subflux.ScanOutcome
 
-// ScanFound and its siblings are ScanOutcome aliases for subflux's scan outcomes.
+// scanFound and its siblings are ScanOutcome aliases for subflux's scan outcomes.
 const (
-	ScanFound          = subflux.ScanFound
-	ScanSkipped        = subflux.ScanSkipped
-	ScanNoResult       = subflux.ScanNoResult
-	ScanBackedOff      = subflux.ScanBackedOff
-	ScanDownloadFailed = subflux.ScanDownloadFailed
-	ScanWriteBlocked   = subflux.ScanWriteBlocked
+	scanFound          = subflux.ScanFound
+	scanSkipped        = subflux.ScanSkipped
+	scanNoResult       = subflux.ScanNoResult
+	scanBackedOff      = subflux.ScanBackedOff
+	scanDownloadFailed = subflux.ScanDownloadFailed
+	scanWriteBlocked   = subflux.ScanWriteBlocked
 )

@@ -9,18 +9,13 @@ import (
 
 const ellipsis = "..."
 
-// Anchor represents language-independent features extracted from a subtitle cue.
-type Anchor struct {
+// anchor represents language-independent features extracted from a subtitle cue.
+type anchor struct {
 	Punctuation string
 	Numbers     []string
 	ProperNouns []string
 	Cognates    []string
-	WordCount   int
-	CharLen     int
 }
-
-// internal alias for use within the package
-type anchor = Anchor
 
 var (
 	numberRe = regexp.MustCompile(`\d[\d.,]*\d|\d`)
@@ -36,7 +31,6 @@ func extractAnchors(text string) anchor {
 	cleaned := stripSubTags(text)
 	trimmed := strings.TrimSpace(cleaned)
 	var a anchor
-	a.CharLen = utf8.RuneCountInString(trimmed)
 	a.Numbers = extractNumbers(cleaned)
 	extractWords(&a, cleaned)
 	a.Punctuation = terminalPunctuation(trimmed)
@@ -65,7 +59,6 @@ func extractWords(a *anchor, cleaned string) {
 		line = strings.TrimPrefix(line, "- ")
 		line = strings.TrimSpace(line)
 		words := strings.Fields(line)
-		a.WordCount += len(words)
 		for i, w := range words {
 			atStart := i == 0 || endsWithSentence(words[i-1])
 			classifyWord(a, w, atStart)

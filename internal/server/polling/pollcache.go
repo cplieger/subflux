@@ -19,7 +19,7 @@ import (
 //
 // A failed durable write leaves the cursor DIRTY: memory and disk disagree,
 // and a restart would replay from the older persisted position. That state
-// is explicit — WARN-logged with its onset, retried via RetryDirty on the
+// is explicit — WARN-logged with its onset, retried via retryDirty on the
 // poll heartbeat, gauged through the optional dirty gauge, and announced
 // when it heals — so restart replay is an expected, explained event instead
 // of a silent drift.
@@ -52,9 +52,9 @@ func (c *PollCache) SetDirtyGauge(fn func(n int)) {
 	c.dirtyGauge = fn
 }
 
-// Get returns the cached timestamp for key, falling back to the DB on miss.
+// get returns the cached timestamp for key, falling back to the DB on miss.
 // Uses LoadOrStore to handle the race between concurrent first-reads atomically.
-func (c *PollCache) Get(ctx context.Context, key subflux.PollKey) time.Time {
+func (c *PollCache) get(ctx context.Context, key subflux.PollKey) time.Time {
 	if v, ok := c.shadow.Load(key); ok {
 		if t, ok := v.(time.Time); ok {
 			return t
@@ -76,10 +76,10 @@ func (c *PollCache) Get(ctx context.Context, key subflux.PollKey) time.Time {
 	return t
 }
 
-// Set updates both the in-memory cache and the persistent store. The cache
+// set updates both the in-memory cache and the persistent store. The cache
 // advances unconditionally so polling keeps working through disk trouble;
 // a failed durable write marks the cursor dirty (see PollCache doc).
-func (c *PollCache) Set(ctx context.Context, key subflux.PollKey, t time.Time) {
+func (c *PollCache) set(ctx context.Context, key subflux.PollKey, t time.Time) {
 	c.shadow.Store(key, t)
 	if err := c.setFn(ctx, key, t); err != nil {
 		c.markDirty(key, err)
@@ -88,10 +88,10 @@ func (c *PollCache) Set(ctx context.Context, key subflux.PollKey, t time.Time) {
 	c.markClean(key)
 }
 
-// RetryDirty re-attempts the durable persist of every dirty cursor using its
+// retryDirty re-attempts the durable persist of every dirty cursor using its
 // CURRENT in-memory position. Called on the poll heartbeat so a transient
 // write failure heals within one cycle; a no-op when everything is clean.
-func (c *PollCache) RetryDirty(ctx context.Context) {
+func (c *PollCache) retryDirty(ctx context.Context) {
 	c.dirtyMu.Lock()
 	keys := make([]subflux.PollKey, 0, len(c.dirty))
 	for k := range c.dirty {

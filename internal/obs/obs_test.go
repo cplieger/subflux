@@ -544,9 +544,9 @@ type errWriter struct {
 	header http.Header
 }
 
-func (e *errWriter) Header() http.Header       { return e.header }
-func (e *errWriter) Write([]byte) (int, error) { return 0, http.ErrAbortHandler }
-func (e *errWriter) WriteHeader(int)           {}
+func (e *errWriter) Header() http.Header     { return e.header }
+func (*errWriter) Write([]byte) (int, error) { return 0, http.ErrAbortHandler }
+func (*errWriter) WriteHeader(int)           {}
 
 func TestHandler_write_error_does_not_panic(t *testing.T) {
 	t.Parallel()

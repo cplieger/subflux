@@ -21,7 +21,7 @@ func TestAudioSyncFromPCM_too_few_cues(t *testing.T) {
 	cues := makeCues(4, 0, 2*time.Second)
 	pcm := make([]int16, 8000)
 	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("audioSyncFromPCM(4 cues) confidence = %f, want 0", float64(result.Confidence))
 	}
 	if result.Method != MethodAudio {
@@ -34,7 +34,7 @@ func TestAudioSyncFromPCM_zero_frames(t *testing.T) {
 	cues := makeCues(10, 0, 2*time.Second)
 	pcm := make([]int16, 50)
 	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("audioSyncFromPCM(zero frames) confidence = %f, want 0", float64(result.Confidence))
 	}
 }
@@ -280,14 +280,14 @@ func TestAudioSyncFromPCM_recovers_a_known_displacement(t *testing.T) {
 		t.Errorf("audioSyncFromPCM(cues 1000ms late).Cues[0].Start = %v, want 1.115s (+/-%dms)",
 			got.Cues[0].Start, audioOffsetToleranceMs)
 	}
-	if got.Confidence <= ConfidenceNone {
+	if got.Confidence <= confidenceNone {
 		t.Errorf("audioSyncFromPCM(cues 1000ms late).Confidence = %v, want > 0", got.Confidence)
 	}
 	// Confidence is the peak scaled by this method's ceiling, so it can never
 	// exceed the ceiling itself.
-	if got.Confidence > DefaultConfidenceCaps.Audio {
+	if got.Confidence > defaultConfidenceCaps.Audio {
 		t.Errorf("audioSyncFromPCM(cues 1000ms late).Confidence = %v, want <= the audio cap %v",
-			got.Confidence, DefaultConfidenceCaps.Audio)
+			got.Confidence, defaultConfidenceCaps.Audio)
 	}
 	if got.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(cues 1000ms late).Method = %q, want %q", got.Method, MethodAudio)
@@ -340,11 +340,11 @@ func TestAudioSyncFromPCM_discards_an_offset_past_the_duration_ceiling(t *testin
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Offset = %d, want %d (+/-%d)",
 					tt.frames, got.Offset, tt.wantOffset, audioOffsetToleranceMs)
 			}
-			if tt.wantApplied && got.Confidence <= ConfidenceNone {
+			if tt.wantApplied && got.Confidence <= confidenceNone {
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Confidence = %v, want > 0",
 					tt.frames, got.Confidence)
 			}
-			if !tt.wantApplied && got.Confidence != ConfidenceNone {
+			if !tt.wantApplied && got.Confidence != confidenceNone {
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Confidence = %v, want 0",
 					tt.frames, got.Confidence)
 			}

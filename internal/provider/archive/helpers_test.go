@@ -16,8 +16,9 @@ func zipExtract(data []byte, want epmarker.Target) ([]byte, error) {
 	return extractWith(zipMembers, data, want)
 }
 
-func rarExtract(data []byte, want epmarker.Target) ([]byte, error) {
-	return extractWith(rarMembers, data, want)
+func rarExtract(data []byte, want epmarker.Target) []byte {
+	got, _ := extractWith(rarMembers, data, want)
+	return got
 }
 
 // gateZipEntry and gateRAREntry run the real entry gate against a real container

@@ -32,7 +32,7 @@ export type Availability =
       readonly suggestedRPID: string;
     };
 
-export type Unavailable = Extract<Availability, { available: false }>;
+type Unavailable = Extract<Availability, { available: false }>;
 
 export function unavailable(reason: UnavailableReason): Unavailable {
   return { available: false, reason, rpID: "", suggestedRPID: "" };
@@ -107,7 +107,7 @@ export function unavailableSentence(a: Unavailable): string {
 
 // --- Outcomes ---
 
-export type RegisterOutcome =
+type RegisterOutcome =
   | { readonly kind: "registered" }
   | { readonly kind: "cancelled" }
   | { readonly kind: "duplicate" }
@@ -281,7 +281,6 @@ function classifyDOMException(e: unknown): AbortVerdict {
 
 interface FinishResult {
   readonly ok: boolean;
-  readonly status: number;
   readonly error?: string;
   readonly code?: string;
   readonly signal?: string;
@@ -307,12 +306,11 @@ async function finishCeremony(
     if (e instanceof DOMException) {
       throw e;
     }
-    return { ok: false, status: 0 };
+    return { ok: false };
   }
   const data: unknown = await res.json().catch(() => ({}));
   const out: { -readonly [K in keyof FinishResult]: FinishResult[K] } = {
     ok: res.ok,
-    status: res.status,
   };
   for (const key of ["error", "code", "signal", "redirect"] as const) {
     const value = readString(data, key);

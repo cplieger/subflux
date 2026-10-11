@@ -250,7 +250,7 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
-	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
+	audit(r, slog.LevelInfo, auditLoginSuccess, true, user.Username,
 		slog.String("method", string(auth.MethodPasskey)))
 }
 

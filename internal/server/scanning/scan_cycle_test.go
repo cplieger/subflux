@@ -27,7 +27,7 @@ func (f *fakeScanStore) RecentlyScanned(_ context.Context, cutoff time.Time) (ma
 	return f.recent, nil
 }
 
-func (f *fakeScanStore) RecordScanState(context.Context, *subflux.ScanRecord) error { return nil }
+func (*fakeScanStore) RecordScanState(context.Context, *subflux.ScanRecord) error { return nil }
 
 func (f *fakeScanStore) ScanCycleStart(context.Context) (time.Time, error) { return f.mark, nil }
 

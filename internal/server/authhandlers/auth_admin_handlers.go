@@ -73,7 +73,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), PasswordCheck{
+	hash, userMsg, err := validateAndHashPassword(r.Context(), passwordCheck{
 		Password:    req.Password,
 		Username:    req.Username,
 		SoleFactor:  true,

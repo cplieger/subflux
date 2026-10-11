@@ -33,8 +33,8 @@ func newDownloadCache(maxEntries int, maxItemSize int64) *downloadCache {
 	}
 }
 
-// Get retrieves cached data by key. Returns nil, false on miss.
-func (dc *downloadCache) Get(key string) ([]byte, bool) {
+// get retrieves cached data by key. Returns nil, false on miss.
+func (dc *downloadCache) get(key string) ([]byte, bool) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	e, ok := dc.cache[key]
@@ -46,11 +46,11 @@ func (dc *downloadCache) Get(key string) ([]byte, bool) {
 	return e.data, true
 }
 
-// Put stores data under key. Returns false (without storing) if the data
+// put stores data under key. Returns false (without storing) if the data
 // exceeds maxItemSize or the cache is full and cannot evict. The onSaturated
 // callback is called at most once per Clear cycle when the cache refuses
 // to store an entry.
-func (dc *downloadCache) Put(key string, data []byte, onSaturated func()) bool {
+func (dc *downloadCache) put(key string, data []byte, onSaturated func()) bool {
 	if int64(len(data)) > dc.maxItemSize {
 		if onSaturated != nil {
 			dc.saturated.Do(onSaturated)
@@ -77,8 +77,8 @@ func (dc *downloadCache) Put(key string, data []byte, onSaturated func()) bool {
 	return true
 }
 
-// Clear removes all cached data and resets the saturation guard.
-func (dc *downloadCache) Clear() {
+// clear removes all cached data and resets the saturation guard.
+func (dc *downloadCache) clear() {
 	dc.mu.Lock()
 	dc.cache = make(map[string]*entry)
 	dc.h = nil

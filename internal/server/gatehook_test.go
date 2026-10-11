@@ -189,7 +189,7 @@ func TestActivate_a_persisted_disable_alerts_until_the_provider_is_switched_off(
 	m := obs.New()
 	gate := openTestGate(t, store, m, clock)
 	s := newGateServer(t, reg, gate, m, func(ctx context.Context, cfg *config.Config, db search.Store, sm search.Metrics) (wiring.Result, error) {
-		return wiring.Build(ctx, cfg, db, sm, reg, gate, wiring.Extras{SyncExec: syncing.InProcessExec{}, Tracks: search.NoopDetector{}, Media: testsupport.MediaWriter()})
+		return wiring.Build(ctx, cfg, db, sm, reg, gate, wiring.Extras{SyncExec: syncing.InProcessExec{}, Tracks: testsupport.NoDetector{}, Media: testsupport.MediaWriter()})
 	})
 	const series = `subflux_provider_disabled{provider="opensubtitles"} 1`
 
@@ -250,7 +250,7 @@ func newGateRig(t *testing.T, withTimeouts bool) *gateRig {
 		sc := scorer.New(&scores)
 		opts := []search.Option{
 			search.WithStore(db), search.WithConfig(cfg), search.WithMetrics(m), search.WithScorer(sc),
-			search.WithSyncer(syncing.Syncer{}), search.WithTracks(search.NoopDetector{}),
+			search.WithSyncer(syncing.Syncer{}), search.WithTracks(testsupport.NoDetector{}),
 			search.WithProviderGate(r.binding), search.WithMediaWriter(testsupport.MediaWriter()),
 		}
 		if r.tracker != nil {

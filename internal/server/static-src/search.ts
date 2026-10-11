@@ -10,7 +10,12 @@ import { join } from "@cplieger/keyenc";
 import { manualSearchRaw, PATH_DOWNLOAD_SUBTITLE } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import { decodeDownloadAccepted } from "./wire/decoders.gen.js";
-import type { DownloadAccepted, ManualProviderNotice, SearchResult } from "./wire/types.gen.js";
+import type {
+  DownloadAccepted,
+  DownloadRequest,
+  ManualProviderNotice,
+  SearchResult,
+} from "./wire/types.gen.js";
 import { apiAction, retryNetwork, registerCleanup } from "@cplieger/actions";
 import { observeActivities } from "./status.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
@@ -19,15 +24,10 @@ import { buildPath, mediaParent, parseRoute } from "./route-path.js";
 import type { Route } from "./route-path.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
 
-const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
+const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string }[] = [
   {
     code: ErrorCode.SearchProviderDisabled,
     msg: "All search providers are disabled. Enable at least one in settings.",
-  },
-  { code: ErrorCode.SearchNoResults, msg: "No results found from any provider.", empty: true },
-  {
-    code: ErrorCode.ProviderTimedOut,
-    msg: "This provider is in cooldown. Try again in a few minutes.",
   },
 ];
 
@@ -61,29 +61,12 @@ interface DownloadOpts {
   isTop: boolean;
 }
 
-interface DownloadArgs {
-  provider: string;
-  subtitle_id: string;
-  release_name: string;
-  language: string;
-  season: number;
-  episode: number;
-  media_type: MediaType;
-  /** MediaRef the server resolves the video file path from (no path on the wire). */
-  media_id: number;
-  top_pick: boolean;
-  score: number;
-  hearing_impaired: boolean;
-  forced: boolean;
-}
-
-// retryNetwork recovers transient blips only; download_failed is not retried
-// (the user re-clicks via the re-enabled button).
-const downloadAction = apiAction<DownloadArgs, DownloadAccepted>({
+// retryNetwork recovers transient blips only.
+const downloadAction = apiAction<DownloadRequest, DownloadAccepted>({
   name: "search.download",
   request: (args) => ({ method: "POST", path: PATH_DOWNLOAD_SUBTITLE, body: args }),
   decode: (data) => decodeDownloadAccepted(data),
-  retryable: (err) => err.code !== ErrorCode.DownloadFailed && retryNetwork(err),
+  retryable: retryNetwork,
   error: false, // callsite drives icon + tooltip + per-error re-enable logic
 });
 
@@ -401,7 +384,7 @@ async function runPopupSearch(
     }
     const matched = SEARCH_ERROR_MAP.find((e) => hasCode(r, e.code));
     if (matched) {
-      patch(out, matched.empty ? emptyDiv(matched.msg) : errDiv(matched.msg));
+      patch(out, errDiv(matched.msg));
     } else {
       patch(out, errDiv(r.error ?? "Search failed"));
     }
@@ -571,10 +554,6 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     btn.dataset["status"] = "err";
     patch(btn, icon("close"));
     btn.setAttribute("data-tip", downloadErr?.message ?? "Download failed");
-    // download_failed is transient-by-design; re-enable for manual retry.
-    if (downloadErr?.code === ErrorCode.DownloadFailed) {
-      (btn as HTMLButtonElement).disabled = false;
-    }
     return;
   }
   const data = o.value;

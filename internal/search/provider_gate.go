@@ -22,19 +22,19 @@ func (e *Engine) ProviderStatus() (status map[subflux.ProviderID]subflux.Provide
 	gate := e.providerGate.Status()
 	status = make(map[subflux.ProviderID]subflux.ProviderStatus, len(health)+len(gate))
 	for id, h := range health {
-		status[id] = MergeProviderStatus(h, gate[id])
+		status[id] = mergeProviderStatus(h, gate[id])
 	}
 	for id, g := range gate {
 		if _, done := status[id]; !done {
-			status[id] = MergeProviderStatus(subflux.ProviderStatus{}, g)
+			status[id] = mergeProviderStatus(subflux.ProviderStatus{}, g)
 		}
 	}
 	return status, health != nil
 }
 
-// MergeProviderStatus is one provider's full status: the health fields from
+// mergeProviderStatus is one provider's full status: the health fields from
 // the tracker, the disable, pause and rejected settings from the gate.
-func MergeProviderStatus(health subflux.ProviderStatus, gate providergate.Status) subflux.ProviderStatus { //nolint:gocritic // hugeParam: health is the copy the merge returns
+func mergeProviderStatus(health subflux.ProviderStatus, gate providergate.Status) subflux.ProviderStatus { //nolint:gocritic // hugeParam: health is the copy the merge returns
 	health.Disabled = gate.Disabled
 	health.DisabledReason = gate.DisabledReason
 	health.AuthFailures = gate.AuthFailures
@@ -112,10 +112,10 @@ func (e *Engine) HasShowCounter() bool { return e.showCounter != nil }
 
 // CountShowSubtitles asks the engine's show-level counter, through the
 // provider gate as a search. A refusal is ErrProviderGated with the gate's
-// reason and makes no request; with no counter it is ErrProviderNotFound.
+// reason and makes no request; with no counter it is errProviderNotFound.
 func (e *Engine) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	if e.showCounter == nil {
-		return 0, fmt.Errorf("%w: no show-level counter", ErrProviderNotFound)
+		return 0, fmt.Errorf("%w: no show-level counter", errProviderNotFound)
 	}
 	name := e.showCounterID
 	if ok, reason := e.providerGate.Admit(name, providergate.OpSearch); !ok {

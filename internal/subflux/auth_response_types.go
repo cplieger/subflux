@@ -19,6 +19,8 @@ type SetupStatus struct {
 }
 
 // WebAuthnUnavailableReason names why a passkey ceremony cannot be conducted.
+//
+//deadset:ignore DS1101 -- The wire generator registers it by name (internal/wirespec/wirespec.go:180); the passkey ceremony code imports the TypeScript type at internal/server/static-src/webauthn-ceremony.ts:12.
 type WebAuthnUnavailableReason string
 
 // The wire reasons, one per condition, so the client's sentence per reason is

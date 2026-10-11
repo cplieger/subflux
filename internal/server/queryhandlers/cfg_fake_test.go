@@ -60,7 +60,7 @@ func (c *fakeQueryCfg) ResolveTargetsWithFallback(_ string, _ []string) []subflu
 }
 
 func (c *fakeQueryCfg) EmbeddedPolicy() subflux.EmbeddedPolicy { return c.embedded }
-func (c *fakeQueryCfg) Scores() subflux.Scores                 { return subflux.DefaultScores }
+func (*fakeQueryCfg) Scores() subflux.Scores                   { return subflux.DefaultScores }
 func (c *fakeQueryCfg) Search() subflux.SearchConfig           { return c.searchCfg }
 func (c *fakeQueryCfg) Adaptive() subflux.AdaptiveConfig       { return c.adaptiveCfg }
 func (c *fakeQueryCfg) PostProcess() subflux.PostProcessConfig { return c.postProcess }
@@ -71,7 +71,7 @@ func (c *fakeQueryCfg) Radarr() subflux.ArrConfig              { return c.radarr
 
 func (c *fakeQueryCfg) Sync() subflux.SyncConfig { return c.syncCfg }
 
-func (c *fakeQueryCfg) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
+func (*fakeQueryCfg) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	return all
 }
 

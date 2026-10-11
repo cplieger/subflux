@@ -23,8 +23,8 @@ const maxRequestBytes = 64 << 20
 // nothing); the parent judges the job by the JSON response. ctx cancellation
 // (parent kill, signal) aborts the underlying ffmpeg/alignment work.
 func RunWorker(ctx context.Context, stdin io.Reader, stdout io.Writer) int {
-	var resp Response
-	resp.Version = ProtocolVersion
+	var resp response
+	resp.Version = protocolVersion
 
 	req, err := readRequest(stdin, maxRequestBytes)
 	if err != nil {
@@ -47,7 +47,7 @@ func RunWorker(ctx context.Context, stdin io.Reader, stdout io.Writer) int {
 // arriving as a truncated decode failure. Every production read passes
 // maxRequestBytes — the parent marshals the request without a size check of
 // its own, so this is the protocol's only bound and nothing negotiates it.
-func readRequest(stdin io.Reader, maxBytes int) (*Request, error) {
+func readRequest(stdin io.Reader, maxBytes int) (*request, error) {
 	raw, err := io.ReadAll(io.LimitReader(stdin, int64(maxBytes)+1))
 	if err != nil {
 		return nil, fmt.Errorf("read request: %w", err)
@@ -55,21 +55,21 @@ func readRequest(stdin io.Reader, maxBytes int) (*Request, error) {
 	if len(raw) > maxBytes {
 		return nil, fmt.Errorf("request exceeds %d bytes", maxBytes)
 	}
-	var req Request
+	var req request
 	if err := json.Unmarshal(raw, &req); err != nil {
 		return nil, fmt.Errorf("decode request: %w", err)
 	}
-	if req.Version != ProtocolVersion {
-		return nil, fmt.Errorf("protocol version %d, worker speaks %d (binary replaced mid-flight?)", req.Version, ProtocolVersion)
+	if req.Version != protocolVersion {
+		return nil, fmt.Errorf("protocol version %d, worker speaks %d (binary replaced mid-flight?)", req.Version, protocolVersion)
 	}
 	return &req, nil
 }
 
 // execute runs the requested strategy in THIS process — the worker child is
 // where the in-process implementations live now.
-func execute(ctx context.Context, req *Request) (subsync.SyncResult, error) {
+func execute(ctx context.Context, req *request) (subsync.SyncResult, error) {
 	switch req.Op {
-	case OpReference:
+	case opReference:
 		slog.Debug("sync worker: reference job",
 			"video", req.VideoPath, "lang", req.Lang, "bytes", len(req.Data))
 		// Same mapper the composition root wires into the in-process Syncer
@@ -77,7 +77,7 @@ func execute(ctx context.Context, req *Request) (subsync.SyncResult, error) {
 		// the language table is identical by construction.
 		return syncing.SyncAgainstReference(ctx, req.Data, req.VideoPath,
 			req.Lang, classify.Alpha2FromAlpha3, req.MinConfidence), nil
-	case OpAudio:
+	case opAudio:
 		slog.Debug("sync worker: audio job",
 			"video", req.VideoPath, "bytes", len(req.Data))
 		return syncing.SyncFromAudio(ctx, req.Data, req.VideoPath, req.SubtitlePath), nil
@@ -86,7 +86,7 @@ func execute(ctx context.Context, req *Request) (subsync.SyncResult, error) {
 	}
 }
 
-func writeResponse(stdout io.Writer, resp *Response, failCode int) int {
+func writeResponse(stdout io.Writer, resp *response, failCode int) int {
 	if err := json.NewEncoder(stdout).Encode(resp); err != nil {
 		slog.Error("sync worker: write response failed", "error", err)
 		return 3

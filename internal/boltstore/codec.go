@@ -54,7 +54,6 @@ type stateRec struct {
 	Path          string             `json:"path"`
 	Title         string             `json:"title"`
 	ImdbID        string             `json:"imdb_id"`
-	ReleaseTag    string             `json:"release_tag"`
 	VideoPath     string             `json:"video_path"`
 	ID            int64              `json:"id"` // NextSequence surrogate
 	Score         int                `json:"score"`
@@ -70,8 +69,7 @@ type stateRec struct {
 // sync offset is NOT stored here: it lives solely in the sync_offsets bucket
 // (keyed by bare path), which SubtitleFiles joins at read time.
 type fileRec struct {
-	UpdatedAt time.Time `json:"updated_at"`
-	Codec     string    `json:"codec"`
+	Codec string `json:"codec"`
 }
 
 // scanRec is the scan_state value, one row per (media_type, media_id) carried

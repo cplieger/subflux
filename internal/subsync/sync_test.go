@@ -31,7 +31,7 @@ func TestSyncWithOptions_empty_incorrect(t *testing.T) {
 	if result.Method != MethodNone {
 		t.Errorf("expected method 'none', got %q", result.Method)
 	}
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
@@ -51,7 +51,7 @@ func TestSyncWithOptions_no_reference_no_audio(t *testing.T) {
 func TestSyncWithOptions_constant_offset(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := DefaultSyncOptions()
 	opts.EnableFramerate = false
 	opts.EnableSplits = false
@@ -68,7 +68,7 @@ func TestSyncWithOptions_constant_offset(t *testing.T) {
 func TestSyncWithOptions_with_reference(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 3*time.Second)
+	inc := shiftCues(ref, 3*time.Second)
 	opts := DefaultSyncOptions()
 	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if len(result.Cues) != len(inc) {
@@ -104,7 +104,7 @@ func TestSyncWithOptions_audio_no_video_path(t *testing.T) {
 func TestConstantOffsetConfidence(t *testing.T) {
 	t.Parallel()
 	longCues := makeLongCues(20, 5*time.Minute)
-	shiftedCues := ShiftCues(longCues, 2*time.Second)
+	shiftedCues := shiftCues(longCues, 2*time.Second)
 	tests := []struct {
 		name    string
 		ref     []Cue
@@ -126,32 +126,32 @@ func TestConstantOffsetConfidence(t *testing.T) {
 			ref:     nil,
 			inc:     nil,
 			offset:  0,
-			wantMin: ConfidenceNone,
-			wantMax: ConfidenceNone,
+			wantMin: confidenceNone,
+			wantMax: confidenceNone,
 		},
 		{
 			name:    "zero length ref spans returns none",
 			ref:     []Cue{{Start: time.Second, End: time.Second, Text: "zero"}},
 			inc:     []Cue{{Start: time.Second, End: 2 * time.Second, Text: "normal"}},
 			offset:  0,
-			wantMin: ConfidenceNone,
-			wantMax: ConfidenceNone,
+			wantMin: confidenceNone,
+			wantMax: confidenceNone,
 		},
 		{
 			name:    "nil reference returns none",
 			ref:     nil,
 			inc:     []Cue{{Start: time.Second, End: 2 * time.Second, Text: "A"}},
 			offset:  0,
-			wantMin: ConfidenceNone,
-			wantMax: ConfidenceNone,
+			wantMin: confidenceNone,
+			wantMax: confidenceNone,
 		},
 		{
 			name:    "nil incorrect returns none",
 			ref:     []Cue{{Start: time.Second, End: 2 * time.Second, Text: "A"}},
 			inc:     nil,
 			offset:  0,
-			wantMin: ConfidenceNone,
-			wantMax: ConfidenceNone,
+			wantMin: confidenceNone,
+			wantMax: confidenceNone,
 		},
 		{
 			name:    "high overlap perfect shift",
@@ -212,10 +212,10 @@ func TestConstantOffsetConfidence(t *testing.T) {
 func TestReferenceSync_prefers_higher_confidence(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := DefaultSyncOptions()
 	result := referenceSync(t.Context(), ref, inc, &opts)
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected some confidence from reference sync")
 	}
 	if len(result.Cues) != len(inc) {
@@ -243,7 +243,7 @@ func TestDefaultSyncOptions(t *testing.T) {
 func TestSyncWithOptions_zero_min_confidence_defaults(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		EnableFramerate: false,
 		EnableSplits:    false,
@@ -258,7 +258,7 @@ func TestSyncWithOptions_zero_min_confidence_defaults(t *testing.T) {
 func TestSyncWithOptions_negative_min_confidence_defaults(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		EnableFramerate: false,
 		EnableSplits:    false,
@@ -275,7 +275,7 @@ func TestSyncWithOptions_zero_min_confidence_gates_at_the_default(t *testing.T) 
 	// An unset MinConfidence has to become the default gate, not a gate of
 	// zero that accepts whatever the first strategy produced.
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{MinConfidence: 0}
 	logs := captureAlignLogs(t, func() {
 		SyncWithOptions(t.Context(), ref, inc, &opts)
@@ -311,7 +311,7 @@ func TestSyncWithOptions_reports_a_result_below_the_gate(t *testing.T) {
 	// A result that misses the gate is the case an operator needs told
 	// about: the caller gets cues back that were deliberately not applied.
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{MinConfidence: 0.99}
 	logs := captureAlignLogs(t, func() {
 		SyncWithOptions(t.Context(), ref, inc, &opts)
@@ -350,7 +350,7 @@ func TestReferenceSync_framerate_strong_returns_early(t *testing.T) {
 		MinConfidence:   0.5,
 	}
 	result := referenceSync(t.Context(), ref, inc, &opts)
-	if result.Method != MethodFramerate {
+	if result.Method != methodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 	if result.Confidence < 0.8 {
@@ -412,7 +412,7 @@ func TestSyncWithOptions_reference_below_threshold_returns_best(t *testing.T) {
 	t.Parallel()
 	// Reference sync produces some confidence but below threshold.
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	opts := SyncOptions{
 		EnableFramerate: false,
 		EnableSplits:    false,
@@ -428,7 +428,7 @@ func TestSyncWithOptions_reference_below_threshold_returns_best(t *testing.T) {
 func TestSyncWithOptions_nil_opts_uses_defaults(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 
 	result := SyncWithOptions(t.Context(), ref, inc, nil)
 
@@ -449,7 +449,7 @@ func TestSyncWithOptions_nil_opts_uses_defaults(t *testing.T) {
 func TestSyncWithOptions_gate_reads_calibrated_confidence(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 
 	opts := SyncOptions{
 		EnableFramerate: false,
@@ -470,7 +470,7 @@ func TestSyncWithOptions_gate_reads_calibrated_confidence(t *testing.T) {
 	}
 	// The winner's calibrated confidence is capped by its method's ceiling —
 	// a rating (raw overlap fraction of 1.0 here) would exceed it.
-	if cap := DefaultConfidenceCaps.ForMethod(got.Method); got.Confidence > cap {
+	if cap := defaultConfidenceCaps.forMethod(got.Method); got.Confidence > cap {
 		t.Errorf("confidence %f exceeds method cap %f — looks like a rating leaked into Confidence",
 			float64(got.Confidence), float64(cap))
 	}
@@ -479,7 +479,7 @@ func TestSyncWithOptions_gate_reads_calibrated_confidence(t *testing.T) {
 func TestReferenceSync_no_candidates_returns_original(t *testing.T) {
 	t.Parallel()
 	// Zero-length cues produce totalRef == 0 in constantOffsetConfidence,
-	// and crossLangAlign returns ConfidenceNone for single-cue inputs.
+	// and crossLangAlign returns confidenceNone for single-cue inputs.
 	// This exercises the len(candidates) == 0 early return.
 	ref := []Cue{
 		{Start: time.Second, End: time.Second, Text: "A"},
@@ -496,7 +496,7 @@ func TestReferenceSync_no_candidates_returns_original(t *testing.T) {
 	if result.Method != MethodNone {
 		t.Errorf("referenceSync(zero-length cues) method = %q, want %q", result.Method, MethodNone)
 	}
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("referenceSync(zero-length cues) confidence = %f, want 0", float64(result.Confidence))
 	}
 	if len(result.Cues) != 1 {

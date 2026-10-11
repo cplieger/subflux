@@ -26,7 +26,7 @@ export interface ConnTestBanner {
  *
  *  Elements rather than ids, because every host builds the control while its
  *  section is still detached. A null element sends "" for its key. */
-export interface ConnTestHost {
+interface ConnTestHost {
   inputs: Record<string, HTMLInputElement | null>;
   banner: ConnTestBanner;
 }

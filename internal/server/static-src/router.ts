@@ -127,7 +127,7 @@ async function handleSeriesSync(id: number): Promise<void> {
 
 function handleSeriesFiles(id: number): Promise<void> {
   return withSeries(id, (s) => {
-    openFileManager("episode", `tvdb-${id}-`, s.title, buildPath({ kind: "series", id }), s.id);
+    openFileManager("episode", `tvdb-${id}-`, s.title, s.id);
   });
 }
 
@@ -162,7 +162,7 @@ async function handleMovieSync(id: number): Promise<void> {
 
 async function handleMovieFiles(id: number): Promise<void> {
   await withMovie(id, (mv) => {
-    openFileManager("movie", `tmdb-${id}`, mv.title, buildPath({ kind: "movie", id }), mv.id);
+    openFileManager("movie", `tmdb-${id}`, mv.title, mv.id);
   });
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 func BenchmarkVADProcessFrame(b *testing.B) {
-	for _, mode := range []Mode{ModeQuality, ModeLowBitrate, ModeAggressive, ModeVeryAggressive} {
+	for _, mode := range []mode{ModeQuality, ModeLowBitrate, ModeAggressive, ModeVeryAggressive} {
 		b.Run(fmt.Sprintf("mode_%d", mode), func(b *testing.B) {
 			v := newVADInst(mode)
 			frame := make([]int16, 160)

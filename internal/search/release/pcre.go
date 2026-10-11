@@ -54,7 +54,7 @@
 // retry adds a group-length-bounded loop, so per-call work is not covered
 // by RE2's linear-time guarantee alone. Callers MUST cap untrusted input
 // at MaxNameLen bytes. The cap is enforced at the provider boundary: the
-// download-retry provider wrapper (internal/provider.WrapRetry), which
+// download-retry provider wrapper (internal/provider.wrapRetry), which
 // both composition roots apply to every provider, clamps each search
 // result's ReleaseName via ClampName before it enters the engine.
 // ParseName additionally clamps its own input (defense in depth for
@@ -153,13 +153,9 @@ type branchPattern struct {
 // Pattern wraps one or more RE2-backed branches compiled from a PCRE
 // pattern. The zero value is not usable; construct via CompilePCRE.
 type Pattern struct {
-	original   string
 	branches   []*branchPattern
 	nSrcGroups int
 }
-
-// String returns the original source pattern.
-func (p *Pattern) String() string { return p.original }
 
 // MatchString reports whether s contains a match satisfying all
 // assertions of at least one branch.

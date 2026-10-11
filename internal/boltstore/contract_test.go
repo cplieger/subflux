@@ -55,7 +55,7 @@ func (s destructiveClearStore) ClearManualLock(_ context.Context, key subflux.Ma
 			if !r.Manual {
 				continue
 			}
-			if _, derr := deleteState(tx, r.ID); derr != nil {
+			if derr := deleteState(tx, r.ID); derr != nil {
 				return derr
 			}
 		}
@@ -73,7 +73,7 @@ type recorderTB struct {
 
 type recorderFatal struct{}
 
-func (r *recorderTB) Helper() {}
+func (*recorderTB) Helper() {}
 
 func (r *recorderTB) Errorf(string, ...any) { r.failed = true }
 

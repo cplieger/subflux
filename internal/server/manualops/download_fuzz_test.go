@@ -28,7 +28,7 @@ func FuzzValidateDownloadRequest(f *testing.F) {
 			Language:   language,
 			MediaType:  subflux.MediaType(mediaType),
 		}
-		err := ValidateDownloadRequest(req)
+		err := validateDownloadRequest(req)
 		if err == nil && !req.MediaType.Valid() {
 			t.Fatalf("ValidateDownloadRequest returned nil but MediaType=%q is invalid", req.MediaType)
 		}

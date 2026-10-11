@@ -47,7 +47,7 @@ func (f *fakeMedia) requests() []mediawrite.PreflightRequest {
 func (*fakeMedia) Blocked(string) (string, bool) { return "", false }
 
 func unwritable(folder string) *mediawrite.UnwritableError {
-	return &mediawrite.UnwritableError{Folder: folder, Root: "/media", Op: "probe", Err: syscall.EROFS}
+	return &mediawrite.UnwritableError{Folder: folder, Op: "probe", Err: syscall.EROFS}
 }
 
 func TestRunFullScan_a_refused_root_starts_nothing(t *testing.T) {

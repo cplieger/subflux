@@ -18,7 +18,7 @@ import (
 // rather than claim a working setup is broken.
 func TestCheckCredentials_delegates_to_the_anidb_client_key(t *testing.T) {
 	t.Parallel()
-	p := &Provider{anidbMapper: anidb.NewMapper("")}
+	p := &source{anidbMapper: anidb.NewMapper("")}
 
 	err := p.CheckCredentials(t.Context())
 

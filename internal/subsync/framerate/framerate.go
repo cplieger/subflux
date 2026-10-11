@@ -50,8 +50,8 @@ func LinearRegression(points []DriftPoint) (slope, intercept, r2 float64) {
 	return slope, intercept, r2
 }
 
-// KnownFramerates contains common video framerates and their NTSC/PAL conversions.
-var KnownFramerates = []float64{
+// knownFramerates contains common video framerates and their NTSC/PAL conversions.
+var knownFramerates = []float64{
 	23.976, // NTSC film (24000/1001)
 	24.0,   // Cinema
 	25.0,   // PAL
@@ -74,8 +74,8 @@ var KnownRatios = buildKnownRatios()
 
 func buildKnownRatios() []RatioPair {
 	var ratios []RatioPair
-	for _, from := range KnownFramerates {
-		for _, to := range KnownFramerates {
+	for _, from := range knownFramerates {
+		for _, to := range knownFramerates {
 			if from == to {
 				continue
 			}

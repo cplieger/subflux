@@ -122,7 +122,7 @@ func TestFactory_options(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
-			prov := p.(*Provider)
+			prov := p.(*source)
 			if prov.useHash != tt.wantHash {
 				t.Errorf("useHash = %v, want %v", prov.useHash, tt.wantHash)
 			}
@@ -141,7 +141,7 @@ func TestCountShowSubtitles_short_circuits_on_empty_imdb(t *testing.T) {
 	// Empty-after-sanitize inputs must return (0, nil) without any HTTP
 	// setup. Using a zero-value Provider (no client, no token) proves the
 	// short-circuit happens before ensureToken/doGet.
-	p := &Provider{}
+	p := &source{}
 	for _, imdb := range []string{"tt0", "tt00000", "0000", "tt"} {
 		count, err := p.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{ImdbID: imdb, Language: "en"})
 		if err != nil {

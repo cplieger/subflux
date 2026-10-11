@@ -281,9 +281,13 @@ store.subscribe("currentPage", (page) => {
  *  `anyFilterActive` does not know about makes `runReload` record a FILTERED
  *  read as the whole dataset. */
 interface HistoryFilters {
+  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly type: string;
+  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly lang: string;
+  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly provider: string;
+  // deadset:ignore DS1301 -- Read by filterParams as filters[k], k: keyof HistoryFilters.
   readonly search: string;
 }
 

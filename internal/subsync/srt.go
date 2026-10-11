@@ -24,8 +24,8 @@ type Cue struct {
 	End   time.Duration
 }
 
-// TimeSpan is a start/end pair used by the alignment algorithm.
-type TimeSpan struct {
+// timeSpan is a start/end pair used by the alignment algorithm.
+type timeSpan struct {
 	Start int64 // milliseconds
 	End   int64
 }
@@ -33,10 +33,10 @@ type TimeSpan struct {
 // --- Public API ---
 
 // cuesToSpans converts subtitle cues to time spans.
-func cuesToSpans(cues []Cue) []TimeSpan {
-	spans := make([]TimeSpan, len(cues))
+func cuesToSpans(cues []Cue) []timeSpan {
+	spans := make([]timeSpan, len(cues))
 	for i, c := range cues {
-		spans[i] = TimeSpan{
+		spans[i] = timeSpan{
 			Start: c.Start.Milliseconds(),
 			End:   c.End.Milliseconds(),
 		}
@@ -110,8 +110,8 @@ func WriteSRT(w io.Writer, cues []Cue) error {
 	return nil
 }
 
-// ShiftCues applies a time offset to all cues.
-func ShiftCues(cues []Cue, offset time.Duration) []Cue {
+// shiftCues applies a time offset to all cues.
+func shiftCues(cues []Cue, offset time.Duration) []Cue {
 	shifted := make([]Cue, len(cues))
 	for i, c := range cues {
 		shifted[i] = Cue{

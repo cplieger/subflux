@@ -118,6 +118,7 @@ const (
 
 // ScoreResult holds the output of a score simulation.
 type ScoreResult struct {
+	//deadset:ignore DS1301 -- The /api/score response returns it as tier, through the conversion to ScorePreview.
 	Tier        ScoreTier // Quality tier label (excellent/good/acceptable/minimal/none).
 	Score       int       // Final score including hash match bonus.
 	ScoreNoHash int       // Score from release attributes only, excluding hash match.

@@ -16,42 +16,28 @@ import (
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
-const (
-	tagOpEd    = "op_ed"
-	tagKaraoke = "karaoke"
-)
-
-// styleRule defines a single non-dialogue classification pattern with its category.
-type styleRule struct {
-	Category string // tagOpEd, tagKaraoke, "signs", "typesetting", "song"
-	Pattern  string // regex fragment
-}
-
-// nonDialogueRules is the data-driven table of non-dialogue style classification
-// patterns. Each rule is individually documentable and testable.
-var nonDialogueRules = []styleRule{
-	{tagOpEd, `\bop[a-z\d]*\b`},
-	{tagOpEd, `\bed[a-z\d]*\b`},
-	{tagOpEd, `\bopening\b`},
-	{tagOpEd, `\bending\b`},
-	{tagKaraoke, `romaji|romanji|kanji`},
-	{tagKaraoke, `karaoke|\bkara\b|lyric`},
-	{"signs", `sign|\btitle|credit|\bnote\b|\bcaption\b`},
-	{"typesetting", `typeset|\bts\b`},
-	{"song", `song|\binsert\b`},
-	{tagKaraoke, `furigana`},
+// nonDialogueStylePatterns are the regex fragments of ASS style names that
+// carry non-dialogue content, grouped by kind.
+var nonDialogueStylePatterns = []string{
+	// OP/ED
+	`\bop[a-z\d]*\b`,
+	`\bed[a-z\d]*\b`,
+	`\bopening\b`,
+	`\bending\b`,
+	// karaoke
+	`romaji|romanji|kanji`,
+	`karaoke|\bkara\b|lyric`,
+	// signs, typesetting, songs
+	`sign|\btitle|credit|\bnote\b|\bcaption\b`,
+	`typeset|\bts\b`,
+	`song|\binsert\b`,
+	// karaoke
+	`furigana`,
 }
 
 // reNonDialogueStyle matches ASS style names that indicate non-dialogue
 // content: OP/ED lyrics, karaoke, signs, titles, credits, typesetting.
-// Built from nonDialogueRules at init time.
-var reNonDialogueStyle = func() *regexp.Regexp {
-	parts := make([]string, len(nonDialogueRules))
-	for i, r := range nonDialogueRules {
-		parts[i] = r.Pattern
-	}
-	return regexp.MustCompile(`(?i)` + strings.Join(parts, "|"))
-}()
+var reNonDialogueStyle = regexp.MustCompile(`(?i)` + strings.Join(nonDialogueStylePatterns, "|"))
 
 // reDialogueStyle matches ASS style names that are known dialogue patterns.
 // Used as a whitelist when the blacklist alone can't distinguish dialogue
@@ -145,14 +131,11 @@ func fallbackToMostUsed(dialogue map[string]bool, unknown []string, styleCounts 
 	}
 }
 
-// ffmpegExtractASSDialogue extracts an ASS subtitle stream, parses it,
-// and returns dialogue cues and mask cues separately.
-//
-// dialogueCues: filtered to dialogue styles only (for correlation signal).
-// maskCues: all cues regardless of style (for dialogue mask time regions).
-func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex int) (dialogueCues, maskCues []Cue, err error) {
+// ffmpegExtractASSDialogue extracts an ASS subtitle stream, parses it, and
+// returns its cues filtered to dialogue styles (the correlation signal).
+func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex int) ([]Cue, error) {
 	if !ffmpeg.Available() {
-		return nil, nil, errors.New("ffmpeg not available")
+		return nil, errors.New("ffmpeg not available")
 	}
 
 	slog.Debug("extracting ASS dialogue",
@@ -173,13 +156,13 @@ func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex
 
 	pipe, pipeErr := cmd.StdoutPipe()
 	if pipeErr != nil {
-		return nil, nil, fmt.Errorf("stdout pipe: %w", pipeErr)
+		return nil, fmt.Errorf("stdout pipe: %w", pipeErr)
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	if startErr := cmd.Start(); startErr != nil {
-		return nil, nil, fmt.Errorf("ffmpeg start: %w", startErr)
+		return nil, fmt.Errorf("ffmpeg start: %w", startErr)
 	}
 
 	// Cap stdout at 50 MB to prevent unbounded memory from pathological inputs.
@@ -187,21 +170,22 @@ func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex
 	data, readErr := io.ReadAll(limited)
 
 	if waitErr := cmd.Wait(); waitErr != nil {
-		return nil, nil, fmt.Errorf("ffmpeg extract ASS stream %d: %w: %s",
+		return nil, fmt.Errorf("ffmpeg extract ASS stream %d: %w: %s",
 			streamIndex, waitErr, stderr.String())
 	}
 	if readErr != nil {
-		return nil, nil, fmt.Errorf("read ffmpeg output: %w", readErr)
+		return nil, fmt.Errorf("read ffmpeg output: %w", readErr)
 	}
 
 	if len(data) == 0 {
 		slog.Debug("ASS stream empty",
 			"video", videoPath,
 			"stream", streamIndex)
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	return ParseASSDialogue(data)
+	dialogueCues, _, err := ParseASSDialogue(data)
+	return dialogueCues, err
 }
 
 // IsASSContent reports whether data looks like ASS/SSA subtitle content

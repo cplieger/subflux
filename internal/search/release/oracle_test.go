@@ -38,10 +38,10 @@ func oraclePatterns() []oraclePatternSpec {
 		name    string
 		formats []Format
 	}{
-		{"sources", SonarrSources},
-		{"codecs", TrashVideoCodecs},
-		{"hdr", TrashHDRFormats},
-		{"streaming", TrashStreamingServices},
+		{"sources", sonarrSources},
+		{"codecs", trashVideoCodecs},
+		{"hdr", trashHDRFormats},
+		{"streaming", trashStreamingServices},
 	}
 	for _, tbl := range tables {
 		for _, f := range tbl.formats {
@@ -155,16 +155,11 @@ type oracleNameHits struct {
 }
 
 type oracleMatch struct {
-	Value  string        `json:"value"`
 	Groups []oracleGroup `json:"groups"`
-	Index  int           `json:"index"`
-	Length int           `json:"length"`
 }
 
 type oracleGroup struct {
 	Value   *string `json:"value"`
-	Index   int     `json:"index"`
-	Length  int     `json:"length"`
 	Success bool    `json:"success"`
 }
 
@@ -346,7 +341,7 @@ func TestDotNetOracleMetadata(t *testing.T) {
 
 // compareReleaseGroupObservable checks the consumed capture observable for
 // the release-group pattern: the last match's m[1], falling back to m[3]
-// (mirroring ParseGroup's consumption).
+// (mirroring parseGroup's consumption).
 func compareReleaseGroupObservable(t *testing.T, contracts map[string]contractEntry, p *Pattern, name string, hit *oracleNameHits) {
 	t.Helper()
 	last := hit.Matches[len(hit.Matches)-1]

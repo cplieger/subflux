@@ -250,9 +250,9 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 		Languages: LanguageRules{
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 		},
-		PollIntervalCfg: Duration{D: 30 * time.Second},
+		PollIntervalCfg: duration{D: 30 * time.Second},
 		ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
-		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := validate(t.Context(), cfg); err != nil {
 		t.Errorf("validate() unexpected error for radarr with public_url only: %v", err)
@@ -388,8 +388,8 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 					Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 				},
 				ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
-				PollIntervalCfg: Duration{D: 30 * time.Second},
-				Cfg:             yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+				PollIntervalCfg: duration{D: 30 * time.Second},
+				Cfg:             yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: duration{D: time.Hour}, UpgradeWindowDays: 7},
 			}
 			if err := validate(t.Context(), cfg); err != nil {
 				t.Errorf("validate() unexpected error for min_score=%d: %v", score, err)
@@ -399,7 +399,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 }
 
 // TestConfig_Validate_property verifies that Config.Validate() (the exported
-// method satisfying the Validator interface) agrees with the package-level
+// method satisfying the validator interface) agrees with the package-level
 // validate() function for any valid config loaded from bytes.
 func TestConfig_Validate_property(t *testing.T) {
 	t.Parallel()
@@ -412,7 +412,7 @@ func TestConfig_Validate_property(t *testing.T) {
 		t.Errorf("Config.Validate() = %v, want nil for valid config", err)
 	}
 	// Confirm interface satisfaction at runtime.
-	var v Validator = cfg
+	var v validator = cfg
 	if err := v.Validate(); err != nil {
 		t.Errorf("Validator.Validate() = %v, want nil", err)
 	}

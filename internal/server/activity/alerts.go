@@ -21,12 +21,12 @@ type AlertKind string
 const (
 	// AlertPersistent requires manual dismissal by the user.
 	AlertPersistent AlertKind = "persistent"
-	// AlertTransient auto-expires after TransientAlertTTL.
+	// AlertTransient auto-expires after transientAlertTTL.
 	AlertTransient AlertKind = "transient"
 )
 
-// TransientAlertTTL is the default TTL for transient alerts.
-const TransientAlertTTL = 1 * time.Hour
+// transientAlertTTL is the default TTL for transient alerts.
+const transientAlertTTL = 1 * time.Hour
 
 // AlertLevel is a typed string for alert severity levels.
 type AlertLevel string
@@ -34,8 +34,8 @@ type AlertLevel string
 // Alert level constants.
 const (
 	LevelError AlertLevel = "error"
-	LevelWarn  AlertLevel = "warn"
-	LevelInfo  AlertLevel = "info"
+	levelWarn  AlertLevel = "warn"
+	levelInfo  AlertLevel = "info"
 )
 
 // Alert represents an actionable error or informational message.
@@ -105,12 +105,12 @@ func (al *AlertLog) Record(source, message string) {
 
 // RecordWarn adds a transient warning alert.
 func (al *AlertLog) RecordWarn(source, message string) {
-	al.AddAlert(source, message, AlertTransient, LevelWarn, 0)
+	al.AddAlert(source, message, AlertTransient, levelWarn, 0)
 }
 
 // RecordInfo adds a short-lived informational alert for scan results.
 func (al *AlertLog) RecordInfo(message string) {
-	al.AddAlert("scan", message, AlertTransient, LevelInfo, 10*time.Minute)
+	al.AddAlert("scan", message, AlertTransient, levelInfo, 10*time.Minute)
 }
 
 // RecordPersistent adds a persistent error that requires manual dismissal.
@@ -218,7 +218,7 @@ func (al *AlertLog) VisibleAlerts() []Alert {
 		}
 		ttl := a.TTL
 		if ttl == 0 {
-			ttl = TransientAlertTTL
+			ttl = transientAlertTTL
 		}
 		if now.Sub(a.Time) < ttl {
 			visible = append(visible, a)

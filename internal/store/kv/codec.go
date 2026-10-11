@@ -47,18 +47,6 @@ const (
 	TolerantSkip
 )
 
-// String implements fmt.Stringer.
-func (m DecodeMode) String() string {
-	switch m {
-	case FailClosed:
-		return "fail-closed"
-	case TolerantSkip:
-		return "tolerant-skip"
-	default:
-		return fmt.Sprintf("DecodeMode(%d)", int(m))
-	}
-}
-
 // DecodeOrHandle decodes data into v and applies the decode-failure policy for
 // mode. On success it returns (false, nil). On a decode error it returns
 // (true, nil) after logging a warning in [TolerantSkip] mode, or (false, err)

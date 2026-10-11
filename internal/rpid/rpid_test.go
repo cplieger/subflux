@@ -48,33 +48,33 @@ func TestDerive_accepts(t *testing.T) {
 func TestDerive_refuses(t *testing.T) {
 	tests := []struct {
 		host   string
-		reason Reason
+		reason reason
 	}{
-		{"duckdns.org", ReasonPublicSuffix},
-		{"ts.net", ReasonPublicSuffix},
-		{"synology.me", ReasonPublicSuffix},
-		{"myqnapcloud.com", ReasonPublicSuffix},
-		{"dynv6.net", ReasonPublicSuffix},
-		{"freeddns.org", ReasonPublicSuffix},
-		{"pages.dev", ReasonPublicSuffix},
-		{"github.io", ReasonPublicSuffix},
-		{"nas", ReasonSingleLabel},
-		{"com", ReasonSingleLabel},
-		{"lan", ReasonSingleLabel},
-		{"10.0.0.5", ReasonIPLiteral},
-		{"127.0.0.1:8374", ReasonIPLiteral},
-		{"::1", ReasonIPLiteral},
-		{"[::1]:8443", ReasonIPLiteral},
-		{"foo.123", ReasonIllegalDomain},
-		{"allowed.example:garbage", ReasonMalformedHost},
-		{"[bad", ReasonMalformedHost},
-		{"sub..example.com", ReasonMalformedHost},
-		{"127.0.0.001", ReasonMalformedHost},
+		{"duckdns.org", reasonPublicSuffix},
+		{"ts.net", reasonPublicSuffix},
+		{"synology.me", reasonPublicSuffix},
+		{"myqnapcloud.com", reasonPublicSuffix},
+		{"dynv6.net", reasonPublicSuffix},
+		{"freeddns.org", reasonPublicSuffix},
+		{"pages.dev", reasonPublicSuffix},
+		{"github.io", reasonPublicSuffix},
+		{"nas", reasonSingleLabel},
+		{"com", reasonSingleLabel},
+		{"lan", reasonSingleLabel},
+		{"10.0.0.5", reasonIPLiteral},
+		{"127.0.0.1:8374", reasonIPLiteral},
+		{"::1", reasonIPLiteral},
+		{"[::1]:8443", reasonIPLiteral},
+		{"foo.123", reasonIllegalDomain},
+		{"allowed.example:garbage", reasonMalformedHost},
+		{"[bad", reasonMalformedHost},
+		{"sub..example.com", reasonMalformedHost},
+		{"127.0.0.001", reasonMalformedHost},
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
 			got, err := Derive(tt.host)
-			var e *Error
+			var e *refusal
 			if !errors.As(err, &e) {
 				t.Fatalf("Derive(%q) = %q, %v; want a *Error", tt.host, got, err)
 			}
@@ -87,14 +87,14 @@ func TestDerive_refuses(t *testing.T) {
 
 func TestDerive_IPIsRefusedBeforeThePSL(t *testing.T) {
 	_, err := Derive("10.0.0.5")
-	var e *Error
+	var e *refusal
 	if !errors.As(err, &e) {
 		t.Fatalf("Derive(10.0.0.5) error = %v, want a *Error", err)
 	}
-	if e.Reason != ReasonIPLiteral {
-		t.Fatalf("Derive(10.0.0.5) reason = %q, want %q", e.Reason, ReasonIPLiteral)
+	if e.Reason != reasonIPLiteral {
+		t.Fatalf("Derive(10.0.0.5) reason = %q, want %q", e.Reason, reasonIPLiteral)
 	}
-	if e.Reason == ReasonPublicSuffix {
+	if e.Reason == reasonPublicSuffix {
 		t.Fatal("Derive(10.0.0.5) reported public_suffix: the IP check ran after the lookup")
 	}
 }
@@ -109,25 +109,25 @@ func TestDerive_illegalDomainWrapsTheLibrarySentinel(t *testing.T) {
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		id     string
-		reason Reason // "" means accepted
+		reason reason // "" means accepted
 	}{
 		{"example.com", ""},
 		{"sub.example.com", ""},
 		{"localhost", ""},
 		{"foo.duckdns.org", ""},
-		{"", ReasonMalformedHost},
-		{"Example.COM", ReasonNotCanonical},
-		{"example.com.", ReasonNotCanonical},
-		{" example.com", ReasonNotCanonical},
-		{"http://example.com", ReasonMalformedHost},
-		{"example.com:8443", ReasonMalformedHost},
-		{"example.com/subflux", ReasonMalformedHost},
-		{"10.0.0.5", ReasonIPLiteral},
-		{"::1", ReasonIPLiteral},
-		{"duckdns.org", ReasonPublicSuffix},
-		{"nas", ReasonSingleLabel},
-		{"foo.123", ReasonIllegalDomain},
-		{"-foo.example.com", ReasonIllegalDomain},
+		{"", reasonMalformedHost},
+		{"Example.COM", reasonNotCanonical},
+		{"example.com.", reasonNotCanonical},
+		{" example.com", reasonNotCanonical},
+		{"http://example.com", reasonMalformedHost},
+		{"example.com:8443", reasonMalformedHost},
+		{"example.com/subflux", reasonMalformedHost},
+		{"10.0.0.5", reasonIPLiteral},
+		{"::1", reasonIPLiteral},
+		{"duckdns.org", reasonPublicSuffix},
+		{"nas", reasonSingleLabel},
+		{"foo.123", reasonIllegalDomain},
+		{"-foo.example.com", reasonIllegalDomain},
 	}
 	for _, tt := range tests {
 		t.Run(tt.id, func(t *testing.T) {
@@ -138,7 +138,7 @@ func TestValidate(t *testing.T) {
 				}
 				return
 			}
-			var e *Error
+			var e *refusal
 			if !errors.As(err, &e) {
 				t.Fatalf("Validate(%q) = %v, want a *Error", tt.id, err)
 			}
@@ -151,7 +151,7 @@ func TestValidate(t *testing.T) {
 
 func TestValidate_notCanonicalNamesTheSpelling(t *testing.T) {
 	err := Validate("Example.COM")
-	var e *Error
+	var e *refusal
 	if !errors.As(err, &e) {
 		t.Fatalf("Validate(Example.COM) = %v, want a *Error", err)
 	}
@@ -164,16 +164,16 @@ func TestValidateForHost(t *testing.T) {
 	tests := []struct {
 		id     string
 		host   string
-		reason Reason
+		reason reason
 	}{
 		{"example.com", "subflux.example.com", ""},
 		{"example.com", "example.com", ""},
 		{"example.com", "a.b.example.com:8443", ""},
 		{"localhost", "localhost:8374", ""},
-		{"example.com", "evilexample.com", ReasonNotServed},
-		{"example.net", "subflux.example.com", ReasonNotServed},
-		{"example.com", "10.0.0.5", ReasonNotServed},
-		{"Example.COM", "subflux.example.com", ReasonNotCanonical},
+		{"example.com", "evilexample.com", reasonNotServed},
+		{"example.net", "subflux.example.com", reasonNotServed},
+		{"example.com", "10.0.0.5", reasonNotServed},
+		{"Example.COM", "subflux.example.com", reasonNotCanonical},
 	}
 	for _, tt := range tests {
 		t.Run(tt.id+"_"+tt.host, func(t *testing.T) {
@@ -184,7 +184,7 @@ func TestValidateForHost(t *testing.T) {
 				}
 				return
 			}
-			var e *Error
+			var e *refusal
 			if !errors.As(err, &e) {
 				t.Fatalf("ValidateForHost(%q, %q) = %v, want a *Error", tt.id, tt.host, err)
 			}
@@ -197,7 +197,7 @@ func TestValidateForHost(t *testing.T) {
 
 func TestValidateForHost_notServedNamesTheDerivedValue(t *testing.T) {
 	err := ValidateForHost("example.net", "subflux.example.com")
-	var e *Error
+	var e *refusal
 	if !errors.As(err, &e) {
 		t.Fatalf("ValidateForHost = %v, want a *Error", err)
 	}

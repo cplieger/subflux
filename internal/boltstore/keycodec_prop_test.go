@@ -191,7 +191,6 @@ func TestProp_codecRoundTrip(t *testing.T) {
 				Path:          genComponent(rt, "path"),
 				Title:         genComponent(rt, "title"),
 				ImdbID:        genComponent(rt, "imdb"),
-				ReleaseTag:    genComponent(rt, "tag"),
 				Score:         rapid.IntRange(-10, 100).Draw(rt, "score"),
 				Season:        rapid.IntRange(0, 50).Draw(rt, "season"),
 				Episode:       rapid.IntRange(0, 500).Draw(rt, "episode"),
@@ -201,10 +200,7 @@ func TestProp_codecRoundTrip(t *testing.T) {
 			}
 			assertRecStable(rt, &rec)
 		case 2:
-			rec := fileRec{
-				Codec:     genComponent(rt, "codec"),
-				UpdatedAt: genTime(rt, "updated"),
-			}
+			rec := fileRec{Codec: genComponent(rt, "codec")}
 			assertRecStable(rt, &rec)
 		case 3:
 			rec := scanRec{

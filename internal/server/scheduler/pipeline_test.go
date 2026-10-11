@@ -34,7 +34,6 @@ import (
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/providergate"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server"
@@ -593,7 +592,7 @@ func (r *pipelineRig) activate(passwords map[subflux.ProviderID]string) *engineS
 	r.t.Helper()
 	cfg := r.config(passwords)
 	res, err := wiring.Build(r.t.Context(), cfg, r.db, r.m, r.reg, r.gate, wiring.Extras{
-		SyncExec: syncing.InProcessExec{}, Tracks: search.NoopDetector{}, Media: r.media,
+		SyncExec: syncing.InProcessExec{}, Tracks: testsupport.NoDetector{}, Media: r.media,
 	})
 	if err != nil {
 		r.t.Fatalf("Setup: wiring.Build: %v", err)

@@ -37,7 +37,7 @@ const (
 	searchLegTimeout       = 90 * time.Second
 	searchLegClientTimeout = 100 * time.Second
 	downloadPollInterval   = time.Second
-	// downloadPollTimeout mirrors the server's manualops.DownloadTimeout:
+	// downloadPollTimeout mirrors the server's manualops.downloadTimeout:
 	// when the server would have given up on the download, so does the poll.
 	downloadPollTimeout = 5 * time.Minute
 )
@@ -353,14 +353,12 @@ type cliResolveCandidate struct {
 type cliResolveResponse struct {
 	Items      []cliResolvedItem     `json:"items"`
 	Candidates []cliResolveCandidate `json:"candidates"`
-	Resolved   bool                  `json:"resolved"`
 }
 
 // cliSearchResult mirrors the manual-search result fields the CLI renders;
 // Tier is computed server-side (the CLI has no scorer).
 type cliSearchResult struct {
 	Provider    string `json:"provider"`
-	Language    string `json:"language"`
 	ReleaseName string `json:"release_name"`
 	MatchedBy   string `json:"matched_by"`
 	SubtitleID  string `json:"subtitle_id"`

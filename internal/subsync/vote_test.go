@@ -11,15 +11,15 @@ import (
 // --- Candidate fixtures ---
 
 // shiftCandidate builds a valid pure-shift candidate over inc.
-func shiftCandidate(inc []Cue, shiftMs int64, source CandidateSource, method SyncMethod, conf Confidence) SyncResult {
+func shiftCandidate(inc []Cue, shiftMs int64, source candidateSource, method SyncMethod, conf Confidence) SyncResult {
 	return SyncResult{
-		Cues:       ShiftCues(inc, time.Duration(shiftMs)*time.Millisecond),
+		Cues:       shiftCues(inc, time.Duration(shiftMs)*time.Millisecond),
 		Offset:     shiftMs,
 		Rate:       1.0,
 		Confidence: conf,
 		Method:     method,
 		Source:     source,
-		Transform:  Transform{Kind: TransformShift, Shift: shiftMs},
+		Transform:  transform{Kind: transformShift, Shift: shiftMs},
 	}
 }
 
@@ -29,9 +29,9 @@ func framerateCandidate(inc []Cue, ratio float64, conf Confidence) SyncResult {
 		Cues:       scaleCues(inc, ratio),
 		Rate:       ratio,
 		Confidence: conf,
-		Method:     MethodFramerate,
+		Method:     methodFramerate,
 		Source:     SourceFramerate,
-		Transform:  Transform{Kind: TransformFramerate, Ratio: ratio},
+		Transform:  transform{Kind: transformFramerate, Ratio: ratio},
 	}
 }
 
@@ -45,9 +45,9 @@ func splitCandidate(inc []Cue, boundary int, shift1, shift2 time.Duration, conf 
 	return SyncResult{
 		Cues:       alignSegments(inc, segs),
 		Confidence: conf,
-		Method:     MethodSplit,
+		Method:     methodSplit,
 		Source:     SourceSplit,
-		Transform:  Transform{Kind: TransformSegments, Segments: transformSegments(segs)},
+		Transform:  transform{Kind: transformSegments, SegmentCount: len(segs)},
 	}
 }
 
@@ -56,9 +56,9 @@ func splitCandidate(inc []Cue, boundary int, shift1, shift2 time.Duration, conf 
 func TestVoteOnCandidates(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second) // correct correction: shift by -2000ms
+	inc := shiftCues(ref, 2*time.Second) // correct correction: shift by -2000ms
 	incSame := makeLongCues(30, 10*time.Minute)
-	incFar := ShiftCues(ref, 31*time.Second) // correct correction beyond LargeOffsetMs
+	incFar := shiftCues(ref, 31*time.Second) // correct correction beyond LargeOffsetMs
 	tests := []struct {
 		check      func(t *testing.T, got SyncResult)
 		name       string
@@ -71,11 +71,11 @@ func TestVoteOnCandidates(t *testing.T) {
 			ref:  ref,
 			inc:  inc,
 			candidates: []SyncResult{
-				shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.7),
+				shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.7),
 			},
 			check: func(t *testing.T, got SyncResult) {
-				if got.Method != MethodOffset {
-					t.Errorf("method = %q, want %q", got.Method, MethodOffset)
+				if got.Method != methodOffset {
+					t.Errorf("method = %q, want %q", got.Method, methodOffset)
 				}
 				if got.Offset != -2000 {
 					t.Errorf("offset = %d, want -2000", got.Offset)
@@ -87,10 +87,10 @@ func TestVoteOnCandidates(t *testing.T) {
 			ref:  ref,
 			inc:  inc,
 			candidates: []SyncResult{
-				shiftCandidate(inc, -2000, SourceCrosslang, MethodCrosslang, 0.6),
-				shiftCandidate(inc, -2100, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, -2000, SourceCrosslang, methodCrosslang, 0.6),
+				shiftCandidate(inc, -2100, SourceOffset, methodOffset, 0.5),
 				// Disagrees with everyone; highest calibrated confidence.
-				shiftCandidate(inc, -20000, SourceSplit, MethodSplit, 0.9),
+				shiftCandidate(inc, -20000, SourceSplit, methodSplit, 0.9),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Source != SourceCrosslang && got.Source != SourceOffset {
@@ -106,8 +106,8 @@ func TestVoteOnCandidates(t *testing.T) {
 				// Both cluster (corrected cues agree within 100ms); -2000 is
 				// exact, so it out-rates -2100 despite the lower calibrated
 				// confidence.
-				shiftCandidate(inc, -2100, SourceCrosslang, MethodCrosslang, 0.9),
-				shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, -2100, SourceCrosslang, methodCrosslang, 0.9),
+				shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.5),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Offset != -2000 {
@@ -123,8 +123,8 @@ func TestVoteOnCandidates(t *testing.T) {
 			ref:  ref,
 			inc:  inc,
 			candidates: []SyncResult{
-				shiftCandidate(inc, -8000, SourceCrosslang, MethodCrosslang, 0.9),
-				shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, -8000, SourceCrosslang, methodCrosslang, 0.9),
+				shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.5),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Offset != -2000 {
@@ -139,8 +139,8 @@ func TestVoteOnCandidates(t *testing.T) {
 			candidates: []SyncResult{
 				// Identical corrected cues: same rating; canonical source
 				// order (crosslang before offset) breaks the tie.
-				shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.9),
-				shiftCandidate(inc, -2000, SourceCrosslang, MethodCrosslang, 0.5),
+				shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.9),
+				shiftCandidate(inc, -2000, SourceCrosslang, methodCrosslang, 0.5),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Source != SourceCrosslang {
@@ -159,9 +159,9 @@ func TestVoteOnCandidates(t *testing.T) {
 				// Two agreeing implausible shifts form the larger validated
 				// cluster; the plausible singleton must not jump the size
 				// key (R3.2: size, then rating, then source order).
-				shiftCandidate(incSame, 40000, SourceOffset, MethodOffset, 0.7),
-				shiftCandidate(incSame, 40800, SourceSplit, MethodSplit, 0.6),
-				shiftCandidate(incSame, -1000, SourceCrosslang, MethodCrosslang, 0.4),
+				shiftCandidate(incSame, 40000, SourceOffset, methodOffset, 0.7),
+				shiftCandidate(incSame, 40800, SourceSplit, methodSplit, 0.6),
+				shiftCandidate(incSame, -1000, SourceCrosslang, methodCrosslang, 0.4),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Offset == -1000 {
@@ -179,8 +179,8 @@ func TestVoteOnCandidates(t *testing.T) {
 				// similar-duration content, so the plausibility guard hands
 				// the cluster to its plausible member despite the lower
 				// rating (the guard's only seat: member selection).
-				shiftCandidate(incFar, -31000, SourceOffset, MethodOffset, 0.9),
-				shiftCandidate(incFar, -29800, SourceCrosslang, MethodCrosslang, 0.4),
+				shiftCandidate(incFar, -31000, SourceOffset, methodOffset, 0.9),
+				shiftCandidate(incFar, -29800, SourceCrosslang, methodCrosslang, 0.4),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Offset != -29800 {
@@ -196,8 +196,8 @@ func TestVoteOnCandidates(t *testing.T) {
 			ref:  ref,
 			inc:  incSame,
 			candidates: []SyncResult{
-				shiftCandidate(incSame, 40000, SourceOffset, MethodOffset, 0.7),
-				shiftCandidate(incSame, 50000, SourceCrosslang, MethodCrosslang, 0.4),
+				shiftCandidate(incSame, 40000, SourceOffset, methodOffset, 0.7),
+				shiftCandidate(incSame, 50000, SourceCrosslang, methodCrosslang, 0.4),
 			},
 			check: func(t *testing.T, got SyncResult) {
 				if got.Method == "" {
@@ -230,9 +230,9 @@ func TestClusterCandidates(t *testing.T) {
 			name: "two shifts within CorrectedCueAgreementMs cluster",
 			candidates: []SyncResult{
 				// 1400ms apart: every corrected cue start and end agrees
-				// within CorrectedCueAgreementMs (1500).
-				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, 1400, SourceOffset, MethodOffset, 0.6),
+				// within correctedCueAgreementMs (1500).
+				shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, 1400, SourceOffset, methodOffset, 0.6),
 			},
 			wantClusters: 1,
 			wantMembers:  []int{2},
@@ -244,8 +244,8 @@ func TestClusterCandidates(t *testing.T) {
 				// prefilter, but the corrected cues disagree (2900 > 1500).
 				// The prefilter is an early rejection, never a grant: cluster
 				// membership is always the corrected-cue predicate (R2.1).
-				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, 2900, SourceOffset, MethodOffset, 0.6),
+				shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, 2900, SourceOffset, methodOffset, 0.6),
 			},
 			wantClusters: 2,
 			wantMembers:  []int{1, 1},
@@ -255,8 +255,8 @@ func TestClusterCandidates(t *testing.T) {
 			candidates: []SyncResult{
 				// 1500ms apart: the agreement threshold is inclusive, so every
 				// corrected cue start and end still counts as agreeing.
-				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, 1500, SourceOffset, MethodOffset, 0.6),
+				shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, 1500, SourceOffset, methodOffset, 0.6),
 			},
 			wantClusters: 1,
 			wantMembers:  []int{2},
@@ -268,8 +268,8 @@ func TestClusterCandidates(t *testing.T) {
 				// threshold admits inclusively, and both shifts clamp every
 				// cue to zero, so the corrected cues are identical. The
 				// prefilter must defer to the corrected-cue predicate.
-				shiftCandidate(inc, -600_000, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, -603_000, SourceOffset, MethodOffset, 0.6),
+				shiftCandidate(inc, -600_000, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, -603_000, SourceOffset, methodOffset, 0.6),
 			},
 			wantClusters: 1,
 			wantMembers:  []int{2},
@@ -281,7 +281,7 @@ func TestClusterCandidates(t *testing.T) {
 				// identical to shift(4000)'s, but a split declares a headline
 				// shift of 0, putting the pair 4000ms apart on the scalar
 				// prefilter. The prefilter speaks only for pure-shift pairs.
-				shiftCandidate(inc, 4000, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, 4000, SourceOffset, methodOffset, 0.5),
 				splitCandidate(inc, 15, 4*time.Second, 4*time.Second, 0.6),
 			},
 			wantClusters: 1,
@@ -290,8 +290,8 @@ func TestClusterCandidates(t *testing.T) {
 		{
 			name: "two shifts beyond ClusterMs split",
 			candidates: []SyncResult{
-				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, 3001, SourceOffset, MethodOffset, 0.6),
+				shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, 3001, SourceOffset, methodOffset, 0.6),
 			},
 			wantClusters: 2,
 			wantMembers:  []int{1, 1},
@@ -299,7 +299,7 @@ func TestClusterCandidates(t *testing.T) {
 		{
 			name: "framerate joins a shift cluster through the corrected-cue predicate",
 			candidates: []SyncResult{
-				shiftCandidate(inc, 0, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, 0, SourceOffset, methodOffset, 0.5),
 				// Ratio 1.0 leaves cues identical to shift(0)'s cues.
 				framerateCandidate(inc, 1.0, 0.7),
 			},
@@ -322,11 +322,11 @@ func TestClusterCandidates(t *testing.T) {
 			name: "complete linkage requires agreement with every member",
 			candidates: []SyncResult{
 				// a(0) agrees b(1400); b(1400) agrees c(2800); a disagrees c
-				// (2800 > CorrectedCueAgreementMs). Single linkage would
+				// (2800 > correctedCueAgreementMs). Single linkage would
 				// chain all three; complete linkage keeps c out of {a,b}.
-				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
-				shiftCandidate(inc, 1400, SourceFramerate, MethodFramerate, 0.5),
-				shiftCandidate(inc, 2800, SourceOffset, MethodOffset, 0.5),
+				shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5),
+				shiftCandidate(inc, 1400, SourceFramerate, methodFramerate, 0.5),
+				shiftCandidate(inc, 2800, SourceOffset, methodOffset, 0.5),
 			},
 			wantClusters: 2,
 			wantMembers:  []int{2, 1},
@@ -355,9 +355,9 @@ func TestClusterCandidates_orderCanonical(t *testing.T) {
 	// non-transitive (adjacent pairs agree within 1500ms, the outer pair
 	// does not), the case where greedy first-fit clustering depended on
 	// arrival order.
-	a := shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5)
-	b := shiftCandidate(inc, 1400, SourceOffset, MethodOffset, 0.6)
-	c := shiftCandidate(inc, 2800, SourceSplit, MethodSplit, 0.7)
+	a := shiftCandidate(inc, 0, SourceCrosslang, methodCrosslang, 0.5)
+	b := shiftCandidate(inc, 1400, SourceOffset, methodOffset, 0.6)
+	c := shiftCandidate(inc, 2800, SourceSplit, methodSplit, 0.7)
 
 	base := clusterCandidates([]SyncResult{a, b, c})
 	perms := [][]SyncResult{
@@ -392,7 +392,7 @@ func TestClusterCandidates_framerateJoinsADistantShift(t *testing.T) {
 	// valid for pure-shift pairs, so it must not reject this one.
 	inc := makeCues(30, 10*time.Minute, time.Second)
 	fr := framerateCandidate(inc, 0.99354, 0.6)
-	sh := shiftCandidate(inc, 4000, SourceOffset, MethodOffset, 0.5)
+	sh := shiftCandidate(inc, 4000, SourceOffset, methodOffset, 0.5)
 	if !correctedCuesAgree(fr.Cues, sh.Cues) {
 		t.Fatalf("fixture: corrected cues must agree, first cue %v vs %v", fr.Cues[0], sh.Cues[0])
 	}
@@ -415,8 +415,8 @@ func TestVoteOnCandidates_sourceOrderBreaksTiesBetweenClusters(t *testing.T) {
 	ref := makeCues(5, 0, time.Second)
 	inc := makeCues(30, 0, 20*time.Second)
 	candidates := []SyncResult{
-		shiftCandidate(inc, 100_000, SourceOffset, MethodOffset, 0.9),
-		shiftCandidate(inc, 200_000, SourceCrosslang, MethodCrosslang, 0.5),
+		shiftCandidate(inc, 100_000, SourceOffset, methodOffset, 0.9),
+		shiftCandidate(inc, 200_000, SourceCrosslang, methodCrosslang, 0.5),
 	}
 	for i := range candidates {
 		if r := alignmentRating(ref, candidates[i].Cues); r != 0 {
@@ -440,7 +440,7 @@ func TestVoteOnCandidates_plausibilityGuardStaysDisarmedAtSimilarDurationMs(t *t
 	// past LargeOffsetMs; arming it here would hand the file to the worse
 	// correction instead.
 	inc := makeCues(30, 0, 20*time.Second)
-	ref := append(ShiftCues(inc, 30_600*time.Millisecond),
+	ref := append(shiftCues(inc, 30_600*time.Millisecond),
 		Cue{Start: 640 * time.Second, End: 641 * time.Second, Text: "tail"})
 	incEndMs := inc[len(inc)-1].End.Milliseconds()
 	refEndMs := ref[len(ref)-1].End.Milliseconds()
@@ -451,9 +451,9 @@ func TestVoteOnCandidates_plausibilityGuardStaysDisarmedAtSimilarDurationMs(t *t
 
 	candidates := []SyncResult{
 		// Past LargeOffsetMs, and the exact correction.
-		shiftCandidate(inc, 30_600, SourceCrosslang, MethodCrosslang, 0.5),
+		shiftCandidate(inc, 30_600, SourceCrosslang, methodCrosslang, 0.5),
 		// Inside LargeOffsetMs, 600ms short of the reference.
-		shiftCandidate(inc, 30_000, SourceOffset, MethodOffset, 0.9),
+		shiftCandidate(inc, 30_000, SourceOffset, methodOffset, 0.9),
 	}
 	clusters := clusterCandidates(candidates)
 	if len(clusters) != 1 {
@@ -492,12 +492,12 @@ func makeVariedCues(n int, gap time.Duration) []Cue {
 func TestArbitration_regression_noSplitCandidate(t *testing.T) {
 	t.Parallel()
 	ref := makeVariedCues(40, 15*time.Second)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 
 	// Generator level: a pure constant offset has no split point, so the
 	// split generator emits nothing.
 	got := alignWithSplits(t.Context(), ref, inc, 0)
-	if got.Confidence != ConfidenceNone {
+	if got.Confidence != confidenceNone {
 		t.Errorf("alignWithSplits(no-split input) confidence = %f, want 0 (no candidate)",
 			float64(got.Confidence))
 	}
@@ -546,8 +546,8 @@ func TestAlignmentRating(t *testing.T) {
 		wantMax   float64
 	}{
 		{"identical cues rate 1.0", ref, ref, 1.0, 1.0},
-		{"disjoint cues rate 0", ref, ShiftCues(ref, 5*time.Second), 0, 0},
-		{"half-overlapped cues rate 0.5", ref, ShiftCues(ref, 500*time.Millisecond), 0.5, 0.5},
+		{"disjoint cues rate 0", ref, shiftCues(ref, 5*time.Second), 0, 0},
+		{"half-overlapped cues rate 0.5", ref, shiftCues(ref, 500*time.Millisecond), 0.5, 0.5},
 		{"empty reference rates 0", nil, ref, 0, 0},
 		{"empty corrected rates 0", ref, nil, 0, 0},
 		{
@@ -593,8 +593,8 @@ func TestAlignmentRating_ordersByCloseness(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
 	exact := alignmentRating(ref, ref)
-	close := alignmentRating(ref, ShiftCues(ref, 200*time.Millisecond))
-	far := alignmentRating(ref, ShiftCues(ref, 800*time.Millisecond))
+	close := alignmentRating(ref, shiftCues(ref, 200*time.Millisecond))
+	far := alignmentRating(ref, shiftCues(ref, 800*time.Millisecond))
 	if !(exact > close && close > far) {
 		t.Errorf("rating not ordered by closeness: exact=%f close=%f far=%f", exact, close, far)
 	}
@@ -606,7 +606,7 @@ func TestAlignmentRating_ordersByCloseness(t *testing.T) {
 func TestAlignmentRating_noHiddenOffsetFitting(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	misaligned := ShiftCues(ref, 3*time.Second) // a fitted offset would recover 1.0
+	misaligned := shiftCues(ref, 3*time.Second) // a fitted offset would recover 1.0
 	if got := alignmentRating(ref, misaligned); got != 0 {
 		t.Errorf("alignmentRating(misaligned) = %f, want 0 (no hidden offset fitting)", got)
 	}
@@ -625,10 +625,10 @@ func TestIsValidCandidate(t *testing.T) {
 		c    SyncResult
 		want bool
 	}{
-		{"valid shifted cues", shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.5), true},
-		{"nil cues", SyncResult{Method: MethodOffset, Confidence: 0.5}, false},
-		{"wrong length", SyncResult{Cues: inc[:5], Method: MethodOffset, Confidence: 0.5}, false},
-		{"non-monotonic starts", SyncResult{Cues: nonMonotonic, Method: MethodOffset, Confidence: 0.5}, false},
+		{"valid shifted cues", shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.5), true},
+		{"nil cues", SyncResult{Method: methodOffset, Confidence: 0.5}, false},
+		{"wrong length", SyncResult{Cues: inc[:5], Method: methodOffset, Confidence: 0.5}, false},
+		{"non-monotonic starts", SyncResult{Cues: nonMonotonic, Method: methodOffset, Confidence: 0.5}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -640,7 +640,7 @@ func TestIsValidCandidate(t *testing.T) {
 	}
 	t.Run("equal starts are monotonic", func(t *testing.T) {
 		t.Parallel()
-		clamped := SyncResult{Cues: ShiftCues(inc, -time.Hour)} // clamps leading starts to 0
+		clamped := SyncResult{Cues: shiftCues(inc, -time.Hour)} // clamps leading starts to 0
 		if !isValidCandidate(&clamped, len(inc)) {
 			t.Error("zero-clamped shift (equal starts) should be valid")
 		}
@@ -650,8 +650,8 @@ func TestIsValidCandidate(t *testing.T) {
 func TestFilterValidCandidates(t *testing.T) {
 	t.Parallel()
 	inc := makeLongCues(10, 5*time.Minute)
-	good := shiftCandidate(inc, -1000, SourceOffset, MethodOffset, 0.6)
-	bad := SyncResult{Cues: inc[:3], Method: MethodSplit, Source: SourceSplit, Confidence: 0.7}
+	good := shiftCandidate(inc, -1000, SourceOffset, methodOffset, 0.6)
+	bad := SyncResult{Cues: inc[:3], Method: methodSplit, Source: SourceSplit, Confidence: 0.7}
 	got := filterValidCandidates([]SyncResult{good, bad}, inc)
 	if len(got) != 1 {
 		t.Fatalf("filterValidCandidates kept %d candidates, want 1", len(got))
@@ -672,10 +672,10 @@ func TestPlausibleCandidate(t *testing.T) {
 		similarDuration bool
 		want            bool
 	}{
-		{"small shift similar duration", shiftCandidate(inc, 5000, SourceOffset, MethodOffset, 0.5), true, true},
-		{"large shift similar duration", shiftCandidate(inc, 40000, SourceOffset, MethodOffset, 0.5), true, false},
-		{"large shift different duration", shiftCandidate(inc, 40000, SourceOffset, MethodOffset, 0.5), false, true},
-		{"boundary shift exactly LargeOffsetMs", shiftCandidate(inc, 30000, SourceOffset, MethodOffset, 0.5), true, true},
+		{"small shift similar duration", shiftCandidate(inc, 5000, SourceOffset, methodOffset, 0.5), true, true},
+		{"large shift similar duration", shiftCandidate(inc, 40000, SourceOffset, methodOffset, 0.5), true, false},
+		{"large shift different duration", shiftCandidate(inc, 40000, SourceOffset, methodOffset, 0.5), false, true},
+		{"boundary shift exactly LargeOffsetMs", shiftCandidate(inc, 30000, SourceOffset, methodOffset, 0.5), true, true},
 		{"framerate transform never implausible", framerateCandidate(inc, 0.959, 0.5), true, true},
 		{"segments transform never implausible", splitCandidate(inc, 5, 40*time.Second, 50*time.Second, 0.5), true, true},
 	}
@@ -694,23 +694,23 @@ func TestPlausibleCandidate(t *testing.T) {
 func TestPickWinner(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
-	incFar := ShiftCues(ref, 31*time.Second)
-	exact := shiftCandidate(inc, -2000, SourceOffset, MethodOffset, 0.5)
-	near := shiftCandidate(inc, -2100, SourceCrosslang, MethodCrosslang, 0.9)
-	lone := shiftCandidate(inc, -9000, SourceSplit, MethodSplit, 0.95)
-	implausible := shiftCandidate(inc, 45000, SourceOffset, MethodOffset, 0.9)
-	implausible2 := shiftCandidate(inc, 45500, SourceSplit, MethodSplit, 0.9)
-	plausibleWeak := shiftCandidate(inc, -2000, SourceCrosslang, MethodCrosslang, 0.3)
+	inc := shiftCues(ref, 2*time.Second)
+	incFar := shiftCues(ref, 31*time.Second)
+	exact := shiftCandidate(inc, -2000, SourceOffset, methodOffset, 0.5)
+	near := shiftCandidate(inc, -2100, SourceCrosslang, methodCrosslang, 0.9)
+	lone := shiftCandidate(inc, -9000, SourceSplit, methodSplit, 0.95)
+	implausible := shiftCandidate(inc, 45000, SourceOffset, methodOffset, 0.9)
+	implausible2 := shiftCandidate(inc, 45500, SourceSplit, methodSplit, 0.9)
+	plausibleWeak := shiftCandidate(inc, -2000, SourceCrosslang, methodCrosslang, 0.3)
 	// Over incFar the exact correction (-31000) is itself beyond
 	// LargeOffsetMs; -29800 is plausible but rates 0 (1.2s off 1s cues).
-	exactFar := shiftCandidate(incFar, -31000, SourceOffset, MethodOffset, 0.9)
-	nearFar := shiftCandidate(incFar, -29800, SourceCrosslang, MethodCrosslang, 0.3)
+	exactFar := shiftCandidate(incFar, -31000, SourceOffset, methodOffset, 0.9)
+	nearFar := shiftCandidate(incFar, -29800, SourceCrosslang, methodCrosslang, 0.3)
 
 	tests := []struct {
 		name            string
 		clusters        []voteCluster
-		wantSource      CandidateSource
+		wantSource      candidateSource
 		wantConfidence  Confidence
 		similarDuration bool
 	}{
@@ -794,15 +794,15 @@ func TestPickWinner(t *testing.T) {
 func TestArbitration_twoValueContract(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 
 	// The crosslang candidate wins (exact correction, rating 1.0) with a
 	// calibrated confidence chosen to sit between the audio fallback
 	// threshold (0.5) and the reference auto-sync gate (0.6).
 	calibrated := Confidence(0.55)
 	winner := voteOnCandidates([]SyncResult{
-		shiftCandidate(inc, -2000, SourceCrosslang, MethodCrosslang, calibrated),
-		shiftCandidate(inc, -7000, SourceOffset, MethodOffset, 0.9),
+		shiftCandidate(inc, -2000, SourceCrosslang, methodCrosslang, calibrated),
+		shiftCandidate(inc, -7000, SourceOffset, methodOffset, 0.9),
 	}, ref, inc)
 
 	if winner.Source != SourceCrosslang {
@@ -843,7 +843,7 @@ func TestProperty_winnerIdentity_permutationStable(t *testing.T) {
 		if rapid.Bool().Draw(t, "crosslang") {
 			candidates = append(candidates, shiftCandidate(inc,
 				rapid.Int64Range(-60000, 60000).Draw(t, "clShift"),
-				SourceCrosslang, MethodCrosslang,
+				SourceCrosslang, methodCrosslang,
 				Confidence(rapid.Float64Range(0.01, 1).Draw(t, "clConf"))))
 		}
 		if rapid.Bool().Draw(t, "framerate") {
@@ -853,7 +853,7 @@ func TestProperty_winnerIdentity_permutationStable(t *testing.T) {
 		}
 		candidates = append(candidates, shiftCandidate(inc,
 			rapid.Int64Range(-60000, 60000).Draw(t, "offShift"),
-			SourceOffset, MethodOffset,
+			SourceOffset, methodOffset,
 			Confidence(rapid.Float64Range(0.01, 1).Draw(t, "offConf"))))
 		if rapid.Bool().Draw(t, "split") {
 			a := rapid.Int64Range(0, 5000).Draw(t, "segShiftA")
@@ -873,9 +873,9 @@ func TestProperty_winnerIdentity_permutationStable(t *testing.T) {
 		if got.Source != base.Source {
 			t.Fatalf("winner source varies with order: %v vs %v", got.Source, base.Source)
 		}
-		if got.Transform.Digest() != base.Transform.Digest() {
+		if got.Transform.digest() != base.Transform.digest() {
 			t.Fatalf("winner transform varies with order: %s vs %s",
-				got.Transform.Digest(), base.Transform.Digest())
+				got.Transform.digest(), base.Transform.digest())
 		}
 		if got.Confidence != base.Confidence {
 			t.Fatalf("winner confidence varies with order: %f vs %f",
@@ -893,10 +893,10 @@ func TestProperty_voteOnCandidates(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		ref := makeLongCues(30, 10*time.Minute)
-		inc := ShiftCues(ref, 2*time.Second)
+		inc := shiftCues(ref, 2*time.Second)
 
-		sources := []CandidateSource{SourceCrosslang, SourceFramerate, SourceOffset, SourceSplit}
-		methods := []SyncMethod{MethodCrosslang, MethodFramerate, MethodOffset, MethodSplit}
+		sources := []candidateSource{SourceCrosslang, SourceFramerate, SourceOffset, SourceSplit}
+		methods := []SyncMethod{methodCrosslang, methodFramerate, methodOffset, methodSplit}
 		n := rapid.IntRange(1, 4).Draw(t, "numCandidates")
 
 		candidates := make([]SyncResult, n)

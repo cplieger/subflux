@@ -44,22 +44,22 @@ func Factory(_ context.Context, settings map[string]any) (provider.Provider, err
 	if ps.APIKey == "" {
 		return nil, errors.New("subsource: api_key is required")
 	}
-	return &Provider{
+	return &source{
 		apiKey:     ps.APIKey,
 		client:     provider.NewHTTPClient(provider.HTTPTimeoutExtended),
 		titleCache: cache.New[int](cache.DefaultTTL),
 	}, nil
 }
 
-// Provider implements the SubSource API client.
-type Provider struct {
+// source implements the SubSource API client.
+type source struct {
 	client     *http.Client
 	titleCache *cache.Cache[int]
 	apiKey     string
 }
 
 // Name returns the provider identifier for SubSource.
-func (p *Provider) Name() subflux.ProviderID { return providerName }
+func (*source) Name() subflux.ProviderID { return providerName }
 
 // langEntry pairs a requested ISO language code with its SubSource language name.
 type langEntry struct {
@@ -76,7 +76,7 @@ type langResult struct {
 
 // Search finds subtitles matching the request via IMDB ID lookup.
 // Tries alternative titles if the primary title is not found.
-func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.ImdbID == "" {
 		slog.Debug("subsource: no IMDB ID, skipping")
 		return nil, nil
@@ -160,7 +160,7 @@ func aggregateLangResults(perLang []langResult) ([]subflux.Subtitle, error) {
 
 // Download fetches the subtitle content for the given search result.
 // SubSource returns archives; the subtitle file is extracted automatically.
-func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
+func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("subsource: %w", err)
 	}
@@ -214,7 +214,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 // searchTitleWithAlternatives tries the primary title, then alternative titles.
 // Rate-limit and auth errors short-circuit the loop since they won't resolve
 // by trying a different title.
-func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *subflux.SearchRequest) (int, error) {
+func (p *source) searchTitleWithAlternatives(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	titleID, err := p.searchTitle(ctx, req)
 	if err != nil {
 		return 0, fmt.Errorf("subsource search title: %w", err)
@@ -266,7 +266,7 @@ func isFatalSearchError(err error) bool {
 
 type searchResult struct {
 	Title       string  `json:"title"`
-	ReleaseYear FlexInt `json:"releaseYear"`
+	ReleaseYear flexInt `json:"releaseYear"`
 	MovieID     int     `json:"movieId"`
 }
 
@@ -277,7 +277,6 @@ type searchResponse struct {
 }
 
 type subtitleItem struct {
-	Language     string   `json:"language"`
 	Commentary   string   `json:"commentary"`
 	ReleaseInfo  []string `json:"releaseInfo"`
 	SubtitleID   int      `json:"subtitleId"`
@@ -295,7 +294,7 @@ type subtitleResponse struct {
 
 // searchTitle resolves the SubSource numeric title id for the request,
 // memoized per titleCacheKey.
-func (p *Provider) searchTitle(ctx context.Context, req *subflux.SearchRequest) (int, error) {
+func (p *source) searchTitle(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	cacheKey := titleCacheKey(req)
 	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
 		return p.searchTitleUncached(ctx, req)
@@ -315,7 +314,7 @@ func titleCacheKey(req *subflux.SearchRequest) string {
 	return keyenc.Join("title", req.ImdbID, strings.ToLower(req.Title), strconv.Itoa(season))
 }
 
-func (p *Provider) searchTitleUncached(ctx context.Context, req *subflux.SearchRequest) (int, error) {
+func (p *source) searchTitleUncached(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
 		paramAPIKey:     {p.apiKey},
 		paramSearchType: {string(matchedByIMDB)},
@@ -340,7 +339,7 @@ func (p *Provider) searchTitleUncached(ctx context.Context, req *subflux.SearchR
 	return matchTitle(data, req.Title, req.Year), nil
 }
 
-func (p *Provider) searchTitleByText(ctx context.Context, req *subflux.SearchRequest) (int, error) {
+func (p *source) searchTitleByText(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
 		paramAPIKey:     {p.apiKey},
 		paramSearchType: {"text"},
@@ -360,7 +359,7 @@ func (p *Provider) searchTitleByText(ctx context.Context, req *subflux.SearchReq
 
 // doSearch executes a title search request and returns the decoded results.
 // Transport errors are redacted to prevent api_key leakage via *url.Error.
-func (p *Provider) doSearch(ctx context.Context, params url.Values) ([]searchResult, error) {
+func (p *source) doSearch(ctx context.Context, params url.Values) ([]searchResult, error) {
 	u := baseURL + "/movies/search?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
@@ -397,7 +396,7 @@ var (
 // apiFailure classifies a success:false answer: a refused key is
 // *subflux.AuthError, a not-found answer is no error (no results), anything
 // else a plain error. The text is redacted of the API key and bounded.
-func (p *Provider) apiFailure(msg string) error {
+func (p *source) apiFailure(msg string) error {
 	text := logsafe.RedactedField(msg, httpx.Secret(p.apiKey))
 	lower := strings.ToLower(text)
 	switch {
@@ -433,7 +432,7 @@ func matchTitle(data []searchResult, title string, year int) int {
 	return 0
 }
 
-func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoLang string, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *source) querySubtitles(ctx context.Context, titleID int, ssLang, isoLang string, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	params := url.Values{
 		paramAPIKey: {p.apiKey},
 		"language":  {strings.ToLower(ssLang)},
@@ -509,10 +508,10 @@ func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) [
 	return subs
 }
 
-// FlexInt unmarshals both string and number JSON representations to an int.
+// flexInt unmarshals both string and number JSON representations to an int.
 // SubSource's releaseYear field returns either shape; errors default to
 // zero (unknown year).
-type FlexInt int
+type flexInt int
 
 // yearPolicy is the lenient decode policy for releaseYear: every gate is
 // jsonx.Zero over the full int64 range, so any odd shape or invalid value
@@ -532,15 +531,15 @@ var yearPolicy = jsonx.Policy{
 	OutOfRange:       jsonx.Zero,
 }
 
-// UnmarshalJSON implements json.Unmarshaler for FlexInt.
-func (f *FlexInt) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements json.Unmarshaler for flexInt.
+func (f *flexInt) UnmarshalJSON(data []byte) error {
 	n, err := jsonx.ParseInt64(data, yearPolicy)
 	if err != nil {
 		// Unreachable under the all-Zero policy; default anyway.
 		*f = 0
 		return nil
 	}
-	*f = FlexInt(n)
+	*f = flexInt(n)
 	return nil
 }
 

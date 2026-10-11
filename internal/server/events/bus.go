@@ -18,25 +18,25 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
-// SSERing is the replay-ring capacity in events (sse.WithReplay).
-const SSERing = 1024
+// sseRing is the replay-ring capacity in events (sse.WithReplay).
+const sseRing = 1024
 
-// ReplyMaxEvents is the largest replay one reconnect may receive
+// replyMaxEvents is the largest replay one reconnect may receive
 // (sse.WithReplyMaxEvents); a cursor further behind head earns gap_budget
 // and the client reconciles through the digest, which is cheaper than a
 // bulk replay.
-const ReplyMaxEvents = 256
+const replyMaxEvents = 256
 
-// SSEReplayTTL is the longest a ring entry may be replayed after it was
+// sseReplayTTL is the longest a ring entry may be replayed after it was
 // published (sse.WithReplayTTL).
-const SSEReplayTTL = 10 * time.Minute
+const sseReplayTTL = 10 * time.Minute
 
-// SSEReconnectDelay is the stream's advertised `retry:` field: the reconnect
+// sseReconnectDelay is the stream's advertised `retry:` field: the reconnect
 // wait a legacy EventSource performs by itself after a transient drop and the
 // floor of the v3 client's post-EOF backoff. Without it Chrome waits 3s and
 // Firefox 5s; it is deliberately not lower because the spec routes a
 // connection to a DOWN server through the same timer.
-const SSEReconnectDelay = 1500 * time.Millisecond
+const sseReconnectDelay = 1500 * time.Millisecond
 
 // Metrics is the observability sink the bus records into: one counter per
 // hello verdict split by the legacy overlap, one per presence departure
@@ -86,10 +86,10 @@ func New(maxClients int, m Metrics) *EventBus {
 	eb := &EventBus{metrics: m, presence: newPresence(m)}
 	eb.hub = sse.MustNew(
 		sse.WithMaxClients(maxClients),
-		sse.WithReplay(SSERing),
-		sse.WithReplayTTL(SSEReplayTTL),
-		sse.WithReplyMaxEvents(ReplyMaxEvents),
-		sse.WithReconnectDelay(SSEReconnectDelay),
+		sse.WithReplay(sseRing),
+		sse.WithReplayTTL(sseReplayTTL),
+		sse.WithReplyMaxEvents(replyMaxEvents),
+		sse.WithReconnectDelay(sseReconnectDelay),
 		sse.WithPresence(func(ev sse.PresenceEvent) { eb.onPresence(&ev) }),
 	)
 	eb.versions = newVersions(eb.hub.Position().Epoch)
@@ -128,7 +128,7 @@ func (eb *EventBus) Presence() *Presence {
 // table. Mount it inside the authentication and cross-origin middleware,
 // under a route timeout (it does not stream).
 func (eb *EventBus) DigestHandler() http.Handler {
-	return eb.hub.DigestHandler(eb.versions.Resolve)
+	return eb.hub.DigestHandler(eb.versions.resolve)
 }
 
 // SetMaxClients applies a new client cap (<= 0 means DefaultMaxSSEClients) to
@@ -189,13 +189,13 @@ func (eb *EventBus) PublishCoverageUpdate(ev *CoverageEvent) {
 // PublishScanStart publishes scan:start for a scan activity that has just
 // been accepted. Outcome is meaningless here and is ignored if set.
 func (eb *EventBus) PublishScanStart(ev *ScanEvent) {
-	eb.Publish(Event{Type: ScanStart, Data: *ev})
+	eb.Publish(Event{Type: scanStart, Data: *ev})
 }
 
 // PublishScanDone publishes scan:done with the scan's four-valued terminal
 // outcome (see ScanEvent.Outcome).
 func (eb *EventBus) PublishScanDone(ev *ScanEvent) {
-	eb.Publish(Event{Type: ScanDone, Data: *ev})
+	eb.Publish(Event{Type: scanDone, Data: *ev})
 }
 
 // PublishNotify publishes a user-facing toast notification at the given
@@ -209,19 +209,19 @@ func (eb *EventBus) PublishNotify(level NotifyLevel, text string) {
 // dismissed. The alert is the under-lock snapshot the AlertLog hook carried;
 // it is dereferenced into the payload and never retained.
 func (eb *EventBus) PublishAlert(op AlertOp, a *activity.Alert) {
-	eb.Publish(Event{Type: AlertDelta, Data: AlertEvent{Op: op, Alert: a}})
+	eb.Publish(Event{Type: alertDelta, Data: AlertEvent{Op: op, Alert: a}})
 }
 
 // PublishProvider publishes a provider status delta. The event is
 // dereferenced into the payload and never retained.
 func (eb *EventBus) PublishProvider(ev *ProviderEvent) {
-	eb.Publish(Event{Type: ProviderDelta, Data: *ev})
+	eb.Publish(Event{Type: providerDelta, Data: *ev})
 }
 
 // PublishSyncDone publishes one sync job's terminal result. The event is
 // dereferenced into the payload and never retained.
 func (eb *EventBus) PublishSyncDone(ev *SyncDoneEvent) {
-	eb.Publish(Event{Type: SyncDone, Data: *ev})
+	eb.Publish(Event{Type: syncDone, Data: *ev})
 }
 
 // ClientCount returns the number of connected SSE clients.

@@ -17,10 +17,10 @@ func TestRecordRoundTrip(t *testing.T) {
 		roundTrip(t, &attemptRec{LastTried: time.Unix(1, 0).UTC(), NextRetry: time.Unix(2, 0).UTC(), Failures: 7})
 	})
 	t.Run("stateRec", func(t *testing.T) {
-		roundTrip(t, &stateRec{ID: 1, MediaType: subflux.MediaTypeEpisode, MediaID: "tt1-s02e03", Language: "fr", Variant: subflux.VariantStandard, Provider: subflux.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", ReleaseTag: "WEB", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
+		roundTrip(t, &stateRec{ID: 1, MediaType: subflux.MediaTypeEpisode, MediaID: "tt1-s02e03", Language: "fr", Variant: subflux.VariantStandard, Provider: subflux.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
 	})
 	t.Run("fileRec", func(t *testing.T) {
-		roundTrip(t, &fileRec{Codec: "ass", UpdatedAt: time.Unix(5, 0).UTC()})
+		roundTrip(t, &fileRec{Codec: "ass"})
 	})
 	t.Run("scanRec", func(t *testing.T) {
 		roundTrip(t, &scanRec{Title: "M", AudioLang: "ja", Season: 1, Episode: 9, ScannedAt: time.Unix(7, 0).UTC()})

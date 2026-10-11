@@ -235,3 +235,13 @@ func TestTimeIndexKeys_chronologicalOrder(t *testing.T) {
 		t.Error("later scanAtKey timestamp should be >= later cutoff")
 	}
 }
+
+// parseStateKey decodes a subtitle_state primary key back into its surrogate
+// id, the inverse of stateKey; ok is false for a non-8-byte key.
+func parseStateKey(key []byte) (id int64, ok bool) {
+	v, ok := kv.DecodeBe64(key)
+	if !ok {
+		return 0, false
+	}
+	return int64(v), true
+}

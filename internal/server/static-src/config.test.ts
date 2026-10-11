@@ -216,13 +216,12 @@ function addInput(id: string, value: string): HTMLInputElement {
   return inp;
 }
 
-function addCheckbox(id: string, checked: boolean): HTMLInputElement {
+function addCheckbox(id: string, checked: boolean): void {
   const inp = document.createElement("input");
   inp.type = "checkbox";
   inp.id = id;
   inp.checked = checked;
   document.body.appendChild(inp);
-  return inp;
 }
 
 function addSelect(parent: HTMLElement, className: string, options: string[], value: string): void {

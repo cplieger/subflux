@@ -11,9 +11,8 @@ import (
 // validateScoreRange checks that a score value is within [defaults.MinScoreValue, defaults.MaxScoreValue].
 func validateScoreRange(value int, field string) error {
 	if value < defaults.MinScoreValue || value > defaults.MaxScoreValue {
-		return configFieldErr(field,
-			fmt.Sprintf("%s must be between %d and %d, got %d",
-				field, defaults.MinScoreValue, defaults.MaxScoreValue, value))
+		return configFieldErr(fmt.Sprintf("%s must be between %d and %d, got %d",
+			field, defaults.MinScoreValue, defaults.MaxScoreValue, value))
 	}
 	return nil
 }
@@ -33,12 +32,12 @@ func validateLangCode(code, field, ctx string) error {
 		return nil
 	}
 	if canon := langcode.Canonical(code); canon != "" {
-		return configFieldErr(field, fmt.Sprintf(
+		return configFieldErr(fmt.Sprintf(
 			"%s %q (%s) is not the code subflux uses for that language; use %q",
 			field, code, ctx, canon,
 		))
 	}
-	return configFieldErr(field, fmt.Sprintf(
+	return configFieldErr(fmt.Sprintf(
 		"%s %q (%s) is not a known language code", field, code, ctx,
 	))
 }
@@ -73,7 +72,7 @@ func validateAudioRule(rule *AudioRule, seenAudio map[string]struct{}) error {
 		return err
 	}
 	if _, dup := seenAudio[rule.Audio]; dup {
-		return fmt.Errorf("%w: %s", ErrDuplicateAudioRule, rule.Audio)
+		return fmt.Errorf("%w: %s", errDuplicateAudioRule, rule.Audio)
 	}
 	seenAudio[rule.Audio] = struct{}{}
 	for i := range rule.Subtitles {
@@ -90,7 +89,7 @@ func validateAudioRule(rule *AudioRule, seenAudio map[string]struct{}) error {
 // (only the first would match).
 func validateLanguages(lang *LanguageRules) error {
 	if len(lang.Default) == 0 {
-		return ErrNoDefaultLang
+		return errNoDefaultLang
 	}
 	seenAudio := make(map[string]struct{}, len(lang.Rules))
 	for i := range lang.Rules {

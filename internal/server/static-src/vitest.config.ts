@@ -25,9 +25,8 @@
 // sit beside the modules they cover.
 //
 // `channel: "chromium"` opts into Chromium's newer headless mode, the real
-// browser rather than the separate headless-shell build. CI installs it with
-// `npx playwright install --with-deps chromium`; locally it is a one-time
-// `npx --no-install playwright install chromium`.
+// browser rather than the separate headless-shell build. Install it once with
+// `npx --no-install playwright install chromium`, as CI does.
 //
 // Run: vitest --run (single pass) or vitest (watch mode)
 import { playwright } from "@vitest/browser-playwright";

@@ -162,7 +162,7 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-// PasswordCheck is one password to validate, with the two policy choices that
+// passwordCheck is one password to validate, with the two policy choices that
 // change what "valid" means.
 //
 // All four are named rather than positional because both pairs are silently
@@ -171,7 +171,7 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 // real one; the two booleans are independent policy switches, and a reversed
 // CheckBreach disables the breach lookup on a path the operator believes is
 // checked while shortening the length floor on one that is not.
-type PasswordCheck struct {
+type passwordCheck struct {
 	// Password is the candidate password.
 	Password string
 	// Username is the account it belongs to, rejected as a substring.
@@ -184,19 +184,19 @@ type PasswordCheck struct {
 	CheckBreach bool
 }
 
-// PasswordHash is an Argon2id password hash. It is a distinct type so it
-// cannot be transposed with ValidateAndHashPassword's other string result, the
+// passwordHash is an Argon2id password hash. It is a distinct type so it
+// cannot be transposed with validateAndHashPassword's other string result, the
 // user-facing rejection message every call site writes into a 400 body: as two
 // plain strings a swapped assignment compiles and publishes the hash to the
 // client. Convert to string only at the auth.User boundary.
-type PasswordHash string
+type passwordHash string
 
-// ValidateAndHashPassword validates password length and context (rejecting
+// validateAndHashPassword validates password length and context (rejecting
 // passwords that contain the username or app name), checks against breach
 // databases (when check.CheckBreach is set), and returns the Argon2id hash.
 // A non-empty userMsg means the password was rejected on policy grounds and is
 // safe to show the caller; hash is empty in that case.
-func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *http.Client) (hash PasswordHash, userMsg string, err error) {
+func validateAndHashPassword(ctx context.Context, check passwordCheck, client *http.Client) (hash passwordHash, userMsg string, err error) {
 	validateLen := auth.ValidateMultiFactorPasswordLength
 	if check.SoleFactor {
 		validateLen = auth.ValidateSoloPasswordLength
@@ -217,7 +217,7 @@ func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *h
 			return "", msgBreachedPassword, nil
 		}
 	}
-	return PasswordHash(auth.HashPassword(check.Password)), "", nil
+	return passwordHash(auth.HashPassword(check.Password)), "", nil
 }
 
 // relyingParty resolves the current relying party from the live snapshot, nil
@@ -247,7 +247,7 @@ func (h *Handler) requireWebAuthn(w http.ResponseWriter, r *http.Request) (*auth
 // consumes the ceremony it names from the ceremony store, and writes an error
 // response on failure.
 func (h *Handler) consumeWebAuthnSession(w http.ResponseWriter, r *http.Request) (authwebauthn.Ceremony, bool) {
-	sessionToken := r.Header.Get(HeaderWebAuthnSession)
+	sessionToken := r.Header.Get(headerWebAuthnSession)
 	if sessionToken == "" {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing session token")
 		return authwebauthn.Ceremony{}, false

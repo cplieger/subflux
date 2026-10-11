@@ -16,14 +16,14 @@ const valTrue = "true"
 // and enabling IDE navigation.
 type SettingKey string
 
-// KeyAPIKey and its siblings enumerate the provider setting keys.
+// keyAPIKey and its siblings enumerate the provider setting keys.
 const (
-	KeyAPIKey          SettingKey = "api_key"
-	KeyUsername        SettingKey = "username"
+	keyAPIKey          SettingKey = "api_key"
+	keyUsername        SettingKey = "username"
 	KeyPassword        SettingKey = "password"
-	KeyPasskey         SettingKey = "passkey"
-	KeyToken           SettingKey = "token"
-	KeyUseHash         SettingKey = "use_hash"
+	keyPasskey         SettingKey = "passkey"
+	keyToken           SettingKey = "token"
+	keyUseHash         SettingKey = "use_hash"
 	KeyIncludeAI       SettingKey = "include_ai_translated"
 	KeyIncludeMT       SettingKey = "include_machine_translated"
 	KeyAniDBClientKey  SettingKey = "anidb_client_key"
@@ -159,16 +159,16 @@ type Settings struct {
 // remaining entries in Custom for provider-specific use.
 func FromMap(settings map[string]any) Settings {
 	ps := Settings{
-		APIKey:   SettingString(settings, KeyAPIKey),
-		Username: SettingString(settings, KeyUsername),
+		APIKey:   SettingString(settings, keyAPIKey),
+		Username: SettingString(settings, keyUsername),
 		Password: SettingString(settings, KeyPassword),
-		Passkey:  SettingString(settings, KeyPasskey),
-		Token:    SettingString(settings, KeyToken),
-		UseHash:  SettingBool(settings, KeyUseHash, false),
+		Passkey:  SettingString(settings, keyPasskey),
+		Token:    SettingString(settings, keyToken),
+		UseHash:  SettingBool(settings, keyUseHash, false),
 	}
 	commonKeys := map[SettingKey]struct{}{
-		KeyAPIKey: {}, KeyUsername: {}, KeyPassword: {},
-		KeyPasskey: {}, KeyToken: {}, KeyUseHash: {},
+		keyAPIKey: {}, keyUsername: {}, KeyPassword: {},
+		keyPasskey: {}, keyToken: {}, keyUseHash: {},
 	}
 	for k, v := range settings {
 		if _, isCommon := commonKeys[SettingKey(k)]; !isCommon {

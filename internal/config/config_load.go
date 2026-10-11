@@ -75,11 +75,11 @@ func isAllowedEnvVar(key string) bool {
 	return false
 }
 
-// ErrConfigTooLarge indicates the config file or data exceeds the maximum allowed size.
-var ErrConfigTooLarge = errors.New("config too large")
+// errConfigTooLarge indicates the config file or data exceeds the maximum allowed size.
+var errConfigTooLarge = errors.New("config too large")
 
-// ErrVariantConflict indicates both "variant" and "variants" are set on the same target.
-var ErrVariantConflict = errors.New("cannot set both variant and variants")
+// errVariantConflict indicates both "variant" and "variants" are set on the same target.
+var errVariantConflict = errors.New("cannot set both variant and variants")
 
 // maxConfigSize references the shared file-size cap from api.
 const maxConfigSize = subflux.MaxSafeFileBytes
@@ -88,12 +88,12 @@ const maxConfigSize = subflux.MaxSafeFileBytes
 // YAML unmarshalling overlays user values on top of these defaults.
 func newWithDefaults() *Config {
 	return &Config{
-		PollIntervalCfg: Duration{D: defaults.DefaultPollInterval},
+		PollIntervalCfg: duration{D: defaults.DefaultPollInterval},
 		Cfg: yamlSearchConfig{
 			MinScore:            0,
-			ScanInterval:        Duration{D: defaults.DefaultScanInterval},
-			ProviderTimeout:     Duration{D: defaults.DefaultProviderTimeout},
-			ScanDelay:           Duration{D: defaults.DefaultScanDelay},
+			ScanInterval:        duration{D: defaults.DefaultScanInterval},
+			ProviderTimeout:     duration{D: defaults.DefaultProviderTimeout},
+			ScanDelay:           duration{D: defaults.DefaultScanDelay},
 			UpgradeEnabled:      true,
 			UpgradeWindowDays:   defaults.DefaultUpgradeWindowDays,
 			MaxSSEClients:       defaults.DefaultMaxSSEClients,
@@ -102,11 +102,11 @@ func newWithDefaults() *Config {
 		},
 		AdaptiveCfg: yamlAdaptiveConfig{
 			Enabled:           true,
-			InitialDelay:      Duration{D: defaults.DefaultAdaptiveInitDelay},
-			MaxDelay:          Duration{D: defaults.DefaultAdaptiveMaxDelay},
+			InitialDelay:      duration{D: defaults.DefaultAdaptiveInitDelay},
+			MaxDelay:          duration{D: defaults.DefaultAdaptiveMaxDelay},
 			BackoffMultiplier: defaults.DefaultBackoffMultiplier,
 		},
-		Logging: LoggingConfig{
+		Logging: loggingConfig{
 			Level:  defaultLogLevel,
 			Format: defaultLogFormat,
 		},
@@ -144,7 +144,7 @@ func Load(ctx context.Context, path string) (*Config, error) {
 		return nil, fmt.Errorf("stat config: %w", err)
 	}
 	if info.Size() > maxConfigSize {
-		return nil, fmt.Errorf("config file %w: %d bytes (max %d)", ErrConfigTooLarge, info.Size(), maxConfigSize)
+		return nil, fmt.Errorf("config file %w: %d bytes (max %d)", errConfigTooLarge, info.Size(), maxConfigSize)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(f, maxConfigSize))
@@ -195,7 +195,7 @@ func expandTargetList(targets []yamlSubtitleTarget, ruleCtx string) ([]yamlSubti
 	for _, t := range targets {
 		if t.Variant != "" && len(t.Variants) > 0 {
 			return nil, fmt.Errorf(
-				"%w (code=%s, context=%s)", ErrVariantConflict, t.Code, ruleCtx,
+				"%w (code=%s, context=%s)", errVariantConflict, t.Code, ruleCtx,
 			)
 		}
 		if len(t.Variants) == 0 {
@@ -223,7 +223,7 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	}
 	slog.Debug("parsing config from bytes", "size", len(data))
 	if len(data) > maxConfigSize {
-		return nil, fmt.Errorf("config data %w: %d bytes (max %d)", ErrConfigTooLarge, len(data), maxConfigSize)
+		return nil, fmt.Errorf("config data %w: %d bytes (max %d)", errConfigTooLarge, len(data), maxConfigSize)
 	}
 
 	// The whole strict loading pipeline is yamlenv.Load: the single-document

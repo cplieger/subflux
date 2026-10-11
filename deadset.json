@@ -1,0 +1,29 @@
+{
+  "target": {
+    "kind": "application"
+  },
+  "analysis": {
+    "configurations": [
+      {
+        "id": "linux-amd64",
+        "os": "linux",
+        "arch": "amd64"
+      },
+      {
+        "id": "linux-amd64-corpus",
+        "os": "linux",
+        "arch": "amd64",
+        "tags": [
+          "corpus"
+        ]
+      }
+    ]
+  },
+  "ts": {
+    "entry_files": [
+      "internal/server/static-src/app.ts",
+      "internal/server/static-src/login.ts",
+      "internal/server/static-src/sse-worker.ts"
+    ]
+  }
+}

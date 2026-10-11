@@ -42,7 +42,7 @@ func TestAudit_emits_fixed_attributes(t *testing.T) {
 	req.Header.Set("User-Agent", "test-agent/1.0")
 
 	records := captureSlog(t, func() {
-		Audit(req, slog.LevelInfo, AuditLoginSuccess, true, "alice",
+		audit(req, slog.LevelInfo, auditLoginSuccess, true, "alice",
 			slog.String("method", "password"))
 	})
 
@@ -56,8 +56,8 @@ func TestAudit_emits_fixed_attributes(t *testing.T) {
 	if got := rec["event_kind"]; got != "auth" {
 		t.Errorf("event_kind: got %v, want \"auth\"", got)
 	}
-	if got := rec["event"]; got != string(AuditLoginSuccess) {
-		t.Errorf("event: got %v, want %v", got, AuditLoginSuccess)
+	if got := rec["event"]; got != string(auditLoginSuccess) {
+		t.Errorf("event: got %v, want %v", got, auditLoginSuccess)
 	}
 	if got := rec["success"]; got != true {
 		t.Errorf("success: got %v, want true", got)
@@ -84,7 +84,7 @@ func TestAudit_failure_emits_at_warn(t *testing.T) {
 	req.RemoteAddr = "192.168.1.50:5432"
 
 	records := captureSlog(t, func() {
-		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "bob",
+		audit(req, slog.LevelWarn, auditLoginFailure, false, "bob",
 			slog.String("reason", "invalid_password"))
 	})
 
@@ -110,7 +110,7 @@ func TestAudit_unknown_user_records_empty_string(t *testing.T) {
 	req.RemoteAddr = "203.0.113.7:1234"
 
 	records := captureSlog(t, func() {
-		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "",
+		audit(req, slog.LevelWarn, auditLoginFailure, false, "",
 			slog.String("reason", "unknown_username"))
 	})
 
@@ -126,7 +126,7 @@ func TestAudit_unknown_user_records_empty_string(t *testing.T) {
 }
 
 func TestAudit_emits_all_extra_attributes(t *testing.T) {
-	// Audit must append every caller-supplied attribute verbatim. Passing
+	// audit must append every caller-supplied attribute verbatim. Passing
 	// more than six extra attrs also exercises the attrs-slice capacity
 	// calculation (6+len(kvs)): an under-allocation there makes a negative
 	// slice size and panics, so the recover converts that into a clean
@@ -142,7 +142,7 @@ func TestAudit_emits_all_extra_attributes(t *testing.T) {
 			}
 		}()
 		records = captureSlog(t, func() {
-			Audit(req, slog.LevelInfo, AuditLoginSuccess, true, "alice",
+			audit(req, slog.LevelInfo, auditLoginSuccess, true, "alice",
 				slog.String("a", "1"), slog.String("b", "2"), slog.String("c", "3"),
 				slog.String("d", "4"), slog.String("e", "5"), slog.String("f", "6"),
 				slog.String("g", "7"))
@@ -165,14 +165,14 @@ func TestAudit_emits_all_extra_attributes(t *testing.T) {
 }
 
 func TestAudit_accepts_raw_key_value_pairs(t *testing.T) {
-	// Audit's contract allows raw key/value pairs alongside slog.Attr values
+	// audit's contract allows raw key/value pairs alongside slog.Attr values
 	// (documented: "raw kv pairs work too but lose type info"). Exercise that
 	// path through the public API and confirm the pair lands in the record.
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "10.0.0.2:4444"
 
 	records := captureSlog(t, func() {
-		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "bob", "reason", "locked_out")
+		audit(req, slog.LevelWarn, auditLoginFailure, false, "bob", "reason", "locked_out")
 	})
 
 	if got := len(records); got != 1 {
@@ -192,7 +192,7 @@ func TestAudit_dangling_key_records_a_nil_value(t *testing.T) {
 	req.RemoteAddr = "10.0.0.2:4444"
 
 	records := captureSlog(t, func() {
-		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "bob", "reason", "locked_out", "dangling")
+		audit(req, slog.LevelWarn, auditLoginFailure, false, "bob", "reason", "locked_out", "dangling")
 	})
 
 	if got := len(records); got != 1 {

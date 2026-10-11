@@ -246,7 +246,7 @@ func TestMovieSearchRequest(t *testing.T) {
 
 // --- Outcome classification of one scanned item ---
 //
-// ScanEpisode and scanMovieDetail translate one engine SearchResult into the
+// scanEpisode and scanMovieDetail translate one engine SearchResult into the
 // scan outcomes the stats, the season tracker and the pacing signal all key
 // on, and decide whether the item's coverage badge needs republishing. The
 // cases below drive the engine's answer directly, because that answer IS the
@@ -293,7 +293,7 @@ func TestScanEpisode_classifies_the_engine_result(t *testing.T) {
 	cases := []struct {
 		name         string
 		result       subflux.SearchResult
-		want         ScanOutcome
+		want         scanOutcome
 		wantCoverage int
 		wantQueried  bool
 	}{
@@ -303,38 +303,38 @@ func TestScanEpisode_classifies_the_engine_result(t *testing.T) {
 				Lang: "fr", Kind: subflux.LangSearched,
 				Paths: []string{"/media/e.fr.srt"}, Searched: 1, Queried: 2,
 			}),
-			want: ScanFound, wantCoverage: 1, wantQueried: true,
+			want: scanFound, wantCoverage: 1, wantQueried: true,
 		},
 		{
 			name: "a searched language that downloaded nothing is a no-result",
 			result: oneLang(subflux.LangOutcome{
 				Lang: "fr", Kind: subflux.LangSearched, Searched: 1, Queried: 2,
 			}),
-			want: ScanNoResult, wantCoverage: 0, wantQueried: true,
+			want: scanNoResult, wantCoverage: 0, wantQueried: true,
 		},
 		{
 			name: "a language that needed no search is skipped",
 			result: oneLang(subflux.LangOutcome{
-				Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1,
+				Lang: "fr", Kind: subflux.LangSkipped,
 			}),
-			want: ScanSkipped, wantCoverage: 0, wantQueried: false,
+			want: scanSkipped, wantCoverage: 0, wantQueried: false,
 		},
 		{
 			name: "a language whose providers are all in backoff is backed off",
 			result: oneLang(subflux.LangOutcome{
 				Lang: "fr", Kind: subflux.LangBackedOff,
 			}),
-			want: ScanBackedOff, wantCoverage: 0, wantQueried: false,
+			want: scanBackedOff, wantCoverage: 0, wantQueried: false,
 		},
 		{
 			name: "an inventory change republishes coverage without a download",
 			result: subflux.SearchResult{
 				CoverageChanged: true,
 				Langs: []subflux.LangOutcome{
-					{Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1},
+					{Lang: "fr", Kind: subflux.LangSkipped},
 				},
 			},
-			want: ScanSkipped, wantCoverage: 1, wantQueried: false,
+			want: scanSkipped, wantCoverage: 1, wantQueried: false,
 		},
 	}
 	for _, tc := range cases {
@@ -345,7 +345,7 @@ func TestScanEpisode_classifies_the_engine_result(t *testing.T) {
 			ls := &LiveState{Cfg: &fakeScanCfg{languages: []string{"fr"}}, Engine: engine}
 			deps := &Deps{Events: ev, Activity: activity.New(10), Alerts: nopAlerts{}}
 
-			scan := ScanEpisode(t.Context(), deps, ls,
+			scan := scanEpisode(t.Context(), deps, ls,
 				scanTestSeries(), scanTestEpisode())
 			got, langs, queried := scan.Outcome, scan.Langs, scan.Queried
 
@@ -372,7 +372,7 @@ func TestScanMovieDetail_classifies_the_engine_result(t *testing.T) {
 	cases := []struct {
 		name         string
 		result       subflux.SearchResult
-		want         ScanOutcome
+		want         scanOutcome
 		wantCoverage int
 		wantQueried  bool
 	}{
@@ -382,38 +382,38 @@ func TestScanMovieDetail_classifies_the_engine_result(t *testing.T) {
 				Lang: "fr", Kind: subflux.LangSearched,
 				Paths: []string{"/media/m.fr.srt"}, Searched: 1, Queried: 2,
 			}),
-			want: ScanFound, wantCoverage: 1, wantQueried: true,
+			want: scanFound, wantCoverage: 1, wantQueried: true,
 		},
 		{
 			name: "a searched language that downloaded nothing is a no-result",
 			result: oneLang(subflux.LangOutcome{
 				Lang: "fr", Kind: subflux.LangSearched, Searched: 1, Queried: 2,
 			}),
-			want: ScanNoResult, wantCoverage: 0, wantQueried: true,
+			want: scanNoResult, wantCoverage: 0, wantQueried: true,
 		},
 		{
 			name: "a language that needed no search is skipped",
 			result: oneLang(subflux.LangOutcome{
-				Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1,
+				Lang: "fr", Kind: subflux.LangSkipped,
 			}),
-			want: ScanSkipped, wantCoverage: 0, wantQueried: false,
+			want: scanSkipped, wantCoverage: 0, wantQueried: false,
 		},
 		{
 			name: "a language whose providers are all in backoff is backed off",
 			result: oneLang(subflux.LangOutcome{
 				Lang: "fr", Kind: subflux.LangBackedOff,
 			}),
-			want: ScanBackedOff, wantCoverage: 0, wantQueried: false,
+			want: scanBackedOff, wantCoverage: 0, wantQueried: false,
 		},
 		{
 			name: "an inventory change republishes coverage without a download",
 			result: subflux.SearchResult{
 				CoverageChanged: true,
 				Langs: []subflux.LangOutcome{
-					{Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1},
+					{Lang: "fr", Kind: subflux.LangSkipped},
 				},
 			},
-			want: ScanSkipped, wantCoverage: 1, wantQueried: false,
+			want: scanSkipped, wantCoverage: 1, wantQueried: false,
 		},
 	}
 	for _, tc := range cases {
@@ -461,7 +461,7 @@ func TestScanEpisode_force_upgrade_reaches_the_engine_only_when_asked(t *testing
 			ls := &LiveState{Cfg: &fakeScanCfg{languages: []string{"fr"}}, Engine: engine}
 			deps := &Deps{Events: &recEvents{}, Activity: activity.New(10), Alerts: nopAlerts{}}
 
-			ScanEpisode(t.Context(), deps, ls, scanTestSeries(), scanTestEpisode(), tc.forceUpgrade...)
+			scanEpisode(t.Context(), deps, ls, scanTestSeries(), scanTestEpisode(), tc.forceUpgrade...)
 
 			if got := engine.lastRequest().ForceUpgrade; got != tc.want {
 				t.Errorf("ScanEpisode(forceUpgrade=%v) request ForceUpgrade = %t, want %t",
@@ -479,12 +479,12 @@ func TestScanItem_successful_search_logs_no_warning(t *testing.T) {
 	buf := captureLogs(t)
 
 	engine := &fakeEngine{result: oneLang(subflux.LangOutcome{
-		Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1,
+		Lang: "fr", Kind: subflux.LangSkipped,
 	})}
 	ls := &LiveState{Cfg: &fakeScanCfg{languages: []string{"fr"}}, Engine: engine}
 	deps := &Deps{Events: &recEvents{}, Activity: activity.New(10), Alerts: nopAlerts{}}
 
-	ScanEpisode(t.Context(), deps, ls, scanTestSeries(), scanTestEpisode())
+	scanEpisode(t.Context(), deps, ls, scanTestSeries(), scanTestEpisode())
 	scanMovieDetail(t.Context(), deps, ls, scanTestMovie())
 
 	if strings.Contains(buf.String(), "level=WARN") {
@@ -497,14 +497,14 @@ func TestItemOutcome_classifies_a_search_result(t *testing.T) {
 	tests := []struct {
 		name  string
 		langs []subflux.LangOutcome
-		want  ScanOutcome
+		want  scanOutcome
 	}{
-		{name: "saved", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, Paths: []string{"/m/a.srt"}}}, want: ScanFound},
-		{name: "folder unwritable", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, WriteBlocked: 1}}, want: ScanWriteBlocked},
-		{name: "a download failed", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1}}, want: ScanDownloadFailed},
-		{name: "searched with nothing", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 1}}, want: ScanNoResult},
-		{name: "backed off", langs: []subflux.LangOutcome{{Kind: subflux.LangBackedOff}}, want: ScanBackedOff},
-		{name: "nothing to search", langs: []subflux.LangOutcome{{Kind: subflux.LangSkipped, Skipped: 1}}, want: ScanSkipped},
+		{name: "saved", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, Paths: []string{"/m/a.srt"}}}, want: scanFound},
+		{name: "folder unwritable", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1, WriteBlocked: 1}}, want: scanWriteBlocked},
+		{name: "a download failed", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 2, Failed: 1}}, want: scanDownloadFailed},
+		{name: "searched with nothing", langs: []subflux.LangOutcome{{Kind: subflux.LangSearched, Searched: 1}}, want: scanNoResult},
+		{name: "backed off", langs: []subflux.LangOutcome{{Kind: subflux.LangBackedOff}}, want: scanBackedOff},
+		{name: "nothing to search", langs: []subflux.LangOutcome{{Kind: subflux.LangSkipped}}, want: scanSkipped},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

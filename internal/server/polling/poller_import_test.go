@@ -42,12 +42,12 @@ func importPoller(engine importSearcher) (*Poller, *LiveState) {
 	return &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}, ls
 }
 
-// movieImportResult is a minimal Radarr ImportResult builder for refresh-path tests.
-func movieImportResult() (*ImportResult, error) {
-	return &ImportResult{
+// movieImportResult is a minimal Radarr resolvedImport builder for refresh-path tests.
+func movieImportResult() (*resolvedImport, error) {
+	return &resolvedImport{
 		Req:       &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, Title: "T"},
 		Label:     "T (2024)",
-		Source:    PollSourceRadarr,
+		Source:    pollSourceRadarr,
 		RefreshID: 7,
 	}, nil
 }
@@ -74,7 +74,7 @@ func TestImport_file_gone(t *testing.T) {
 	}
 
 	importOne(t.Context(), p, ls, "/nonexistent/video.mkv",
-		func() (*ImportResult, error) {
+		func() (*resolvedImport, error) {
 			t.Fatal("buildFn should not be called when file is gone")
 			return nil, nil
 		},
@@ -96,7 +96,7 @@ func TestImport_warns_when_cleanup_errors(t *testing.T) {
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(errStore{}), stateFunc: func() *LiveState { return ls }}
 	importOne(t.Context(), p, ls, "/nonexistent/cleanup-err.mkv",
-		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
+		func() (*resolvedImport, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") == 0 {
 		t.Errorf("cleanup error: want WARN 'poll: cleanup failed'")
@@ -110,7 +110,7 @@ func TestImport_silent_when_cleanup_ok(t *testing.T) {
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	importOne(t.Context(), p, ls, "/nonexistent/cleanup-ok.mkv",
-		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
+		func() (*resolvedImport, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") > 0 {
 		t.Errorf("cleanup ok: unexpected WARN 'poll: cleanup failed'")
@@ -149,12 +149,12 @@ func TestImport_search_success(t *testing.T) {
 
 	req := &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, Title: "Test"}
 	importOne(t.Context(), p, ls, videoPath,
-		func() (*ImportResult, error) {
-			return &ImportResult{
+		func() (*resolvedImport, error) {
+			return &resolvedImport{
 				Req:       req,
 				Targets:   []subflux.SubtitleTarget{{Code: "en"}},
 				Label:     "Test (2024)",
-				Source:    PollSourceRadarr,
+				Source:    pollSourceRadarr,
 				RefreshID: 1,
 			}, nil
 		},

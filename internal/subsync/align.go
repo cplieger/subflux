@@ -23,7 +23,7 @@ func syncCues(ctx context.Context, reference, incorrect []Cue) ([]Cue, time.Dura
 	if offsetMs == 0 {
 		return incorrect, 0
 	}
-	return ShiftCues(incorrect, offset), offset
+	return shiftCues(incorrect, offset), offset
 }
 
 // maxAlignSpans caps the number of spans per input to prevent O(n*m) memory
@@ -53,7 +53,7 @@ const maxBucketRangeMs = 32_000_000
 // using differential computation (delta-of-deltas), then finds the maximum.
 //
 // Returns the optimal offset in milliseconds.
-func alignConstantOffset(ctx context.Context, reference, incorrect []TimeSpan) int64 {
+func alignConstantOffset(ctx context.Context, reference, incorrect []timeSpan) int64 {
 	if len(reference) == 0 || len(incorrect) == 0 {
 		return 0
 	}
@@ -98,7 +98,7 @@ func alignConstantOffset(ctx context.Context, reference, incorrect []TimeSpan) i
 
 // spanScore returns the overlap quality score for a reference/incorrect span pair.
 // Zero-length or inverted spans return 0 (caller should skip).
-func spanScore(r, s TimeSpan) float64 {
+func spanScore(r, s timeSpan) float64 {
 	rLen := float64(r.End - r.Start)
 	sLen := float64(s.End - s.Start)
 	if rLen <= 0 || sLen <= 0 {
@@ -112,7 +112,7 @@ func spanScore(r, s TimeSpan) float64 {
 // breakpoints of the piecewise-linear rating function). A single sweep
 // integrates the deltas twice (derivative -> rating) to find the peak.
 // Efficient when the offset range is small relative to the number of span pairs.
-func alignBucketSort(ctx context.Context, ref, inc []TimeSpan, minOffset, maxOffset int64) int64 {
+func alignBucketSort(ctx context.Context, ref, inc []timeSpan, minOffset, maxOffset int64) int64 {
 	size := maxOffset - minOffset + 1
 
 	// Bounded dense allocation (~256 MB max, see maxBucketRangeMs); fall
@@ -149,7 +149,7 @@ func alignBucketSort(ctx context.Context, ref, inc []TimeSpan, minOffset, maxOff
 // accumulateDeltas fills the bucket-sort delta array with the piecewise-linear
 // rating-derivative breakpoints for every reference/incorrect span pair. It
 // reports false if the context was cancelled mid-accumulation.
-func accumulateDeltas(ctx context.Context, deltas []float64, ref, inc []TimeSpan, minOffset, size int64) bool {
+func accumulateDeltas(ctx context.Context, deltas []float64, ref, inc []timeSpan, minOffset, size int64) bool {
 	var iterations int
 	for _, r := range ref {
 		for _, s := range inc {

@@ -134,7 +134,7 @@ func (t *readTable) resolveTags(ctx context.Context, names []string, logMissing 
 }
 
 // sonarrReads is the Sonarr read surface the wrapper coalesces: the three
-// Sonarr read families plus raw tag resolution. Satisfied by *arrsvc.Sonarr
+// Sonarr read families plus raw tag resolution. Satisfied by *sonarr
 // (the shipped 3-attempt client) and by the wrapper's own single-attempt
 // *arrapi.Sonarr wave client.
 type sonarrReads interface {
@@ -156,7 +156,7 @@ type radarrReads interface {
 // 3-attempt client; admitted wave passes run single-attempt on the wrapper's
 // own wave client. Returned slices are shared cache state: read-only.
 type CachedSonarr struct {
-	*Sonarr
+	*sonarr
 	shipped   sonarrReads
 	wave      sonarrReads
 	waveClose func()
@@ -169,7 +169,7 @@ type CachedSonarr struct {
 // them atomically. The wrapper's cache starts empty, so a reload revokes the
 // previous instance's in-flight wave writes.
 func NewCachedSonarr(baseURL string, apiKey APIKey, gate *ReadGate) (*CachedSonarr, error) {
-	s, err := NewSonarr(baseURL, apiKey)
+	s, err := newSonarr(baseURL, apiKey)
 	if err != nil {
 		return nil, err
 	}
@@ -186,13 +186,13 @@ func NewCachedSonarr(baseURL string, apiKey APIKey, gate *ReadGate) (*CachedSona
 
 // newCachedSonarr wires the wrapper around explicit read surfaces (the seam
 // the tests use with fake upstreams).
-func newCachedSonarr(shipped *Sonarr, wave sonarrReads, gate *ReadGate) *CachedSonarr {
-	return &CachedSonarr{Sonarr: shipped, shipped: shipped, wave: wave, table: newReadTable(gate)}
+func newCachedSonarr(shipped *sonarr, wave sonarrReads, gate *ReadGate) *CachedSonarr {
+	return &CachedSonarr{sonarr: shipped, shipped: shipped, wave: wave, table: newReadTable(gate)}
 }
 
 // Close releases both clients' transports.
 func (c *CachedSonarr) Close() {
-	c.Sonarr.Close()
+	c.sonarr.Close()
 	if c.waveClose != nil {
 		c.waveClose()
 	}
@@ -336,7 +336,7 @@ func (s sonarrWriteThrough) Episodes(ctx context.Context, seriesID int) ([]arrap
 
 // CachedRadarr is the Radarr half of the arr-read wrapper; see CachedSonarr.
 type CachedRadarr struct {
-	*Radarr
+	*radarr
 	shipped   radarrReads
 	wave      radarrReads
 	waveClose func()
@@ -345,7 +345,7 @@ type CachedRadarr struct {
 
 // NewCachedRadarr builds the wrapped Radarr service; see NewCachedSonarr.
 func NewCachedRadarr(baseURL string, apiKey APIKey, gate *ReadGate) (*CachedRadarr, error) {
-	r, err := NewRadarr(baseURL, apiKey)
+	r, err := newRadarr(baseURL, apiKey)
 	if err != nil {
 		return nil, err
 	}
@@ -362,13 +362,13 @@ func NewCachedRadarr(baseURL string, apiKey APIKey, gate *ReadGate) (*CachedRada
 
 // newCachedRadarr wires the wrapper around explicit read surfaces (the test
 // seam).
-func newCachedRadarr(shipped *Radarr, wave radarrReads, gate *ReadGate) *CachedRadarr {
-	return &CachedRadarr{Radarr: shipped, shipped: shipped, wave: wave, table: newReadTable(gate)}
+func newCachedRadarr(shipped *radarr, wave radarrReads, gate *ReadGate) *CachedRadarr {
+	return &CachedRadarr{radarr: shipped, shipped: shipped, wave: wave, table: newReadTable(gate)}
 }
 
 // Close releases both clients' transports.
 func (c *CachedRadarr) Close() {
-	c.Radarr.Close()
+	c.radarr.Close()
 	if c.waveClose != nil {
 		c.waveClose()
 	}

@@ -200,7 +200,7 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 			return putState(tx, &rec)
 		case "deleteState":
 			id := rapid.Int64Range(1, 4).Draw(rt, "delStateID")
-			_, err := deleteState(tx, id)
+			err := deleteState(tx, id)
 			return err
 		case "putAttempt":
 			tr := rapid.SampledFrom(statePool).Draw(rt, "attemptTriple")
@@ -214,7 +214,7 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 		case "deleteAttempt":
 			tr := rapid.SampledFrom(statePool).Draw(rt, "delAttemptTriple")
 			p := rapid.SampledFrom(providerPool).Draw(rt, "delAttemptProvider")
-			_, err := deleteAttempt(tx, tr.mt, tr.mid, tr.lang, p)
+			err := deleteAttempt(tx, tr.mt, tr.mid, tr.lang, p)
 			return err
 		case "putScan":
 			m := rapid.SampledFrom(scanMediaPool).Draw(rt, "scanMedia")
@@ -228,10 +228,7 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 			return putScanState(tx, m.mt, m.mid, &rec)
 		case "putFile":
 			f := rapid.SampledFrom(fileSpecPool).Draw(rt, "putFileSpec")
-			rec := fileRec{
-				Codec:     rapid.SampledFrom([]string{"subrip", "ass", ""}).Draw(rt, "codec"),
-				UpdatedAt: timeAtHour(rapid.IntRange(0, 12).Draw(rt, "updatedAt")),
-			}
+			rec := fileRec{Codec: rapid.SampledFrom([]string{"subrip", "ass", ""}).Draw(rt, "codec")}
 			return putSubtitleFile(tx, f.key(), &rec)
 		case "deleteFile":
 			f := rapid.SampledFrom(fileSpecPool).Draw(rt, "delFileSpec")

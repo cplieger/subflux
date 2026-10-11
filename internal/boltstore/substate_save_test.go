@@ -183,7 +183,7 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 	db, _ := openTemp(t)
 
-	manualRec := func(path string, ordinal int) *subflux.DownloadRecord {
+	manualRec := func(path string) *subflux.DownloadRecord {
 		return &subflux.DownloadRecord{
 			MediaType:    testMT,
 			MediaID:      testMID,
@@ -205,7 +205,7 @@ func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 		{"/media/test.fr.2.srt", 2},
 	}
 	for _, p := range paths {
-		if err := db.SaveDownload(t.Context(), manualRec(p.path, p.ordinal)); err != nil {
+		if err := db.SaveDownload(t.Context(), manualRec(p.path)); err != nil {
 			t.Fatalf("SaveDownload(%s): %v", p.path, err)
 		}
 	}

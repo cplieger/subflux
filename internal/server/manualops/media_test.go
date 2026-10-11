@@ -192,10 +192,10 @@ func TestRunDownload_a_failed_save_names_the_folder_or_the_path(t *testing.T) {
 				Provider: "os", SubtitleID: "sub-1", Language: "en",
 				MediaType: subflux.MediaTypeMovie, ArrID: 42,
 			}
-			req.SetVideoPath(video)
+			req.setVideoPath(video)
 
 			mw := mediaWriterFailing(t, folder, tc.fail)
-			if RunDownload(t.Context(), deps, ls, &recStore{}, mw, req, "act-1") {
+			if runDownload(t.Context(), deps, ls, &recStore{}, mw, req, "act-1") {
 				t.Fatal("RunDownload() = true for a failed save")
 			}
 			sub := strings.TrimSuffix(video, ".mkv") + ".en.1.srt"

@@ -135,7 +135,7 @@ func (d *DB) deletePathsBatch(paths []string) ([]string, error) {
 // its triple/media membership. An ix_state_video entry with no primary row is
 // skipped defensively (index/primary drift); an undecodable primary is left
 // for deleteState's fail-closed decode, which refuses to orphan index entries.
-func (d *DB) deleteStateRowsForPath(tx *bolt.Tx, sb *bolt.Bucket, videoPath string, affectedTriples map[tripleRef]struct{}, affectedMedia map[mediaRef]struct{}) ([]string, error) {
+func (*DB) deleteStateRowsForPath(tx *bolt.Tx, sb *bolt.Bucket, videoPath string, affectedTriples map[tripleRef]struct{}, affectedMedia map[mediaRef]struct{}) ([]string, error) {
 	ids, err := collectVideoPathIDs(tx, videoPath)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (d *DB) deleteStateRowsForPath(tx *bolt.Tx, sb *bolt.Bucket, videoPath stri
 		if sr.Path != "" {
 			subPaths = append(subPaths, sr.Path)
 		}
-		if _, derr := deleteState(tx, id); derr != nil {
+		if derr := deleteState(tx, id); derr != nil {
 			return nil, derr
 		}
 		affectedTriples[tripleRef{mt: sr.MediaType, mid: sr.MediaID, lang: sr.Language}] = struct{}{}
@@ -255,7 +255,7 @@ func cleanOrphanedCoverageFor(tx *bolt.Tx, media map[mediaRef]struct{}) error {
 		if err := deleteSubtitleFilesByMedia(tx, mr.mt, mr.mid); err != nil {
 			return err
 		}
-		if _, err := deleteScanState(tx, mr.mt, mr.mid); err != nil {
+		if err := deleteScanState(tx, mr.mt, mr.mid); err != nil {
 			return err
 		}
 	}
@@ -406,7 +406,7 @@ func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string,
 		})
 	}
 	for _, a := range toDelete {
-		if _, err := deleteAttempt(tx, a.mt, a.mid, a.lang, a.prov); err != nil {
+		if err := deleteAttempt(tx, a.mt, a.mid, a.lang, a.prov); err != nil {
 			return 0, err
 		}
 	}
@@ -730,7 +730,7 @@ func reconcileQuad(tx *bolt.Tx, sb *bolt.Bucket, q stateQuadInfo, missing []reco
 // remaining rows and any manual lock.
 func deleteMissingRows(tx *bolt.Tx, missing []reconcileEntry) error {
 	for _, e := range missing {
-		if _, derr := deleteState(tx, e.id); derr != nil {
+		if derr := deleteState(tx, e.id); derr != nil {
 			return derr
 		}
 	}
@@ -753,7 +753,7 @@ func reconcileResetQuad(tx *bolt.Tx, sb *bolt.Bucket, q stateQuadInfo, missing [
 	now := time.Now()
 	for _, e := range missing {
 		if e.manual {
-			if _, derr := deleteState(tx, e.id); derr != nil {
+			if derr := deleteState(tx, e.id); derr != nil {
 				return derr
 			}
 			continue

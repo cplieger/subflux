@@ -91,7 +91,7 @@ func (e *fakeEngine) lastRequest() subflux.SearchRequest {
 	return e.requests[len(e.requests)-1]
 }
 
-func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
+func (*fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
 	return false
 }
 
@@ -294,7 +294,7 @@ func newScanRig(t *testing.T) *scanRig {
 }
 
 // post drives one handler invocation and decodes the ScanAccepted body.
-func (rig *scanRig) post(t *testing.T, handler http.HandlerFunc, target, body string) (int, ScanAccepted) {
+func (*scanRig) post(t *testing.T, handler http.HandlerFunc, target, body string) (int, ScanAccepted) {
 	t.Helper()
 	var rd *strings.Reader
 	if body == "" {
@@ -544,7 +544,7 @@ func TestScan_queued_cancel_ends_cancelled_not_success(t *testing.T) {
 	rig := newScanRig(t)
 
 	// Simulate another manual scan holding the slot so ours queues.
-	if !rig.guard.Acquire(t.Context(), nil) {
+	if !rig.guard.acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 
@@ -563,7 +563,7 @@ func TestScan_queued_cancel_ends_cancelled_not_success(t *testing.T) {
 	if !rig.log.Cancel(accepted.ActivityID) {
 		t.Fatal("queued Cancel returned false")
 	}
-	rig.guard.Release()
+	rig.guard.release()
 	rig.bg.Wait()
 
 	entry, _ := rig.log.Get(accepted.ActivityID)
@@ -815,7 +815,6 @@ func TestRunFullScan_outcomes(t *testing.T) {
 type nopScanMetrics struct{}
 
 func (nopScanMetrics) RecordScan(int, int, time.Duration) {}
-func (nopScanMetrics) AdaptiveSkip()                      {}
 
 // --- full-pass accounting over both media kinds ---
 //
@@ -1107,7 +1106,7 @@ func TestRunFullScan_movie_results_line_reports_the_skipped_tally(t *testing.T) 
 	// No t.Parallel: this test swaps the global slog default logger.
 	buf := captureLogs(t)
 	rig := newFullScanRig(t, subflux.SearchResult{
-		Langs: []subflux.LangOutcome{{Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1}},
+		Langs: []subflux.LangOutcome{{Lang: "fr", Kind: subflux.LangSkipped}},
 	})
 
 	RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID)
@@ -1269,10 +1268,10 @@ func TestScan_queued_stop_cancels_without_slot_release(t *testing.T) {
 
 	// Scan A holds the slot for the WHOLE test — B must reach its terminal
 	// state without A ever releasing.
-	if !rig.guard.Acquire(t.Context(), nil) {
+	if !rig.guard.acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
-	defer rig.guard.Release()
+	defer rig.guard.release()
 
 	code, accepted := rig.post(t, rig.h.HandleScanMovie, "/api/scan/movie/7", "")
 	if code != http.StatusAccepted {
@@ -1309,10 +1308,10 @@ func TestScan_queued_shutdown_unblocks_without_slot_release(t *testing.T) {
 	t.Parallel()
 	rig := newScanRig(t)
 
-	if !rig.guard.Acquire(t.Context(), nil) {
+	if !rig.guard.acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
-	defer rig.guard.Release()
+	defer rig.guard.release()
 
 	_, accepted := rig.post(t, rig.h.HandleScanMovie, "/api/scan/movie/7", "")
 	waitFor(t, "entry to queue", func() bool {
@@ -1395,7 +1394,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 
 	// Hold the slot so the accepted scan QUEUES: the reload lands between
 	// queue admission and execution.
-	if !guard.Acquire(t.Context(), nil) {
+	if !guard.acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 
@@ -1422,7 +1421,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	curLS = &LiveState{Cfg: cfg, Engine: engineB}
 	mu.Unlock()
 
-	guard.Release()
+	guard.release()
 	bg.Wait()
 
 	if got := callCount(); got != callsAtAccept {

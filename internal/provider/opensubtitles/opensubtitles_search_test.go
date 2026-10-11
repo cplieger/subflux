@@ -448,7 +448,6 @@ func TestFilterSearchResults(t *testing.T) {
 				Files:    []searchFile{{FileID: 99}},
 				FeatureDetails: featureDetails{
 					Title:         "Breaking Bad",
-					Year:          2008,
 					SeasonNumber:  5,
 					EpisodeNumber: 16,
 				},
@@ -460,9 +459,6 @@ func TestFilterSearchResults(t *testing.T) {
 		}
 		if got[0].Title != "Breaking Bad" {
 			t.Errorf("Title = %q, want %q", got[0].Title, "Breaking Bad")
-		}
-		if got[0].Year != 2008 {
-			t.Errorf("Year = %d, want %d", got[0].Year, 2008)
 		}
 		if got[0].Season != 5 {
 			t.Errorf("Season = %d, want %d", got[0].Season, 5)

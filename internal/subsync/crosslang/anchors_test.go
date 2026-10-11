@@ -22,15 +22,11 @@ func TestExtractAnchors(t *testing.T) {
 		wantNums  []string
 		wantNouns []string
 		wantCogs  []string
-		wantWords int
-		wantChars int
 	}{
 		{
 			name:      "plain_text",
 			input:     "Hello world",
 			wantPunct: "",
-			wantWords: 2,
-			wantChars: 11,
 		},
 		{
 			name:     "numbers",
@@ -83,22 +79,18 @@ func TestExtractAnchors(t *testing.T) {
 			wantCogs: []string{"television", "president", "arrived"},
 		},
 		{
-			name:      "strips_html_tags",
-			input:     "<i>Hello</i> world",
-			wantChars: 11,
-			wantWords: 2,
+			name:     "strips_html_tags",
+			input:    "<i>Hello</i> world",
+			wantCogs: []string{"hello", "world"},
 		},
 		{
-			name:      "strips_ass_tags",
-			input:     "{\\an8}Hello world",
-			wantChars: 11,
-			wantWords: 2,
+			name:     "strips_ass_tags",
+			input:    "{\\an8}Hello world",
+			wantCogs: []string{"hello", "world"},
 		},
 		{
-			name:      "empty_string",
-			input:     "",
-			wantWords: 0,
-			wantChars: 0,
+			name:  "empty_string",
+			input: "",
 		},
 		{
 			name:     "number_normalization_commas_dots",
@@ -108,20 +100,17 @@ func TestExtractAnchors(t *testing.T) {
 		{
 			name:      "multiline_dialogue",
 			input:     "- Hello John!\n- How are you?",
-			wantWords: 5,
 			wantPunct: "?",
 		},
 		{
-			name:      "cjk_excluded_from_cognates",
-			input:     "The 東京タワー is tall",
-			wantCogs:  []string{"tall"},
-			wantWords: 4,
+			name:     "cjk_excluded_from_cognates",
+			input:    "The 東京タワー is tall",
+			wantCogs: []string{"tall"},
 		},
 		{
-			name:      "cyrillic_excluded_from_cognates",
-			input:     "Москва is beautiful",
-			wantCogs:  []string{"beautiful"},
-			wantWords: 3,
+			name:     "cyrillic_excluded_from_cognates",
+			input:    "Москва is beautiful",
+			wantCogs: []string{"beautiful"},
 		},
 		{
 			// A hyphen inside a word is dropped rather than replaced, so the
@@ -142,12 +131,6 @@ func TestExtractAnchors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			a := extractAnchors(tt.input)
-			if tt.wantWords > 0 && a.WordCount != tt.wantWords {
-				t.Errorf("WordCount = %d, want %d", a.WordCount, tt.wantWords)
-			}
-			if tt.wantChars > 0 && a.CharLen != tt.wantChars {
-				t.Errorf("CharLen = %d, want %d", a.CharLen, tt.wantChars)
-			}
 			if tt.wantPunct != "" || tt.name == "no_punctuation" || tt.name == "plain_text" || tt.name == "empty_string" {
 				if a.Punctuation != tt.wantPunct {
 					t.Errorf("Punctuation = %q, want %q", a.Punctuation, tt.wantPunct)

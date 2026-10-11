@@ -13,10 +13,10 @@ import (
 
 type availabilityConfig struct{ rpID string }
 
-func (c availabilityConfig) BasicAuthEnabled() bool       { return true }
-func (c availabilityConfig) CheckBreachedPasswords() bool { return false }
-func (c availabilityConfig) OIDCEnabled() bool            { return false }
-func (c availabilityConfig) WebAuthnRPID() string         { return c.rpID }
+func (availabilityConfig) BasicAuthEnabled() bool       { return true }
+func (availabilityConfig) CheckBreachedPasswords() bool { return false }
+func (availabilityConfig) OIDCEnabled() bool            { return false }
+func (c availabilityConfig) WebAuthnRPID() string       { return c.rpID }
 
 func availabilityHandler(t *testing.T, rp *authwebauthn.RelyingParty, cfg AuthConfig) *Handler {
 	t.Helper()

@@ -11,7 +11,7 @@ import (
 func TestAlignWithSplits_empty_inputs(t *testing.T) {
 	t.Parallel()
 	result := alignWithSplits(t.Context(), nil, nil, 0)
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
@@ -20,7 +20,7 @@ func TestAlignWithSplits_empty_reference(t *testing.T) {
 	t.Parallel()
 	inc := makeCues(10, 0, 2*time.Second)
 	result := alignWithSplits(t.Context(), nil, inc, 0)
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
@@ -29,7 +29,7 @@ func TestAlignWithSplits_identical_subtitles(t *testing.T) {
 	t.Parallel()
 	cues := makeLongCues(30, 10*time.Minute)
 	result := alignWithSplits(t.Context(), cues, cues, 0)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Fatalf("expected method 'split', got %q", result.Method)
 	}
 }
@@ -37,9 +37,9 @@ func TestAlignWithSplits_identical_subtitles(t *testing.T) {
 func TestAlignWithSplits_constant_offset(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	result := alignWithSplits(t.Context(), ref, inc, 0)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Fatalf("expected method 'split', got %q", result.Method)
 	}
 }
@@ -52,12 +52,12 @@ func TestAlignWithSplits_no_split_emits_no_candidate(t *testing.T) {
 	// nothing: zero confidence and unchanged cues (R1.1). A very high
 	// penalty forces the single segment.
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 3*time.Second)
+	inc := shiftCues(ref, 3*time.Second)
 	result := alignWithSplits(t.Context(), ref, inc, 1e12)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("expected no candidate (zero confidence) for no-split input, got %f",
 			float64(result.Confidence))
 	}
@@ -95,7 +95,7 @@ func TestAlignWithSplits_two_segments(t *testing.T) {
 	}
 
 	result := alignWithSplits(t.Context(), ref, inc, 500)
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected some confidence for two-segment case")
 	}
 	if len(result.Cues) != 20 {
@@ -105,13 +105,13 @@ func TestAlignWithSplits_two_segments(t *testing.T) {
 	if result.Source != SourceSplit {
 		t.Errorf("source = %v, want split", result.Source)
 	}
-	if result.Transform.Kind != TransformSegments {
+	if result.Transform.Kind != transformSegments {
 		t.Errorf("transform kind = %v, want segments", result.Transform.Kind)
 	}
 	// Tiny-segment merging can collapse detected splits, so only the
 	// descriptor's presence is guaranteed, not a segment count.
-	if len(result.Transform.Segments) < 1 {
-		t.Errorf("transform segments = %d, want >= 1", len(result.Transform.Segments))
+	if result.Transform.SegmentCount < 1 {
+		t.Errorf("transform segments = %d, want >= 1", result.Transform.SegmentCount)
 	}
 }
 
@@ -209,7 +209,7 @@ func TestSegmentCost_large_identical_values(t *testing.T) {
 func TestSegmentConfidence_no_segments(t *testing.T) {
 	t.Parallel()
 	c := segmentConfidence(nil, nil, nil)
-	if c != ConfidenceNone {
+	if c != confidenceNone {
 		t.Fatalf("expected none, got %f", float64(c))
 	}
 }
@@ -275,9 +275,9 @@ func TestAlignWithSplits_default_penalty(t *testing.T) {
 	t.Parallel()
 	// splitPenalty <= 0 should use defaultSplitPenalty.
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	result := alignWithSplits(t.Context(), ref, inc, 0)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
 }
@@ -285,9 +285,9 @@ func TestAlignWithSplits_default_penalty(t *testing.T) {
 func TestAlignWithSplits_negative_penalty(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
-	inc := ShiftCues(ref, 2*time.Second)
+	inc := shiftCues(ref, 2*time.Second)
 	result := alignWithSplits(t.Context(), ref, inc, -100)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
 }
@@ -296,7 +296,7 @@ func TestAlignWithSplits_empty_incorrect(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(10, 5*time.Minute)
 	result := alignWithSplits(t.Context(), ref, nil, 0)
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("expected no confidence for nil incorrect, got %f",
 			float64(result.Confidence))
 	}
@@ -322,7 +322,7 @@ func TestDetectSplits_many_segments_capped(t *testing.T) {
 func TestPerCueOffsets_basic(t *testing.T) {
 	t.Parallel()
 	// Use ref spans with varying lengths so each inc cue has a unique best match.
-	ref := []TimeSpan{
+	ref := []timeSpan{
 		{Start: 0, End: 5000},      // 5s
 		{Start: 10000, End: 12000}, // 2s
 	}
@@ -357,7 +357,7 @@ func TestSegmentConfidence_zero_total_cues(t *testing.T) {
 	t.Parallel()
 	segs := []segment{{startIdx: 0, endIdx: 10}}
 	c := segmentConfidence(segs, nil, nil)
-	if c != ConfidenceNone {
+	if c != confidenceNone {
 		t.Errorf("segmentConfidence(nil cues) = %f, want 0", float64(c))
 	}
 }
@@ -367,13 +367,13 @@ func TestSegmentConfidence_zero_length_ref_spans(t *testing.T) {
 	// All refSpans have zero length (Start == End), so totalRef == 0.
 	// This hits the totalRef == 0 guard after the overlap loop.
 	inc := makeCues(5, 0, 2*time.Second)
-	refSpans := []TimeSpan{
+	refSpans := []timeSpan{
 		{Start: 0, End: 0},
 		{Start: 1000, End: 1000},
 	}
 	segs := []segment{{startIdx: 0, endIdx: 5, offset: 0}}
 	c := segmentConfidence(segs, inc, refSpans)
-	if c != ConfidenceNone {
+	if c != confidenceNone {
 		t.Errorf("segmentConfidence(zero-length refs) = %f, want 0", float64(c))
 	}
 }
@@ -404,7 +404,7 @@ func TestSegmentConfidence_overlap_ratio_capped(t *testing.T) {
 	// Reference span is very short (100ms). The corrected cue (10s) fully
 	// covers it, so overlap = 100ms and totalRef = 100ms → ratio = 1.0.
 	// To get ratio > 1.0, we need multiple ref spans that the same cue overlaps.
-	refSpans := []TimeSpan{
+	refSpans := []timeSpan{
 		{Start: 0, End: 50},
 		{Start: 100, End: 150},
 	}
@@ -414,7 +414,7 @@ func TestSegmentConfidence_overlap_ratio_capped(t *testing.T) {
 	if c > Confidence(0.86) {
 		t.Errorf("segmentConfidence(overlap ratio capped) = %f, want <= 0.85", float64(c))
 	}
-	if c == ConfidenceNone {
+	if c == confidenceNone {
 		t.Error("segmentConfidence(overlap ratio capped) = 0, want > 0")
 	}
 }
@@ -423,8 +423,8 @@ func TestOverlapTotal(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
-		corr        []TimeSpan
-		ref         []TimeSpan
+		corr        []timeSpan
+		ref         []timeSpan
 		wantOverlap float64
 		wantRef     float64
 	}{
@@ -434,8 +434,8 @@ func TestOverlapTotal(t *testing.T) {
 			// cover a 10s reference span (previously only the first
 			// counted, rating the pair 0.5).
 			name:        "reference span covered by two adjacent corrected spans counts fully",
-			corr:        []TimeSpan{{Start: 0, End: 5000}, {Start: 5000, End: 10000}},
-			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			corr:        []timeSpan{{Start: 0, End: 5000}, {Start: 5000, End: 10000}},
+			ref:         []timeSpan{{Start: 0, End: 10000}},
 			wantOverlap: 10000,
 			wantRef:     10000,
 		},
@@ -443,8 +443,8 @@ func TestOverlapTotal(t *testing.T) {
 			// (0,6000) and (4000,10000) overlap each other by 2000; the
 			// union is 10000, never 12000.
 			name:        "overlapping corrected spans are not double-counted",
-			corr:        []TimeSpan{{Start: 0, End: 6000}, {Start: 4000, End: 10000}},
-			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			corr:        []timeSpan{{Start: 0, End: 6000}, {Start: 4000, End: 10000}},
+			ref:         []timeSpan{{Start: 0, End: 10000}},
 			wantOverlap: 10000,
 			wantRef:     10000,
 		},
@@ -452,8 +452,8 @@ func TestOverlapTotal(t *testing.T) {
 			// A corrected span fully contained in the already-covered
 			// stretch contributes nothing.
 			name:        "contained corrected span adds nothing",
-			corr:        []TimeSpan{{Start: 0, End: 8000}, {Start: 2000, End: 3000}},
-			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			corr:        []timeSpan{{Start: 0, End: 8000}, {Start: 2000, End: 3000}},
+			ref:         []timeSpan{{Start: 0, End: 10000}},
 			wantOverlap: 8000,
 			wantRef:     10000,
 		},
@@ -461,15 +461,15 @@ func TestOverlapTotal(t *testing.T) {
 			// One corrected span may overlap consecutive reference spans;
 			// it counts against each (per-span union, per-span cap).
 			name:        "one corrected span overlaps consecutive reference spans",
-			corr:        []TimeSpan{{Start: 0, End: 3000}},
-			ref:         []TimeSpan{{Start: 0, End: 1000}, {Start: 2000, End: 3000}},
+			corr:        []timeSpan{{Start: 0, End: 3000}},
+			ref:         []timeSpan{{Start: 0, End: 1000}, {Start: 2000, End: 3000}},
 			wantOverlap: 2000,
 			wantRef:     2000,
 		},
 		{
 			name:        "disjoint spans overlap zero",
-			corr:        []TimeSpan{{Start: 5000, End: 6000}},
-			ref:         []TimeSpan{{Start: 0, End: 1000}},
+			corr:        []timeSpan{{Start: 5000, End: 6000}},
+			ref:         []timeSpan{{Start: 0, End: 1000}},
 			wantOverlap: 0,
 			wantRef:     1000,
 		},
@@ -549,19 +549,19 @@ func TestAlignWithSplits_three_segments(t *testing.T) {
 	}
 
 	result := alignWithSplits(t.Context(), ref, inc, 100)
-	if result.Method != MethodSplit {
+	if result.Method != methodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected some confidence for three-segment case")
 	}
 	if len(result.Cues) != 30 {
 		t.Errorf("expected 30 cues, got %d", len(result.Cues))
 	}
-	if result.Transform.Kind != TransformSegments {
+	if result.Transform.Kind != transformSegments {
 		t.Errorf("transform kind = %v, want segments", result.Transform.Kind)
 	}
-	if got, want := len(result.Transform.Segments), 2; got < want {
+	if got, want := result.Transform.SegmentCount, 2; got < want {
 		t.Errorf("transform segments = %d, want >= %d", got, want)
 	}
 }
@@ -673,13 +673,13 @@ func TestAlignWithSplits_non_positive_penalty_falls_back_to_the_default(t *testi
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := alignWithSplits(t.Context(), ref, inc, tt.penalty)
-			if got.Confidence != ConfidenceNone {
+			if got.Confidence != confidenceNone {
 				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v).Confidence = %v, want %v",
-					tt.penalty, float64(got.Confidence), float64(ConfidenceNone))
+					tt.penalty, float64(got.Confidence), float64(confidenceNone))
 			}
-			if len(got.Transform.Segments) != 0 {
-				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v) produced %d segments, want 0: %+v",
-					tt.penalty, len(got.Transform.Segments), got.Transform.Segments)
+			if got.Transform.SegmentCount != 0 {
+				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v) produced %d segments, want 0: %s",
+					tt.penalty, got.Transform.SegmentCount, got.Transform.digest())
 			}
 			if !slices.Equal(got.Cues, inc) {
 				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v) altered the cues; want them returned verbatim",
@@ -718,9 +718,9 @@ func TestAlignWithSplits_logs_one_fewer_split_than_segments(t *testing.T) {
 	logs := captureAlignLogs(t, func() {
 		got = alignWithSplits(t.Context(), ref, inc, 0)
 	})
-	if len(got.Transform.Segments) != 2 {
+	if got.Transform.SegmentCount != 2 {
 		t.Fatalf("alignWithSplits(two-block track) produced %d segments, want 2: %+v",
-			len(got.Transform.Segments), got.Transform.Segments)
+			got.Transform.SegmentCount, got.Transform.digest())
 	}
 	if !strings.Contains(logs, "segments=2") {
 		t.Errorf("alignWithSplits(two-block track) did not report segments=2; logged:\n%s", logs)
@@ -736,7 +736,7 @@ func TestAlignWithSplits_logs_one_fewer_split_than_segments(t *testing.T) {
 func TestPerCueOffsets_keeps_the_first_of_two_equally_scoring_spans(t *testing.T) {
 	t.Parallel()
 	// Both reference spans are 1000ms, as is the cue, so both score 1.0.
-	refSpans := []TimeSpan{
+	refSpans := []timeSpan{
 		{Start: 0, End: 1000},
 		{Start: 5000, End: 6000},
 	}
@@ -756,7 +756,7 @@ func TestPerCueOffsets_keeps_the_first_of_two_equally_scoring_spans(t *testing.T
 // reported as needing no shift.
 func TestPerCueOffsets_ignores_a_reference_span_that_cannot_overlap(t *testing.T) {
 	t.Parallel()
-	refSpans := []TimeSpan{{Start: 4000, End: 4000}}
+	refSpans := []timeSpan{{Start: 4000, End: 4000}}
 	inc := []Cue{{Start: 2 * time.Second, End: 3 * time.Second, Text: "cue"}}
 	got := perCueOffsets(t.Context(), refSpans, inc)
 	if len(got) != 1 {
@@ -818,7 +818,7 @@ func TestSegmentConfidence_scales_the_overlap_ratio_by_the_segment_ceiling(t *te
 		{Start: 6 * time.Second, End: 7 * time.Second, Text: "d"},
 	}
 	// 4000ms of reference time, of which the cues cover 2000ms.
-	refSpans := []TimeSpan{
+	refSpans := []timeSpan{
 		{Start: 0, End: 1000},
 		{Start: 2000, End: 3000},
 		{Start: 20000, End: 22000},

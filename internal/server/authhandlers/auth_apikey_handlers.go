@@ -87,7 +87,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 		Label:     req.Label,
 		CreatedAt: now,
 	})
-	Audit(r, slog.LevelInfo, AuditAPIKeyCreate, true, user.Username,
+	audit(r, slog.LevelInfo, auditAPIKeyCreate, true, user.Username,
 		slog.Int64("key_id", apiKey.ID),
 		slog.String("label", req.Label))
 }
@@ -113,6 +113,6 @@ func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		"username", user.Username, "key_id", keyID, "ip", ClientIP(r))
 
 	httpapi.Ok(w)
-	Audit(r, slog.LevelInfo, AuditAPIKeyRevoke, true, user.Username,
+	audit(r, slog.LevelInfo, auditAPIKeyRevoke, true, user.Username,
 		slog.Int64("key_id", keyID))
 }

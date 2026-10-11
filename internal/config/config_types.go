@@ -22,13 +22,13 @@ const (
 	defaultLogFormat  = defaults.LogFormat
 )
 
-// Duration wraps time.Duration with extended YAML parsing that supports
+// duration wraps time.Duration with extended YAML parsing that supports
 // day (D), month (M), and year (Y) suffixes in addition to Go's standard
 // duration units (ns, us, ms, s, m, h). Only single-unit values are
 // supported for extended units (e.g. "7D", "3M", "1Y").
 //
 // Conversions: 1D = 24h, 1M = 730h (30.4 days), 1Y = 8760h (365 days).
-type Duration struct {
+type duration struct {
 	D time.Duration
 }
 
@@ -42,7 +42,7 @@ type Duration struct {
 // (appOwnedDecodeErr, handed to yamlenv.Load). The line number is the
 // locator; the value stays out of operator-facing text (field-name-only
 // posture, as in seadex-scout).
-func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+func (d *duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
 	if err := value.Decode(&s); err != nil {
 		return err
@@ -60,14 +60,14 @@ type Config struct {
 	// ruleIndex maps audio language code to its index in Languages.Rules for O(1) lookup.
 	ruleIndex    map[string]int
 	ProvidersCfg map[subflux.ProviderID]yamlProviderCfg `yaml:"providers"`
-	Scoring      ScoringConfig                          `yaml:"scoring"`
+	Scoring      scoringConfig                          `yaml:"scoring"`
 	// cachedRuleTargets maps audio language to pre-computed []subflux.SubtitleTarget.
 	cachedRuleTargets map[string][]subflux.SubtitleTarget
 	// cachedProviders is the pre-computed result of Providers().
 	cachedProviders map[subflux.ProviderID]subflux.ProviderCfg
 	SonarrCfg       yamlArrConfig `yaml:"sonarr"`
 	RadarrCfg       yamlArrConfig `yaml:"radarr"`
-	Logging         LoggingConfig `yaml:"logging"`
+	Logging         loggingConfig `yaml:"logging"`
 	Languages       LanguageRules `yaml:"languages"`
 	// cachedLangCodes is the pre-computed result of LanguageCodes().
 	cachedLangCodes []string
@@ -98,7 +98,7 @@ type Config struct {
 	AdaptiveCfg       yamlAdaptiveConfig    `yaml:"adaptive"`
 	PostProcessing    yamlPostProcessConfig `yaml:"post_processing"`
 	EmbeddedSubtitles yamlEmbeddedConfig    `yaml:"embedded_subtitles"`
-	PollIntervalCfg   Duration              `yaml:"poll_interval"`
+	PollIntervalCfg   duration              `yaml:"poll_interval"`
 }
 
 // LanguageRules maps detected audio languages to desired subtitle downloads.
@@ -204,9 +204,9 @@ type yamlProviderCfg struct {
 // yamlSearchConfig controls search behavior (yaml-tagged).
 type yamlSearchConfig struct {
 	ExcludeArrTags         []string `yaml:"exclude_arr_tags"`
-	ScanInterval           Duration `yaml:"scan_interval"`
-	ProviderTimeout        Duration `yaml:"provider_timeout"`
-	ScanDelay              Duration `yaml:"scan_delay"`
+	ScanInterval           duration `yaml:"scan_interval"`
+	ProviderTimeout        duration `yaml:"provider_timeout"`
+	ScanDelay              duration `yaml:"scan_delay"`
 	MinScore               int      `yaml:"min_score"`
 	UpgradeWindowDays      int      `yaml:"upgrade_window_days"`
 	DownloadMaxAttempts    int      `yaml:"download_max_attempts"`
@@ -215,51 +215,51 @@ type yamlSearchConfig struct {
 	UpgradeEnabled         bool     `yaml:"upgrade_enabled"`
 }
 
-// ScoringConfig allows users to customize scoring weights.
-type ScoringConfig struct {
+// scoringConfig allows users to customize scoring weights.
+type scoringConfig struct {
 	Weights *subflux.Scores `yaml:"weights,omitempty"`
 }
 
 // yamlAdaptiveConfig controls adaptive search backoff (yaml-tagged).
 type yamlAdaptiveConfig struct {
 	Enabled           bool     `yaml:"enabled"`
-	InitialDelay      Duration `yaml:"initial_delay"`
-	MaxDelay          Duration `yaml:"max_delay"`
+	InitialDelay      duration `yaml:"initial_delay"`
+	MaxDelay          duration `yaml:"max_delay"`
 	BackoffMultiplier float64  `yaml:"backoff_multiplier"`
 	MaxAttempts       int      `yaml:"max_attempts"` // 0 = search forever
 }
 
-// LogLevel is a typed string for log verbosity levels.
-type LogLevel = subflux.LogLevel
+// logLevel is a typed string for log verbosity levels.
+type logLevel = subflux.LogLevel
 
 // LogLevel constants for the supported log verbosity levels.
 const (
-	LogLevelError LogLevel = "error"
-	LogLevelWarn  LogLevel = "warn"
-	LogLevelInfo  LogLevel = "info"
-	LogLevelDebug LogLevel = "debug"
+	logLevelError logLevel = "error"
+	logLevelWarn  logLevel = "warn"
+	logLevelInfo  logLevel = "info"
+	logLevelDebug logLevel = "debug"
 )
 
-// ValidLogLevel returns true if the level is a recognized value.
-func ValidLogLevel(l LogLevel) bool {
+// validLogLevel returns true if the level is a recognized value.
+func validLogLevel(l logLevel) bool {
 	switch l {
-	case LogLevelError, LogLevelWarn, LogLevelInfo, LogLevelDebug:
+	case logLevelError, logLevelWarn, logLevelInfo, logLevelDebug:
 		return true
 	}
 	return false
 }
 
-// LogFormat is a typed string for log output formats. The recognized values
-// are owned by slogx.ParseFormat (see ValidLogFormat), not by a local
+// logFormat is a typed string for log output formats. The recognized values
+// are owned by slogx.ParseFormat (see validLogFormat), not by a local
 // vocabulary.
-type LogFormat = subflux.LogFormat
+type logFormat = subflux.LogFormat
 
-// ValidLogFormat returns true if the format is a recognized value, judged by
+// validLogFormat returns true if the format is a recognized value, judged by
 // slogx.ParseFormat — the same case-insensitive, trimming normalization
 // setupLogging applies when it consumes the value — so validation and
 // consumption cannot drift. The empty string is "unset" (the caller falls back
 // to the default), not a valid value.
-func ValidLogFormat(f LogFormat) bool {
+func validLogFormat(f logFormat) bool {
 	if strings.TrimSpace(string(f)) == "" {
 		return false
 	}
@@ -267,10 +267,10 @@ func ValidLogFormat(f LogFormat) bool {
 	return ok
 }
 
-// LoggingConfig controls log output.
-type LoggingConfig struct {
-	Level  LogLevel  `yaml:"level"`
-	Format LogFormat `yaml:"format"`
+// loggingConfig controls log output.
+type loggingConfig struct {
+	Level  logLevel  `yaml:"level"`
+	Format logFormat `yaml:"format"`
 }
 
 // yamlEmbeddedConfig is the top-level embedded_subtitles section
@@ -307,7 +307,7 @@ type yamlOIDCConfig struct {
 // yamlBackupConfig controls scheduled database backups (yaml-tagged).
 type yamlBackupConfig struct {
 	Path      string   `yaml:"path"`
-	Frequency Duration `yaml:"frequency"`
+	Frequency duration `yaml:"frequency"`
 	Retention int      `yaml:"retention"`
 	Enabled   bool     `yaml:"enabled"`
 }
@@ -318,8 +318,8 @@ type yamlAuthConfig struct {
 	CheckBreached    *bool          `yaml:"check_breached_passwords,omitempty"`
 	OIDC             yamlOIDCConfig `yaml:"oidc"`
 	WebAuthnRPID     string         `yaml:"webauthn_rp_id"`
-	SessionIdle      Duration       `yaml:"session_idle_timeout"`
-	SessionAbsolute  Duration       `yaml:"session_absolute_timeout"`
+	SessionIdle      duration       `yaml:"session_idle_timeout"`
+	SessionAbsolute  duration       `yaml:"session_absolute_timeout"`
 	OIDCEnabled      bool           `yaml:"oidc_enabled"`
 	OIDCAutoRedirect bool           `yaml:"oidc_auto_redirect"`
 	DisableAuth      bool           `yaml:"disable_auth"`
@@ -328,10 +328,10 @@ type yamlAuthConfig struct {
 // ServerPort is the fixed HTTP server port.
 const ServerPort = 8374
 
-// Validator is satisfied by types that can self-validate after loading.
-type Validator interface {
+// validator is satisfied by types that can self-validate after loading.
+type validator interface {
 	Validate() error
 }
 
-// Compile-time assertion: *Config satisfies Validator.
-var _ Validator = (*Config)(nil)
+// Compile-time assertion: *Config satisfies validator.
+var _ validator = (*Config)(nil)

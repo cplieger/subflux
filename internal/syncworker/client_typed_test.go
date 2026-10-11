@@ -18,8 +18,8 @@ import (
 
 func TestRunAudio_result_carries_the_worker_result(t *testing.T) {
 	t.Parallel()
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
-		return &Response{Version: ProtocolVersion, Result: wireFromResult(&subsync.SyncResult{
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
+		return &response{Version: protocolVersion, Result: wireFromResult(&subsync.SyncResult{
 			Method: subsync.MethodAudio, Offset: 1500, Confidence: 0.9,
 		})}, nil
 	})
@@ -34,11 +34,11 @@ func TestRunAudio_result_carries_the_worker_result(t *testing.T) {
 
 func TestRunAudio_worker_reported_error_is_crash(t *testing.T) {
 	t.Parallel()
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
-		return &Response{Version: ProtocolVersion, Error: "ffmpeg exploded"}, nil
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
+		return &response{Version: protocolVersion, Error: "ffmpeg exploded"}, nil
 	})
 	out := c.RunAudio(t.Context(), []byte(tinySRT), "/v.mkv", "", nil)
-	if out.Outcome != OutcomeCrash {
+	if out.Outcome != outcomeCrash {
 		t.Fatalf("outcome = %q, want crash for a worker-reported job error", out.Outcome)
 	}
 	if out.Err == nil || out.Err.Error() != "ffmpeg exploded" {
@@ -48,11 +48,11 @@ func TestRunAudio_worker_reported_error_is_crash(t *testing.T) {
 
 func TestRunAudio_spawn_failure_is_crash(t *testing.T) {
 	t.Parallel()
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		return nil, errors.New("worker process: signal: killed")
 	})
 	out := c.RunAudio(t.Context(), []byte(tinySRT), "/v.mkv", "", nil)
-	if out.Outcome != OutcomeCrash {
+	if out.Outcome != outcomeCrash {
 		t.Fatalf("outcome = %q, want crash for a spawn failure", out.Outcome)
 	}
 }
@@ -65,7 +65,7 @@ func TestRunAudio_spawn_failure_is_crash(t *testing.T) {
 // arm skipped the budget whenever any deadline existed).
 func TestRunAudio_budget_is_its_own_signal(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		c := newSeamClient(func(ctx context.Context, _ *Request) (*Response, error) {
+		c := newSeamClient(func(ctx context.Context, _ *request) (*response, error) {
 			<-ctx.Done()
 			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
 		})
@@ -85,7 +85,7 @@ func TestRunAudio_budget_is_its_own_signal(t *testing.T) {
 
 func TestRunAudio_caller_cancellation_is_cancelled_not_timeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		c := newSeamClient(func(ctx context.Context, _ *Request) (*Response, error) {
+		c := newSeamClient(func(ctx context.Context, _ *request) (*response, error) {
 			<-ctx.Done()
 			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
 		})
@@ -106,9 +106,9 @@ func TestRunAudio_caller_cancellation_is_cancelled_not_timeout(t *testing.T) {
 func TestRunAudio_no_budget_while_queued(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
-		c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+		c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 			<-release
-			return &Response{Version: ProtocolVersion}, nil
+			return &response{Version: protocolVersion}, nil
 		})
 		first := make(chan RunOutcome, 1)
 		go func() { first <- c.RunAudio(t.Context(), nil, "/hold.mkv", "", nil) }()
@@ -132,9 +132,9 @@ func TestRunAudio_no_budget_while_queued(t *testing.T) {
 func TestRunAudio_hook_refusal_never_spawns(t *testing.T) {
 	t.Parallel()
 	var spawned atomic.Int32
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		spawned.Add(1)
-		return &Response{Version: ProtocolVersion}, nil
+		return &response{Version: protocolVersion}, nil
 	})
 	out := c.RunAudio(t.Context(), nil, "/v.mkv", "", func() bool { return false })
 	if out.Outcome != OutcomeCancelled || !errors.Is(out.Err, ErrAdmissionRefused) {
@@ -148,8 +148,8 @@ func TestRunAudio_hook_refusal_never_spawns(t *testing.T) {
 func TestRunAudio_hook_fires_once_at_slot_acquisition(t *testing.T) {
 	t.Parallel()
 	var hooks atomic.Int32
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
-		return &Response{Version: ProtocolVersion}, nil
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
+		return &response{Version: protocolVersion}, nil
 	})
 	out := c.RunAudio(t.Context(), nil, "/v.mkv", "", func() bool {
 		hooks.Add(1)
@@ -167,10 +167,10 @@ func TestRunAudio_cancelled_while_waiting_for_the_slot(t *testing.T) {
 	t.Parallel()
 	release := make(chan struct{})
 	occupied := make(chan struct{})
-	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+	c := newSeamClient(func(_ context.Context, _ *request) (*response, error) {
 		close(occupied)
 		<-release
-		return &Response{Version: ProtocolVersion}, nil
+		return &response{Version: protocolVersion}, nil
 	})
 	go c.RunAudio(t.Context(), nil, "/hold.mkv", "", nil)
 	<-occupied

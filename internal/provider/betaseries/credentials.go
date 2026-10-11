@@ -10,7 +10,7 @@ import (
 // Compile-time check on the CredentialChecker opt-in: discovered by type
 // assertion in provider.Registry.CheckCredentials, so nothing else would catch
 // a rename.
-var _ provider.CredentialChecker = (*Provider)(nil)
+var _ provider.CredentialChecker = (*source)(nil)
 
 // statusURL is the cheapest key-gated route BetaSeries publishes: it takes no
 // parameters, so nothing is looked up. Measured 2026-09-19 — an unregistered
@@ -21,7 +21,7 @@ const statusURL = baseURL + "status"
 // CheckCredentials reports whether BetaSeries accepts the configured token.
 // A refusal arrives as *subflux.AuthError from classifyBadRequest (code 1001);
 // every other failure means the check did not complete.
-func (p *Provider) CheckCredentials(ctx context.Context) error {
+func (p *source) CheckCredentials(ctx context.Context) error {
 	body, err := p.doGet(ctx, statusURL)
 	if err != nil {
 		return err

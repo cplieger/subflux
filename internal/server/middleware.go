@@ -12,7 +12,7 @@ import (
 // --- Request middleware ---
 //
 // Every middleware has signature `func(http.HandlerFunc) http.HandlerFunc`
-// so they compose via routeGroup chains in routes.go. This is the complete
+// so they compose via the group chains in routes.go. This is the complete
 // set; there is no per-handler auth check elsewhere in the package.
 
 // sessionAuthenticator is the narrow interface that middleware needs from
@@ -42,7 +42,7 @@ func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 // writes happen inside the library's session verifier, throttled per session.
 //
 // Handlers downstream read the user with authhandlers.UserFromContext and the
-// session hash with authhandlers.SessionHashFromContext. The latter is empty for
+// session hash with authhandlers.sessionHashFromContext. The latter is empty for
 // API-key-authenticated requests.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

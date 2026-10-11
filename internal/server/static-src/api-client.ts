@@ -34,15 +34,12 @@ import { createFetch } from "@cplieger/fetch";
 import type { ApiResult as FetchApiResult, HttpMethod, RequestOptions } from "@cplieger/fetch";
 import { observeStamp } from "./subjects.js";
 
-/** Decoder<T> is owned by validators.ts (single source of truth); re-exported
- *  here so callers can import it from api-client as well as validators. */
-export type { Decoder } from "./validators.js";
 import type { Decoder } from "./validators.js";
 
 // ApiResult keeps subflux's historical envelope shape rather than adopting
 // fetch's discriminated union: `ok` is a plain boolean with optional
 // data/error (so `r.data` / `r.error` reads at existing call sites need no
-// narrowing), plus the lifted `code` / `requestId` fields and `headers`
+// narrowing), plus the lifted `code` field and `headers`
 // (present whenever an HTTP response was received, absent on a network,
 // timeout or cancelled failure).
 export interface ApiResult<T> {
@@ -51,7 +48,6 @@ export interface ApiResult<T> {
   data?: T;
   error?: string;
   code?: string;
-  requestId?: string;
   headers?: Headers;
 }
 
@@ -132,9 +128,6 @@ async function requestRaw<T>(
   const result: ApiResult<T> = { ok: false, status: r.status, error: r.error };
   if (r.code !== undefined) {
     result.code = r.code;
-  }
-  if (r.requestId !== undefined) {
-    result.requestId = r.requestId;
   }
   if (r.headers !== undefined) {
     result.headers = r.headers;

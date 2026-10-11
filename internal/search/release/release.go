@@ -31,7 +31,7 @@ type Info struct {
 // Input is clamped to MaxNameLen bytes before any pattern runs (defense in
 // depth for the layer's measured linear-time gate): a longer name is
 // treated as its MaxNameLen-byte prefix, matching the provider boundary's
-// ClampName semantics, so callers that bypass provider.WrapRetry cannot
+// ClampName semantics, so callers that bypass provider.wrapRetry cannot
 // violate the input bound. Provider-path behavior is unchanged (those
 // names arrive already clamped).
 func ParseName(name string) Info {
@@ -50,7 +50,7 @@ func ParseName(name string) Info {
 		info.Edition = strings.ToLower(m)
 	}
 
-	info.ReleaseGroup = ParseGroup(name)
+	info.ReleaseGroup = parseGroup(name)
 
 	if slog.Default().Enabled(context.TODO(), slog.LevelDebug) {
 		slog.Debug("parsed release name",
@@ -64,15 +64,15 @@ func ParseName(name string) Info {
 	return info
 }
 
-// ParseGroup extracts the release group from a release name.
-func ParseGroup(name string) string {
-	stripped := FileExtRe.ReplaceAllString(name, "")
+// parseGroup extracts the release group from a release name.
+func parseGroup(name string) string {
+	stripped := fileExtRe.ReplaceAllString(name, "")
 
-	if m := CompiledAnimeReleaseGroup.FindStringSubmatch(stripped); len(m) > 1 {
+	if m := compiledAnimeReleaseGroup.FindStringSubmatch(stripped); len(m) > 1 {
 		return m[1]
 	}
 
-	if m := CompiledReleaseGroup.FindStringSubmatch(stripped); m != nil {
+	if m := compiledReleaseGroup.FindStringSubmatch(stripped); m != nil {
 		if len(m) > 1 && m[1] != "" {
 			return m[1]
 		}
@@ -84,19 +84,19 @@ func ParseGroup(name string) string {
 	return ""
 }
 
-// SourceFamily maps granular source labels to their family for comparison.
-var SourceFamily = map[string]string{
-	NormWebDL:    "web",
-	NormWebRip:   "web",
-	NormBluray:   "bluray",
-	NormRemux:    "bluray",
-	NormHDTV:     "tv",
-	NormSDTV:     "tv",
-	NormDVD:      "dvd",
-	NormCam:      NormCam,
-	NormTelesync: NormCam,
-	NormTelecine: NormCam,
-	NormHDRip:    "hdrip",
+// sourceFamily maps granular source labels to their family for comparison.
+var sourceFamily = map[string]string{
+	normWebDL:    "web",
+	normWebRip:   "web",
+	normBluray:   "bluray",
+	normRemux:    "bluray",
+	normHDTV:     "tv",
+	normSDTV:     "tv",
+	normDVD:      "dvd",
+	normCam:      normCam,
+	normTelesync: normCam,
+	normTelecine: normCam,
+	normHDRip:    "hdrip",
 }
 
 // CompareSource checks if two sources are in the same family.
@@ -104,14 +104,14 @@ func CompareSource(matches *subflux.MatchSet, a, b string) {
 	if a == "" || b == "" {
 		return
 	}
-	if SourceOrFamily(a) == SourceOrFamily(b) {
+	if sourceOrFamily(a) == sourceOrFamily(b) {
 		matches.Source = true
 	}
 }
 
-// SourceOrFamily returns the source family for comparison.
-func SourceOrFamily(src string) string {
-	if f, ok := SourceFamily[src]; ok {
+// sourceOrFamily returns the source family for comparison.
+func sourceOrFamily(src string) string {
+	if f, ok := sourceFamily[src]; ok {
 		return f
 	}
 	return src

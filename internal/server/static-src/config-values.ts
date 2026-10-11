@@ -128,7 +128,7 @@ export function cfgList(section: string): string[] {
 }
 
 /** CfgProviderBlock is one provider's entry under the providers section. */
-export interface CfgProviderBlock {
+interface CfgProviderBlock {
   enabled?: boolean;
   priority?: number;
   settings?: Record<string, unknown>;

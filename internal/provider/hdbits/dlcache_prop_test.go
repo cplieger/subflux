@@ -20,7 +20,7 @@ func TestPut_neverExceedsMaxEntries(t *testing.T) {
 		for range ops {
 			key := strconv.Itoa(rapid.IntRange(0, 12).Draw(rt, "key"))
 			val := []byte(rapid.String().Draw(rt, "val"))
-			dc.Put(key, val, nil)
+			dc.put(key, val, nil)
 			if got := len(dc.cache); got > maxEntries {
 				rt.Fatalf("cache size %d exceeds maxEntries %d", got, maxEntries)
 			}

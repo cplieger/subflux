@@ -18,7 +18,7 @@ func TestCorrectFramerate_too_few_cues(t *testing.T) {
 	if result.Rate != 1.0 {
 		t.Errorf("expected rate 1.0, got %f", result.Rate)
 	}
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
@@ -29,7 +29,7 @@ func TestCorrectFramerate_too_short_duration(t *testing.T) {
 	ref := makeCues(30, 0, 2*time.Second)
 	inc := makeCues(30, 0, 2*time.Second)
 	result := correctFramerate(t.Context(), ref, inc, "")
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Fatalf("expected no confidence for short duration, got %f", float64(result.Confidence))
 	}
 }
@@ -47,10 +47,10 @@ func TestCorrectFramerate_known_ratio_23976_to_25(t *testing.T) {
 	inc := scaleCuesForTest(ref, ratio)
 
 	result := correctFramerate(t.Context(), ref, inc, "")
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected framerate detection, got no confidence")
 	}
-	if result.Method != MethodFramerate {
+	if result.Method != methodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 }
@@ -139,14 +139,14 @@ func TestOverlapMs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		a, b TimeSpan
+		a, b timeSpan
 		want float64
 	}{
-		{"full overlap", TimeSpan{0, 100}, TimeSpan{0, 100}, 100},
-		{"partial", TimeSpan{0, 100}, TimeSpan{50, 150}, 50},
-		{"no overlap", TimeSpan{0, 100}, TimeSpan{200, 300}, 0},
-		{"adjacent", TimeSpan{0, 100}, TimeSpan{100, 200}, 0},
-		{"contained", TimeSpan{0, 200}, TimeSpan{50, 100}, 50},
+		{"full overlap", timeSpan{0, 100}, timeSpan{0, 100}, 100},
+		{"partial", timeSpan{0, 100}, timeSpan{50, 150}, 50},
+		{"no overlap", timeSpan{0, 100}, timeSpan{200, 300}, 0},
+		{"adjacent", timeSpan{0, 100}, timeSpan{100, 200}, 0},
+		{"contained", timeSpan{0, 200}, timeSpan{50, 100}, 50},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,8 +161,8 @@ func TestOverlapMs(t *testing.T) {
 
 func TestAlignmentScore_shifted(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{{Start: 1000, End: 2000}}
-	inc := []TimeSpan{{Start: 0, End: 1000}}
+	ref := []timeSpan{{Start: 1000, End: 2000}}
+	inc := []timeSpan{{Start: 0, End: 1000}}
 	// With offset 1000, inc becomes [1000, 2000] which fully overlaps ref.
 	score := alignmentScore(ref, inc, 1000)
 	if score != 1000 {
@@ -227,7 +227,7 @@ func TestCorrectFramerate_non_linear_drift(t *testing.T) {
 	}
 	result := correctFramerate(t.Context(), ref, inc, "")
 	// Non-linear drift should produce no confidence.
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("CorrectFramerate(non-linear drift) confidence = %f, want 0",
 			float64(result.Confidence))
 	}
@@ -259,12 +259,12 @@ func TestMeasureDrifts_mismatched_lengths(t *testing.T) {
 func TestGoldenSectionSearch_ratio_near_one(t *testing.T) {
 	t.Parallel()
 	// When the observed ratio is very close to 1.0, GSS should converge
-	// to ~1.0 and return ConfidenceNone (no correction needed).
+	// to ~1.0 and return confidenceNone (no correction needed).
 	ref := makeLongCues(50, 10*time.Minute)
 	// Tiny ratio deviation: 1.000001 — effectively identical.
 	observedRatio := 1.000001
 	result := goldenSectionSearch(t.Context(), ref, ref, observedRatio, 0.95)
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("goldenSectionSearch(ratio~1.0) confidence = %f, want 0",
 			float64(result.Confidence))
 	}
@@ -281,10 +281,10 @@ func TestGoldenSectionSearch_real_ratio(t *testing.T) {
 	inc := scaleCuesForTest(ref, 1.03)
 	// observedRatio should be close to 1.03.
 	result := goldenSectionSearch(t.Context(), ref, inc, 1.03, 0.95)
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected some confidence from GSS with real ratio")
 	}
-	if result.Method != MethodFramerate {
+	if result.Method != methodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 }
@@ -321,10 +321,10 @@ func TestMatchKnownRatio(t *testing.T) {
 		wantOK   bool
 		wantConf Confidence
 	}{
-		{"no_match", 1.5, 0, 0.97, false, ConfidenceNone},
+		{"no_match", 1.5, 0, 0.97, false, confidenceNone},
 		{"with_video_fps", 25.0 / 23.976, 25.0, 0.97, true, 0.97},
 		{"video_fps_caps_the_confidence", 25.0 / 23.976, 25.0, 0.99, true, 0.98},
-		{"video_fps_filters_candidates", 25.0 / 23.976, 60.0, 0.97, false, ConfidenceNone},
+		{"video_fps_filters_candidates", 25.0 / 23.976, 60.0, 0.97, false, confidenceNone},
 		{"exact_match", 25.0 / 23.976, 0, 0.97, true, 0.95},
 	}
 	for _, tc := range tests {
@@ -346,7 +346,7 @@ func TestMatchKnownRatio(t *testing.T) {
 				t.Errorf("matchKnownRatio(%v, r2=%v, videoFPS=%v) confidence = %v, want %v",
 					tc.ratio, tc.r2, tc.videoFPS, float64(result.Confidence), float64(tc.wantConf))
 			}
-			if ok && result.Method != MethodFramerate {
+			if ok && result.Method != methodFramerate {
 				t.Errorf("expected method 'framerate', got %q", result.Method)
 			}
 		})
@@ -406,8 +406,8 @@ func TestCollectRatioCandidates(t *testing.T) {
 
 func TestAlignmentScore_no_overlap(t *testing.T) {
 	t.Parallel()
-	ref := []TimeSpan{{Start: 0, End: 1000}}
-	inc := []TimeSpan{{Start: 5000, End: 6000}}
+	ref := []timeSpan{{Start: 0, End: 1000}}
+	inc := []timeSpan{{Start: 5000, End: 6000}}
 	score := alignmentScore(ref, inc, 0)
 	if score != 0 {
 		t.Errorf("alignmentScore(no overlap) = %f, want 0", score)
@@ -473,10 +473,10 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 	result := correctFramerate(t.Context(), ref, inc, "")
 
 	// The function should still produce a result (via GSS fallthrough).
-	if result.Confidence == ConfidenceNone {
+	if result.Confidence == confidenceNone {
 		t.Error("expected some confidence after GSS fallthrough")
 	}
-	if result.Method != MethodFramerate {
+	if result.Method != methodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 	// The rate should be close to actualRatio (GSS finds the true ratio).
@@ -491,7 +491,7 @@ func TestCorrectFramerate_cue_count_mismatch_too_large(t *testing.T) {
 	ref := makeLongCues(100, 30*time.Minute)
 	inc := makeLongCues(50, 30*time.Minute)
 	result := correctFramerate(t.Context(), ref, inc, "")
-	if result.Confidence != ConfidenceNone {
+	if result.Confidence != confidenceNone {
 		t.Errorf("CorrectFramerate(100 ref, 50 inc) confidence = %f, want 0 (cue count mismatch)",
 			float64(result.Confidence))
 	}
@@ -511,9 +511,9 @@ func TestCorrectFramerate_cue_count_mismatch_at_boundary(t *testing.T) {
 
 	result := correctFramerate(t.Context(), ref, inc, "")
 
-	if result.Confidence != DefaultConfidenceCaps.FramerateGSS {
+	if result.Confidence != defaultConfidenceCaps.FramerateGSS {
 		t.Errorf("CorrectFramerate(28 ref, 21 inc) confidence = %v, want %v",
-			float64(result.Confidence), float64(DefaultConfidenceCaps.FramerateGSS))
+			float64(result.Confidence), float64(defaultConfidenceCaps.FramerateGSS))
 	}
 	if relErr := math.Abs(result.Rate-25.0/23.976) / (25.0 / 23.976); relErr > 1e-6 {
 		t.Errorf("CorrectFramerate(28 ref, 21 inc) rate = %v, want %v (rel err %g > 1e-6)",
@@ -530,9 +530,9 @@ func TestCorrectFramerate_accepts_the_minimum_cue_count(t *testing.T) {
 
 	result := correctFramerate(t.Context(), ref, inc, "")
 
-	if result.Confidence != DefaultConfidenceCaps.FramerateGSS {
+	if result.Confidence != defaultConfidenceCaps.FramerateGSS {
 		t.Errorf("CorrectFramerate(20 ref, 20 inc) confidence = %v, want %v",
-			float64(result.Confidence), float64(DefaultConfidenceCaps.FramerateGSS))
+			float64(result.Confidence), float64(defaultConfidenceCaps.FramerateGSS))
 	}
 	// The recovered ratio is the exact NTSC-film-to-PAL ratio, not a captured
 	// magnitude: a track authored at 23.976 fps and played at 25 runs
@@ -551,8 +551,8 @@ func TestCorrectFramerate_rejects_below_the_minimum_cue_count(t *testing.T) {
 		nInc     int
 		wantConf Confidence
 	}{
-		{"one_reference_cue_short", 19, 20, ConfidenceNone},
-		{"one_incorrect_cue_short", 20, 19, ConfidenceNone},
+		{"one_reference_cue_short", 19, 20, confidenceNone},
+		{"one_incorrect_cue_short", 20, 19, confidenceNone},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -594,14 +594,14 @@ func TestCorrectFramerate_accepts_the_minimum_duration(t *testing.T) {
 			name:     "reference_at_the_floor",
 			ref:      atFloor,
 			inc:      scaleCuesForTest(atFloor, 25.0/23.976),
-			wantConf: DefaultConfidenceCaps.FramerateKnown,
+			wantConf: defaultConfidenceCaps.FramerateKnown,
 			wantRate: 25.0 / 24.0,
 		},
 		{
 			name:     "incorrect_at_the_floor",
 			ref:      scaleCuesForTest(atFloor, 25.0/23.976),
 			inc:      atFloor,
-			wantConf: DefaultConfidenceCaps.FramerateGSS,
+			wantConf: defaultConfidenceCaps.FramerateGSS,
 			wantRate: 23.976 / 25.0,
 		},
 	}
@@ -881,14 +881,14 @@ func TestScaleCues_round_trip_property(t *testing.T) {
 func TestOverlapMs_commutativity_property(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		a := TimeSpan{
+		a := timeSpan{
 			Start: rapid.Int64Range(0, 100000).Draw(t, "a_start"),
 			End:   rapid.Int64Range(0, 100000).Draw(t, "a_end"),
 		}
 		if a.End < a.Start {
 			a.Start, a.End = a.End, a.Start
 		}
-		b := TimeSpan{
+		b := timeSpan{
 			Start: rapid.Int64Range(0, 100000).Draw(t, "b_start"),
 			End:   rapid.Int64Range(0, 100000).Draw(t, "b_end"),
 		}
@@ -913,7 +913,7 @@ func TestOverlapMs_self_overlap_property(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		start := rapid.Int64Range(0, 100000).Draw(t, "start")
 		end := rapid.Int64Range(start, start+100000).Draw(t, "end")
-		span := TimeSpan{Start: start, End: end}
+		span := timeSpan{Start: start, End: end}
 
 		got := overlapMs(span, span)
 		want := float64(end - start)

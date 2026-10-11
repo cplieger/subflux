@@ -15,6 +15,11 @@ import (
 
 // --- Helpers ---
 
+const contentTypeJSON = "application/json"
+
+// errorResponse is the error envelope the helpers put on the wire.
+type errorResponse = webhttp.ErrorResponse
+
 // decodeErrorBody decodes {"error": msg} into msg, failing the test on
 // decode error.
 func decodeErrorBody(t *testing.T, body io.Reader) string {

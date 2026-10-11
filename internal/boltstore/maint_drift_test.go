@@ -39,7 +39,7 @@ func seedAttempt(t *testing.T, db *DB, mt subflux.MediaType, mid, lang string, p
 // counter consistent with the primary after deletions (Requirement 8.1).
 func assertBackoffConsistent(t *testing.T, db *DB, wantRows int) {
 	t.Helper()
-	_, attempts, _ := mustStats(t, db)
+	_, attempts := mustStats(t, db)
 	if attempts != wantRows {
 		t.Errorf("Stats().attempts = %d, want %d", attempts, wantRows)
 	}

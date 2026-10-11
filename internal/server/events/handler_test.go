@@ -74,7 +74,7 @@ type epochEnvelope struct {
 func epochFrames(frames []sseFrame) []sseFrame {
 	var found []sseFrame
 	for _, f := range frames {
-		if f.event == string(Epoch) {
+		if f.event == string(epoch) {
 			found = append(found, f)
 		}
 	}
@@ -93,8 +93,8 @@ func epochOf(t *testing.T, frames []sseFrame) (sseFrame, EpochEvent) {
 	if err := json.Unmarshal([]byte(found[0].data), &env); err != nil {
 		t.Fatalf("epoch payload %q: %v", found[0].data, err)
 	}
-	if env.Type != string(Epoch) {
-		t.Fatalf("epoch envelope type = %q, want %q (the {type,data} shape Publish uses)", env.Type, Epoch)
+	if env.Type != string(epoch) {
+		t.Fatalf("epoch envelope type = %q, want %q (the {type,data} shape Publish uses)", env.Type, epoch)
 	}
 	return found[0], env.Data
 }
@@ -123,7 +123,7 @@ func helloOf(t *testing.T, frames []sseFrame) sse.Hello {
 func replayedIDs(frames []sseFrame) []string {
 	var ids []string
 	for _, f := range frames {
-		if f.event != string(Epoch) && f.event != "sse:hello" {
+		if f.event != string(epoch) && f.event != "sse:hello" {
 			ids = append(ids, f.id)
 		}
 	}
@@ -132,7 +132,7 @@ func replayedIDs(frames []sseFrame) []string {
 
 func publishN(bus *EventBus, n int) {
 	for range n {
-		bus.Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "x"}})
+		bus.Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifySuccess, Text: "x"}})
 	}
 }
 
@@ -213,7 +213,7 @@ func TestHandleAdvertisesReconnectDelayOnce(t *testing.T) {
 	Handle(bus, rec, req)
 	body := rec.Body.String()
 
-	want := fmt.Sprintf("retry: %d\n\n", SSEReconnectDelay.Milliseconds())
+	want := fmt.Sprintf("retry: %d\n\n", sseReconnectDelay.Milliseconds())
 	if n := strings.Count(body, "retry: "); n != 1 {
 		t.Fatalf("body carries %d retry: lines, want exactly 1 (it is a property of the connection, not of a frame); body = %q", n, body)
 	}
@@ -222,7 +222,7 @@ func TestHandleAdvertisesReconnectDelayOnce(t *testing.T) {
 	}
 }
 
-// TestHandle_options_reach_the_hub pins that ReplyMaxEvents is passed to the
+// TestHandle_options_reach_the_hub pins that replyMaxEvents is passed to the
 // hub: one offset inside the cap resumes with exactly that many frames, one
 // past it is gap_budget with no replay. The arithmetic is the library's; the
 // option reaching it is subflux's.
@@ -245,8 +245,8 @@ func TestHandle_options_reach_the_hub(t *testing.T) {
 	if h.Verdict != sse.VerdictResumed || !h.Resumed {
 		t.Errorf("hello at head-256 = %+v, want verdict resumed", h)
 	}
-	if got := replayedIDs(frames); len(got) != ReplyMaxEvents {
-		t.Errorf("resumed connect replayed %d frames, want ReplyMaxEvents (%d)", len(got), ReplyMaxEvents)
+	if got := replayedIDs(frames); len(got) != replyMaxEvents {
+		t.Errorf("resumed connect replayed %d frames, want ReplyMaxEvents (%d)", len(got), replyMaxEvents)
 	}
 }
 
@@ -300,7 +300,7 @@ func TestHandleEpochBeforeLive(t *testing.T) {
 	t.Cleanup(func() { resp.Body.Close() })
 
 	waitClients(t, bus, 1)
-	bus.Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifyInfo, Text: "live"}})
+	bus.Publish(Event{Type: Notify, Data: NotifyEvent{Level: NotifySuccess, Text: "live"}})
 
 	var order []string
 	buf := make([]byte, 1)
@@ -333,15 +333,15 @@ func TestPublishIsTopicless(t *testing.T) {
 	}
 }
 
-// TestRingCapacity pins WithReplay(SSERing) at events.New: the ring holds
-// exactly SSERing events, so the floor moves once it fills.
+// TestRingCapacity pins WithReplay(sseRing) at events.New: the ring holds
+// exactly sseRing events, so the floor moves once it fills.
 func TestRingCapacity(t *testing.T) {
 	t.Parallel()
 	bus := New(0, nil)
-	publishN(bus, SSERing+1)
+	publishN(bus, sseRing+1)
 	pos := bus.hub.Position()
-	if pos.Floor != 2 || pos.Head != uint64(SSERing+1) {
-		t.Errorf("Position() after SSERing+1 publishes = (floor %d, head %d), want (2, %d)", pos.Floor, pos.Head, SSERing+1)
+	if pos.Floor != 2 || pos.Head != uint64(sseRing+1) {
+		t.Errorf("Position() after SSERing+1 publishes = (floor %d, head %d), want (2, %d)", pos.Floor, pos.Head, sseRing+1)
 	}
 }
 

@@ -25,10 +25,10 @@ func BenchmarkVoteOnCandidates(b *testing.B) {
 			candidates[i] = SyncResult{
 				Cues:       makeBenchCues(100, time.Duration(offsetMs)*time.Millisecond),
 				Confidence: Confidence(0.5 + float64(i)*0.05),
-				Method:     MethodOffset,
+				Method:     methodOffset,
 				Source:     SourceOffset,
 				Offset:     offsetMs,
-				Transform:  Transform{Kind: TransformShift, Shift: offsetMs},
+				Transform:  transform{Kind: transformShift, Shift: offsetMs},
 			}
 		}
 		b.Run(tc.name, func(b *testing.B) {
@@ -47,18 +47,18 @@ func BenchmarkClusterCandidates(b *testing.B) {
 	candidates := []SyncResult{
 		{
 			Cues: makeBenchCues(1500, 100*time.Millisecond), Confidence: 0.6,
-			Method: MethodFramerate, Source: SourceFramerate,
-			Transform: Transform{Kind: TransformFramerate, Ratio: 1.001},
+			Method: methodFramerate, Source: SourceFramerate,
+			Transform: transform{Kind: transformFramerate, Ratio: 1.001},
 		},
 		{
 			Cues: inc, Confidence: 0.6,
-			Method: MethodSplit, Source: SourceSplit,
-			Transform: Transform{Kind: TransformSegments, Segments: []Segment{{StartIdx: 0, EndIdx: 1500}}},
+			Method: methodSplit, Source: SourceSplit,
+			Transform: transform{Kind: transformSegments, SegmentCount: 1},
 		},
 		{
 			Cues: makeBenchCues(1500, 50*time.Millisecond), Confidence: 0.7,
-			Method: MethodOffset, Source: SourceOffset,
-			Transform: Transform{Kind: TransformShift, Shift: 50},
+			Method: methodOffset, Source: SourceOffset,
+			Transform: transform{Kind: transformShift, Shift: 50},
 		},
 	}
 	b.ReportAllocs()

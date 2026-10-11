@@ -12,8 +12,8 @@ import (
 
 // Subtitle format extensions used for ASS/SSA detection.
 const (
-	ExtASS = ".ass"
-	ExtSSA = ".ssa"
+	extASS = ".ass"
+	extSSA = ".ssa"
 )
 
 // Syncer implements SubtitleSyncer using the subsync library.

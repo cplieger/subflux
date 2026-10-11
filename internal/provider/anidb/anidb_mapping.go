@@ -79,10 +79,9 @@ type mappingList struct {
 }
 
 type mapping struct {
-	Text        string `xml:",chardata"`
-	AniDBSeason int    `xml:"anidbseason,attr"`
-	TVDBSeason  int    `xml:"tvdbseason,attr"`
-	Offset      int    `xml:"offset,attr"`
+	Text       string `xml:",chardata"`
+	TVDBSeason int    `xml:"tvdbseason,attr"`
+	Offset     int    `xml:"offset,attr"`
 }
 
 type candidate struct {

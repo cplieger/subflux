@@ -113,7 +113,7 @@ type syntheticProvider struct {
 	forced      bool
 }
 
-func (p *syntheticProvider) Name() subflux.ProviderID { return providerName }
+func (*syntheticProvider) Name() subflux.ProviderID { return providerName }
 
 // Search returns results based on the configured mode.
 func (p *syntheticProvider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
@@ -211,7 +211,6 @@ func (p *syntheticProvider) generateResults(req *subflux.SearchRequest) []subflu
 				DownloadURL: fmt.Sprintf("synthetic://download/%s/%d", lang, i),
 				MatchedBy:   subflux.MatchByTitle,
 				Title:       req.Title,
-				Year:        req.Year,
 				Season:      req.Season,
 				Episode:     req.Episode,
 				HearingImp:  p.hi,
@@ -240,7 +239,6 @@ func (p *syntheticProvider) generateSeasonPackResults(req *subflux.SearchRequest
 			DownloadURL: fmt.Sprintf("synthetic://download/spack/%s", lang),
 			MatchedBy:   subflux.MatchByTitle,
 			Title:       req.Title,
-			Year:        req.Year,
 			Season:      req.Season,
 		}
 		results = append(results, sub)

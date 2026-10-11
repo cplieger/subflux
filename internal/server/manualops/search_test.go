@@ -36,7 +36,7 @@ func (e *fakeSearchEngine) SweepProviders(context.Context, *subflux.SearchReques
 	return e.swept, nil
 }
 
-func (e *fakeSearchEngine) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
+func (*fakeSearchEngine) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -50,7 +50,7 @@ func (e *fakeSearchEngine) ScoreSubtitles(_ *subflux.SearchRequest, _ []subflux.
 	return e.scored
 }
 
-func (e *fakeSearchEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ subflux.Variant) ([]byte, int64) {
+func (*fakeSearchEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ subflux.Variant) ([]byte, int64) {
 	return data, 0
 }
 
@@ -93,7 +93,7 @@ func TestTryComputeHash(t *testing.T) {
 			ls := &LiveState{Cfg: fakeManualCfg{}, Engine: engine}
 			req := &subflux.SearchRequest{Title: "Show", VideoHash: tc.haveHash}
 
-			TryComputeHash(t.Context(), ls, req, tc.filePath)
+			tryComputeHash(t.Context(), ls, req, tc.filePath)
 
 			if req.VideoHash != tc.wantHash {
 				t.Errorf("TryComputeHash(path=%q, have=%q) VideoHash = %q, want %q",
@@ -180,7 +180,7 @@ func (p *countingProvider) Search(context.Context, *subflux.SearchRequest) ([]su
 	return nil, p.err
 }
 
-func (p *countingProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
+func (*countingProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -223,7 +223,7 @@ func TestRunSearch_names_gated_and_failed_providers(t *testing.T) {
 			t.Errorf("RunSearch() notice for %s has no message", n.Provider)
 		}
 	}
-	want := map[subflux.ProviderID]string{"hdbits": NoticeGated, "subdl": NoticeError}
+	want := map[subflux.ProviderID]string{"hdbits": noticeGated, "subdl": noticeError}
 	if !maps.Equal(kinds, want) {
 		t.Errorf("RunSearch() provider notices = %+v, want kinds %v", got.Providers, want)
 	}

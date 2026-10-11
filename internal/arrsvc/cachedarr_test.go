@@ -108,7 +108,7 @@ func testGate(ctx context.Context) *ReadGate {
 }
 
 // testCachedSonarr wires a wrapper around fake shipped and wave clients (the
-// embedded *Sonarr passthrough surface stays nil and unused).
+// embedded *sonarr passthrough surface stays nil and unused).
 func testCachedSonarr(shipped, wave sonarrReads, gate *ReadGate) *CachedSonarr {
 	return &CachedSonarr{shipped: shipped, wave: wave, table: newReadTable(gate)}
 }
@@ -698,7 +698,7 @@ func TestCachedRadarr_MovieByTmdbID(t *testing.T) {
 
 // The wrapper builds TWO transports — the shipped 3-attempt client and its own
 // single-attempt wave client — so its Close has to release both. It OVERRIDES
-// the Close promoted from the embedded *Sonarr, and that is the whole hazard:
+// the Close promoted from the embedded *sonarr, and that is the whole hazard:
 // deleting the override leaves the promoted method, which still satisfies the
 // `interface{ Close() }` assertion activation reaches it through
 // (server/reload.go closeArrClient), so the wave transport would leak with no

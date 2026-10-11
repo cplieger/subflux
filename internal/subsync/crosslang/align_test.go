@@ -20,15 +20,15 @@ func TestDPAlign(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
-		pairs     []CuePair
+		pairs     []cuePair
 		wantLen   int
 		checkMono bool
 	}{
 		{"empty", nil, 0, false},
-		{"single_pair", []CuePair{{IncIdx: 0, RefIdx: 0, Score: 1.0}}, 1, true},
+		{"single_pair", []cuePair{{IncIdx: 0, RefIdx: 0, Score: 1.0}}, 1, true},
 		{
 			"monotonic_input",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 0, RefIdx: 0, Score: 0.5},
 				{IncIdx: 1, RefIdx: 1, Score: 0.8},
 				{IncIdx: 2, RefIdx: 2, Score: 0.7},
@@ -37,7 +37,7 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"crossing_pairs_selects_optimal",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 0, RefIdx: 0, Score: 0.5},
 				{IncIdx: 1, RefIdx: 2, Score: 0.8},
 				{IncIdx: 2, RefIdx: 1, Score: 0.9}, // crosses with previous
@@ -47,7 +47,7 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"prefers_higher_score_path",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 0, RefIdx: 0, Score: 0.1},
 				{IncIdx: 0, RefIdx: 1, Score: 0.9}, // same IncIdx, higher score
 				{IncIdx: 1, RefIdx: 2, Score: 0.5},
@@ -56,10 +56,10 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"large_input_exceeds_dpMaxPredecessors",
-			func() []CuePair {
-				pairs := make([]CuePair, 400)
+			func() []cuePair {
+				pairs := make([]cuePair, 400)
 				for i := range pairs {
-					pairs[i] = CuePair{IncIdx: i, RefIdx: i, Score: 0.5}
+					pairs[i] = cuePair{IncIdx: i, RefIdx: i, Score: 0.5}
 				}
 				return pairs
 			}(),
@@ -67,7 +67,7 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"unsorted_input",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 3, RefIdx: 3, Score: 0.7},
 				{IncIdx: 0, RefIdx: 0, Score: 0.5},
 				{IncIdx: 1, RefIdx: 1, Score: 0.8},
@@ -76,7 +76,7 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"duplicate_indices_different_scores",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 0, RefIdx: 0, Score: 0.3},
 				{IncIdx: 0, RefIdx: 0, Score: 0.9},
 				{IncIdx: 1, RefIdx: 1, Score: 0.5},
@@ -85,7 +85,7 @@ func TestDPAlign(t *testing.T) {
 		},
 		{
 			"all_same_index",
-			[]CuePair{
+			[]cuePair{
 				{IncIdx: 5, RefIdx: 5, Score: 0.3},
 				{IncIdx: 5, RefIdx: 5, Score: 0.9},
 				{IncIdx: 5, RefIdx: 5, Score: 0.5},
@@ -122,7 +122,7 @@ func TestDPAlign_tieBreakKeepsNearerPredecessor(t *testing.T) {
 	// accumulated score. The predecessor scan walks backward from the node, so
 	// the nearer candidate (1,2) is seen first and kept, fixing the path's
 	// middle node.
-	pairs := []CuePair{
+	pairs := []cuePair{
 		{IncIdx: 0, RefIdx: 0, Score: 5.0},
 		{IncIdx: 1, RefIdx: 1, Score: 1.0},
 		{IncIdx: 1, RefIdx: 2, Score: 1.0},
@@ -142,7 +142,7 @@ func TestDPAlign_tieBreakKeepsEarliestEndNode(t *testing.T) {
 	t.Parallel()
 	// Two independent end nodes with equal score and no chain between them
 	// (same IncIdx). The earliest is chosen as the path end.
-	pairs := []CuePair{
+	pairs := []cuePair{
 		{IncIdx: 0, RefIdx: 0, Score: 3.0},
 		{IncIdx: 0, RefIdx: 1, Score: 3.0},
 	}
@@ -159,14 +159,14 @@ func TestWeightedMedianOffset(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name  string
-		pairs []CuePair
+		pairs []cuePair
 		want  int64
 	}{
 		{"empty", nil, 0},
-		{"single", []CuePair{{Score: 1.0, OffsetMs: 500}}, 500},
+		{"single", []cuePair{{Score: 1.0, OffsetMs: 500}}, 500},
 		{
 			"two_equal_weight",
-			[]CuePair{
+			[]cuePair{
 				{Score: 1.0, OffsetMs: 100},
 				{Score: 1.0, OffsetMs: 200},
 			},
@@ -174,7 +174,7 @@ func TestWeightedMedianOffset(t *testing.T) {
 		},
 		{
 			"skewed_weight_picks_heavy",
-			[]CuePair{
+			[]cuePair{
 				{Score: 0.1, OffsetMs: 100},
 				{Score: 10.0, OffsetMs: 500},
 			},
@@ -182,7 +182,7 @@ func TestWeightedMedianOffset(t *testing.T) {
 		},
 		{
 			"three_middle_wins",
-			[]CuePair{
+			[]cuePair{
 				{Score: 1.0, OffsetMs: 100},
 				{Score: 1.0, OffsetMs: 300},
 				{Score: 1.0, OffsetMs: 500},
@@ -191,7 +191,7 @@ func TestWeightedMedianOffset(t *testing.T) {
 		},
 		{
 			"unsorted_input",
-			[]CuePair{
+			[]cuePair{
 				{Score: 1.0, OffsetMs: 500},
 				{Score: 1.0, OffsetMs: 100},
 				{Score: 1.0, OffsetMs: 300},
@@ -200,7 +200,7 @@ func TestWeightedMedianOffset(t *testing.T) {
 		},
 		{
 			"all_zero_weight",
-			[]CuePair{
+			[]cuePair{
 				{Score: 0.0, OffsetMs: 100},
 				{Score: 0.0, OffsetMs: 300},
 				{Score: 0.0, OffsetMs: 500},
@@ -498,7 +498,7 @@ func TestScoredCandidatesForCue_reachesAReferenceAtTheEdgeOfTheScan(t *testing.T
 // return the other one.
 func TestDPAlign_ordersByIncorrectCueIndexBeforeReferenceIndex(t *testing.T) {
 	t.Parallel()
-	pairs := []CuePair{
+	pairs := []cuePair{
 		{IncIdx: 0, RefIdx: 5, Score: 1.0},
 		{IncIdx: 1, RefIdx: 0, Score: 1.0},
 	}
@@ -514,10 +514,10 @@ func TestDPAlign_ordersByIncorrectCueIndexBeforeReferenceIndex(t *testing.T) {
 // agreeingPairs builds n pairs that all carry the same offset and an equal
 // weight, so the weight ratio a confidence is derived from is just the share of
 // pairs that agree.
-func agreeingPairs(n int, offsetMs int64) []CuePair {
-	pairs := make([]CuePair, n)
+func agreeingPairs(n int, offsetMs int64) []cuePair {
+	pairs := make([]cuePair, n)
 	for i := range pairs {
-		pairs[i] = CuePair{IncIdx: i, RefIdx: i, Score: 0.5, OffsetMs: offsetMs}
+		pairs[i] = cuePair{IncIdx: i, RefIdx: i, Score: 0.5, OffsetMs: offsetMs}
 	}
 	return pairs
 }
@@ -532,7 +532,7 @@ func TestComputeConfidence(t *testing.T) {
 	tests := []struct {
 		name   string
 		desc   string
-		pairs  []CuePair
+		pairs  []cuePair
 		median int64
 		want   float64
 	}{
@@ -567,7 +567,7 @@ func TestComputeConfidence(t *testing.T) {
 		{
 			name: "an_offset_exactly_at_the_agreement_limit_agrees",
 			desc: "1500ms from the median is inside the agreement window",
-			pairs: []CuePair{
+			pairs: []cuePair{
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
@@ -580,7 +580,7 @@ func TestComputeConfidence(t *testing.T) {
 		{
 			name: "an_offset_one_past_the_agreement_limit_disagrees",
 			desc: "1501ms is outside, dropping the count to four and re-arming the penalty",
-			pairs: []CuePair{
+			pairs: []cuePair{
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
@@ -593,7 +593,7 @@ func TestComputeConfidence(t *testing.T) {
 		{
 			name: "one_disagreeing_pair_of_six_lowers_the_ratio",
 			desc: "five sixths of the weight agrees",
-			pairs: []CuePair{
+			pairs: []cuePair{
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
 				{Score: 0.5, OffsetMs: 100},
@@ -607,7 +607,7 @@ func TestComputeConfidence(t *testing.T) {
 		{
 			name: "distance_to_the_median_is_signed_not_summed",
 			desc: "an offset the negative of the median is far from it, not on top of it",
-			pairs: []CuePair{
+			pairs: []cuePair{
 				{Score: 0.5, OffsetMs: 800},
 				{Score: 0.5, OffsetMs: 800},
 				{Score: 0.5, OffsetMs: 800},
@@ -621,7 +621,7 @@ func TestComputeConfidence(t *testing.T) {
 		{
 			name:   "no_weight_at_all",
 			desc:   "nothing to take a share of",
-			pairs:  []CuePair{{Score: 0, OffsetMs: 5}},
+			pairs:  []cuePair{{Score: 0, OffsetMs: 5}},
 			median: 5,
 			want:   0,
 		},

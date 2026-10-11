@@ -158,15 +158,15 @@ func (l *eventLog) kinds(id subflux.ProviderID) []Kind {
 	return out
 }
 
-func (l *eventLog) last(id subflux.ProviderID) (Event, bool) {
+func (l *eventLog) last(id subflux.ProviderID) Event {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, e := range slices.Backward(l.events) {
 		if e.Provider == id {
-			return e, true
+			return e
 		}
 	}
-	return Event{}, false
+	return Event{}
 }
 
 // memStore is an in-memory Store that counts writes.

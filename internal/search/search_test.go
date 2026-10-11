@@ -340,7 +340,7 @@ type mockStoreWithBackoffError struct {
 	mockStore
 }
 
-func (m *mockStoreWithBackoffError) BackedOffProviders(_ context.Context, _ subflux.MediaType, _, _ string, _ int) ([]subflux.ProviderID, error) {
+func (*mockStoreWithBackoffError) BackedOffProviders(_ context.Context, _ subflux.MediaType, _, _ string, _ int) ([]subflux.ProviderID, error) {
 	return nil, errors.New("db error")
 }
 
@@ -373,7 +373,7 @@ type mockStoreWithRecordError struct {
 	mockStore
 }
 
-func (m *mockStoreWithRecordError) RecordNoResult(_ context.Context, _ subflux.MediaType, _, _ string, _ subflux.ProviderID, _ subflux.BackoffParams) error {
+func (*mockStoreWithRecordError) RecordNoResult(_ context.Context, _ subflux.MediaType, _, _ string, _ subflux.ProviderID, _ subflux.BackoffParams) error {
 	return errors.New("db write error")
 }
 
@@ -683,7 +683,7 @@ type mockConfigWithStripHI struct {
 	mockConfig
 }
 
-func (m *mockConfigWithStripHI) PostProcess() subflux.PostProcessConfig {
+func (*mockConfigWithStripHI) PostProcess() subflux.PostProcessConfig {
 	return subflux.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,
