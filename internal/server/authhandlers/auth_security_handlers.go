@@ -9,7 +9,7 @@ import (
 
 	"github.com/cplieger/auth/v6"
 	"github.com/cplieger/auth/v6/ratelimit"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 )
