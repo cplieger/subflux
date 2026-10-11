@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/ssrf/v4"
 )
 
@@ -73,10 +74,10 @@ func (p *source) login(ctx context.Context) error {
 		return errors.New("empty token in login response")
 	}
 
-	if resp.BaseURL != "" && !isValidServerHost(resp.BaseURL.Raw()) {
+	if resp.BaseURL.Raw() != "" && !isValidServerHost(resp.BaseURL.Raw()) {
 		slog.Warn("opensubtitles: rejecting suspicious server redirect",
 			"base_url", resp.BaseURL)
-		resp.BaseURL = ""
+		resp.BaseURL = runesafe.Untrusted{}
 	}
 
 	p.tokenMu.Lock()

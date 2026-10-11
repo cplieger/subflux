@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 	"github.com/cplieger/subflux/internal/subtitlefile"
