@@ -648,14 +648,9 @@ describe("a failed leg", () => {
 describe("the lifecycle events this module only reports", () => {
   it("a worker that cannot be constructed falls back to this tab's own stream, with the cause", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.stubGlobal(
-      "SharedWorker",
-      class {
-        constructor() {
-          throw new Error("shared workers are blocked here");
-        }
-      },
-    );
+    vi.stubGlobal("SharedWorker", function SharedWorker() {
+      throw new Error("shared workers are blocked here");
+    });
 
     events.connect();
     await settle();

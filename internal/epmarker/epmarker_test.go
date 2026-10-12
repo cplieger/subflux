@@ -393,8 +393,10 @@ func TestClaims(t *testing.T) {
 		{
 			"every range in the name expands", "Show S01E01-E02 E05-E06.srt",
 			[]epmarker.Marker{
-				{Season: 1, Episode: 1}, {Season: 1, Episode: 2},
-				{Season: 1, Episode: 5}, {Season: 1, Episode: 6},
+				{Season: 1, Episode: 1},
+				{Season: 1, Episode: 2},
+				{Season: 1, Episode: 5},
+				{Season: 1, Episode: 6},
 			},
 		},
 	}
@@ -429,15 +431,18 @@ func TestFind_merges_both_notations_in_order_of_appearance(t *testing.T) {
 	}{
 		{
 			"cross before standard", "Show 01x02 S03E04.srt",
-			[]epmarker.Marker{{Season: 1, Episode: 2}, {Season: 3, Episode: 4}}, 5,
+			[]epmarker.Marker{{Season: 1, Episode: 2}, {Season: 3, Episode: 4}},
+			5,
 		},
 		{
 			"standard at the start, cross later", "S01E01 01x02.srt",
-			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}}, 0,
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}},
+			0,
 		},
 		{
 			"two cross markers", "Show - 01x01-01x02 - Title.srt",
-			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}}, 7,
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}},
+			7,
 		},
 		{"cross marker opening the name", "01x08 - VIII.srt", []epmarker.Marker{{Season: 1, Episode: 8}}, 0},
 	}
