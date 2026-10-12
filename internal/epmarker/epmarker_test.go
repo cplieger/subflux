@@ -364,6 +364,39 @@ func TestClaims(t *testing.T) {
 			[]epmarker.Marker{{Season: 1, Episode: 1}},
 		},
 		{"no marker", "Movie.2024.BluRay.srt", nil},
+
+		// Claims come back ordered by season, then episode, whatever order the
+		// name states them in.
+		{
+			"later season stated first", "Show S02E01 S01E05.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 5}, {Season: 2, Episode: 1}},
+		},
+		{
+			"later episode stated first", "Show S01E03 S01E01.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 3}},
+		},
+
+		// Range bounds: the last episode may reach 999, a span may reach 50,
+		// and a range naming one episode still claims it.
+		{
+			"range ending at episode 999", "Show S01E998-E999.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 998}, {Season: 1, Episode: 999}},
+		},
+		{
+			"range late in a season", "Show S01E30-E31.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 30}, {Season: 1, Episode: 31}},
+		},
+		{
+			"single-episode range", "Show S01E01 E05-05.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 5}},
+		},
+		{
+			"every range in the name expands", "Show S01E01-E02 E05-E06.srt",
+			[]epmarker.Marker{
+				{Season: 1, Episode: 1}, {Season: 1, Episode: 2},
+				{Season: 1, Episode: 5}, {Season: 1, Episode: 6},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -372,6 +405,82 @@ func TestClaims(t *testing.T) {
 				t.Errorf("Claims(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestClaims_a_fifty_episode_span_reaches_its_last_episode(t *testing.T) {
+	t.Parallel()
+	const name = "Show S01E01-E51.srt"
+	if !epmarker.For(epmarker.Marker{Season: 1, Episode: 51}).Matches(name) {
+		t.Errorf("For(S01E51).Matches(%q) = false, want true", name)
+	}
+	if epmarker.For(epmarker.Marker{Season: 1, Episode: 52}).Matches("Show S01E01-E52.srt") {
+		t.Errorf("For(S01E52).Matches(%q) = true, want false: a 51-episode span is not a range", "Show S01E01-E52.srt")
+	}
+}
+
+func TestFind_merges_both_notations_in_order_of_appearance(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		input     string
+		want      []epmarker.Marker
+		wantIndex int
+	}{
+		{
+			"cross before standard", "Show 01x02 S03E04.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 2}, {Season: 3, Episode: 4}}, 5,
+		},
+		{
+			"standard at the start, cross later", "S01E01 01x02.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}}, 0,
+		},
+		{
+			"two cross markers", "Show - 01x01-01x02 - Title.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}}, 7,
+		},
+		{"cross marker opening the name", "01x08 - VIII.srt", []epmarker.Marker{{Season: 1, Episode: 8}}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := epmarker.Find(tt.input); !slices.Equal(got, tt.want) {
+				t.Errorf("Find(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+			if got := epmarker.FirstIndex(tt.input); got != tt.wantIndex {
+				t.Errorf("FirstIndex(%q) = %d, want %d", tt.input, got, tt.wantIndex)
+			}
+		})
+	}
+}
+
+// A cross token glued to a preceding letter or digit is the tail of a longer
+// word or number. The cases sit on each edge of the alphanumeric ranges.
+func TestFind_cross_marker_after_an_alphanumeric_is_not_a_marker(t *testing.T) {
+	t.Parallel()
+	for _, input := range []string{"001x02", "901x02", "a01x02", "z01x02", "A01x02", "Z01x02"} {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+			if got := epmarker.Find(input); got != nil {
+				t.Errorf("Find(%q) = %v, want nil", input, got)
+			}
+		})
+	}
+}
+
+func TestMarker_String_zero_pads_single_digits_only(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		m    epmarker.Marker
+		want string
+	}{
+		{epmarker.Marker{Season: 0, Episode: 10}, "S00E10"},
+		{epmarker.Marker{Season: 9, Episode: 100}, "S09E100"},
+	}
+	for _, tt := range tests {
+		if got := tt.m.String(); got != tt.want {
+			t.Errorf("%#v.String() = %q, want %q", tt.m, got, tt.want)
+		}
 	}
 }
 

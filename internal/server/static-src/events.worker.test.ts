@@ -67,7 +67,7 @@ vi.mock("./wire/client.gen.js", () => ({
 
 import * as notify from "./notify.js";
 import { clearSyncCorrelation } from "./sync-jobs.js";
-import { setStatusAttached, setStatusDegraded } from "./status.js";
+import { pollStatus, setStatusAttached, setStatusDegraded } from "./status.js";
 import { noteServerRestart } from "./search.js";
 import { handleSessionExpiry } from "./api-client.js";
 import { _resetSubjectsForTest, versionMap } from "./subjects.js";
@@ -348,5 +348,56 @@ describe("events: the logout seam", () => {
 
     expect(conn.ended).toBe(true);
     expect(events._stateForTest().mode).toBeNull();
+  });
+});
+
+describe("events: a revalidate run the host gave up on", () => {
+  it("reports failed rather than done when the run's signal dies mid-leg", async () => {
+    vi.useFakeTimers(); // the tab bounds a routed run at 30s
+    try {
+      await attach();
+      fromHost(hello(EPOCH_A));
+      await messageTick();
+      versionMap().observe({ kind: "activity", ref: "" }, "3", EPOCH_A);
+      server.current!.digestScript.push({
+        changed: [{ kind: "activity", ref: "", version: "4" }],
+      });
+      let releaseStatus = (): void => undefined;
+      vi.mocked(pollStatus).mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          releaseStatus = () => resolve();
+        }),
+      );
+
+      fromHost({
+        type: "revalidate_run",
+        runId: 7,
+        ctx: { cause: "visible", epoch: EPOCH_A, generation: 1, full: false },
+      });
+      await messageTick();
+      await messageTick();
+      expect(pollStatus).toHaveBeenCalledTimes(1); // the leg is in flight
+
+      // Keep beating so the port watchdog does not respawn the worker out
+      // from under the run; the 30s run bound is what has to fire here.
+      const link = host();
+      for (let beat = 2; beat <= 9; beat++) {
+        await vi.advanceTimersByTimeAsync(4_000);
+        fromHost({ type: "heartbeat", seq: beat });
+        await messageTick();
+      }
+      releaseStatus(); // the leg answers anyway, too late to be trusted
+      await messageTick();
+      await messageTick();
+
+      expect(link.received).toContainEqual({
+        type: "revalidate_failed",
+        runId: 7,
+        cause: "revalidate aborted",
+      });
+      expect(link.received).not.toContainEqual({ type: "revalidate_done", runId: 7 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

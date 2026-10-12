@@ -9,12 +9,21 @@ import type * as BusModule from "./bus.js";
 import { EPOCH_A, EPOCH_B, fakeSSE, type FakeSSE } from "./events-fakes.js";
 
 const server = vi.hoisted(() => ({ current: null as FakeSSE | null }));
+// A digest POST held open on request: releasing it AFTER the run's signal has
+// been aborted is the only way to enter the legs with a dead run, which is
+// the race the transaction's entry guard exists for.
+const digestGate = vi.hoisted(() => ({ hold: false, waiting: [] as (() => void)[] }));
 vi.mock("./api-client.js", () => ({
-  authFetch: (input: RequestInfo | URL, init?: RequestInit) => {
+  authFetch: async (input: RequestInfo | URL, init?: RequestInit) => {
     if (!server.current) {
       throw new Error("fake server not installed");
     }
-    return server.current.fetch(input, init);
+    const answer = server.current.fetch(input, init);
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (digestGate.hold && url.includes("/api/events/sync")) {
+      await new Promise<void>((release) => digestGate.waiting.push(release));
+    }
+    return answer;
   },
   handleSessionExpiry: vi.fn(),
 }));
@@ -178,7 +187,7 @@ vi.mock("./wire/client.gen.js", () => ({
     pairCall("movies", q, opts?.signal),
 }));
 
-import { subsumeDirtyRoots } from "./coverage-heal.js";
+import { healFromCoverageEvent, subsumeDirtyRoots } from "./coverage-heal.js";
 import { _resetSubjectsForTest, versionMap } from "./subjects.js";
 
 const events = await import("./events.js");
@@ -245,6 +254,8 @@ beforeEach(() => {
   wire.result = { ok: true, status: 200, data: [] };
   wire.defer = false;
   wire.pending = [];
+  digestGate.hold = false;
+  digestGate.waiting = [];
 });
 
 afterEach(() => {
@@ -631,5 +642,106 @@ describe("a failed leg", () => {
     ]);
     expect(wire.series).toHaveLength(2);
     expect(cov.applied).toHaveLength(1);
+  });
+});
+
+describe("the lifecycle events this module only reports", () => {
+  it("a worker that cannot be constructed falls back to this tab's own stream, with the cause", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "SharedWorker",
+      class {
+        constructor() {
+          throw new Error("shared workers are blocked here");
+        }
+      },
+    );
+
+    events.connect();
+    await settle();
+
+    expect(warn).toHaveBeenCalledWith(
+      "sse: worker unavailable, this tab streams on its own",
+      "error",
+    );
+    expect(server.current!.connections).toHaveLength(1); // it really did stream
+  });
+
+  it("a frame the replay table throws on is reported with the frame's type and the error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await connectHello();
+    const boom = new Error("applier blew up");
+    vi.mocked(healFromCoverageEvent).mockImplementationOnce(() => {
+      throw boom;
+    });
+
+    server.current!.last().frame(
+      "coverage",
+      {
+        media_type: "movie",
+        media_id: "tmdb-1",
+        language: "en",
+        variant: "standard",
+        source: "opensubtitles",
+      },
+      `${EPOCH_A}:1`,
+    );
+    await settle();
+
+    expect(warn).toHaveBeenCalledWith("sse: frame rejected", "coverage", boom);
+  });
+
+  it("a revalidate that outlives the hold timeout is reported", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    seed("series", "", "1");
+    server.current!.digestScript.push({ changed: [{ kind: "series", ref: "", version: "2" }] });
+    wire.defer = true; // the pair leg never answers, so the run cannot settle
+    await connectHello();
+    expect(wire.series).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalledWith("sse: revalidate timed out");
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(warn).toHaveBeenCalledWith("sse: revalidate timed out");
+  });
+});
+
+describe("a run cancelled before its legs start", () => {
+  it("lands no snapshot: the digest answered after the run was already dead", async () => {
+    seed("series", "", "1");
+    server.current!.digestScript.push({ changed: [{ kind: "series", ref: "", version: "2" }] });
+    digestGate.hold = true;
+    await connectHello();
+    expect(server.current!.digestCalls).toHaveLength(1);
+    expect(wire.series).toHaveLength(0); // still inside the digest
+
+    // The stream gives up on the run and aborts its signal.
+    await vi.advanceTimersByTimeAsync(30_000);
+    // Only now does the digest answer, naming a subject to refetch.
+    for (const release of digestGate.waiting) {
+      release();
+    }
+    await settle();
+
+    expect(cov.applied).toHaveLength(0);
+    expect(versionMap().has({ kind: "series", ref: "" })).toBe(true); // still owed
+  });
+
+  it("an unknown subject kind runs no leg at all", async () => {
+    // A newer server stamps a GET with a subject this bundle does not know;
+    // the map holds it, so the digest asks about it and can answer changed.
+    seed("sandwiches", "", "1");
+    server.current!.digestScript.push({
+      changed: [{ kind: "sandwiches", ref: "", version: "2" }],
+    });
+    await connectHello();
+
+    expect(server.current!.digestCalls[0]?.subjects).toStrictEqual([
+      { kind: "sandwiches", ref: "", version: "1" },
+    ]);
+    expect(wire.series).toHaveLength(0);
+    expect(leg.calls).toHaveLength(0);
+    expect(status.signals).toHaveLength(0);
+    expect(syncReg.reattaches).toHaveLength(0);
   });
 });

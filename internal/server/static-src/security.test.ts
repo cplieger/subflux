@@ -1458,6 +1458,34 @@ describe("security dialog: passkey registration", () => {
     expect(toasts.errors).toEqual(["Failed to register passkey"]);
   });
 
+  it("names the one-passkey-per-device limit when the authenticator already holds one", async () => {
+    asks.answers = ["old-secret"];
+    client.begin = beginResponse();
+    creds.createThrows = new DOMException("already registered", "InvalidStateError");
+    await openSecurity();
+
+    button("Add passkey").click();
+    await settle();
+
+    expect(toasts.errors).toEqual([
+      "This device already has a passkey for subflux. Use the one you have, or add a passkey from another device.",
+    ]);
+  });
+
+  it("warns that a timed-out registration may still have completed", async () => {
+    asks.answers = ["old-secret"];
+    client.begin = beginResponse();
+    creds.createThrows = new DOMException("timed out", "TimeoutError");
+    await openSecurity();
+
+    button("Add passkey").click();
+    await settle();
+
+    expect(toasts.errors).toEqual([
+      "Passkey registration timed out. It may have completed. Reload and check your passkey list before trying again.",
+    ]);
+  });
+
   it("stays silent when the user aborts the WebAuthn ceremony", async () => {
     asks.answers = ["old-secret"];
     client.begin = beginResponse();

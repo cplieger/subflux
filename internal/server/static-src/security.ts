@@ -543,19 +543,12 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
     "Done",
   );
 
-  // Insert after the API Keys heading.
+  // Insert after the API Keys heading. The section is built here, so the
+  // heading is always present with a sibling after it; a null reference node
+  // would append, which is the same placement for a section with neither.
   const heading = container.querySelector("h3");
-  const insertPoint = heading ? heading.nextSibling : null;
-  if (insertPoint) {
-    container.insertBefore(keyDisplay, insertPoint);
-    container.insertBefore(
-      el("div", { className: "sec-actions" }, doneBtn),
-      keyDisplay.nextSibling,
-    );
-  } else {
-    container.appendChild(keyDisplay);
-    container.appendChild(el("div", { className: "sec-actions" }, doneBtn));
-  }
+  container.insertBefore(keyDisplay, heading?.nextSibling ?? null);
+  container.insertBefore(el("div", { className: "sec-actions" }, doneBtn), keyDisplay.nextSibling);
 
   // The key is shown exactly once and is inserted ABOVE the current focus:
   // announce it and move focus onto it so it cannot be missed.

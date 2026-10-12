@@ -399,6 +399,10 @@ function legsFor(changed: readonly Subject[]): Set<Leg> {
       case "jobs":
         legs.add("jobs");
         break;
+      // A kind this bundle does not know reaches here only from a newer
+      // server that stamped a GET with it; nothing follows the switch, so
+      // dropping the arm is behaviour-identical.
+      // Stryker disable next-line ConditionalExpression
       default:
         break;
     }
