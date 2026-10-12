@@ -527,6 +527,37 @@ describe("coverage-heal: failure escalation", () => {
     expect(wire.summaryCalls).toHaveLength(3);
   });
 
+  it("a fresh event inside the retry window restores the full retry budget", async () => {
+    await load([seriesWire(1)]);
+    wire.summaryCalls = [];
+    wire.summaries.set("series:1", { ok: false, status: 502 });
+
+    healFromCoverageEvent(ev("tvdb-1-s01e01"));
+    await window_(); // the event-fresh attempt fails, re-enqueued as the retry
+    expect(wire.summaryCalls).toHaveLength(1);
+
+    // A second event for the same root lands while that retry is still
+    // queued, so the queued entry becomes event-fresh again.
+    healFromCoverageEvent(ev("tvdb-1-s01e02"));
+    await window_();
+    expect(wire.summaryCalls).toHaveLength(2);
+
+    // Event-fresh again means one more automatic retry before the dirty set.
+    await window_();
+    expect(wire.summaryCalls).toHaveLength(3);
+
+    for (let i = 0; i < 5; i++) {
+      await window_();
+    }
+    expect(wire.summaryCalls).toHaveLength(3);
+
+    // It landed in the dirty set rather than being dropped.
+    wire.summaries.set("series:1", okRes(seriesWire(1, { title: "Healed" })));
+    fireReconcileTick();
+    await window_();
+    expect(coverageRow("tvdb-1")?.title).toBe("Healed");
+  });
+
   it("caps the dirty set at 64 roots, dropping the oldest", async () => {
     await load([seriesWire(999)]);
     const total = DIRTY_ROOT_CAP + 1;

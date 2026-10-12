@@ -22,6 +22,7 @@ const clientState = vi.hoisted(() => ({
   // The movie /subs mirror of defer/pending.
   subsDefer: false,
   subsPending: [] as ((v: unknown) => void)[],
+  subsError: null as Error | null,
 }));
 vi.mock("./wire/client.gen.js", () => ({
   mediaEpisodes: () => {
@@ -37,6 +38,9 @@ vi.mock("./wire/client.gen.js", () => ({
   coverageSeriesDetail: () => Promise.resolve([]),
   coverageMovieSubsRaw: () => {
     clientState.movieSubsCalls += 1;
+    if (clientState.subsError) {
+      return Promise.reject(clientState.subsError);
+    }
     if (clientState.subsDefer) {
       // The pending resolver still takes the bare rows; the envelope is put on
       // here, so no extra microtask sits between the resolve and the paint.
@@ -198,6 +202,14 @@ function makeMovie(tmdbId: number): MovieDetail {
 /** Open a movie detail and let its on-demand /subs read land: the mocked
  *  fetch resolves inside the skeleton's 150ms show-delay, so the commit
  *  renders on the microtask queue — two ticks drain the then/commit chain. */
+/** Drain the promise hops between a /subs settlement and the paint it drives;
+ *  the read, its collapse and the skeleton commit chain more than two. */
+async function settleMicrotasks(): Promise<void> {
+  for (let i = 0; i < 8; i++) {
+    await Promise.resolve();
+  }
+}
+
 async function openMovieSettled(m: MovieDetail, skipPush?: boolean): Promise<void> {
   openMovieDetail(m, skipPush);
   await Promise.resolve();
@@ -1131,6 +1143,7 @@ describe("detail: openMovieDetail", () => {
     clientState.movieSubsCalls = 0;
     clientState.subsDefer = false;
     clientState.subsPending = [];
+    clientState.subsError = null;
     history.replaceState(null, "", "/");
     _resetPanelsForTest();
     document.body.replaceChildren(libraryPanel().root);
@@ -1203,6 +1216,44 @@ describe("detail: openMovieDetail", () => {
     // functions; this pins the count stays 1:1 with opens).
     await openMovieSettled(makeMovie(65), true);
     expect(clientState.movieSubsCalls).toBe(2);
+  });
+
+  it("replaces the view with the read's error when /subs rejects", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(70));
+    expect(document.querySelector("table.movie-detail")).not.toBeNull();
+
+    clientState.subsError = new Error("subs read blew up");
+    openMovieDetail(makeMovie(70), true);
+    await settleMicrotasks();
+
+    const err = document.querySelector('#coverageContent .empty[data-status="err"]');
+    expect(err?.textContent).toBe("subs read blew up");
+    expect(document.querySelector("table.movie-detail")).toBeNull();
+  });
+
+  it("cancels the skeleton and paints nothing when the rejected read belongs to a route already left", async () => {
+    vi.useFakeTimers();
+    try {
+      clientState.movieSubs = [movieSub("en", 90)];
+      openMovieDetail(makeMovie(71));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(document.querySelector("table.movie-detail")).not.toBeNull();
+
+      // The page leg's controller is already aborted when the open runs, so
+      // the rejection that follows belongs to nobody on screen.
+      const left = new AbortController();
+      left.abort();
+      clientState.subsError = new Error("subs read blew up");
+      openMovieDetail(makeMovie(71), true, left.signal);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(500); // past the skeleton's show delay
+
+      expect(document.querySelector('#coverageContent .empty[data-status="err"]')).toBeNull();
+      expect(document.querySelector("#coverageContent .skeleton")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("paints the loading skeleton at 150ms and holds it 300ms once shown", async () => {

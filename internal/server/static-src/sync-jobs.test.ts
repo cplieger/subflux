@@ -121,6 +121,31 @@ describe("watchSyncJob + syncDoneFromEvent", () => {
     expect(seenB[0]?.outcome).toBe("crash");
   });
 
+  it("the 65th settlement drops the oldest, so that job's replay is no longer deduped", () => {
+    for (let jobId = 1; jobId <= 64; jobId++) {
+      syncDoneFromEvent(doneEvent(jobId));
+    }
+    // Job 1 is still settled at the cap, so a late watcher answers from it.
+    const atCap = vi.fn();
+    watchSyncJob(1, atCap);
+    expect(atCap).toHaveBeenCalledTimes(1);
+
+    syncDoneFromEvent(doneEvent(65));
+
+    const evicted = vi.fn();
+    const unwatch = watchSyncJob(1, evicted);
+    expect(evicted).not.toHaveBeenCalled();
+    unwatch();
+
+    // The entry that pushed it out, and the one below it, both survive.
+    const kept = vi.fn();
+    watchSyncJob(65, kept);
+    expect(kept).toHaveBeenCalledTimes(1);
+    const alsoKept = vi.fn();
+    watchSyncJob(2, alsoKept);
+    expect(alsoKept).toHaveBeenCalledTimes(1);
+  });
+
   it("unwatch stops the callback", () => {
     const seen: (SyncDoneEvent | null)[] = [];
     const unwatch = watchSyncJob(7, (ev) => seen.push(ev));
