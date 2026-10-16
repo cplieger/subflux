@@ -130,13 +130,7 @@ func validate(ctx context.Context, cfg *Config) error {
 	ve.add(validateSearch(&cfg.Cfg))
 	ve.add(validateAdaptive(&cfg.AdaptiveCfg))
 	ve.add(validateScoring(cfg.Scoring.Weights))
-	if cfg.PostProcessing.AudioSyncFallback && !cfg.PostProcessing.SyncSubtitles {
-		ve.add(fmt.Errorf("%w: %w", errPostProcessConfig, &fieldDependencyError{
-			Field:     "post_processing.audio_sync_fallback",
-			DependsOn: "post_processing.sync_subtitles",
-			Reason:    "audio_sync_fallback requires sync_subtitles to be enabled",
-		}))
-	}
+	ve.add(validatePostProcessing(&cfg.PostProcessing))
 	ve.add(validateLogging(&cfg.Logging))
 	ve.add(validateBackup(&cfg.Backup))
 	if _, err := parseTrustedProxies(cfg.TrustedProxies); err != nil {
@@ -145,28 +139,54 @@ func validate(ctx context.Context, cfg *Config) error {
 	if _, err := parseAllowedHosts(cfg.AllowedHosts); err != nil {
 		ve.add(err)
 	}
-	if cfg.Auth.DisableAuth {
+	ve.add(validateAuth(&cfg.Auth))
+	ve.add(checkMediaRoots(ctx, cfg.MediaRootDirs))
+	return ve.err()
+}
+
+// validatePostProcessing rejects audio-sync fallback without timing sync,
+// which it falls back from.
+func validatePostProcessing(pp *yamlPostProcessConfig) error {
+	if pp.AudioSyncFallback && !pp.SyncSubtitles {
+		return fmt.Errorf("%w: %w", errPostProcessConfig, &fieldDependencyError{
+			Field:     "post_processing.audio_sync_fallback",
+			DependsOn: "post_processing.sync_subtitles",
+			Reason:    "audio_sync_fallback requires sync_subtitles to be enabled",
+		})
+	}
+	return nil
+}
+
+// validateAuth warns on the auth settings that weaken login and refuses
+// disabling password login with no other way in.
+func validateAuth(a *yamlAuthConfig) error {
+	if a.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}
-	warnIllegalWebAuthnRPID(cfg.Auth.WebAuthnRPID)
-	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
-		ve.add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it"))
+	warnIllegalWebAuthnRPID(a.WebAuthnRPID)
+	if a.BasicEnabled != nil && !*a.BasicEnabled && !a.OIDCEnabled {
+		return errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it")
 	}
-	if len(cfg.MediaRootDirs) == 0 {
+	return nil
+}
+
+// checkMediaRoots warns about missing or unreachable media roots; only a
+// cancelled ctx is an error.
+func checkMediaRoots(ctx context.Context, roots []string) error {
+	if len(roots) == 0 {
 		slog.Warn("media_roots not configured, path-based operations (preview, sync, manual download, subtitle deletion) will be refused")
-	} else {
-		for _, root := range cfg.MediaRootDirs {
-			if err := ctx.Err(); err != nil {
-				ve.add(err)
-				break
-			}
-			if _, err := os.Stat(root); err != nil {
-				slog.Warn("media root not accessible at config load time",
-					"root", root, "error", err)
-			}
+		return nil
+	}
+	for _, root := range roots {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, err := os.Stat(root); err != nil {
+			slog.Warn("media root not accessible at config load time",
+				"root", root, "error", err)
 		}
 	}
-	return ve.err()
+	return nil
 }
 
 // warnIllegalWebAuthnRPID WARNs rather than failing the load: a passkey field
