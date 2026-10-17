@@ -12,7 +12,7 @@ require (
 	github.com/cplieger/httpx/v5 v5.0.5
 	github.com/cplieger/jsonx/v2 v2.0.3
 	github.com/cplieger/keyenc v1.1.0-dev.1
-	github.com/cplieger/langtag/v2 v2.1.0-dev.1
+	github.com/cplieger/langtag/v3 v3.0.0-dev.2
 	github.com/cplieger/metrics/v4 v4.2.1
 	github.com/cplieger/pathinside/v2 v2.0.3
 	github.com/cplieger/runesafe/v3 v3.0.0
