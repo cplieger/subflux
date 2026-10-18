@@ -200,8 +200,8 @@ func (r *Registry) Schema(name subflux.ProviderID) (string, []subflux.ProviderSc
 // deterministic ordering.
 // Unknown provider names are skipped with a warning (a typo in config
 // should not prevent all other providers from loading).
-// Providers are returned unwrapped; download retry wrapping (WrapRetryAll)
-// is applied by the composition root (main.go wiring).
+// Providers are returned unwrapped; the caller applies download retry
+// wrapping (WrapRetryAll).
 //
 // LoadAll reads only cfg.Enabled and cfg.Settings from each entry.
 // Other ProviderCfg fields (if added) will not affect provider loading.

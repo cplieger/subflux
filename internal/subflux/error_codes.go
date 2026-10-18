@@ -1,10 +1,5 @@
 // error_codes.go: machine-readable error codes for the JSON envelope.
 //
-// Constants exist for codes used at 3+ httpapi call sites; one-off codes stay
-// string literals at their call site. The enum lives in this package because
-// internal/wirespec auto-discovers it by name for the TypeScript string-union it
-// generates, so the catalog is a wire type, not response plumbing.
-//
 // Renaming a code: do NOT — clients consume these as a contract.
 
 package subflux

@@ -11,15 +11,7 @@
 // sized to what it calls; behaviour lives in the package named for the job it
 // does.
 //
-// The package imports no subflux package at all — only errors, fmt and time,
-// plus cplieger/auth for the user and session types the auth response bodies
-// carry. Implementation packages import it, never the reverse, and that
-// acyclicity is what the package is for.
-//
-// Two of its contents are a published contract rather than an internal detail.
-// The constants of the enums wirespec registers (ErrorCode, JobOutcome) and
-// every json-tagged struct here are discovered by internal/wirespec and emitted
-// as TypeScript, so a type that leaves or a field that is renamed changes a
-// cross-language contract. SchemaFunc is a func type, and the one
-// contract-shaped declaration still here.
+// The package imports no subflux package at all, only errors, fmt and time.
+// Implementation packages import it, never the reverse, and that acyclicity is
+// what the package is for.
 package subflux

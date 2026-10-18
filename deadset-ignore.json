@@ -1,17 +1,989 @@
 {
-  "description": "Adjudications for subflux that an inline directive cannot carry.",
+  "description": "Adjudications for subflux. An entry on a retained package's code reads \"Retained until <landing> (<pattern>)\", naming its row in internal/testrig/retained_test.go, and goes with that row.",
   "ignore": [
     {
-      "code": "DS1601",
-      "symbol": "ts://subflux-web/package.json#stylelint:dev-dependency",
-      "path": "internal/server/static-src/package.json",
-      "reason": "The CI web-lint step runs npx stylelint over the tracked CSS in internal/server/static-src."
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Detector",
+      "path": "internal/embedded/embedded.go",
+      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
     },
     {
-      "code": "DS1601",
-      "symbol": "ts://subflux-web/package.json#stylelint-config-standard:dev-dependency",
-      "path": "internal/server/static-src/package.json",
-      "reason": "The root .stylelintrc.json extends it, and the CI web-lint step resolves it from internal/server/static-src."
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Detector.DetectTracks",
+      "path": "internal/embedded/embedded.go",
+      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/langcode#Valid",
+      "path": "internal/langcode/langcode.go",
+      "reason": "Retained until SE-2 (internal/langcode#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/langcode#FromName",
+      "path": "internal/langcode/resolve.go",
+      "reason": "Retained until SE-2 (internal/langcode#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/langcode#ParseAudioList",
+      "path": "internal/langcode/resolve.go",
+      "reason": "Retained until SE-2 (internal/langcode#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/animetosho#Factory",
+      "path": "internal/provider/animetosho/animetosho.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/betaseries#Factory",
+      "path": "internal/provider/betaseries/betaseries.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#ShowSubtitleCounter",
+      "path": "internal/provider/cache.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/gestdown#Factory",
+      "path": "internal/provider/gestdown/gestdown.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/hdbits#Factory",
+      "path": "internal/provider/hdbits/hdbits.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/opensubtitles#Factory",
+      "path": "internal/provider/opensubtitles/opensubtitles.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#FactoryFunc",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#NewRegistry",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.CheckCredentials",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.CredentialCheck",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.LoadAll",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.Normalize",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.ProviderNames",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.Register",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.RegisterCredentialCheck",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.RegisterSchema",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#Registry.Schema",
+      "path": "internal/provider/registry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider#WrapRetryAll",
+      "path": "internal/provider/retry.go",
+      "reason": "Retained until SE-2 (internal/provider#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/subdl#Factory",
+      "path": "internal/provider/subdl/subdl.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/subsource#Factory",
+      "path": "internal/provider/subsource/subsource.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/synthetic#Factory",
+      "path": "internal/provider/synthetic/synthetic.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/synthetic#Schema",
+      "path": "internal/provider/synthetic/synthetic.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/provider/yifysubtitles#Factory",
+      "path": "internal/provider/yifysubtitles/yifysubtitles.go",
+      "reason": "Retained until SE-2 (internal/provider/*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompiledHDR",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompiledSources",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompiledStreaming",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompiledVideoCodecs",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#Format",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#MatchFirst",
+      "path": "internal/search/release/formats.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#Pattern",
+      "path": "internal/search/release/pcre.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#Pattern.FindStringSubmatch",
+      "path": "internal/search/release/pcre.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#Pattern.MatchString",
+      "path": "internal/search/release/pcre.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompilePCRE",
+      "path": "internal/search/release/pcre_compile.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompileError",
+      "path": "internal/search/release/pcre_errors.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#CompareSource",
+      "path": "internal/search/release/release.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#Info",
+      "path": "internal/search/release/release.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/search/release#ParseName",
+      "path": "internal/search/release/release.go",
+      "reason": "Retained until SE-2 (internal/search/release#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ErrorCode",
+      "path": "internal/subflux/error_codes.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#AudioRuleJSON",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ProviderSchema",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ProviderSchemaField.Help",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ProviderSchemaField.Label",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ProviderStatus",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SchemaField",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SchemaOption",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SchemaSection",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SubtitleTargJSON",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SubtitleTarget",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SubtitleTarget.EffectiveVariant",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#VariantStandard",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SubtitleSource",
+      "path": "internal/subflux/types_coverage.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#JobOutcome",
+      "path": "internal/subflux/types_response.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ScanOutcome",
+      "path": "internal/subflux/types_response.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SearchTarget",
+      "path": "internal/subflux/types_response.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ScoreTier",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.Edition",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.HDR",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.Hash",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.ReleaseGroup",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.SeasonPack",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.Source",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.StreamingService",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Scores.VideoCodec",
+      "path": "internal/subflux/types_scoring.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#LangBackedOff",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#LangOutcome",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#LangOutcomeKind",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#SearchResult",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Subtitle.Forced",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Subtitle.HearingImp",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Subtitle.Provider",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Subtitle.Title",
+      "path": "internal/subflux/types_search.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#CleanupResult",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ConfigDrift",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ConfigDrift.Empty",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#DownloadMeta",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#EmbeddedTrack.Codec",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#EmbeddedTrack.Forced",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#EmbeddedTrack.HearingImpaired",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#EmbeddedTrack.Lang",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its readers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ManualLockEntry",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#ManualLockKey",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#PollKey",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#PollKeyRadarr",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#PollKeySonarr",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#StateEntry",
+      "path": "internal/subflux/types_store.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#IsASSContent",
+      "path": "internal/subsync/ass.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ParseASSDialogue",
+      "path": "internal/subsync/ass.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#AudioSyncHints",
+      "path": "internal/subsync/audio_sync.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Confidence",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#MethodAudio",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#MethodNone",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#MinCuesForSync",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ShouldApplyThreshold",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncMethod",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncResult",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncResult.Applied",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncResult.ShouldApply",
+      "path": "internal/subsync/confidence.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ExtractEmbeddedSRT",
+      "path": "internal/subsync/ffmpeg.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcess",
+      "path": "internal/subsync/postprocess.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcessBytes",
+      "path": "internal/subsync/postprocess.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcessOptions",
+      "path": "internal/subsync/postprocess.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Cue",
+      "path": "internal/subsync/srt.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ParseSRT",
+      "path": "internal/subsync/srt.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#WriteSRT",
+      "path": "internal/subsync/srt.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#DefaultSyncOptions",
+      "path": "internal/subsync/sync.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncOptions",
+      "path": "internal/subsync/sync.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncWithOptions",
+      "path": "internal/subsync/sync.go",
+      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ErrEmpty",
+      "path": "internal/subtitlefile/content.go",
+      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#VariantFromFlags",
+      "path": "internal/subtitlefile/path.go",
+      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Kind",
+      "path": "internal/formschema/schema.go",
+      "reason": "Field.Kind's type: other packages set it through the Kind constants and never need to name it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Value",
+      "path": "internal/formschema/values.go",
+      "reason": "The element type of the exported Values map; callers read it through the Values getters, and an unexported element would hide the map's type from them."
+    },
+    {
+      "code": "DS1803",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Secret",
+      "path": "internal/formschema/values.go",
+      "reason": "Retained until PA-2 (internal/formschema#Values.Secret): a by-key lookup answers (value, found), and the first optional Secret field, which lands there, reads found."
+    },
+    {
+      "code": "DS1803",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
+      "path": "internal/formschema/values.go",
+      "reason": "Retained until PA-2 (internal/formschema#Values.Duration): a by-key lookup answers (value, found), and the first optional Duration field, which lands there, reads found."
+    },
+    {
+      "code": "DS1803",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.StringList",
+      "path": "internal/formschema/values.go",
+      "reason": "A by-key lookup answers (value, found): the server section reads a nil list as absent, and a list with no absent meaning reads found."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#MarkPlain",
+      "path": "internal/formschema/marks.go",
+      "reason": "Retained until LG-1 (internal/formschema#MarkPlain): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Label",
+      "path": "internal/formschema/schema.go",
+      "reason": "Retained until PA-2 (internal/formschema#Field.Label): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Help",
+      "path": "internal/formschema/schema.go",
+      "reason": "Retained until PA-2 (internal/formschema#Field.Help): its first reader lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Bool",
+      "path": "internal/formschema/values.go",
+      "reason": "Retained until PA-2 (internal/formschema#Values.Bool): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
+      "path": "internal/formschema/values.go",
+      "reason": "Retained until PA-2 (internal/formschema#Values.Duration): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Snapshot.Document",
+      "path": "internal/settings/document.go",
+      "reason": "Retained until PA-2 (internal/settings#Snapshot.Document): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.TrustedProxies",
+      "path": "internal/settings/server.go",
+      "reason": "Retained until PA-2 (internal/settings#Server.TrustedProxies): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.Hosts",
+      "path": "internal/settings/server.go",
+      "reason": "Retained until AP-1 (internal/settings#Server.Hosts): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.AllowedHosts",
+      "path": "internal/settings/server.go",
+      "reason": "Retained until PA-2 (internal/settings#Server.AllowedHosts): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#ErrActivation",
+      "path": "internal/settings/service.go",
+      "reason": "One of Save's sentinels: its first caller outside settings maps it to an HTTP code."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#ErrClosed",
+      "path": "internal/settings/service.go",
+      "reason": "One of Save's sentinels: its first caller outside settings maps it to an HTTP code."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#ErrConflict",
+      "path": "internal/settings/service.go",
+      "reason": "One of Save's sentinels: its first caller outside settings maps it to an HTTP code."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Service.Diverged",
+      "path": "internal/settings/service.go",
+      "reason": "Retained until PAS-1 (internal/settings#Service.Diverged): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Service.Merge",
+      "path": "internal/settings/service.go",
+      "reason": "Retained until AP-1 (internal/settings#Service.Merge): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Snapshot.Active",
+      "path": "internal/settings/snapshot.go",
+      "reason": "The parsed configuration a snapshot holds: the store's activation is its first reader outside settings."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Alert",
+      "path": "internal/status/alerts.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Store.Reconcile",
+      "path": "internal/status/alerts.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Store.RetainAlerts",
+      "path": "internal/status/alerts.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Phase",
+      "path": "internal/status/jobs.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Cause",
+      "path": "internal/status/jobs.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Done",
+      "path": "internal/status/jobs.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#JobLimits.PerOwner",
+      "path": "internal/status/persist.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#JobLimits.Total",
+      "path": "internal/status/persist.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#ProviderState",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Store.SetProvider",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Jobs",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Alerts",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Providers",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Boot",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertConfig",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertStore",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertBackup",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertAuthDisabled",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertAdminSocket",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertRestartPending",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertPendingWrites",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#MaxAlertSource",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#ProviderAlert",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#SourceAlert",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#SourceOverlapAlert",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlert",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#MediaRootAlert",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertKind",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
     }
   ]
 }

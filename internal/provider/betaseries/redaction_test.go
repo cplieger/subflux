@@ -8,14 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // Not parallel: it swaps slog's default logger.
 func TestSearch_an_echoed_token_reaches_no_log(t *testing.T) {
 	var logs bytes.Buffer
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, nil)))
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&logs, nil)))
 	body := `{"errors":[{"code":2001,"text":"bad key placeholder token, placeholder\ntoken"}],"episodes":[]}`
 	p := &source{
 		token: "placeholder token",

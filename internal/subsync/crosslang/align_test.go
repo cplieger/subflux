@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/slogx/capture"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -909,7 +909,7 @@ func TestAlign_secondPassAdmitsAMatchExactlyAtItsWindowEdge(t *testing.T) {
 // No t.Parallel: this swaps the process-wide default logger.
 func TestAlign_rejectsADegenerateDurationAtTheDurationGuard(t *testing.T) {
 	var buf bytes.Buffer
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
 	tests := []struct {
 		name string

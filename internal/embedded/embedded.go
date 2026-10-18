@@ -26,10 +26,6 @@ const (
 )
 
 // Detector detects embedded subtitle tracks via ffprobe.
-//
-// Note: this type satisfies the search.TrackDetector interface, but the
-// compile-time assertion lives in internal/wiring (composition root)
-// to keep this package decoupled from search/.
 type Detector struct{}
 
 // DetectTracks returns all embedded subtitle tracks in the given video
