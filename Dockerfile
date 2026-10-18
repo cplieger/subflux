@@ -196,7 +196,7 @@ ARG CPLIEGER_ACTIONS_VERSION=3.3.0-dev.1
 # renovate: datasource=npm depName=@cplieger/reactive
 ARG CPLIEGER_REACTIVE_VERSION=2.3.0-dev.1
 # renovate: datasource=npm depName=@cplieger/ui-primitives
-ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.3.0-dev.2
+ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.3.0-dev.3
 # renovate: datasource=npm depName=@cplieger/fetch
 ARG CPLIEGER_FETCH_VERSION=2.3.0-dev.1
 # renovate: datasource=npm depName=@cplieger/keyenc
