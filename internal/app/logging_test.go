@@ -10,7 +10,7 @@ import (
 func TestBootLoggingFollowsServerSection(t *testing.T) {
 	t.Run("failed_file_keeps_text", func(t *testing.T) {
 		out := &syncBuffer{}
-		boot(t, "server:\n  log_format: text\nbogus: 1\n", func(c *Config) { c.LogOutput = out })
+		boot(t, "server:\n  log_format: text\nbogus: 1\n"+validLanguages, func(c *Config) { c.LogOutput = out })
 		got := out.String()
 		if !strings.Contains(got, "level=WARN") || !strings.Contains(got, "msg=\"settings failed to load") || strings.Contains(got, "{\"time\"") {
 			t.Errorf("a Failed file with log_format text logged:\n%s", got)
@@ -38,7 +38,7 @@ func TestBootLoggingFollowsServerSection(t *testing.T) {
 		if captured.Enabled(context.Background(), slog.LevelDebug) {
 			t.Fatal("DEBUG enabled before the save")
 		}
-		saveText(t, b.svc, "server:\n  log_level: debug\n")
+		saveText(t, b.svc, "server:\n  log_level: debug\n"+validLanguages)
 		if !eventually(func() bool { return captured.Enabled(context.Background(), slog.LevelDebug) }) {
 			t.Fatal("a logger captured before the save never reached DEBUG")
 		}

@@ -201,6 +201,51 @@ func TestDecodeNullIsAbsent(t *testing.T) {
 	} else if b, _ := vals.String("b"); b != "null" {
 		t.Errorf("quoted null read as %q", b)
 	}
+	marked := section(t, "a: ~\nb: null\nc: x\nl: [~]\n")
+	for _, k := range []string{"a", "b"} {
+		valueNode(marked, k).Tag = PlainTag
+	}
+	valueNode(marked, "l").Content[0].Tag = PlainTag
+	withList := Schema{Fields: append(slices.Clone(s.Fields), Field{Key: "l", Kind: StringList})}
+	vals, errs = withList.Decode(marked)
+	if !slices.Equal(errs, []FieldError{{"l[0]", "must be a single value"}}) {
+		t.Errorf("marked nulls: errors %v, want only the list's null element refused", errs)
+	}
+	if n, _ := vals.Int("a"); n != 3 {
+		t.Errorf("a marked null did not take the default: %d", n)
+	}
+	if b, ok := vals.String("b"); ok {
+		t.Errorf("a marked null string read as %q", b)
+	}
+}
+
+func TestIsNull(t *testing.T) {
+	m := section(t, "plain: ~\nword: null\nNull: Null\nupper: NULL\nempty:\nstr: !!str ~\nquoted: 'null'\ndq: \"\"\ntext: nil\nlist: []\n")
+	m.Content[1].Tag = PlainTag
+	for key, want := range map[string]bool{
+		"plain": true, "word": true, "Null": true, "upper": true, "empty": true, "str": true,
+		"quoted": false, "dq": false, "text": false, "list": false,
+	} {
+		t.Run(key, func(t *testing.T) {
+			if got := IsNull(valueNode(m, key)); got != want {
+				t.Errorf("IsNull = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestParseBool(t *testing.T) {
+	for text, want := range map[string]struct{ value, ok bool }{
+		"true": {true, true}, "True": {true, true}, "TRUE": {true, true},
+		"false": {false, true}, "False": {false, true}, "FALSE": {false, true},
+		"yes": {}, "1": {}, "tRUE": {}, "": {},
+	} {
+		t.Run(text, func(t *testing.T) {
+			if value, ok := ParseBool(text); value != want.value || ok != want.ok {
+				t.Errorf("ParseBool(%q) = %v, %v; want %v, %v", text, value, ok, want.value, want.ok)
+			}
+		})
+	}
 }
 
 func TestDecodeRefusesSharedNodes(t *testing.T) {

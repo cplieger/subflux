@@ -10,8 +10,13 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
 	"go.yaml.in/yaml/v3"
 )
+
+// validLanguages is the smallest languages section that parses, for a file
+// whose test is about another section: an absent one fails the file.
+const validLanguages = "languages: {default: [{tag: en}]}\n"
 
 // loadText writes text as the file in a fresh directory and loads it.
 func loadText(t testing.TB, text string) Snapshot {
@@ -81,11 +86,15 @@ func TestLoadModes(t *testing.T) {
 			t.Errorf("directory holds %v (%v), want nothing", entries, err)
 		}
 	})
+	_, absent := language.ParsePolicy(nil)
 	for _, text := range []string{"", "# only a comment\n", "\n\n"} {
-		t.Run("empty "+strings.TrimSpace(text), func(t *testing.T) {
+		t.Run("empty "+strings.TrimSpace(text)+" answers each section's absent outcome", func(t *testing.T) {
 			s := loadText(t, text)
-			if _, ok := s.Active(); !ok || s.Mode() != ModeActive {
-				t.Errorf("mode %v, want ModeActive", s.Mode())
+			if errs, ok := s.Failure(); !ok || !slices.Equal(errs, absent) {
+				t.Errorf("Failure() = %v, %v; want the absent languages section's %v", errs, ok, absent)
+			}
+			if srv, ok := s.Server(); !ok || srv.Hosts().Active() {
+				t.Errorf("Server() = %+v, %v; want the server defaults", srv, ok)
 			}
 		})
 	}
@@ -138,7 +147,7 @@ func TestModeText(t *testing.T) {
 }
 
 func TestUnknownSectionFails(t *testing.T) {
-	s := loadText(t, "server: {allowed_hosts: [nas.lan]}\nbogus: 1\n")
+	s := loadText(t, "server: {allowed_hosts: [nas.lan]}\nbogus: 1\n"+validLanguages)
 	if got := failurePaths(t, s); !slices.Equal(got, []string{"bogus"}) {
 		t.Errorf("paths %v, want [bogus]", got)
 	}
@@ -148,12 +157,40 @@ func TestUnknownSectionFails(t *testing.T) {
 	}
 }
 
+func TestLoadLanguagesSection(t *testing.T) {
+	t.Run("a parsed section is Active's Policy", func(t *testing.T) {
+		a, ok := loadText(t, "languages: {close_varieties: true, default: [{tag: pt-BR}]}\n").Active()
+		if !ok {
+			t.Fatal("a valid languages section did not load Active")
+		}
+		if got := a.Languages.TargetsFor(language.Tag{}, nil); len(got) != 1 || got[0].Tag.String() != "pt-BR" || !a.Languages.CloseVarieties() {
+			t.Errorf("Languages = %v, close varieties %v; want [pt-BR], true", got, a.Languages.CloseVarieties())
+		}
+	})
+	t.Run("a languages error fails the file at an absolute path", func(t *testing.T) {
+		s := loadText(t, "server: {allowed_hosts: [nas.lan]}\nlanguages: {default: [{tag: pb}]}\n")
+		errs, _ := s.Failure()
+		if got := failurePaths(t, s); !slices.Equal(got, []string{"languages.default[0].tag"}) || errs[0].Message != "use pt-BR" {
+			t.Errorf("Failure() = %v; want languages.default[0].tag: use pt-BR", errs)
+		}
+		if srv, ok := s.Server(); !ok || !admits(srv, "nas.lan") || admits(srv, "evil.example") {
+			t.Errorf("the server section %v did not survive a languages error", ok)
+		}
+	})
+	t.Run("an absent section answers ParsePolicy(nil)", func(t *testing.T) {
+		_, want := language.ParsePolicy(nil)
+		if errs, ok := loadText(t, "server: {}\n").Failure(); !ok || !slices.Equal(errs, want) {
+			t.Errorf("Failure() = %v, %v; want %v", errs, ok, want)
+		}
+	})
+}
+
 func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 	got, _ := testSection(t)
 	t.Setenv("SUBFLUX_PASS", "a${b")
 	t.Setenv("SUBFLUX_NESTED", "${SUBFLUX_PASS}")
 	t.Run("resolved value holding ${", func(t *testing.T) {
-		s := loadText(t, "t: {a: '${SUBFLUX_PASS}', b: 'x-${SUBFLUX_NESTED}'}\n")
+		s := loadText(t, "t: {a: '${SUBFLUX_PASS}', b: 'x-${SUBFLUX_NESTED}'}\n"+validLanguages)
 		if s.Mode() != ModeActive {
 			t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 		}
@@ -165,7 +202,7 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 	})
 	t.Run("reference outside SUBFLUX_ and unresolved name", func(t *testing.T) {
 		t.Setenv("HOME", "/home/x")
-		s := loadText(t, "t: {a: '${HOME}', b: '${SUBFLUX_MISSING}'}\n")
+		s := loadText(t, "t: {a: '${HOME}', b: '${SUBFLUX_MISSING}'}\n"+validLanguages)
 		errs, _ := s.Failure()
 		if got := failurePaths(t, s); !slices.Equal(got, []string{"t.a", "t.b"}) {
 			t.Fatalf("paths %v, want [t.a t.b]", got)
@@ -176,7 +213,7 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 	})
 	t.Run("lowercase subflux name is outside the space", func(t *testing.T) {
 		t.Setenv("SUBFLUX_lower", "x")
-		if got := failurePaths(t, loadText(t, "t: {a: '${SUBFLUX_lower}'}\n")); !slices.Equal(got, []string{"t.a"}) {
+		if got := failurePaths(t, loadText(t, "t: {a: '${SUBFLUX_lower}'}\n"+validLanguages)); !slices.Equal(got, []string{"t.a"}) {
 			t.Errorf("paths %v, want [t.a]", got)
 		}
 	})
@@ -186,7 +223,7 @@ func TestExpandedDigitsStayStrings(t *testing.T) {
 	got, _ := testSection(t)
 	t.Setenv("SUBFLUX_KEY", "0123")
 	t.Setenv("SUBFLUX_N", "42")
-	s := loadText(t, "t:\n  a: '${SUBFLUX_KEY}'\n  s: ${SUBFLUX_KEY}\n  n: ${SUBFLUX_N}\n")
+	s := loadText(t, "t:\n  a: '${SUBFLUX_KEY}'\n  s: ${SUBFLUX_KEY}\n  n: ${SUBFLUX_N}\n"+validLanguages)
 	if s.Mode() != ModeActive {
 		t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 	}

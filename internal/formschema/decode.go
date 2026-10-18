@@ -24,7 +24,7 @@ func (s Schema) Decode(n *yaml.Node) (Values, []FieldError) {
 	for i := range s.Fields {
 		f := &s.Fields[i]
 		v, ok := present[f.Key]
-		if !ok || isNull(v) {
+		if !ok || IsNull(v) {
 			errs = append(errs, s.absent(f, vals)...)
 			continue
 		}
@@ -48,7 +48,7 @@ func (s Schema) Decode(n *yaml.Node) (Values, []FieldError) {
 // collect indexes n's keys, refusing a non-mapping, unknown keys and repeats.
 func (s Schema) collect(n *yaml.Node) (map[string]*yaml.Node, []FieldError) {
 	present := map[string]*yaml.Node{}
-	if n == nil || isNull(n) {
+	if n == nil || IsNull(n) {
 		return present, nil
 	}
 	if n.Kind != yaml.MappingNode {
@@ -111,7 +111,7 @@ func decodeList(f *Field, v *yaml.Node) (Value, []FieldError) {
 	var errs []FieldError
 	list := make([]string, 0, len(v.Content))
 	for i, e := range v.Content {
-		if e.Kind != yaml.ScalarNode || isNull(e) {
+		if e.Kind != yaml.ScalarNode || IsNull(e) {
 			errs = append(errs, FieldError{fmt.Sprintf("%s[%d]", f.Key, i), "must be a single value"})
 			continue
 		}
@@ -144,11 +144,8 @@ func parseText(f *Field, text string) (val Value, msg string) {
 		}
 		return Value{kind: Enum, text: text}, ""
 	case Bool:
-		switch text {
-		case "true", "True", "TRUE":
-			return Value{kind: Bool, b: true}, ""
-		case "false", "False", "FALSE":
-			return Value{kind: Bool}, ""
+		if b, ok := ParseBool(text); ok {
+			return Value{kind: Bool, b: b}, ""
 		}
 		return Value{}, "must be true or false"
 	case Int:
@@ -198,13 +195,35 @@ func markScalars(kind Kind, v *yaml.Node) {
 		v.Tag = PlainTag
 	case kind == StringList && v.Kind == yaml.SequenceNode:
 		for _, e := range v.Content {
-			if e.Kind == yaml.ScalarNode && !isNull(e) {
+			if e.Kind == yaml.ScalarNode && !IsNull(e) {
 				e.Tag = PlainTag
 			}
 		}
 	}
 }
 
-func isNull(n *yaml.Node) bool {
-	return n.Kind == yaml.ScalarNode && n.ShortTag() == "!!null"
+// IsNull reports whether n, which must not be nil, is a YAML 1.2 core-schema
+// null read by its text whatever its tag (a plain "", ~, null, Null or NULL),
+// so a null retagged PlainTag still reads as absent.
+func IsNull(n *yaml.Node) bool {
+	if n.Kind != yaml.ScalarNode || n.Style&(yaml.SingleQuotedStyle|yaml.DoubleQuotedStyle|yaml.LiteralStyle|yaml.FoldedStyle) != 0 {
+		return false
+	}
+	switch n.Value {
+	case "", "~", "null", "Null", "NULL":
+		return true
+	}
+	return false
+}
+
+// ParseBool reads a YAML 1.2 core-schema boolean's text (true, True, TRUE,
+// false, False, FALSE); ok is false for every other text.
+func ParseBool(text string) (value, ok bool) {
+	switch text {
+	case "true", "True", "TRUE":
+		return true, true
+	case "false", "False", "FALSE":
+		return false, true
+	}
+	return false, false
 }

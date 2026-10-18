@@ -123,7 +123,7 @@ func TestDocumentRedacts(t *testing.T) {
 		}
 	})
 	t.Run("an anchored, tagged or forged-mark scalar is unchanged", func(t *testing.T) {
-		s := serve(fixture(t, "server: {log_level: !!str debug, log_format: &f json}\nx: *f\nf: {s: !plain lit}\n"), nil, nil)
+		s := serve(fixture(t, "server: {log_level: !!str debug, log_format: &f json}\nx: *f\nf: {s: !plain lit}\n"+validLanguages), nil, nil)
 		want := []string{"server.log_level", "server.log_format", "x", "f.s"}
 		if got := unchangedPaths(s.Snapshot().Document()); !slices.Equal(got, want) {
 			t.Errorf("unchanged %v, want %v", got, want)
@@ -132,7 +132,7 @@ func TestDocumentRedacts(t *testing.T) {
 }
 
 func TestSaveRefusesMovedSecret(t *testing.T) {
-	const stored = "t2: [{id: a, s: k1}, {id: b, s: k2}]\nt3: [{s: k3}, {s: k4}]\nt4: [{id: d, s: k5}, {id: d, s: k6}]\n"
+	const stored = "t2: [{id: a, s: k1}, {id: b, s: k2}]\nt3: [{s: k3}, {s: k4}]\nt4: [{id: d, s: k5}, {id: d, s: k6}]\n" + validLanguages
 	snap := serve(fixture(t, stored), nil, nil).Snapshot()
 	cases := []struct{ name, body, path string }{
 		{"a reordered id-less element", "t3: [{s: !unchanged ''}, {s: k3}]\n", "t3[0]"},
@@ -160,7 +160,7 @@ func TestSaveRefusesMovedSecret(t *testing.T) {
 	})
 }
 
-// sectionFixtures holds one valid file per registered section and the paths
+// sectionFixtures holds one valid section per registered row and the paths
 // its Document leaves unchanged, its Secret fields'.
 var sectionFixtures = map[string]struct {
 	text    string
@@ -170,40 +170,55 @@ var sectionFixtures = map[string]struct {
 		text:    "server:\n  trusted_proxies: [10.0.0.0/8, 192.168.1.5]\n  allowed_hosts: [nas.lan, 'nas.lan:8374']\n  log_level: \"debug\"\n  log_format: text\n",
 		secrets: nil,
 	},
+	"languages": {
+		text:    "languages:\n  close_varieties: true\n  default:\n    - tag: pt-BR\n      variants: [standard, forced]\n    - tag: en\n      variants: [hi]\n  rules:\n    - audio: ja\n      targets:\n        - tag: en\n    - audio: es\n      targets: []\n",
+		secrets: nil,
+	},
 }
 
+// TestDocumentRoundTrip saves the Document of one file holding every
+// section's fixture: each row needs one, so a section whose parse does not
+// mark what it read fails here.
 func TestDocumentRoundTrip(t *testing.T) {
+	var text strings.Builder
+	var secrets []string
 	for _, sec := range sections {
-		t.Run(sec.key, func(t *testing.T) {
-			fx, ok := sectionFixtures[sec.key]
-			if !ok {
-				t.Fatalf("section %s has no round-trip fixture", sec.key)
-			}
-			path := fixture(t, fx.text)
-			s := serve(path, nil, nil)
-			if m := s.Snapshot().Mode(); m != ModeActive {
-				t.Fatalf("fixture mode %v, want active", m)
-			}
-			doc := s.Snapshot().Document()
-			if got := unchangedPaths(doc); !slices.Equal(got, fx.secrets) {
-				t.Errorf("unchanged %v, want the Secret paths %v", got, fx.secrets)
-			}
-			if _, errs, err := s.Save(t.Context(), doc, s.Snapshot().Revision()); err != nil || errs != nil {
-				t.Fatalf("Save(Document()) = %v, %v", errs, err)
-			}
-			if got, want := scalars(Load(path, Registries{}).p.doc, ""), scalars(node(t, fx.text), ""); !slices.Equal(got, want) {
-				t.Errorf("saved values %v, want %v", got, want)
-			}
-		})
+		fx, ok := sectionFixtures[sec.key]
+		if !ok {
+			t.Fatalf("section %s has no round-trip fixture", sec.key)
+		}
+		text.WriteString(fx.text)
+		secrets = append(secrets, fx.secrets...)
+	}
+	for key := range sectionFixtures {
+		if !slices.ContainsFunc(sections, func(s section) bool { return s.key == key }) {
+			t.Errorf("fixture %s names no registered section", key)
+		}
+	}
+	path := fixture(t, text.String())
+	s := serve(path, nil, nil)
+	if m := s.Snapshot().Mode(); m != ModeActive {
+		failure, _ := s.Snapshot().Failure()
+		t.Fatalf("fixture mode %v (%v), want active", m, failure)
+	}
+	doc := s.Snapshot().Document()
+	if got := unchangedPaths(doc); !slices.Equal(got, secrets) {
+		t.Errorf("unchanged %v, want the Secret paths %v", got, secrets)
+	}
+	if _, errs, err := s.Save(t.Context(), doc, s.Snapshot().Revision()); err != nil || errs != nil {
+		t.Fatalf("Save(Document()) = %v, %v", errs, err)
+	}
+	if got, want := scalars(Load(path, Registries{}).p.doc, ""), scalars(node(t, text.String()), ""); !slices.Equal(got, want) {
+		t.Errorf("saved values %v, want %v", got, want)
 	}
 }
 
 func TestDocumentFreshCopy(t *testing.T) {
-	snap := serve(fixture(t, "server: {log_level: debug}\n"), nil, nil).Snapshot()
+	snap := serve(fixture(t, "server: {log_level: debug}\n"+validLanguages), nil, nil).Snapshot()
 	first := snap.Document()
 	first.Content[1].Content[1].Value = "error"
 	first.Content = append(first.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "x"})
-	if got := scalars(snap.Document(), ""); !slices.Equal(got, []string{"server.log_level=debug"}) {
+	if got := scalars(snap.Document(), ""); !slices.Equal(got, []string{"server.log_level=debug", "languages.default[0].tag=en"}) {
 		t.Errorf("a later Document %v saw an earlier copy's edit", got)
 	}
 }

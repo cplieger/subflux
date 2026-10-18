@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -52,7 +53,8 @@ type Registries struct{}
 
 // Active is a configuration that parsed, one field per section.
 type Active struct {
-	Server Server
+	Languages language.Policy
+	Server    Server
 }
 
 // Snapshot is one immutable reading of the file. Only Load and Service.Save

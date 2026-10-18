@@ -86,7 +86,7 @@ func errPaths(errs []formschema.FieldError) []string {
 
 func TestSaveSurvivesRequestCancel(t *testing.T) {
 	t.Run("a cancelled request still persists and commits", func(t *testing.T) {
-		path := fixture(t, "server: {log_level: info}\n")
+		path := fixture(t, "server: {log_level: info}\n"+validLanguages)
 		ctx, cancel := context.WithCancel(t.Context())
 		var activeErr error
 		s := serve(path, func(actx context.Context, _ Active) error {
@@ -94,7 +94,7 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 			activeErr = actx.Err()
 			return nil
 		}, nil)
-		snap, errs, err := s.Save(ctx, node(t, "server: {log_level: debug}\n"), s.Snapshot().Revision())
+		snap, errs, err := s.Save(ctx, node(t, "server: {log_level: debug}\n"+validLanguages), s.Snapshot().Revision())
 		if err != nil || errs != nil {
 			t.Fatalf("Save = %v, %v", errs, err)
 		}
@@ -112,11 +112,11 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 		}
 	})
 	t.Run("a failing activate restores the bytes and keeps the snapshot", func(t *testing.T) {
-		const before = "# kept as written\nserver: {log_level: info}\n"
+		const before = "# kept as written\nserver: {log_level: info}\n" + validLanguages
 		path := fixture(t, before)
 		s := serve(path, func(context.Context, Active) error { return errActivate }, nil)
 		old := s.Snapshot()
-		got, errs, err := save(t, s, "server: {log_level: debug}\n")
+		got, errs, err := save(t, s, "server: {log_level: debug}\n"+validLanguages)
 		if !errors.Is(err, ErrActivation) || !errors.Is(err, errActivate) || errs != nil {
 			t.Fatalf("Save = %v, %v; want ErrActivation wrapping the cause", errs, err)
 		}
@@ -130,7 +130,7 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 	t.Run("a failing first save leaves no file", func(t *testing.T) {
 		path := fixture(t, "")
 		s := serve(path, func(context.Context, Active) error { return errActivate }, nil)
-		if _, _, err := save(t, s, "server: {log_level: debug}\n"); !errors.Is(err, ErrActivation) {
+		if _, _, err := save(t, s, "server: {log_level: debug}\n"+validLanguages); !errors.Is(err, ErrActivation) {
 			t.Fatalf("Save error %v, want ErrActivation", err)
 		}
 		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
@@ -142,7 +142,7 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 	})
 	t.Run("a slow activate serialises a concurrent save", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			path := fixture(t, "server: {log_level: info}\n")
+			path := fixture(t, "server: {log_level: info}\n"+validLanguages)
 			release := make(chan struct{})
 			var running, most atomic.Int32
 			s := serve(path, func(context.Context, Active) error {
@@ -156,12 +156,12 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 			var first, second error
 			done := make(chan struct{}, 2)
 			go func() {
-				_, _, first = s.Save(t.Context(), node(t, "server: {log_level: debug}\n"), base)
+				_, _, first = s.Save(t.Context(), node(t, "server: {log_level: debug}\n"+validLanguages), base)
 				done <- struct{}{}
 			}()
 			synctest.Wait()
 			go func() {
-				_, _, second = s.Save(t.Context(), node(t, "server: {log_level: warn}\n"), base)
+				_, _, second = s.Save(t.Context(), node(t, "server: {log_level: warn}\n"+validLanguages), base)
 				done <- struct{}{}
 			}()
 			synctest.Wait()
@@ -197,7 +197,7 @@ func TestSaveRefusesFileChangedBeforeSave(t *testing.T) {
 			if err := os.WriteFile(path, []byte(c.edit), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			_, errs, err := save(t, s, "server: {log_level: debug}\n")
+			_, errs, err := save(t, s, "server: {log_level: debug}\n"+validLanguages)
 			if err != nil || len(errs) != 1 || errs[0].Path != "" || errs[0].Message != msgChangedOnDisk {
 				t.Fatalf("Save = %v, %v; want the root changed-on-disk error", errs, err)
 			}
@@ -209,7 +209,7 @@ func TestSaveRefusesFileChangedBeforeSave(t *testing.T) {
 	t.Run("a file unreadable at load is never overwritten", func(t *testing.T) {
 		path := fixture(t, strings.Repeat("#", maxFileBytes+1))
 		s := serve(path, nil, nil)
-		_, errs, err := save(t, s, "server: {log_level: debug}\n")
+		_, errs, err := save(t, s, "server: {log_level: debug}\n"+validLanguages)
 		if err != nil || len(errs) != 1 || errs[0].Message != msgUnreadAtStart {
 			t.Fatalf("Save = %v, %v; want the unread-at-start error", errs, err)
 		}
@@ -217,7 +217,7 @@ func TestSaveRefusesFileChangedBeforeSave(t *testing.T) {
 }
 
 func TestSaveRefusesDocumentOverLimit(t *testing.T) {
-	const stored = "server: {log_level: info}\n"
+	const stored = "server: {log_level: info}\n" + validLanguages
 	path := fixture(t, stored)
 	s := serve(path, nil, nil)
 	old := s.Snapshot()
@@ -239,7 +239,7 @@ func TestSaveRefusesDocumentOverLimit(t *testing.T) {
 }
 
 func TestFailedRestoreRecordsReread(t *testing.T) {
-	path := fixture(t, "server: {log_level: info}\n")
+	path := fixture(t, "server: {log_level: info}\n"+validLanguages)
 	rec := capture.Default(t)
 	failActivate := true
 	s := serve(path, func(context.Context, Active) error {
@@ -258,7 +258,7 @@ func TestFailedRestoreRecordsReread(t *testing.T) {
 		}
 		return real(ctx, p, data)
 	}
-	if _, _, err := save(t, s, "server: {log_level: debug}\n"); !errors.Is(err, ErrActivation) {
+	if _, _, err := save(t, s, "server: {log_level: debug}\n"+validLanguages); !errors.Is(err, ErrActivation) {
 		t.Fatalf("Save error %v, want ErrActivation", err)
 	}
 	if sig := signalled(s); !s.Diverged() || !sig {
@@ -268,7 +268,7 @@ func TestFailedRestoreRecordsReread(t *testing.T) {
 		t.Errorf("logged %q, want one ERROR naming the failed restore", rec.Messages())
 	}
 	failActivate = false
-	if _, errs, err := save(t, s, "server: {log_level: warn}\n"); err != nil || errs != nil {
+	if _, errs, err := save(t, s, "server: {log_level: warn}\n"+validLanguages); err != nil || errs != nil {
 		t.Fatalf("the save after a failed restore = %v, %v; want it accepted", errs, err)
 	}
 	if s.Diverged() || logLevel(Load(path, Registries{})) != slog.LevelWarn {
@@ -279,7 +279,7 @@ func TestFailedRestoreRecordsReread(t *testing.T) {
 func TestShutdownCancelsRunningSave(t *testing.T) {
 	t.Run("an overrun cancels the save, which restores the file", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			const before = "server: {log_level: info}\n"
+			const before = "server: {log_level: info}\n" + validLanguages
 			path := fixture(t, before)
 			s := serve(path, func(ctx context.Context, _ Active) error {
 				<-ctx.Done()
@@ -287,7 +287,7 @@ func TestShutdownCancelsRunningSave(t *testing.T) {
 			}, nil)
 			saved := make(chan error, 1)
 			go func() {
-				_, _, err := save(t, s, "server: {log_level: debug}\n")
+				_, _, err := save(t, s, "server: {log_level: debug}\n"+validLanguages)
 				saved <- err
 			}()
 			synctest.Wait()
@@ -302,7 +302,7 @@ func TestShutdownCancelsRunningSave(t *testing.T) {
 			if fileText(t, path) != before {
 				t.Errorf("file %q, want the baseline", fileText(t, path))
 			}
-			if _, _, err := save(t, s, "server: {log_level: warn}\n"); !errors.Is(err, ErrClosed) {
+			if _, _, err := save(t, s, "server: {log_level: warn}\n"+validLanguages); !errors.Is(err, ErrClosed) {
 				t.Errorf("a later save answered %v, want ErrClosed", err)
 			}
 		})
@@ -314,7 +314,7 @@ func TestShutdownCancelsRunningSave(t *testing.T) {
 				t.Errorf("Shutdown = %v", err)
 			}
 		}
-		if _, _, err := save(t, s, "server: {}\n"); !errors.Is(err, ErrClosed) {
+		if _, _, err := save(t, s, "server: {}\n"+validLanguages); !errors.Is(err, ErrClosed) {
 			t.Errorf("save after Shutdown answered %v, want ErrClosed", err)
 		}
 	})
@@ -338,7 +338,7 @@ type ctxKey struct{}
 func TestSaveCheckRefuses(t *testing.T) {
 	refusal := []formschema.FieldError{{Path: "server.log_level", Message: "refused by the check"}}
 	t.Run("a refusal writes nothing", func(t *testing.T) {
-		const before = "server: {log_level: info}\n"
+		const before = "server: {log_level: info}\n" + validLanguages
 		path := fixture(t, before)
 		var gotCtx context.Context
 		var prev Active
@@ -348,7 +348,7 @@ func TestSaveCheckRefuses(t *testing.T) {
 		})
 		old := s.Snapshot()
 		ctx := context.WithValue(t.Context(), ctxKey{}, "save")
-		_, errs, err := s.Save(ctx, node(t, "server: {log_level: debug}\n"), old.Revision())
+		_, errs, err := s.Save(ctx, node(t, "server: {log_level: debug}\n"+validLanguages), old.Revision())
 		if err != nil || !slices.Equal(errs, refusal) {
 			t.Fatalf("Save = %v, %v; want the check's errors", errs, err)
 		}
@@ -364,11 +364,11 @@ func TestSaveCheckRefuses(t *testing.T) {
 	})
 	t.Run("load and a refused parse never call it", func(t *testing.T) {
 		calls := 0
-		s := serve(fixture(t, "server: {}\n"), nil, func(context.Context, Active, Active) []formschema.FieldError {
+		s := serve(fixture(t, "server: {}\n"+validLanguages), nil, func(context.Context, Active, Active) []formschema.FieldError {
 			calls++
 			return nil
 		})
-		if _, errs, _ := save(t, s, "bogus: 1\n"); len(errs) == 0 {
+		if _, errs, _ := save(t, s, "bogus: 1\n"+validLanguages); len(errs) == 0 {
 			t.Fatal("an unknown section was accepted")
 		}
 		if calls != 0 {
@@ -384,13 +384,13 @@ func TestSaveCheckRefuses(t *testing.T) {
 			}
 			return nil
 		})
-		if _, errs, err := save(t, s, "server: {}\n"); err != nil || errs != nil || !called {
+		if _, errs, err := save(t, s, "server: {}\n"+validLanguages); err != nil || errs != nil || !called {
 			t.Errorf("Save = %v, %v, check called %v", errs, err, called)
 		}
 	})
 	t.Run("a nil check checks nothing", func(t *testing.T) {
 		s := serve(fixture(t, ""), nil, nil)
-		if _, errs, err := save(t, s, "server: {log_level: debug}\n"); err != nil || errs != nil {
+		if _, errs, err := save(t, s, "server: {log_level: debug}\n"+validLanguages); err != nil || errs != nil {
 			t.Errorf("Save = %v, %v", errs, err)
 		}
 	})
@@ -514,7 +514,7 @@ func TestExpandedSecretStaysInParse(t *testing.T) {
 	})
 	t.Run("Save and Document keep the reference text", func(t *testing.T) {
 		values, _ := testSection(t)
-		tpath := fixture(t, "t: {s: '${SUBFLUX_SRC_KEY}', a: x}\n")
+		tpath := fixture(t, "t: {s: '${SUBFLUX_SRC_KEY}', a: x}\n"+validLanguages)
 		ts := serve(tpath, nil, nil)
 		snap := ts.Snapshot()
 		next, errs, err := ts.Save(t.Context(), snap.Document(), snap.Revision())
@@ -545,11 +545,11 @@ func TestExpandedSecretStaysInParse(t *testing.T) {
 // revision are one reading: a commit between an editor's read and its save
 // makes that save a conflict, never an overwrite.
 func TestEditorSaveAfterInterleavedCommitConflicts(t *testing.T) {
-	path := fixture(t, "server: {log_level: info}\n")
+	path := fixture(t, "server: {log_level: info}\n"+validLanguages)
 	s := serve(path, nil, nil)
 	read := s.Snapshot()
 	doc := read.Document()
-	if _, errs, err := save(t, s, "server: {log_level: warn}\n"); err != nil || errs != nil {
+	if _, errs, err := save(t, s, "server: {log_level: warn}\n"+validLanguages); err != nil || errs != nil {
 		t.Fatalf("the interleaved Save = %v, %v", errs, err)
 	}
 	doc.Content[1].Content[1].Value = "debug"
@@ -562,10 +562,10 @@ func TestEditorSaveAfterInterleavedCommitConflicts(t *testing.T) {
 }
 
 func TestSaveRefusesStaleBase(t *testing.T) {
-	path := fixture(t, "server: {log_level: info}\n")
+	path := fixture(t, "server: {log_level: info}\n"+validLanguages)
 	s := serve(path, nil, nil)
 	base := s.Snapshot().Revision()
-	first, errs, err := s.Save(t.Context(), node(t, "server: {log_level: debug}\n"), base)
+	first, errs, err := s.Save(t.Context(), node(t, "server: {log_level: debug}\n"+validLanguages), base)
 	if err != nil || errs != nil {
 		t.Fatalf("first Save = %v, %v", errs, err)
 	}
@@ -575,7 +575,7 @@ func TestSaveRefusesStaleBase(t *testing.T) {
 	if err := os.WriteFile(path, []byte("server: {log_level: error}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, errs, err = s.Save(t.Context(), node(t, "server: {log_level: warn}\n"), base)
+	_, errs, err = s.Save(t.Context(), node(t, "server: {log_level: warn}\n"+validLanguages), base)
 	if !errors.Is(err, ErrConflict) || errs != nil {
 		t.Errorf("stale Save = %v, %v; want ErrConflict before the file is read", errs, err)
 	}
@@ -585,9 +585,9 @@ func TestSaveRefusesStaleBase(t *testing.T) {
 }
 
 func TestSaveBodyShapes(t *testing.T) {
-	forged := node(t, "server: {log_level: debug}\n")
+	forged := node(t, "server: {log_level: debug}\n"+validLanguages)
 	forged.Content[1].Content[1].Tag = formschema.PlainTag
-	binary := node(t, "server: {log_level: debug}\n")
+	binary := node(t, "server: {log_level: debug}\n"+validLanguages)
 	binary.Content[1].Content[1].Tag, binary.Content[1].Content[1].Value = "!!binary", "not base64"
 	cases := []struct {
 		name  string
@@ -595,15 +595,15 @@ func TestSaveBodyShapes(t *testing.T) {
 		paths []string
 		msg   string
 	}{
-		{"a written mark", node(t, "server: {log_level: !plain debug}\n"), []string{"server.log_level"}, ""},
-		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"), []string{"server.log_level"}, msgTagged},
+		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
+		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
 		{"a mark set in code", forged, []string{"server.log_level"}, ""},
-		{"a key held twice", node(t, "server: {log_level: debug, log_level: warn}\n"), []string{"server.log_level"}, ""},
-		{"an anchor and alias", node(t, "server: {log_level: &l debug, log_format: *l}\n"), []string{"server.log_level", "server.log_format"}, ""},
-		{"a merge key", node(t, "server: {<<: {log_level: debug}}\n"), []string{"server.<<"}, ""},
-		{"an unchanged value with text", node(t, "server: {log_level: !unchanged debug}\n"), []string{"server.log_level"}, ""},
-		{"an unchanged key", node(t, "server: {!unchanged '': x}\n"), []string{"server."}, ""},
-		{"a binary scalar", node(t, "server: {log_level: !!binary ZGVidWc=}\n"), []string{"server.log_level"}, ""},
+		{"a key held twice", node(t, "server: {log_level: debug, log_level: warn}\n"+validLanguages), []string{"server.log_level"}, ""},
+		{"an anchor and alias", node(t, "server: {log_level: &l debug, log_format: *l}\n"+validLanguages), []string{"server.log_level", "server.log_format"}, ""},
+		{"a merge key", node(t, "server: {<<: {log_level: debug}}\n"+validLanguages), []string{"server.<<"}, ""},
+		{"an unchanged value with text", node(t, "server: {log_level: !unchanged debug}\n"+validLanguages), []string{"server.log_level"}, ""},
+		{"an unchanged key", node(t, "server: {!unchanged '': x}\n"+validLanguages), []string{"server."}, ""},
+		{"a binary scalar", node(t, "server: {log_level: !!binary ZGVidWc=}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a binary scalar set in code", binary, []string{"server.log_level"}, msgTagged},
 		{"invalid UTF-8", &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
 			{Kind: yaml.ScalarNode, Value: "server"},
@@ -614,7 +614,7 @@ func TestSaveBodyShapes(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			const before = "server: {log_level: info}\n"
+			const before = "server: {log_level: info}\n" + validLanguages
 			path := fixture(t, before)
 			s := serve(path, nil, nil)
 			_, errs, err := s.Save(t.Context(), c.body, s.Snapshot().Revision())
@@ -632,12 +632,12 @@ func TestSaveBodyShapes(t *testing.T) {
 }
 
 func TestNewServiceOfZeroSnapshotRefusesSaves(t *testing.T) {
-	path := fixture(t, "server: {}\n")
+	path := fixture(t, "server: {}\n"+validLanguages)
 	s := NewService(path, Registries{}, Snapshot{}, nil, nil)
 	if s.Snapshot().Mode() != Failed {
 		t.Errorf("mode %v, want Failed", s.Snapshot().Mode())
 	}
-	if _, errs, err := save(t, s, "server: {}\n"); err != nil || len(errs) != 1 || errs[0].Message != msgUnreadAtStart {
+	if _, errs, err := save(t, s, "server: {}\n"+validLanguages); err != nil || len(errs) != 1 || errs[0].Message != msgUnreadAtStart {
 		t.Errorf("Save = %v, %v; want the unread-at-start error", errs, err)
 	}
 }

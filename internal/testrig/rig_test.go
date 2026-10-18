@@ -89,7 +89,7 @@ func TestConfigModeFollowsSave(t *testing.T) {
 		}
 	}
 	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("server:\n  log_level: info\n"), &doc); err != nil {
+	if err := yaml.Unmarshal([]byte("server:\n  log_level: info\nlanguages:\n  default: [{tag: en}]\n"), &doc); err != nil {
 		t.Fatal(err)
 	}
 	if _, errs, err := r.Settings.Save(t.Context(), doc.Content[0], r.Settings.Snapshot().Revision()); err != nil || len(errs) != 0 {

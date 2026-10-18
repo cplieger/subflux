@@ -188,7 +188,9 @@ func denyAllServer() Server {
 // own value when valid, else its default, and a host policy of the entries as
 // written. Each refused element passes its path text, which CanonicalHost
 // refuses, so a list with no valid entry denies every Host; a list it cannot
-// read, an alias or a merge key denies every Host. It follows no alias.
+// read, an alias or a merge key denies every Host. It follows no alias. It
+// reads a null by its YAML tag, not formschema.IsNull: a failed section can
+// hold a written tag, and IsNull reads !!str ~ as absent, admitting any Host.
 func failClosedServer(nodes []*yaml.Node) Server {
 	if len(nodes) != 1 {
 		return denyAllServer()
