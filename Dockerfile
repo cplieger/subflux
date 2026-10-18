@@ -192,7 +192,7 @@ COPY internal/server/static-src/ ./
 # web-terminal-kiro. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsc's
 # bundler resolution finds the package + its types.
 # renovate: datasource=npm depName=@cplieger/actions
-ARG CPLIEGER_ACTIONS_VERSION=3.3.0-dev.1
+ARG CPLIEGER_ACTIONS_VERSION=4.0.0-dev.3
 # renovate: datasource=npm depName=@cplieger/reactive
 ARG CPLIEGER_REACTIVE_VERSION=2.3.0-dev.1
 # renovate: datasource=npm depName=@cplieger/ui-primitives
