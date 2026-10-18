@@ -6,7 +6,7 @@
 # the secret gate matched nothing whatever the tree contained. Measured with
 # gitleaks 8.30.1 against a working tree carrying a planted `ghp_` GitHub PAT:
 # 0 findings with the old config, the PAT invisible; 3 findings the moment
-# `useDefault = true` was added, the PAT plus two test fixtures.
+# `useDefault = true` was added, the PAT plus two identifier-shaped fixtures.
 # Never remove the `[extend]` block. On its own, `[[allowlists]]` allows
 # nothing, because there is nothing to allow.
 #
@@ -35,6 +35,14 @@ useDefault = true
 #   on purpose: they feed placeholder keys and assert none reaches a log or a
 #   response. A test that cannot hold a fake secret cannot test redaction.
 #
+#   The two other paths are files this tree no longer has. The advisory
+#   full-history pass still reads every commit that held them, so their rows
+#   stay as long as that history exists. sections_providers.go was the old
+#   settings-UI schema, whose descriptors had a Go struct field named `Key`
+#   (`Key: "normalize_utf8"`), and static-src/testdata/settings-*.json was that
+#   schema rendered to JSON (`"key": "normalize_utf8"`): form identifiers, not
+#   credentials.
+#
 # `targetRules` is load-bearing, so never simplify this to a bare `paths` list.
 # Scoping to the one low-precision heuristic rule keeps every provider rule
 # (github-pat, aws-access-token, private-key blocks) live over these same
@@ -42,8 +50,10 @@ useDefault = true
 # the planted PAT above: the rule-scoped form reports it and drops the
 # fixtures, while a blanket path allowlist reports neither.
 [[allowlists]]
-description = "generic-api-key over Go test fixtures: identifier-shaped names, not credentials"
+description = "generic-api-key over Go test fixtures and the old settings-schema files in history: identifier-shaped names, not credentials"
 targetRules = ["generic-api-key"]
 paths = [
   '''_test\.go$''',
+  '''(^|/)internal/config/schema/sections_providers\.go$''',
+  '''(^|/)internal/server/static-src/testdata/settings-[^/]+\.json$''',
 ]
