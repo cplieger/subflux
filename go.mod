@@ -14,7 +14,7 @@ require (
 	github.com/cplieger/runesafe/v3 v3.1.0-dev.1
 	github.com/cplieger/slogx v1.7.0
 	github.com/cplieger/ssrf/v4 v4.5.0-dev.2
-	github.com/cplieger/webhttp/v3 v3.0.2
+	github.com/cplieger/webhttp/v4 v4.0.0-dev.1
 	github.com/cplieger/xmlx v1.0.6
 	github.com/nwaples/rardecode/v2 v2.4.5
 	github.com/ulikunitz/xz v0.5.17

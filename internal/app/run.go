@@ -14,7 +14,7 @@ import (
 	"github.com/cplieger/health"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
-	"github.com/cplieger/webhttp/v3"
+	"github.com/cplieger/webhttp/v4"
 )
 
 // Paths are the files the process reads and writes.

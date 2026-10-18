@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"github.com/cplieger/webhttp/v3"
+	"github.com/cplieger/webhttp/v4"
 	"go.yaml.in/yaml/v3"
 )
 

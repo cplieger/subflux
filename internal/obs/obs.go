@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/metrics/v4"
-	"github.com/cplieger/webhttp/v3"
+	"github.com/cplieger/webhttp/v4"
 )
 
 // Metric is the metrics library's collector, so a series another package

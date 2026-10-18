@@ -12,7 +12,7 @@ import (
 	"github.com/cplieger/metrics/v4"
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/obs"
-	"github.com/cplieger/webhttp/v3"
+	"github.com/cplieger/webhttp/v4"
 )
 
 func scrape(t *testing.T, m *obs.Metrics) string {
