@@ -9,6 +9,8 @@ subflux finds, downloads and times subtitles for the shows and movies in your So
 
 subflux is under active development and has not reached version 1.0. Any update can change the config format, the saved state, the API or the behavior. Pin a specific image tag instead of `latest`, and read the release notes before you upgrade.
 
+The `dev` branch is mid-rebuild. Its image serves a placeholder page, `/api/health` and `/metrics`, and does none of the work below until the rebuild lands. Run a released `main` tag.
+
 ## What it does
 
 subflux gets subtitles in your languages onto your whole library:
@@ -39,6 +41,8 @@ services:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
+    # subflux finishes its shutdown within 8 seconds; this leaves it room before Docker kills it.
+    stop_grace_period: 10s
     # Run "sudo install -d -o 1000 -g 1000 /opt/appdata/subflux" before the first start,
     # or the container restarts in a loop. If .env sets PUID and PGID, use those numbers.
     user: "${PUID:-1000}:${PGID:-1000}"
@@ -60,11 +64,11 @@ services:
 6. In the setup wizard, enter Sonarr's address as you open it from another device, not `localhost`, and the API key from the General page of Sonarr's Settings. Do the same for Radarr.
 7. Enter the right-hand paths from step 2 as media roots, pick your subtitle sites and languages, then click **Finish**.
 
-Run `docker logs subflux`. You should see `HTTP server listening`. If you see `failed to write default config`, the settings folder from step 1 is missing or belongs to another user.
+Run `docker logs subflux`. You should see `HTTP server listening`.
 
 ## Configuration reference
 
-Every setting is in the web page's Settings dialog and is saved to `/config/config.yaml`. A save applies at once, with no restart. To write the file yourself, start from the annotated [`config.example.yaml`](config.example.yaml).
+Every setting is in the web page's Settings dialog and is saved to `/config/config.yaml`. A save applies at once, with no restart. To write the file yourself, see [Configuration](docs/configuration.md).
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -112,7 +116,6 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 
 The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page.
 
-- The container restarts with `failed to write default config`. Create the settings folder for the container user, as in step 1.
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
 - Full scans do not start. A folder in `media_roots` is missing or not writable. Fix it or remove it from the list.
 - An alert says a subtitle site was disabled. The site rejected your credentials three times. Save new ones or press the site's **Test** button.
@@ -122,7 +125,7 @@ The healthcheck runs `subflux health`, which passes while the web server is runn
 
 ## Monitoring
 
-subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Eight Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
+subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Three Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
 
 ## Documentation
 

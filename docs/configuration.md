@@ -2,11 +2,13 @@
 
 This page lists every setting and command of subflux, for readers who write `config.yaml` by hand or want to change more than the setup wizard asks.
 
+The `dev` branch is being rebuilt, so its image reads `/config/config.yaml` at start but has no setup wizard or Settings dialog yet. The rest of this page describes subflux once the rebuild lands.
+
 ## Where settings live
 
 Settings live in `/config/config.yaml`. The Settings dialog on the web page edits every one of them, and a save that passes its checks applies at once, with no restart. That includes login, passkey, OIDC and logging changes. A save that fails its checks is refused, and the running settings stay as they were.
 
-On its first start, subflux writes the annotated [`config.example.yaml`](../config.example.yaml) as `/config/config.yaml` and opens the setup wizard. You can also write the file before the first start. The Default column below is the value used when a key is absent from the file.
+With no `/config/config.yaml`, subflux starts unconfigured, and the first settings save writes the file. You can also write the file before the first start. The Default column below is the value used when a key is absent from the file.
 
 ## First start
 
@@ -36,7 +38,7 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `languages.default` | _(unset)_ | The targets for audio languages no rule matches. Remove it to skip them |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
 | `providers.<name>.priority` | per site | Breaks a tie between equal scores. Lower is more trusted |
-| `providers.<name>.settings` | per site | Account settings. [`config.example.yaml`](../config.example.yaml) lists each site's keys and where to get them |
+| `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |
 | `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
 | `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |
 | `search.upgrade_enabled` | `true` | Look for better subtitles during scans |

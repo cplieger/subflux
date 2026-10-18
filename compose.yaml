@@ -4,6 +4,8 @@ services:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
+    # subflux finishes its shutdown within 8 seconds; this leaves it room before Docker kills it.
+    stop_grace_period: 10s
     # Run "sudo install -d -o 1000 -g 1000 /opt/appdata/subflux" before the first start,
     # or the container restarts in a loop. If .env sets PUID and PGID, use those numbers.
     user: "${PUID:-1000}:${PGID:-1000}"

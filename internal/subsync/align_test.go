@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/slogx/capture"
 	"pgregory.net/rapid"
 )
 
@@ -574,7 +574,7 @@ func TestSpanScore_equal_length_is_one(t *testing.T) {
 func captureAlignLogs(t *testing.T, fn func()) string {
 	t.Helper()
 	var buf strings.Builder
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.TimeKey {
