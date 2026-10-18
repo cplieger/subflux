@@ -1149,12 +1149,6 @@
     },
     {
       "code": "DS1101",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Flags",
-      "path": "internal/language/variant.go",
-      "reason": "What a file carries: Flags.Serves' first caller outside the package, in TS-1, names it."
-    },
-    {
-      "code": "DS1101",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Parse",
       "path": "internal/language/tag.go",
       "reason": "The one canonicalizer, live through the languages section; its first caller outside the package, storage's tag decoding, lands in ST-1."
@@ -1188,6 +1182,180 @@
       "symbol": "go://github.com/cplieger/subflux/internal/language#Flags.Serves",
       "path": "internal/language/variant.go",
       "reason": "Retained until TS-1 (internal/language#Flags.Serves): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#Choose",
+      "path": "internal/media/choose.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#Key",
+      "path": "internal/media/key.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#Key.Root",
+      "path": "internal/media/key.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#ParseKey",
+      "path": "internal/media/key.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#ParseRootKey",
+      "path": "internal/media/key.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#RootKey",
+      "path": "internal/media/key.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/media#Scheme",
+      "path": "internal/media/kind.go",
+      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver#Label",
+      "path": "internal/mediaserver/label.go",
+      "reason": "Retained until AP-1 (internal/mediaserver#*): its first caller outside the package, api's item document, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue.Reordered",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue.Validate",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#CatalogueEpisode",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#CatalogueOrder",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#EpisodeTitle",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ExtraPlace",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Place",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#RootEvidence",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#RootEvidence.Validate",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#SeriesEvidence",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TitleSet",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TitleSet.Validate",
+      "path": "internal/mediasource/catalogue.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Cursor",
+      "path": "internal/mediasource/cursor.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Cause",
+      "path": "internal/mediasource/errors.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#SourceError",
+      "path": "internal/mediasource/errors.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#NativeID",
+      "path": "internal/mediasource/facts.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#NativeRef",
+      "path": "internal/mediasource/facts.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Order",
+      "path": "internal/mediasource/facts.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TagRef",
+      "path": "internal/mediasource/facts.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Listed",
+      "path": "internal/mediasource/join.go",
+      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
     }
   ]
 }
