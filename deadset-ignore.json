@@ -728,12 +728,6 @@
       "reason": "A by-key lookup answers (value, found): the server section reads a nil list as absent, and a list with no absent meaning reads found."
     },
     {
-      "code": "DS1101",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#MarkPlain",
-      "path": "internal/formschema/marks.go",
-      "reason": "Retained until LG-1 (internal/formschema#MarkPlain): its first caller outside the package lands there."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Label",
       "path": "internal/formschema/schema.go",
@@ -984,6 +978,216 @@
       "symbol": "go://github.com/cplieger/subflux/internal/status#AlertKind",
       "path": "internal/status/sources.go",
       "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#FilenameTag",
+      "path": "internal/language/filename.go",
+      "reason": "Retained until TS-2 (internal/language#FilenameTag): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ReadFilename",
+      "path": "internal/language/filename.go",
+      "reason": "Retained until TS-2 (internal/language#ReadFilename): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#FormatVersion",
+      "path": "internal/language/format.go",
+      "reason": "Retained until ST-1 (internal/language#FormatVersion): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#FromName",
+      "path": "internal/language/fromname.go",
+      "reason": "Retained until MS-2 (internal/language#FromName): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Grade",
+      "path": "internal/language/grade.go",
+      "reason": "Retained until ST-1 (internal/language#Policy.Grade): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Automatic",
+      "path": "internal/language/grade.go",
+      "reason": "Retained until SE-2 (internal/language#Policy.Automatic): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ISO3",
+      "path": "internal/language/iso3.go",
+      "reason": "Retained until MS-2 (internal/language#ISO3): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Names",
+      "path": "internal/language/names.go",
+      "reason": "Retained until AP-1 (internal/language#Names): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#EnglishName",
+      "path": "internal/language/names.go",
+      "reason": "Retained until AP-1 (internal/language#EnglishName): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Targets",
+      "path": "internal/language/policy.go",
+      "reason": "Retained until MS-2 (internal/language#Policy.Targets): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Digest",
+      "path": "internal/language/policy.go",
+      "reason": "Retained until ST-1 (internal/language#Policy.Digest): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#NewProviderMap",
+      "path": "internal/language/providermap.go",
+      "reason": "Retained until SE-2 (internal/language#NewProviderMap): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#MustProviderMap",
+      "path": "internal/language/providermap.go",
+      "reason": "Retained until SE-2 (internal/language#MustProviderMap): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ProviderMap.Wire",
+      "path": "internal/language/providermap.go",
+      "reason": "Retained until SE-2 (internal/language#ProviderMap.Wire): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ProviderMap.Tag",
+      "path": "internal/language/providermap.go",
+      "reason": "Retained until SE-2 (internal/language#ProviderMap.Tag): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ProviderMap.Tags",
+      "path": "internal/language/providermap.go",
+      "reason": "Retained until SE-2 (internal/language#ProviderMap.Tags): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.AutoQuery",
+      "path": "internal/language/query.go",
+      "reason": "Retained until SE-2 (internal/language#Policy.AutoQuery): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.ManualQuery",
+      "path": "internal/language/query.go",
+      "reason": "Retained until SE-2 (internal/language#Policy.ManualQuery): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#RefineFromTitle",
+      "path": "internal/language/refine.go",
+      "reason": "Retained until TS-2 (internal/language#RefineFromTitle): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Variant.Flags",
+      "path": "internal/language/variant.go",
+      "reason": "Retained until TS-1 (internal/language#Variant.Flags): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Closeness",
+      "path": "internal/language/grade_types.go",
+      "reason": "A field type of Grade: Policy.Grade's first caller outside the package, in ST-1, reads it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Class",
+      "path": "internal/language/grade_types.go",
+      "reason": "A field type of Grade: Policy.Grade's first caller outside the package, in ST-1, reads it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Grade",
+      "path": "internal/language/grade_types.go",
+      "reason": "Policy.Grade's answer: its first caller outside the package, in ST-1, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Name",
+      "path": "internal/language/names.go",
+      "reason": "Names' element type: its first caller outside the package, in AP-1, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#CloseName",
+      "path": "internal/language/names.go",
+      "reason": "Name.Close's element type: Names' first caller outside the package, in AP-1, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#WirePair",
+      "path": "internal/language/providermap.go",
+      "reason": "NewProviderMap's input: its first caller outside the package, in SE-2, builds it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#ProviderMap",
+      "path": "internal/language/providermap.go",
+      "reason": "NewProviderMap's answer: its first caller outside the package, in SE-2, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Variant",
+      "path": "internal/language/variant.go",
+      "reason": "A target's variant: Variant.Flags' first caller outside the package, in TS-1, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Flags",
+      "path": "internal/language/variant.go",
+      "reason": "What a file carries: Flags.Serves' first caller outside the package, in TS-1, names it."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Parse",
+      "path": "internal/language/tag.go",
+      "reason": "The one canonicalizer, live through the languages section; its first caller outside the package, storage's tag decoding, lands in ST-1."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Grade.Reason",
+      "path": "internal/language/grade_types.go",
+      "reason": "Policy.Grade's description line: search's substitute-delivery log, in SE-2, is its first reader."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#CloseName.Tag",
+      "path": "internal/language/names.go",
+      "reason": "Read by Names' first caller outside the package, the languages list in AP-1."
+    },
+    {
+      "code": "DS1004",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#exceptionRow.evidence",
+      "path": "internal/language/filename.go",
+      "reason": "Each read exception row carries its evidence of common use as data (languages design 3.6), which TestExceptionRows requires; no production path reads it."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Active.Languages",
+      "path": "internal/settings/snapshot.go",
+      "reason": "Retained until ST-1 (internal/settings#Active.Languages): storage's Activation is its first reader."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/language#Flags.Serves",
+      "path": "internal/language/variant.go",
+      "reason": "Retained until TS-1 (internal/language#Flags.Serves): its first caller outside the package lands there."
     }
   ]
 }

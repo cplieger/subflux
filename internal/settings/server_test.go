@@ -111,7 +111,7 @@ func TestFailedServerSectionFailsClosed(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			s := loadText(t, c.text)
+			s := loadText(t, c.text+validLanguages)
 			if got := failurePaths(t, s); !slices.Equal(got, c.want.paths) {
 				t.Errorf("paths %v, want %v", got, c.want.paths)
 			}
@@ -141,7 +141,7 @@ func TestFailedServerSectionFailsClosed(t *testing.T) {
 		})
 	}
 	t.Run("e a valid text format is kept", func(t *testing.T) {
-		srv, _ := loadText(t, "server: {log_format: text, log_level: loud}\n").Server()
+		srv, _ := loadText(t, "server: {log_format: text, log_level: loud}\n"+validLanguages).Server()
 		if srv.LogFormat() != "text" {
 			t.Errorf("format %s, want text", srv.LogFormat())
 		}
@@ -172,7 +172,7 @@ func TestRootFailureDeniesEveryHost(t *testing.T) {
 		})
 	}
 	t.Run("a shape refusal elsewhere keeps the server section", func(t *testing.T) {
-		s := loadText(t, "server: {allowed_hosts: [nas.lan]}\nx: &a 1\n")
+		s := loadText(t, "server: {allowed_hosts: [nas.lan]}\nx: &a 1\n"+validLanguages)
 		srv, ok := s.Server()
 		if s.Mode() != Failed || !ok || !admits(srv, "nas.lan") || admits(srv, "evil.example") {
 			t.Errorf("mode %v, Server() %v", s.Mode(), ok)
@@ -182,7 +182,7 @@ func TestRootFailureDeniesEveryHost(t *testing.T) {
 
 func TestServerSection(t *testing.T) {
 	t.Run("proxies as CIDR and bare address", func(t *testing.T) {
-		s := loadText(t, "server: {trusted_proxies: [10.0.0.0/8, 192.168.1.5, '::1', 172.16.3.4/12]}\n")
+		s := loadText(t, "server: {trusted_proxies: [10.0.0.0/8, 192.168.1.5, '::1', 172.16.3.4/12]}\n"+validLanguages)
 		a, ok := s.Active()
 		want := []netip.Prefix{
 			netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.168.1.5/32"),
@@ -193,13 +193,13 @@ func TestServerSection(t *testing.T) {
 		}
 	})
 	t.Run("pasted URL", func(t *testing.T) {
-		errs, _ := loadText(t, "server: {allowed_hosts: [http://nas.lan]}\n").Failure()
+		errs, _ := loadText(t, "server: {allowed_hosts: [http://nas.lan]}\n"+validLanguages).Failure()
 		if len(errs) != 1 || errs[0].Path != "server.allowed_hosts[0]" || !strings.Contains(errs[0].Message, "host name") {
 			t.Errorf("Failure() = %v", errs)
 		}
 	})
 	t.Run("allowed hosts canonical once each in file order", func(t *testing.T) {
-		a, _ := loadText(t, "server: {allowed_hosts: [Nas.LAN, 192.168.1.5, 'nas.lan:8374']}\n").Active()
+		a, _ := loadText(t, "server: {allowed_hosts: [Nas.LAN, 192.168.1.5, 'nas.lan:8374']}\n"+validLanguages).Active()
 		if got := a.Server.AllowedHosts(); !slices.Equal(got, []string{"nas.lan", "192.168.1.5"}) {
 			t.Errorf("AllowedHosts() = %v", got)
 		}
@@ -208,21 +208,21 @@ func TestServerSection(t *testing.T) {
 		}
 	})
 	t.Run("accepted entries of a failed list", func(t *testing.T) {
-		srv, _ := loadText(t, "server: {allowed_hosts: [nas.lan, http://x]}\n").Server()
+		srv, _ := loadText(t, "server: {allowed_hosts: [nas.lan, http://x]}\n"+validLanguages).Server()
 		if got := srv.AllowedHosts(); !slices.Equal(got, []string{"nas.lan"}) {
 			t.Errorf("AllowedHosts() = %v, want [nas.lan]", got)
 		}
 	})
 	for name, text := range map[string]string{"absent": "server: {}\n", "null": "server: {allowed_hosts: ~}\n", "empty": "server: {allowed_hosts: []}\n", "no section": ""} {
 		t.Run(name+" list allows every host", func(t *testing.T) {
-			a, ok := loadText(t, text).Active()
+			a, ok := loadText(t, text+validLanguages).Active()
 			if !ok || a.Server.AllowedHosts() != nil || a.Server.Hosts().Active() || !admits(a.Server, "evil.example") {
 				t.Errorf("Active %v, AllowedHosts %v", ok, a.Server.AllowedHosts())
 			}
 		})
 	}
 	t.Run("defaults and levels", func(t *testing.T) {
-		a, _ := loadText(t, "server: {}\n").Active()
+		a, _ := loadText(t, "server: {}\n"+validLanguages).Active()
 		if a.Server.LogLevel() != slog.LevelInfo || a.Server.LogFormat() != "json" {
 			t.Errorf("defaults %v %s", a.Server.LogLevel(), a.Server.LogFormat())
 		}

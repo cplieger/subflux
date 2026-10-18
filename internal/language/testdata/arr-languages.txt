@@ -1,0 +1,69 @@
+# The language names Sonarr and Radarr send, from Language.cs:
+# Sonarr src/NzbDrone.Core/Languages/Language.cs at 2b39049ee6e16e1b326792009ea4b985e29adf48
+# Radarr src/NzbDrone.Core/Languages/Language.cs at 7879a635dd5ae22e41bbe75dd39b6aadfe2e2358
+# One name per line, the union of both, sorted, then a tab and the tag
+# FromName answers, or - where it answers false.
+Afrikaans	af
+Albanian	sq
+Any	-
+Arabic	ar
+Azerbaijani	az
+Bengali	bn
+Bosnian	bs
+Bulgarian	bg
+Catalan	ca
+Chinese	zh
+Croatian	hr
+Czech	cs
+Danish	da
+Dutch	nl
+English	en
+Estonian	et
+Finnish	fi
+Flemish	nl-BE
+French	fr
+Georgian	ka
+German	de
+Greek	el
+Hebrew	he
+Hindi	hi
+Hungarian	hu
+Icelandic	is
+Indonesian	id
+Irish	ga
+Italian	it
+Japanese	ja
+Kannada	kn
+Korean	ko
+Latvian	lv
+Lithuanian	lt
+Macedonian	mk
+Malay	ms
+Malayalam	ml
+Marathi	mr
+Mongolian	mn
+Norwegian	no
+Original	-
+Persian	fa
+Polish	pl
+Portuguese	pt
+Portuguese (Brazil)	pt-BR
+Romanian	ro
+Romansh	rm
+Russian	ru
+Serbian	sr
+Slovak	sk
+Slovenian	sl
+Spanish	es
+Spanish (Latino)	es-419
+Swedish	sv
+Tagalog	fil
+Tamil	ta
+Telugu	te
+Thai	th
+Turkish	tr
+Ukrainian	uk
+Unknown	-
+Urdu	ur
+Uzbek	uz
+Vietnamese	vi

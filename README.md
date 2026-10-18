@@ -75,7 +75,7 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
 | `sonarr.api_key`, `radarr.api_key` | required | The API key from the General page of that app's Settings |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
-| `languages` | required | The subtitle languages to fetch for each audio language, plus a fallback list |
+| `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
 | `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
 | `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |

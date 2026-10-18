@@ -130,6 +130,10 @@ func (b *booted) markerPresent() bool {
 	return err == nil
 }
 
+// validLanguages is the smallest languages section that parses, for a file
+// whose test is about another section: an absent one fails the file.
+const validLanguages = "languages:\n  default: [{tag: en}]\n"
+
 func saveText(t *testing.T, svc *settings.Service, text string) {
 	t.Helper()
 	var doc yaml.Node
@@ -389,7 +393,7 @@ func TestChangeLoopCallsAppliedPerCommit(t *testing.T) {
 	want := map[string]slog.Level{"debug": slog.LevelDebug, "info": slog.LevelInfo, "warn": slog.LevelWarn, "error": slog.LevelError}
 	for i := range 100 {
 		name := levels[i%len(levels)]
-		saveText(t, svc, "server:\n  log_level: "+name+"\n")
+		saveText(t, svc, "server:\n  log_level: "+name+"\n"+validLanguages)
 		select {
 		case got := <-calls:
 			if got != want[name] {
@@ -434,7 +438,7 @@ func TestChangeLoopCallsAppliedPerCommit(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		go func() { _ = changeLoop(ctx, svc, level, obs.New(), nil) }()
-		saveText(t, svc, "server:\n  log_level: debug\n")
+		saveText(t, svc, "server:\n  log_level: debug\n"+validLanguages)
 		if !eventually(func() bool { return level.Level() == slog.LevelDebug }) {
 			t.Error("the loop with no hook did not apply the commit")
 		}

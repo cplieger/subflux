@@ -24,6 +24,7 @@ func FuzzLoad_neverAllowAllWhenListed(f *testing.F) {
 		"<<: {server: {allowed_hosts: [x]}}\n", "a: &k server\n*k: {allowed_hosts: [x]}\n",
 		"server: {allowed_hosts: []}\nserver: {allowed_hosts: [x]}\n", "server: !!map {allowed_hosts: !!seq []}\n",
 		"server: {allowed_hosts: [nas.lan, '${SUBFLUX_UNSET}']}\n", "x: &a 1\nserver: {allowed_hosts: [nas.lan]}\n",
+		"server: !!str\n", "server: {allowed_hosts: !!str ~}\n",
 	} {
 		f.Add([]byte(seed))
 	}

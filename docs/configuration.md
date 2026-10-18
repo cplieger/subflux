@@ -32,10 +32,11 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `sonarr.enabled`, `radarr.enabled` | `true` in the first-start file | Turn one app off without deleting its settings |
 | `sonarr.public_url`, `radarr.public_url` | _(unset)_ | The address your browser opens the app at, for links on the web page. Falls back to `url` |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
-| `languages` | required | The subtitle languages to fetch for each audio language, plus a fallback list |
-| `languages.rules[].audio` | required | A two-letter ISO 639-1 audio language, such as `en`. `pb` is Brazilian Portuguese |
-| `languages.rules[].subtitles[]` | required | Targets with a `code`, optional `variants` (`standard`, `forced`, `hi`), `min_score`, `providers` and `exclude`. An empty list fetches nothing |
-| `languages.default` | _(unset)_ | The targets for audio languages no rule matches. Remove it to skip them |
+| `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
+| `languages.close_varieties` | `false` | Download a close variety automatically when the exact one is missing, such as `pt-PT` or bare `pt` for a `pt-BR` target |
+| `languages.default[]` | `[]` | The targets for items no rule matches, at most 16. Each has a `tag` and optional `variants` (`standard`, `hi`, `forced`), default `[standard]` |
+| `languages.rules[].audio` | required | A language tag, such as `ja` or `pt-BR`. subflux tries an item's original language first, then each audio track, and the rule whose tag is closest wins |
+| `languages.rules[].targets[]` | required | The targets for an item the rule matches, at most 16. An empty list fetches nothing and skips `default` |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
 | `providers.<name>.priority` | per site | Breaks a tie between equal scores. Lower is more trusted |
 | `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |
@@ -87,7 +88,9 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 
 Durations accept `s`, `m` and `h`, plus `D` for days, `M` for 730-hour months and `Y` for years. Fractions work, such as `0.5D`, and `s`, `m` and `h` combine, such as `1h30m`.
 
-Language codes are checked when the file loads, so a typo is reported at the start instead of matching nothing. Use the two-letter form: `en`, not `eng` or `EN`, and `pb` rather than `pt-BR`. The error names the code to use.
+Language tags are checked when the file loads, so a typo is reported at the start instead of matching nothing. Write each tag in its standard form, such as `en`, `pt-BR`, `es-419` or `zh-Hant`. The error names the form to use: `eng` answers "use en" and `pb` answers "use pt-BR". A Chinese target names its script, `zh-Hans` or `zh-Hant`. A file may hold at most 64 rules and 32 distinct target languages.
+
+Subtitle files named the way other tools name them still count. `movie.pb.srt` reads as `pt-BR`, and `movie.cht.srt` as `zh-Hant`. That is also why `cht`, `spl` and `es-LA` are refused as targets: a file named with them reads as Traditional Chinese or Latin American Spanish, so name those targets `zh-Hant` and `es-419`.
 
 ## Environment variables in config.yaml
 

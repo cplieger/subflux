@@ -113,7 +113,10 @@ func parse(root *yaml.Node, _ Registries, f fileState) Snapshot {
 	if stored != nil {
 		s.doc, s.view = stored, view(stored, doc)
 	}
-	if len(errs) == 0 {
+	// With no file there is nothing to refuse: Unconfigured runs each section
+	// at its owner's defaults even where the owner refuses an absent section,
+	// as languages does.
+	if len(errs) == 0 || mode == Unconfigured {
 		return Snapshot{s}
 	}
 	s.mode, s.failure, s.serverOK = Failed, errs, !failed["server"]

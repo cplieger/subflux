@@ -2,6 +2,7 @@ package settings
 
 import (
 	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -18,6 +19,11 @@ var sections = []section{
 	{key: "server", parse: func(n *yaml.Node, a *Active) []formschema.FieldError {
 		var errs []formschema.FieldError
 		a.Server, errs = parseServer(n)
+		return errs
+	}},
+	{key: "languages", parse: func(n *yaml.Node, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Languages, errs = language.ParsePolicy(n)
 		return errs
 	}},
 }

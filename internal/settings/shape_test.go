@@ -26,7 +26,7 @@ func TestLoadRefusesShapes(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			_, calls := testSection(t)
-			s := loadText(t, c.text)
+			s := loadText(t, c.text+validLanguages)
 			if got := failurePaths(t, s); !slices.Equal(got, c.paths) {
 				t.Errorf("paths %v, want %v", got, c.paths)
 			}
@@ -36,7 +36,7 @@ func TestLoadRefusesShapes(t *testing.T) {
 		})
 	}
 	t.Run("top-level merge key fails every section", func(t *testing.T) {
-		s := loadText(t, "<<: {server: {allowed_hosts: [nas.lan]}}\n")
+		s := loadText(t, "<<: {server: {allowed_hosts: [nas.lan]}}\n"+validLanguages)
 		if got := failurePaths(t, s); !slices.Equal(got, []string{"<<"}) {
 			t.Errorf("paths %v, want [<<]", got)
 		}
@@ -46,7 +46,7 @@ func TestLoadRefusesShapes(t *testing.T) {
 	})
 	t.Run("a refused shape leaves other sections parsing", func(t *testing.T) {
 		got, calls := testSection(t)
-		s := loadText(t, "t: {a: kept}\nx: &a 1\n")
+		s := loadText(t, "t: {a: kept}\nx: &a 1\n"+validLanguages)
 		if paths := failurePaths(t, s); !slices.Equal(paths, []string{"x", "x"}) {
 			t.Errorf("paths %v, want [x x] (shape, unknown section)", paths)
 		}
