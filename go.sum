@@ -18,8 +18,8 @@ github.com/cplieger/runesafe/v3 v3.1.0 h1:nT5wl7iRvs2LXSy3zM3+yXgx8EQG6ktpHzs4SE
 github.com/cplieger/runesafe/v3 v3.1.0/go.mod h1:fRNhoxNxl4NHo4xkFyf5hePwPE7lGwcuGYN9MwyKZDU=
 github.com/cplieger/slogx v1.7.0 h1:BObi90ZGndVLzhbNvGZevH3RQQiHsTGhVR1tmT9N5FI=
 github.com/cplieger/slogx v1.7.0/go.mod h1:OVpRiI3PBCUgA0uWdER654LNftjSDHbV/7PDYMoemTA=
-github.com/cplieger/ssrf/v4 v4.5.0-dev.2 h1:tS7KaUx3Bz3B01N/oz/nNd65b/QRsgX/5/Zn4RGa8NY=
-github.com/cplieger/ssrf/v4 v4.5.0-dev.2/go.mod h1:A8DYChfizaq67VhJ3vZCnVpZgclBuAs6B9FMbBg0AFo=
+github.com/cplieger/ssrf/v4 v4.5.0-dev.3 h1:mcQmKSl0EHcq2twkfDFjnxeJeZGNv02B2vChI5kOcr0=
+github.com/cplieger/ssrf/v4 v4.5.0-dev.3/go.mod h1:RL5aXul3iP9U28JyTL8fjg9RnEgrjrow4V+M6AbGlcE=
 github.com/cplieger/webhttp/v3 v3.0.2 h1:4eAHYipBy/4tdGUM0S9shdvjkX97Lw2bhulJ3z94cZE=
 github.com/cplieger/webhttp/v3 v3.0.2/go.mod h1:pl50N8nFHBn/2Le+YTpXgSRdmtkS9dt26LRXl/X9uZc=
 github.com/cplieger/xmlx v1.0.6 h1:oKsCEocYbKcWM/4+j+l+QlPv4Myvqj+HQ3X+j5naDns=
