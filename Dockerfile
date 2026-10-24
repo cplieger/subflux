@@ -13,7 +13,7 @@ ARG FFMPEG_VERSION=9.0.2
 ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
 # --- Source downloads (cached independently) ---
-FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS sources
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 ARG FFMPEG_VERSION
@@ -88,7 +88,7 @@ EOF
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
 # Produces ~5MB ffmpeg + ~2MB ffprobe. No network, no HW accel.
-FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS ffmpeg-builder
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS ffmpeg-builder
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
@@ -165,7 +165,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 # the pinned @cplieger client libraries; the bundling itself happens in the
 # Go builder stage via cmd/bundle (esbuild's Go API — see that stage), which
 # consumes this stage's static-src tree with the fetched node_modules.
-FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS ts-builder
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018
@@ -200,9 +200,9 @@ ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.2.0
 # renovate: datasource=npm depName=@cplieger/fetch
 ARG CPLIEGER_FETCH_VERSION=2.2.2
 # renovate: datasource=npm depName=@cplieger/keyenc
-ARG CPLIEGER_KEYENC_VERSION=1.0.11
+ARG CPLIEGER_KEYENC_VERSION=1.1.0
 # renovate: datasource=npm depName=@cplieger/sse
-ARG CPLIEGER_SSE_VERSION=1.2.0
+ARG CPLIEGER_SSE_VERSION=1.2.1
 
 # Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
 # client compiles from the ARG-pinned npm tarballs below, while
@@ -301,7 +301,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     sh scripts/collect-licenses.sh --name subflux .
 
 # --- Final image ---
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99
 
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
