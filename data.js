@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792537510839,
-  "repoUrl": "https://github.com/cplieger/subflux",
+  "lastUpdate": 1793142052631,
+  "repoUrl": "https://github.com/cplieger/ci",
   "entries": {
     "Benchmark": [
       {
@@ -26477,6 +26477,1879 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkWeightedMedianOffset",
             "value": 7838,
             "range": "± 938.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "tribble-trouble[bot]",
+            "username": "tribble-trouble[bot]",
+            "email": "338123824+tribble-trouble[bot]@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "a4adc2450f849e94a70171386398350c33f7b66f",
+          "message": "chore(deps): update cplieger/ci digest to a00f6a5 (#890)\n\nCo-authored-by: tribble-trouble[bot] <338123824+tribble-trouble[bot]@users.noreply.github.com>",
+          "timestamp": "2026-10-27T02:08:25Z",
+          "url": "https://github.com/cplieger/ci/commit/a4adc2450f849e94a70171386398350c33f7b66f"
+        },
+        "date": 1793142052328,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkAlign/200 - B/op",
+            "value": 1261803,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkAlign/200 - allocs/op",
+            "value": 5456,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkAlign/200",
+            "value": 3144019,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkAlign/50 - B/op",
+            "value": 189934,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkAlign/50 - allocs/op",
+            "value": 1301,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkAlign/50",
+            "value": 691750,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkAlign/500 - B/op",
+            "value": 4635481,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkAlign/500 - allocs/op",
+            "value": 14075,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkAlign/500",
+            "value": 10825887,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/asymmetric_100x1500 - B/op",
+            "value": 38387763.5,
+            "range": "± 2.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/asymmetric_100x1500 - allocs/op",
+            "value": 7,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/asymmetric_100x1500",
+            "value": 8970694.5,
+            "range": "± 171888.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/large_2000 - B/op",
+            "value": 95985728,
+            "range": "± 5.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/large_2000 - allocs/op",
+            "value": 8,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/large_2000",
+            "value": 57745066,
+            "range": "± 2740963",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/medium_500 - B/op",
+            "value": 23986233.5,
+            "range": "± 1.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/medium_500 - allocs/op",
+            "value": 8,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/medium_500",
+            "value": 7002437.5,
+            "range": "± 376209.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/small_50 - B/op",
+            "value": 163880,
+            "range": "± 0.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/small_50 - allocs/op",
+            "value": 6,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignConstantOffset/small_50",
+            "value": 531878,
+            "range": "± 988.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlignWithSplits - B/op",
+            "value": 374782,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkAlignWithSplits - allocs/op",
+            "value": 53,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkAlignWithSplits",
+            "value": 22496349,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/already_2char - B/op",
+            "value": 228,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/already_2char - allocs/op",
+            "value": 3,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/already_2char",
+            "value": 869.9,
+            "range": "± 8.55",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/empty - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/empty - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/empty",
+            "value": 2.187,
+            "range": "± 0.039",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/known_3char - B/op",
+            "value": 228,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/known_3char - allocs/op",
+            "value": 3,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/known_3char",
+            "value": 993.05,
+            "range": "± 52.7",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/unknown_3char - B/op",
+            "value": 240,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/unknown_3char - allocs/op",
+            "value": 4,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAlpha2FromAlpha3/unknown_3char",
+            "value": 446.8,
+            "range": "± 6.6",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/1000_cues - B/op",
+            "value": 128056,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/1000_cues - allocs/op",
+            "value": 8002,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/1000_cues",
+            "value": 306956,
+            "range": "± 1300.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/100_cues - B/op",
+            "value": 12848,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/100_cues - allocs/op",
+            "value": 801,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/100_cues",
+            "value": 30816,
+            "range": "± 293",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/500_cues - B/op",
+            "value": 64056,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/500_cues - allocs/op",
+            "value": 4002,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAudioSync/500_cues",
+            "value": 153567,
+            "range": "± 954.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/hit - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/hit - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/hit",
+            "value": 79.695,
+            "range": "± 0.155",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/miss - B/op",
+            "value": 944,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/miss - allocs/op",
+            "value": 7,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_GetOrFetch/miss",
+            "value": 565.3,
+            "range": "± 3.2",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_concurrent - B/op",
+            "value": 7,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_concurrent - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCache_concurrent",
+            "value": 81.38,
+            "range": "± 56.025",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkClusterCandidates - B/op",
+            "value": 1080,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkClusterCandidates - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkClusterCandidates",
+            "value": 16712.5,
+            "range": "± 54",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/100_cues - B/op",
+            "value": 2612588,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/100_cues - allocs/op",
+            "value": 49,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/100_cues",
+            "value": 10751182,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/2000_cues - B/op",
+            "value": 384340120,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/2000_cues - allocs/op",
+            "value": 61,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/2000_cues",
+            "value": 251787964,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/500_cues - B/op",
+            "value": 96047258,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/500_cues - allocs/op",
+            "value": 61,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkCorrectFramerate/500_cues",
+            "value": 27432006,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkCountNonText - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountNonText - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountNonText",
+            "value": 346.05,
+            "range": "± 1",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000 - B/op",
+            "value": 5271.5,
+            "range": "± 5243",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000",
+            "value": 3952829.5,
+            "range": "± 41484",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000 - B/op",
+            "value": 198277.5,
+            "range": "± 108475",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000",
+            "value": 17697776,
+            "range": "± 538258",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000 - B/op",
+            "value": 2552.5,
+            "range": "± 1521.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000",
+            "value": 2117266.5,
+            "range": "± 229147",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000 - B/op",
+            "value": 105.5,
+            "range": "± 9",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000",
+            "value": 133249.5,
+            "range": "± 5385",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/100 - B/op",
+            "value": 5856,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/100 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/100",
+            "value": 7992.5,
+            "range": "± 27.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/1000 - B/op",
+            "value": 76384,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/1000 - allocs/op",
+            "value": 13,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/1000",
+            "value": 276338,
+            "range": "± 19744.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/500 - B/op",
+            "value": 40928,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/500 - allocs/op",
+            "value": 12,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDPAlign/500",
+            "value": 117755.5,
+            "range": "± 842",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024",
+            "value": 16313,
+            "range": "± 33.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256",
+            "value": 3523,
+            "range": "± 9.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096",
+            "value": 79300.5,
+            "range": "± 131",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=10 - B/op",
+            "value": 4504,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=10 - allocs/op",
+            "value": 15,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=10",
+            "value": 1526,
+            "range": "± 99.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=200 - B/op",
+            "value": 81296,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=200 - allocs/op",
+            "value": 209,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=200",
+            "value": 26803,
+            "range": "± 1097.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=50 - B/op",
+            "value": 19256,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=50 - allocs/op",
+            "value": 57,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSearchResults/n=50",
+            "value": 6235,
+            "range": "± 188",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=10 - B/op",
+            "value": 4784,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=10 - allocs/op",
+            "value": 15,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=10",
+            "value": 3543.5,
+            "range": "± 192",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=100 - B/op",
+            "value": 42739,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=100 - allocs/op",
+            "value": 109,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=100",
+            "value": 31620.5,
+            "range": "± 4820",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=50 - B/op",
+            "value": 20656,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=50 - allocs/op",
+            "value": 57,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFilterSubtitleData/items=50",
+            "value": 15828,
+            "range": "± 153.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkIsHearingImpaired - B/op",
+            "value": 16,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkIsHearingImpaired - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkIsHearingImpaired",
+            "value": 525.75,
+            "range": "± 5.35",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_no_overrides - B/op",
+            "value": 228,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_no_overrides - allocs/op",
+            "value": 3,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_no_overrides",
+            "value": 887.55,
+            "range": "± 4.85",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_with_overrides - B/op",
+            "value": 228,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_with_overrides - allocs/op",
+            "value": 3,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/known_with_overrides",
+            "value": 891.1,
+            "range": "± 36.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/override_hit - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/override_hit - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/override_hit",
+            "value": 28.135,
+            "range": "± 0.09",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/unknown - B/op",
+            "value": 240,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/unknown - allocs/op",
+            "value": 4,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLookupLangName/unknown",
+            "value": 344.1,
+            "range": "± 8.15",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=1024 - B/op",
+            "value": 98119.5,
+            "range": "± 241",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=1024 - allocs/op",
+            "value": 1052,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=1024",
+            "value": 513968,
+            "range": "± 3860.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=128 - B/op",
+            "value": 11278.5,
+            "range": "± 11",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=128 - allocs/op",
+            "value": 150,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=128",
+            "value": 50593.5,
+            "range": "± 5296",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=256 - B/op",
+            "value": 23605.5,
+            "range": "± 18",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=256 - allocs/op",
+            "value": 280,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=256",
+            "value": 109109.5,
+            "range": "± 3083.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=512 - B/op",
+            "value": 48310.5,
+            "range": "± 81.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=512 - allocs/op",
+            "value": 538,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=512",
+            "value": 235108,
+            "range": "± 2662.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=64 - B/op",
+            "value": 5613,
+            "range": "± 6",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=64 - allocs/op",
+            "value": 84,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/assertion_scan_cost/n=64",
+            "value": 23972,
+            "range": "± 180",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=1024 - B/op",
+            "value": 41308,
+            "range": "± 211",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=1024 - allocs/op",
+            "value": 254,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=1024",
+            "value": 3295634,
+            "range": "± 76062.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=128 - B/op",
+            "value": 5119.5,
+            "range": "± 12",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=128 - allocs/op",
+            "value": 47,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=128",
+            "value": 331666.5,
+            "range": "± 5259.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=256 - B/op",
+            "value": 10061.5,
+            "range": "± 13",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=256 - allocs/op",
+            "value": 77,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=256",
+            "value": 723005.5,
+            "range": "± 14577",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=512 - B/op",
+            "value": 20172.5,
+            "range": "± 73.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=512 - allocs/op",
+            "value": 137,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=512",
+            "value": 1545832.5,
+            "range": "± 38301",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=64 - B/op",
+            "value": 2780,
+            "range": "± 5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=64 - allocs/op",
+            "value": 31,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/flagship_release_group/n=64",
+            "value": 146546.5,
+            "range": "± 3543.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=1024 - B/op",
+            "value": 504.5,
+            "range": "± 4",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=1024 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=1024",
+            "value": 52939.5,
+            "range": "± 896.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=128 - B/op",
+            "value": 499,
+            "range": "± 1.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=128 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=128",
+            "value": 7712.5,
+            "range": "± 205.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=256 - B/op",
+            "value": 500,
+            "range": "± 2",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=256 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=256",
+            "value": 14156.5,
+            "range": "± 417.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=512 - B/op",
+            "value": 502,
+            "range": "± 3",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=512 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=512",
+            "value": 27465,
+            "range": "± 399",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=64 - B/op",
+            "value": 499,
+            "range": "± 1",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=64 - allocs/op",
+            "value": 9,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/retry_worst_case/n=64",
+            "value": 4430.5,
+            "range": "± 25.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=1024 - B/op",
+            "value": 53774,
+            "range": "± 45",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=1024 - allocs/op",
+            "value": 705,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=1024",
+            "value": 262100,
+            "range": "± 1946.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=128 - B/op",
+            "value": 9919.5,
+            "range": "± 5.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=128 - allocs/op",
+            "value": 105,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=128",
+            "value": 30539,
+            "range": "± 2569.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=256 - B/op",
+            "value": 20878,
+            "range": "± 36.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=256 - allocs/op",
+            "value": 191,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=256",
+            "value": 59821.5,
+            "range": "± 492.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=512 - B/op",
+            "value": 42881,
+            "range": "± 31",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=512 - allocs/op",
+            "value": 365,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=512",
+            "value": 128687,
+            "range": "± 1525.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=64 - B/op",
+            "value": 4895.5,
+            "range": "± 5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=64 - allocs/op",
+            "value": 59,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPCREScaling/witness_nested_branch/n=64",
+            "value": 15461.5,
+            "range": "± 79",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseName - B/op",
+            "value": 6709,
+            "range": "± 28.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseName - allocs/op",
+            "value": 110,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseName",
+            "value": 612555,
+            "range": "± 5890.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseSRT - B/op",
+            "value": 194906.5,
+            "range": "± 69.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseSRT - allocs/op",
+            "value": 1516,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseSRT",
+            "value": 112230.5,
+            "range": "± 1030.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcess - B/op",
+            "value": 317016.5,
+            "range": "± 328",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcess - allocs/op",
+            "value": 8402,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcess",
+            "value": 1134780,
+            "range": "± 127935.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcessBytes - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcessBytes - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPostProcessBytes",
+            "value": 4.055,
+            "range": "± 0.0045",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=1 - B/op",
+            "value": 2,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=1 - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=1",
+            "value": 12.79,
+            "range": "± 0.24",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=2 - B/op",
+            "value": 2,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=2 - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=2",
+            "value": 12.815,
+            "range": "± 0.725",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=3 - B/op",
+            "value": 2,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=3 - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Download/attempts=3",
+            "value": 12.82,
+            "range": "± 0.05",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=1 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=1 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=1",
+            "value": 4.371,
+            "range": "± 0.0085",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=2 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=2 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=2",
+            "value": 4.3685,
+            "range": "± 0.0085",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=3 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=3 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRetryProvider/Search/attempts=3",
+            "value": 4.3695,
+            "range": "± 0.008",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/100_cues - B/op",
+            "value": 654257.5,
+            "range": "± 1.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/100_cues - allocs/op",
+            "value": 10,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/100_cues",
+            "value": 2328698,
+            "range": "± 111383.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/2000_cues - B/op",
+            "value": 96116818.5,
+            "range": "± 8",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/2000_cues - allocs/op",
+            "value": 14,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/2000_cues",
+            "value": 57672867.5,
+            "range": "± 2810418",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/500_cues - B/op",
+            "value": 24019025,
+            "range": "± 0.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/500_cues - allocs/op",
+            "value": 14,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncCues/500_cues",
+            "value": 6894530.5,
+            "range": "± 214524",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/200_cues_framerate - B/op",
+            "value": 307328843,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/200_cues_framerate - allocs/op",
+            "value": 716,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/200_cues_framerate",
+            "value": 82538481,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/500_cues_splits - B/op",
+            "value": 799901848,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/500_cues_splits - allocs/op",
+            "value": 1472,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/500_cues_splits",
+            "value": 338122840,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/50_cues_offset - B/op",
+            "value": 190914,
+            "unit": "B/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/50_cues_offset - allocs/op",
+            "value": 141,
+            "unit": "allocs/op"
+          },
+          {
+            "name": "BenchmarkSyncWithOptions/50_cues_offset",
+            "value": 668550,
+            "unit": "ns/op"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_0 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_0 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_0",
+            "value": 1225,
+            "range": "± 2.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_1 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_1 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_1",
+            "value": 1225,
+            "range": "± 2.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_2 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_2 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_2",
+            "value": 1224,
+            "range": "± 5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_3 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_3 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVADProcessFrame/mode_3",
+            "value": 1223.5,
+            "range": "± 12.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/4096B - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/4096B - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/4096B",
+            "value": 399.95,
+            "range": "± 0.95",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/512B - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/512B - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/512B",
+            "value": 326.95,
+            "range": "± 0.65",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/64B - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/64B - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkValidate/64B",
+            "value": 108.45,
+            "range": "± 0.35",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/10_candidates - B/op",
+            "value": 40440,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/10_candidates - allocs/op",
+            "value": 27,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/10_candidates",
+            "value": 32949,
+            "range": "± 332",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/2_candidates - B/op",
+            "value": 7720,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/2_candidates - allocs/op",
+            "value": 8,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/2_candidates",
+            "value": 3721.5,
+            "range": "± 36",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/5_candidates - B/op",
+            "value": 20152,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/5_candidates - allocs/op",
+            "value": 16,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkVoteOnCandidates/5_candidates",
+            "value": 12476,
+            "range": "± 110",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWeightedMedianOffset - B/op",
+            "value": 6528,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWeightedMedianOffset - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWeightedMedianOffset",
+            "value": 7848.5,
+            "range": "± 250",
             "unit": "ns/op",
             "extra": "10 samples, median"
           }
