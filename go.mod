@@ -18,7 +18,7 @@ require (
 	github.com/cplieger/xmlx v1.1.0
 	github.com/nwaples/rardecode/v2 v2.4.5
 	github.com/ulikunitz/xz v0.5.17
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/sync v0.24.0
 	pgregory.net/rapid v1.3.0
 )
