@@ -18,6 +18,8 @@ github.com/cplieger/envx/yamlenv/v2 v2.0.3 h1:ED9OyefBaGKA1zu3zeiJEmX6+hbRJqjdV/
 github.com/cplieger/envx/yamlenv/v2 v2.0.3/go.mod h1:xFCFAHUJC/SvFw2vBxj8zH6jZdCVyBQN8XjF7fvfpRY=
 github.com/cplieger/envx/yamlenv/v2 v2.2.0 h1:o8PbjJCAAFYEL4tDtJILOYzvcds27iPGRbvhG3WW4tI=
 github.com/cplieger/envx/yamlenv/v2 v2.2.0/go.mod h1:idpaUHFHf3XxK7soZZP93XbrjgJzZ0AZvkBR9K/iVdo=
+github.com/cplieger/envx/yamlenv/v2 v2.3.0 h1:tQGLB8XOoFaD0/J8oUG93zlu+v06E/piS3kKeFE+l5k=
+github.com/cplieger/envx/yamlenv/v2 v2.3.0/go.mod h1:1vDYAReMA98JUrHG8GwspoTTOXvyIZMophegTUPRpM8=
 github.com/cplieger/health v1.8.2 h1:diGNLq2UwTYpprTMJg0Dc5sd5l4Ec1wNFk1Ri8vaEGQ=
 github.com/cplieger/health v1.8.2/go.mod h1:uiQm1zh3/7TGZffTX9W0p+GRTbVXfEM9POyWe1Rf0PU=
 github.com/cplieger/health v1.10.0 h1:t56+GKvpseo3FwFIXVcEyNrBe0Pb/YpjW17uKUeCqe4=
@@ -60,6 +62,8 @@ github.com/cplieger/ssrf/v4 v4.4.0 h1:ItIoYNWrg//DzOUCfWeCWhDILFIHwOUIm6vXssL1Tb
 github.com/cplieger/ssrf/v4 v4.4.0/go.mod h1:XssdRD8XPxVlxQkVOBLIOyi0aMhjG2xxO5uvAaiXZBg=
 github.com/cplieger/ssrf/v4 v4.4.1 h1:/tZ+zhoHEWLw6TxNsQZV3jExG6NI8ooMPwx9AHKpH4c=
 github.com/cplieger/ssrf/v4 v4.4.1/go.mod h1:JbdhAU/ANQBghfS7DJb35Lxzqf9CP9XmzLJUcymV7NI=
+github.com/cplieger/ssrf/v4 v4.5.0 h1:pnaK2UER1WKWVPTbz2p2APs0OEicRj/uOcqBlrhW+IM=
+github.com/cplieger/ssrf/v4 v4.5.0/go.mod h1:JbdhAU/ANQBghfS7DJb35Lxzqf9CP9XmzLJUcymV7NI=
 github.com/cplieger/webhttp/v3 v3.0.2 h1:4eAHYipBy/4tdGUM0S9shdvjkX97Lw2bhulJ3z94cZE=
 github.com/cplieger/webhttp/v3 v3.0.2/go.mod h1:pl50N8nFHBn/2Le+YTpXgSRdmtkS9dt26LRXl/X9uZc=
 github.com/cplieger/webhttp/v3 v3.0.3 h1:2N07M8hpw6VuYRKDqtqs63OcwXu99vV09XKELcEU67I=
