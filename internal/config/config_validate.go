@@ -145,28 +145,41 @@ func validate(ctx context.Context, cfg *Config) error {
 	if _, err := parseAllowedHosts(cfg.AllowedHosts); err != nil {
 		ve.add(err)
 	}
-	if cfg.Auth.DisableAuth {
+	ve.add(validateAuth(&cfg.Auth))
+	ve.add(checkMediaRoots(ctx, cfg.MediaRootDirs))
+	return ve.err()
+}
+
+// validateAuth WARNs on a bypassed or unusable auth setting and refuses a
+// config that would leave no way to log in.
+func validateAuth(a *yamlAuthConfig) error {
+	if a.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}
-	warnIllegalWebAuthnRPID(cfg.Auth.WebAuthnRPID)
-	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
-		ve.add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it"))
+	warnIllegalWebAuthnRPID(a.WebAuthnRPID)
+	if a.BasicEnabled != nil && !*a.BasicEnabled && !a.OIDCEnabled {
+		return errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true, otherwise no one could log in. A CLI override can re-enable it")
 	}
-	if len(cfg.MediaRootDirs) == 0 {
+	return nil
+}
+
+// checkMediaRoots WARNs on a missing or unreadable media root; it fails only
+// when ctx ends.
+func checkMediaRoots(ctx context.Context, roots []string) error {
+	if len(roots) == 0 {
 		slog.Warn("media_roots not configured, path-based operations (preview, sync, manual download, subtitle deletion) will be refused")
-	} else {
-		for _, root := range cfg.MediaRootDirs {
-			if err := ctx.Err(); err != nil {
-				ve.add(err)
-				break
-			}
-			if _, err := os.Stat(root); err != nil {
-				slog.Warn("media root not accessible at config load time",
-					"root", root, "error", err)
-			}
+		return nil
+	}
+	for _, root := range roots {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, err := os.Stat(root); err != nil {
+			slog.Warn("media root not accessible at config load time",
+				"root", root, "error", err)
 		}
 	}
-	return ve.err()
+	return nil
 }
 
 // warnIllegalWebAuthnRPID WARNs rather than failing the load: a passkey field
