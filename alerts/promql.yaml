@@ -36,24 +36,6 @@ groups:
             configured scrape target. Check for a dropped target, a removed scrape
             config, or a deleted Kubernetes pod or ServiceMonitor. Every other rule
             in this group is blind.
-      # The deadman for the scan loop. The uptime guard is required. After a
-      # restart, increase() reads 0 as soon as there are two samples, so without
-      # the guard this fires after every restart. subflux_configured keeps it
-      # quiet in unconfigured mode, where there is no scan to miss.
-      - alert: SubfluxScanStalled
-        expr: >
-          subflux_configured == 1
-          and increase(subflux_scans_total[26h]) == 0
-          and (time() - process_start_time_seconds) > 93600
-        for: 2h
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux has not completed a scan in over a day"
-          description: >
-            subflux is configured and has been up for over 26h, but no scheduled
-            scan completed in that window. The scheduler or a scan may be stuck,
-            or the arrs unreachable. Check the subflux logs and /api/activity.
       - alert: SubfluxHTTP5xx
         expr: sum(increase(subflux_http_requests_total{status=~"5.."}[10m])) > 5
         for: 10m
@@ -62,65 +44,5 @@ groups:
         annotations:
           summary: "subflux is returning HTTP 5xx"
           description: >
-            subflux returned more than 5 server errors in 10m. Check upstream
-            connectivity, provider config, and the subflux logs.
-      - alert: SubfluxBackupStale
-        expr: >
-          subflux_backup_last_success_timestamp > 0
-          and (time() - subflux_backup_last_success_timestamp) > 172800
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux backup is stale"
-          description: >
-            No successful subflux backup recorded in over 48h. Check the backup
-            task and the /config volume.
-      # A provider that rejects its credentials is stopped after three
-      # attempts so it is not hammered into a forced password reset, and it
-      # stays stopped until someone fixes it. The second arm covers an
-      # optional setting the provider refused while the provider keeps
-      # working, such as AnimeTosho's AniDB client key.
-      - alert: SubfluxProviderCredentialsRejected
-        expr: >
-          max by (provider) (subflux_provider_disabled) == 1
-          or max by (provider) (subflux_provider_setting_rejected) == 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux: {{ $labels.provider }} rejected a credential"
-          description: >
-            The provider rejected a credential and subflux stopped using it. After
-            three attempts that is the whole provider, otherwise only the rejected
-            optional setting. Fix it in the settings dialog and save, or use the
-            provider's Test button.
-      # The rule reads a gauge and not the write-error counter. While a folder is
-      # unwritable no subtitle work happens there, so an increase() rule would
-      # resolve while the share is still broken. The gauge stays at 1 until every
-      # folder marked under the root passes a write test or a save.
-      - alert: SubfluxMediaUnwritable
-        expr: max by (root) (subflux_media_root_unwritable) == 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux cannot write subtitle files in a folder under {{ $labels.root }}"
-          description: >
-            A folder under this media root failed a write and has not accepted one
-            since, so no subtitles are saved there. The share may be read-only,
-            full or refusing subflux's user. The web UI and the log name the
-            folder.
-      # The gauge stays at 1 until the path that failed reads again, which the
-      # recheck tries every 5 minutes.
-      - alert: SubfluxMediaUnavailable
-        expr: max by (root) (subflux_media_root_unavailable) == 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "subflux cannot read the media under {{ $labels.root }}"
-          description: >
-            A file under this media root could not be checked, so the share is
-            likely unmounted or hung. Nothing under it is treated as deleted and
-            new imports there wait. The web UI and the log name the path.
+            subflux returned more than 5 server errors in 10m. The subflux log
+            names each failed request.

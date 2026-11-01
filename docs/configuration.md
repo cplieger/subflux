@@ -2,11 +2,13 @@
 
 This page lists every setting and command of subflux, for readers who write `config.yaml` by hand or want to change more than the setup wizard asks.
 
+The `dev` branch is being rebuilt, so its image reads `/config/config.yaml` at start but has no setup wizard or Settings dialog yet. The rest of this page describes subflux once the rebuild lands.
+
 ## Where settings live
 
 Settings live in `/config/config.yaml`. The Settings dialog on the web page edits every one of them, and a save that passes its checks applies at once, with no restart. That includes login, passkey, OIDC and logging changes. A save that fails its checks is refused, and the running settings stay as they were.
 
-On its first start, subflux writes the annotated [`config.example.yaml`](../config.example.yaml) as `/config/config.yaml` and opens the setup wizard. You can also write the file before the first start. The Default column below is the value used when a key is absent from the file.
+With no `/config/config.yaml`, subflux starts unconfigured, and the first settings save writes the file. You can also write the file before the first start. The Default column below is the value used when a key is absent from the file.
 
 ## First start
 
@@ -30,13 +32,14 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `sonarr.enabled`, `radarr.enabled` | `true` in the first-start file | Turn one app off without deleting its settings |
 | `sonarr.public_url`, `radarr.public_url` | _(unset)_ | The address your browser opens the app at, for links on the web page. Falls back to `url` |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
-| `languages` | required | The subtitle languages to fetch for each audio language, plus a fallback list |
-| `languages.rules[].audio` | required | A two-letter ISO 639-1 audio language, such as `en`. `pb` is Brazilian Portuguese |
-| `languages.rules[].subtitles[]` | required | Targets with a `code`, optional `variants` (`standard`, `forced`, `hi`), `min_score`, `providers` and `exclude`. An empty list fetches nothing |
-| `languages.default` | _(unset)_ | The targets for audio languages no rule matches. Remove it to skip them |
+| `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
+| `languages.close_varieties` | `false` | Download a close variety automatically when the exact one is missing, such as `pt-PT` or bare `pt` for a `pt-BR` target |
+| `languages.default[]` | `[]` | The targets for items no rule matches, at most 16. Each has a `tag` and optional `variants` (`standard`, `hi`, `forced`), default `[standard]` |
+| `languages.rules[].audio` | required | A language tag, such as `ja` or `pt-BR`. subflux tries an item's original language first, then each audio track, and the rule whose tag is closest wins |
+| `languages.rules[].targets[]` | required | The targets for an item the rule matches, at most 16. An empty list fetches nothing and skips `default` |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
 | `providers.<name>.priority` | per site | Breaks a tie between equal scores. Lower is more trusted |
-| `providers.<name>.settings` | per site | Account settings. [`config.example.yaml`](../config.example.yaml) lists each site's keys and where to get them |
+| `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |
 | `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
 | `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |
 | `search.upgrade_enabled` | `true` | Look for better subtitles during scans |
@@ -85,7 +88,9 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 
 Durations accept `s`, `m` and `h`, plus `D` for days, `M` for 730-hour months and `Y` for years. Fractions work, such as `0.5D`, and `s`, `m` and `h` combine, such as `1h30m`.
 
-Language codes are checked when the file loads, so a typo is reported at the start instead of matching nothing. Use the two-letter form: `en`, not `eng` or `EN`, and `pb` rather than `pt-BR`. The error names the code to use.
+Language tags are checked when the file loads, so a typo is reported at the start instead of matching nothing. Write each tag in its standard form, such as `en`, `pt-BR`, `es-419` or `zh-Hant`. The error names the form to use: `eng` answers "use en" and `pb` answers "use pt-BR". A Chinese target names its script, `zh-Hans` or `zh-Hant`. A file may hold at most 64 rules and 32 distinct target languages.
+
+Subtitle files named the way other tools name them still count. `movie.pb.srt` reads as `pt-BR`, and `movie.cht.srt` as `zh-Hant`. That is also why `cht`, `spl` and `es-LA` are refused as targets: a file named with them reads as Traditional Chinese or Latin American Spanish, so name those targets `zh-Hant` and `es-419`.
 
 ## Environment variables in config.yaml
 

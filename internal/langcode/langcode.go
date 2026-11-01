@@ -26,7 +26,7 @@ package langcode
 import (
 	"strings"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 // BrazilianPortuguese is subflux's internal code for Brazilian Portuguese.

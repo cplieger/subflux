@@ -1,436 +1,106 @@
-// Package obs owns Subflux's observability surface: the Prometheus registry
-// (exposition prefix "subflux_") and every counter, gauge and histogram it
-// serves — searches, downloads, imports, scans, the HTTP transport, and the
-// bbolt store. The collectors are unexported, so a caller records through a
-// named method and cannot register, rename or delete a series.
-//
-// Named obs, not metrics: the github.com/cplieger/metrics library it wraps
-// owns that name, and while this package was called metrics the collision
-// forced every reference to the library through an extmetrics alias. The
-// rename removed the collision, so the library is imported plainly.
+// Package obs is subflux's /metrics registry: the platform series and the
+// door every other owner's series registers through. It wraps
+// github.com/cplieger/metrics under another name so the two never collide at
+// an import.
 package obs
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
+	"slices"
 	"strconv"
-	"sync/atomic"
-	"time"
 
 	"github.com/cplieger/metrics/v4"
-	"github.com/cplieger/sse"
-	"github.com/cplieger/subflux/internal/search/providergate"
-	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v3"
 )
 
-// The SSE counters' closed label domains, declared at zero when the registry
-// is built so an unseen verdict or cause reads 0 rather than as a missing
-// series. None of them is a request-supplied string.
-var (
-	sseVerdicts = []sse.Verdict{
-		sse.VerdictFresh, sse.VerdictResumed, sse.VerdictGapFloor, sse.VerdictGapBudget,
-		sse.VerdictGapAhead, sse.VerdictEpochChanged, sse.VerdictCursorInvalid,
-	}
-	sseCauses = []sse.PresenceCause{
-		sse.PresenceClosed, sse.PresenceDead, sse.PresenceEvicted, sse.PresenceShutdown, sse.PresenceHookFailed,
-	}
-	sseClients             = []string{"v3", "legacy"}
-	ssePresenceTransitions = []string{"alive", "expired"}
-)
+// Metric is the metrics library's collector, so a series another package
+// declares with that library registers here.
+type Metric = metrics.Metric
 
-// Metrics holds all application metrics.
+var configModes = []string{"unconfigured", "failed", "active"}
+
+// buildVersion is the release tag the image build stamps with -X; a build
+// without it reports the module version.
+var buildVersion string
+
+// Metrics is the process's one registry; New builds it.
 type Metrics struct {
-	scansTotal   *metrics.Counter
-	errors       *metrics.LabeledCounter
-	downloads    *metrics.LabeledCounter
-	dlErrors     *metrics.LabeledCounter
-	durations    *metrics.LabeledHistogram
-	imports      *metrics.LabeledCounter
-	searches     *metrics.LabeledCounter
-	scanItems    *metrics.Counter
-	scanFound    *metrics.Counter
-	scanDur      *metrics.Gauge
-	adaptSkips   *metrics.Counter
-	embDetErrs   *metrics.Counter
+	registry     *metrics.Registry
 	httpRequests *metrics.LabeledCounter
 	httpDuration *metrics.Histogram
-	httpPanics   *metrics.Counter
-	registry     *metrics.Registry
-
-	// Provider credential gate and subtitle saves.
-	providerDisabled     *metrics.LabeledGauge
-	providerSettingRej   *metrics.LabeledGauge
-	providerAuthFailures *metrics.LabeledCounter
-	providerRateLimited  *metrics.LabeledCounter
-	subtitlesSaved       *metrics.LabeledCounter
-	subtitleWriteErrors  *metrics.Counter
-	mediaRootUnwritable  *metrics.LabeledGauge
-	mediaRootUnavail     *metrics.LabeledGauge
-
-	// Store observability.
-	storeFileBytes     *metrics.Gauge
-	storeFreelistBytes *metrics.Gauge
-	reconcileDuration  *metrics.Gauge
-	reconcileDeleted   *metrics.Counter
-	reconcileReset     *metrics.Counter
-	backupLastSuccess  *metrics.Gauge
-	backupDuration     *metrics.Gauge
-
-	// Mode observability.
-	configured *metrics.Gauge
-
-	// Poll-cursor durability (S13): >0 while a cursor's durable persist is
-	// failing (in-memory position ahead of disk; restart would replay).
-	pollCursorsDirty *metrics.Gauge
-
-	// SSE observability.
-	sseConnects            *metrics.LabeledCounter
-	sseLegacyConnects      *metrics.LabeledCounter
-	sseDisconnects         *metrics.LabeledCounter
-	ssePresenceTransitions *metrics.LabeledCounter
-	sseClients             *metrics.Gauge
-	sseQueuedFrames        *metrics.Gauge
-	sseHead                *metrics.Gauge
-
-	totalSearch atomic.Int64
+	panics       *metrics.Counter
+	configMode   *metrics.LabeledGauge
 }
 
-const providerLabel = "provider"
-
-// New creates a new Metrics instance.
+// New builds the registry, prefix subflux, with the platform series
+// registered and build_info set. The library already exports
+// process_start_time_seconds beside its other process series.
 func New() *Metrics {
-	labels := []string{providerLabel}
-
 	m := &Metrics{
-		searches:     metrics.NewLabeledCounter("searches_total", "Total subtitle searches by provider", labels),
-		errors:       metrics.NewLabeledCounter("search_errors_total", "Total search errors by provider", labels),
-		downloads:    metrics.NewLabeledCounter("downloads_total", "Total subtitle files fetched from providers", labels),
-		dlErrors:     metrics.NewLabeledCounter("download_errors_total", "Total download errors by provider", labels),
-		durations:    metrics.NewLabeledHistogram("search_duration_seconds", "Search duration", labels, metrics.WithBuckets(metrics.APIBuckets())),
-		imports:      metrics.NewLabeledCounter("imports_detected_total", "Total imports detected by source", []string{"source"}),
-		scansTotal:   metrics.NewCounter("scans_total", "Total full scans completed"),
-		scanItems:    metrics.NewCounter("scan_items_total", "Total items scanned"),
-		scanFound:    metrics.NewCounter("scan_found_total", "Total subtitles found during scans"),
-		scanDur:      metrics.NewGauge("scan_duration_seconds", "Last scan duration in seconds"),
-		adaptSkips:   metrics.NewCounter("adaptive_skips_total", "Total items skipped by adaptive search"),
-		embDetErrs:   metrics.NewCounter("embedded_detector_errors_total", "Total embedded track detector failures (context cancellations excluded)"),
-		httpRequests: metrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
-		httpDuration: metrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
-		httpPanics:   metrics.NewCounter("http_panics_total", "Total HTTP handler panics recovered by the Recoverer middleware"),
-
-		providerDisabled:     metrics.NewLabeledGauge("provider_disabled", "1 while a provider is disabled because it rejected its credentials", labels),
-		providerSettingRej:   metrics.NewLabeledGauge("provider_setting_rejected", "1 while a provider ignores an optional setting it rejected", []string{providerLabel, "setting"}),
-		providerAuthFailures: metrics.NewLabeledCounter("provider_auth_failures_total", "Total credential rejections counted by the provider gate", labels),
-		providerRateLimited:  metrics.NewLabeledCounter("provider_rate_limited_total", "Total rate-limit answers that paused a provider", []string{providerLabel, "op"}),
-		subtitlesSaved:       metrics.NewLabeledCounter("subtitles_saved_total", "Total subtitle files written next to the media by automated search", labels),
-		subtitleWriteErrors:  metrics.NewCounter("subtitle_write_errors_total", "Total failed subtitle file writes and media folder write tests"),
-		mediaRootUnwritable:  metrics.NewLabeledGauge("media_root_unwritable", "1 while subtitle files cannot be written under this media root (the root itself or a folder below it)", []string{"root"}),
-		mediaRootUnavail:     metrics.NewLabeledGauge("media_root_unavailable", "1 while this media root cannot be read, so no file under it is treated as deleted", []string{"root"}),
-
-		// Store observability.
-		storeFileBytes:     metrics.NewGauge("store_file_bytes", "Current bbolt database file size in bytes"),
-		storeFreelistBytes: metrics.NewGauge("store_freelist_bytes", "Reclaimable freelist bytes in the bbolt database"),
-		reconcileDuration:  metrics.NewGauge("reconcile_duration_seconds", "Duration of last reconcile pass in seconds"),
-		reconcileDeleted:   metrics.NewCounter("reconcile_deleted_total", "Total subtitle paths deleted by reconciliation"),
-		reconcileReset:     metrics.NewCounter("reconcile_reset_total", "Total triples reset by reconciliation"),
-		backupLastSuccess:  metrics.NewGauge("backup_last_success_timestamp", "Unix timestamp of last successful backup"),
-		backupDuration:     metrics.NewGauge("backup_duration_seconds", "Duration of last successful backup in seconds"),
-
-		// Mode observability.
-		configured: metrics.NewGauge("configured", "1 when a valid configuration is active, 0 in unconfigured mode"),
-
-		pollCursorsDirty: metrics.NewGauge("poll_cursors_dirty", "Number of poll cursors whose durable persist is failing (in-memory ahead of disk)"),
-
-		// SSE observability.
-		sseConnects:            metrics.NewLabeledCounter("sse_connects_total", "Total SSE connections by hello verdict", []string{"verdict"}),
-		sseLegacyConnects:      metrics.NewLabeledCounter("sse_legacy_connects_total", "Total SSE connections by client generation (v3 sends SSE-Wire, legacy does not)", []string{"client"}),
-		sseDisconnects:         metrics.NewLabeledCounter("sse_disconnects_total", "Total SSE disconnections by cause", []string{"cause"}),
-		ssePresenceTransitions: metrics.NewLabeledCounter("sse_presence_transitions_total", "Total SSE presence-table transitions (alive: first acknowledgement after connect or expiry; expired: connected but unacknowledged past the window)", []string{"kind"}),
-		sseClients:             metrics.NewGauge("sse_clients", "Connected SSE clients"),
-		sseQueuedFrames:        metrics.NewGauge("sse_queued_frames", "SSE frames queued across all client channels"),
-		sseHead:                metrics.NewGauge("sse_head", "Newest SSE replay-ring offset published this epoch"),
+		registry:     metrics.NewRegistry("subflux"),
+		httpRequests: metrics.NewLabeledCounter("http_requests_total", "HTTP requests by method, route and status.", []string{"method", "path", "status"}),
+		httpDuration: metrics.NewHistogram("http_request_duration_seconds", "HTTP request latency.", metrics.WithBuckets(metrics.APIBuckets())),
+		panics:       metrics.NewCounter("panics_total", "HTTP handler panics recovered."),
+		configMode:   metrics.NewLabeledGauge("config_mode", "1 for the configuration's current mode, 0 for the others.", []string{"mode"}),
 	}
-	for _, v := range sseVerdicts {
-		m.sseConnects.Add(0, string(v))
+	buildInfo := metrics.NewLabeledGauge("build_info", "Always 1, labelled with the running version.", []string{"version"})
+	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, buildInfo)
+	buildInfo.Set(1, version())
+	for _, mode := range configModes {
+		m.configMode.Set(0, mode)
 	}
-	for _, c := range sseCauses {
-		m.sseDisconnects.Add(0, string(c))
-	}
-	for _, c := range sseClients {
-		m.sseLegacyConnects.Add(0, c)
-	}
-	for _, k := range ssePresenceTransitions {
-		m.ssePresenceTransitions.Add(0, k)
-	}
-
-	m.registry = metrics.NewRegistry("subflux")
-	// MustRegister is the right door here: New has no error result and every
-	// failure it can report (bad metric name, bad label set, family collision,
-	// invalid registry prefix) is a programming error fixed at the literal
-	// above, not runtime state a caller could handle.
-	m.registry.MustRegister(
-		m.searches,
-		m.errors,
-		m.downloads,
-		m.dlErrors,
-		m.durations,
-		m.imports,
-		m.scansTotal,
-		m.scanItems,
-		m.scanFound,
-		m.scanDur,
-		m.adaptSkips,
-		m.embDetErrs,
-		m.httpRequests,
-		m.httpDuration,
-		m.httpPanics,
-		m.providerDisabled,
-		m.providerSettingRej,
-		m.providerAuthFailures,
-		m.providerRateLimited,
-		m.subtitlesSaved,
-		m.subtitleWriteErrors,
-		m.mediaRootUnwritable,
-		m.mediaRootUnavail,
-		m.storeFileBytes,
-		m.storeFreelistBytes,
-		m.reconcileDuration,
-		m.reconcileDeleted,
-		m.reconcileReset,
-		m.backupLastSuccess,
-		m.backupDuration,
-		m.configured,
-		m.pollCursorsDirty,
-		m.sseConnects,
-		m.sseLegacyConnects,
-		m.sseDisconnects,
-		m.ssePresenceTransitions,
-		m.sseClients,
-		m.sseQueuedFrames,
-		m.sseHead,
-	)
-
 	return m
 }
 
-// --- SSE observability ---
-
-// RecordSSEConnect counts one accepted SSE connection under its hello verdict
-// and under its client generation. The generation label is decided by whether
-// the SSE-Wire header was present, never by its value.
-func (m *Metrics) RecordSSEConnect(verdict string, legacy bool) {
-	m.sseConnects.Inc(verdict)
-	client := "v3"
-	if legacy {
-		client = "legacy"
+func version() string {
+	if buildVersion != "" {
+		return buildVersion
 	}
-	m.sseLegacyConnects.Inc(client)
-}
-
-// RecordSSEDisconnect counts one SSE departure under the hub's cause.
-func (m *Metrics) RecordSSEDisconnect(cause string) {
-	m.sseDisconnects.Inc(cause)
-}
-
-// RecordSSEPresenceTransition counts one presence-table transition (alive or
-// expired).
-func (m *Metrics) RecordSSEPresenceTransition(kind string) {
-	m.ssePresenceTransitions.Inc(kind)
-}
-
-// SetSSEClients records the connected SSE client count.
-func (m *Metrics) SetSSEClients(n int) {
-	m.sseClients.Set(float64(n))
-}
-
-// SetSSEQueuedFrames records the frames queued across all SSE client channels.
-func (m *Metrics) SetSSEQueuedFrames(n int) {
-	m.sseQueuedFrames.Set(float64(n))
-}
-
-// SetSSEHead records the newest replay-ring offset published this epoch.
-func (m *Metrics) SetSSEHead(n uint64) {
-	m.sseHead.Set(float64(n))
-}
-
-// SetPollCursorsDirty records how many poll cursors currently have a failing
-// durable persist (0 when healthy).
-func (m *Metrics) SetPollCursorsDirty(n int) {
-	m.pollCursorsDirty.Set(float64(n))
-}
-
-// RecordSearch records a search attempt for a provider.
-func (m *Metrics) RecordSearch(provider subflux.ProviderID, dur time.Duration, err error) {
-	p := string(provider)
-	m.searches.Inc(p)
-	m.totalSearch.Add(1)
-	if err != nil {
-		m.errors.Inc(p)
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
+		return bi.Main.Version
 	}
-	m.durations.Observe(dur.Seconds(), p)
+	return "unknown"
 }
 
-// RecordDownload records a download attempt, routing to the success or error counter.
-func (m *Metrics) RecordDownload(provider subflux.ProviderID, err error) {
-	p := string(provider)
-	if err == nil {
-		m.downloads.Inc(p)
-	} else {
-		m.dlErrors.Inc(p)
+// Register adds other owners' collectors in turn, stopping at the first
+// error: a duplicate family, or one a collector captured at construction.
+func (m *Metrics) Register(ms ...Metric) error {
+	for _, c := range ms {
+		if err := m.registry.Register(c); err != nil {
+			return fmt.Errorf("obs: %w", err)
+		}
 	}
+	return nil
 }
 
-// RecordImport records an import detected.
-func (m *Metrics) RecordImport(source subflux.PollKey) {
-	m.imports.Inc(string(source))
+// Handler serves the exposition.
+func (m *Metrics) Handler() http.HandlerFunc { return m.registry.Handler() }
+
+// RecordHTTP is webhttp.WithRecordRouteMetric's hook: the library bounds the
+// method and route labels.
+func (m *Metrics) RecordHTTP(r webhttp.RequestMetric) {
+	metrics.RecordHTTP(m.httpRequests, m.httpDuration, r.Latency, r.Method, r.Path, strconv.Itoa(r.Status))
 }
 
-// RecordScan records scan completion.
-func (m *Metrics) RecordScan(items, found int, dur time.Duration) {
-	m.scansTotal.Inc()
-	m.scanItems.Add(int64(items))
-	m.scanFound.Add(int64(found))
-	m.scanDur.Set(dur.Seconds())
-}
+// RecordPanic counts one recovered handler panic.
+func (m *Metrics) RecordPanic() { m.panics.Inc() }
 
-// RecordHTTP records one HTTP request. It takes webhttp's named-field record
-// rather than four positional values so the two adjacent strings cannot be
-// transposed on the way to a metric label.
-func (m *Metrics) RecordHTTP(rm webhttp.RequestMetric) {
-	metrics.RecordHTTP(m.httpRequests, m.httpDuration, rm.Latency, rm.Method, rm.Path, strconv.Itoa(rm.Status))
-}
-
-// RecordPanic records one HTTP handler panic recovered by the webhttp.Recoverer
-// middleware. Wired as Recoverer's WithPanicHook so a recovered 500 also
-// increments a monitorable counter.
-func (m *Metrics) RecordPanic() {
-	m.httpPanics.Inc()
-}
-
-// AdaptiveSkip records an item skipped by adaptive search.
-func (m *Metrics) AdaptiveSkip() {
-	m.adaptSkips.Inc()
-}
-
-// RecordEmbeddedDetectorError counts a failed embedded track probe. The
-// search engine excludes context cancellations before calling this.
-func (m *Metrics) RecordEmbeddedDetectorError() {
-	m.embDetErrs.Inc()
-}
-
-// --- Provider credential gate and subtitle saves ---
-
-// SetProviderDisabled sets the provider's disabled gauge.
-func (m *Metrics) SetProviderDisabled(id subflux.ProviderID, disabled bool) {
-	m.providerDisabled.Set(boolGauge(disabled), string(id))
-}
-
-// DeleteProviderDisabled removes the provider's disabled series.
-func (m *Metrics) DeleteProviderDisabled(id subflux.ProviderID) {
-	m.providerDisabled.Delete(string(id))
-}
-
-// IncProviderAuthFailure counts one credential rejection for the provider.
-func (m *Metrics) IncProviderAuthFailure(id subflux.ProviderID) {
-	m.providerAuthFailures.Inc(string(id))
-}
-
-// IncProviderRateLimited counts one rate-limit pause for the provider and op.
-func (m *Metrics) IncProviderRateLimited(id subflux.ProviderID, op providergate.Op) {
-	m.providerRateLimited.Inc(string(id), string(op))
-}
-
-// SetProviderSettingRejected sets the series for a rejected optional setting,
-// or deletes it when the rejection clears.
-func (m *Metrics) SetProviderSettingRejected(id subflux.ProviderID, setting string, rejected bool) {
-	if rejected {
-		m.providerSettingRej.Set(1, string(id), setting)
+// SetConfigMode sets mode's config_mode series to 1 and the others to 0. A
+// mode outside settings' three is a programming fault: logged at ERROR, and
+// nothing changes.
+func (m *Metrics) SetConfigMode(mode string) {
+	if !slices.Contains(configModes, mode) {
+		slog.Error("obs: unknown config mode", "mode", mode)
 		return
 	}
-	m.providerSettingRej.Delete(string(id), setting)
-}
-
-// RecordSubtitleSaved counts one subtitle file written for the provider.
-func (m *Metrics) RecordSubtitleSaved(provider subflux.ProviderID) {
-	m.subtitlesSaved.Inc(string(provider))
-}
-
-// IncSubtitleWriteError counts one failed subtitle write or media folder
-// write test.
-func (m *Metrics) IncSubtitleWriteError() {
-	m.subtitleWriteErrors.Inc()
-}
-
-// SetMediaRootUnwritable sets the media root's unwritable gauge.
-func (m *Metrics) SetMediaRootUnwritable(root string, unwritable bool) {
-	m.mediaRootUnwritable.Set(boolGauge(unwritable), root)
-}
-
-// DeleteMediaRoot removes the media root's unwritable series.
-func (m *Metrics) DeleteMediaRoot(root string) {
-	m.mediaRootUnwritable.Delete(root)
-}
-
-// SetMediaRootUnavailable sets the media root's unavailable gauge.
-func (m *Metrics) SetMediaRootUnavailable(root string, unavailable bool) {
-	m.mediaRootUnavail.Set(boolGauge(unavailable), root)
-}
-
-// DeleteMediaRootUnavailable removes the media root's unavailable series.
-func (m *Metrics) DeleteMediaRootUnavailable(root string) {
-	m.mediaRootUnavail.Delete(root)
-}
-
-func boolGauge(b bool) float64 {
-	if b {
-		return 1
+	for _, other := range configModes {
+		v := 0.0
+		if other == mode {
+			v = 1
+		}
+		m.configMode.Set(v, other)
 	}
-	return 0
-}
-
-// TotalSearches returns the cumulative search count across all providers.
-func (m *Metrics) TotalSearches() int64 {
-	return m.totalSearch.Load()
-}
-
-// Handler returns an HTTP handler that serves Prometheus metrics.
-func (m *Metrics) Handler() http.HandlerFunc {
-	return m.registry.Handler()
-}
-
-// --- Store observability ---
-
-// RecordStoreFileSize records the current bbolt database file size.
-func (m *Metrics) RecordStoreFileSize(bytes int64) {
-	m.storeFileBytes.Set(float64(bytes))
-}
-
-// RecordStoreFreelistBytes records the reclaimable freelist bytes.
-func (m *Metrics) RecordStoreFreelistBytes(bytes int64) {
-	m.storeFreelistBytes.Set(float64(bytes))
-}
-
-// RecordReconcile records metrics from a reconcile pass.
-func (m *Metrics) RecordReconcile(deleted int, reset int64, dur time.Duration) {
-	m.reconcileDuration.Set(dur.Seconds())
-	m.reconcileDeleted.Add(int64(deleted))
-	m.reconcileReset.Add(reset)
-}
-
-// RecordBackupSuccess records a successful backup's timestamp and duration.
-func (m *Metrics) RecordBackupSuccess(dur time.Duration) {
-	m.backupLastSuccess.Set(float64(time.Now().Unix()))
-	m.backupDuration.Set(dur.Seconds())
-}
-
-// SetConfigured records whether a valid configuration is active. It sets the
-// subflux_configured gauge to 1 when configured (background automation running)
-// and 0 in unconfigured mode (scheduler/poller/backup goroutines skipped),
-// enabling a level-triggered "stuck unconfigured" alert.
-func (m *Metrics) SetConfigured(ok bool) {
-	v := 0.0
-	if ok {
-		v = 1.0
-	}
-	m.configured.Set(v)
 }

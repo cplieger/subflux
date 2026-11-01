@@ -12,8 +12,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // countingMapper answers every episode-API request with body and counts them.
@@ -32,7 +32,7 @@ func countingMapper(body string, calls *atomic.Int32) *Mapper {
 
 func TestEpisodeID_latches_a_refused_client_key(t *testing.T) {
 	var logs bytes.Buffer
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, nil)))
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&logs, nil)))
 	var calls atomic.Int32
 	m := countingMapper(`<error code="302">client version missing or invalid</error>`, &calls)
 
@@ -90,7 +90,7 @@ func TestEpisodeID_records_an_accepted_client_key(t *testing.T) {
 func TestResolve_a_refused_key_overrides_episode_ids_cached_while_it_worked(t *testing.T) {
 	// Each request after the first waits out AniDB's request interval on the bubble's clock.
 	synctest.Test(t, func(t *testing.T) {
-		testsupport.SwapDefaultLogger(t, slog.New(slog.DiscardHandler))
+		capture.SwapDefault(t, slog.New(slog.DiscardHandler))
 		var calls atomic.Int32
 		m := NewMapper("placeholder-client")
 		m.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -141,7 +141,7 @@ func TestForgetClientKeyVerdict_makes_the_next_lookup_ask_again(t *testing.T) {
 	// The second request waits out AniDB's request interval on the bubble's clock.
 	synctest.Test(t, func(t *testing.T) {
 		var logs bytes.Buffer
-		testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, nil)))
+		capture.SwapDefault(t, slog.New(slog.NewTextHandler(&logs, nil)))
 		var calls atomic.Int32
 		m := countingMapper(`<error code="302">client version missing or invalid</error>`, &calls)
 		if _, err := m.episodeID(t.Context(), 1, 1); err == nil {

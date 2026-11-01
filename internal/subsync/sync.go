@@ -11,8 +11,6 @@
 // returns the winning SyncResult. Callers own file I/O: read the subtitle,
 // decode it with subtitleenc.Normalize, ParseSRT it, sync, then WriteSRT the
 // corrected cues.
-// internal/search/syncing is the in-repo consumer and shows the full shape
-// (parse -> SyncWithOptions -> WriteSRT -> PostProcess).
 //
 // Audio-only sync (no reference subtitle) is the same call with a nil
 // reference, EnableAudio, and SyncOptions.VideoPath set.

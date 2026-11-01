@@ -67,6 +67,5 @@ The image has no shell and no package manager. It runs as the user in your `comp
 | FFmpeg and ffprobe | built from source at a pinned release tag, statically linked, without network support |
 | x264 | built from source at a pinned commit, because upstream publishes no release tags |
 | Go modules | `go.mod` and `go.sum` |
-| Web page packages | the `@cplieger/*` packages, pinned exactly in `internal/server/static-src/package.json` and the Dockerfile |
 
 Images are published for `amd64` and `arm64`, with cosign signatures and SBOM attestations, which [Checking a signature](https://github.com/cplieger/docs/blob/main/docs/images.md#checking-a-signature) and [Reading the software bill of materials](https://github.com/cplieger/docs/blob/main/docs/images.md#reading-the-software-bill-of-materials) show how to check. The license text of every bundled component is under `/usr/share/licenses/` in the image.
