@@ -1,7 +1,7 @@
 github.com/cplieger/atomicfile/v4 v4.2.0 h1:hbruc99AEUNLHzJWSS34NsR6k6vjGYr6uL3TRiPGcdw=
 github.com/cplieger/atomicfile/v4 v4.2.0/go.mod h1:hwmPt/GCOA/SHUX3hrxNRqdhQeaC2P1Ku1FxpnOi3fA=
-github.com/cplieger/envx/yamlenv/v2 v2.3.0-dev.1 h1:hVlKP7oSGeZTjeHD7IKcVU1JjwXOufXDVck4hBboW7I=
-github.com/cplieger/envx/yamlenv/v2 v2.3.0-dev.1/go.mod h1:1vDYAReMA98JUrHG8GwspoTTOXvyIZMophegTUPRpM8=
+github.com/cplieger/envx/yamlenv/v2 v2.3.0 h1:tQGLB8XOoFaD0/J8oUG93zlu+v06E/piS3kKeFE+l5k=
+github.com/cplieger/envx/yamlenv/v2 v2.3.0/go.mod h1:1vDYAReMA98JUrHG8GwspoTTOXvyIZMophegTUPRpM8=
 github.com/cplieger/health v1.10.0 h1:t56+GKvpseo3FwFIXVcEyNrBe0Pb/YpjW17uKUeCqe4=
 github.com/cplieger/health v1.10.0/go.mod h1:Y1YQqGeH4YeEoTYzoNtzO/cp7+ummHliN/JsU/0UlKM=
 github.com/cplieger/httpx/v5 v5.2.0 h1:vVW4HBZvjsn8I7wQyCAK9zHOWFcE/spVhrQFVkKbS2s=
@@ -10,8 +10,8 @@ github.com/cplieger/jsonx/v2 v2.1.0-dev.1 h1:RqDap3/xFhz89pgtO61ug9P7pdBIKqvNEmC
 github.com/cplieger/jsonx/v2 v2.1.0-dev.1/go.mod h1:WU0dgDvr++1FUIk4VoXoQQycVEnY4v1h5OS7+QtEOdE=
 github.com/cplieger/keyenc v1.1.0 h1:rlBEmqEBUS378lkJJfrRWlWKBqpgX2ahquivHfdMgxw=
 github.com/cplieger/keyenc v1.1.0/go.mod h1:41HJ59GzUd2gNdRpmdgiOP3VW4CdETY+ecQ8/lzOySQ=
-github.com/cplieger/langtag/v3 v3.1.0-dev.3 h1:Hz5VNk2KzlKrqjFS3xO5gC6abSz6j+9muSfyDMy/O5A=
-github.com/cplieger/langtag/v3 v3.1.0-dev.3/go.mod h1:l9xswWicp31qquRod3FKzweWF0gJ06XKj/rqsNGESAQ=
+github.com/cplieger/langtag/v3 v3.1.0 h1:MlMJXkRqZxw51jE6XTGbC/ax8ANcd4tEXELXtdz55iU=
+github.com/cplieger/langtag/v3 v3.1.0/go.mod h1:l9xswWicp31qquRod3FKzweWF0gJ06XKj/rqsNGESAQ=
 github.com/cplieger/metrics/v4 v4.3.0-dev.1 h1:O8O16nc4cBilOHk4tsZGnOLpGkiLm5v3tgdEVmI5tiA=
 github.com/cplieger/metrics/v4 v4.3.0-dev.1/go.mod h1:TvOn/WEckd9YGH+xGdrfU1Lpa1JvLlZduYRSHLuCr2k=
 github.com/cplieger/runesafe/v3 v3.2.0 h1:YoMExOkKrhIqks3FEGU0S26ZohRyHJpGbOjmEO6FpSA=
