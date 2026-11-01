@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/slogx/capture"
 )
 
 // echoKey holds a space so the upstream text can spell it in a form the
@@ -20,7 +20,7 @@ const echoedRefusal = `<error code="302">unknown client placeholder client or pl
 // Not parallel: it swaps slog's default logger.
 func TestEpisodeID_an_echoed_client_key_reaches_no_error_or_log(t *testing.T) {
 	var logs bytes.Buffer
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&logs, nil)))
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&logs, nil)))
 	tests := []struct {
 		body         string
 		transportErr error

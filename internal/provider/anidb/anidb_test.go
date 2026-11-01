@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/xmlx"
 	"pgregory.net/rapid"
 )
@@ -341,7 +341,7 @@ func TestBuildEpisodeCacheKey_matches_getEpisodeID_format(t *testing.T) {
 func captureLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer
-	testsupport.SwapDefaultLogger(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	return &buf
 }
 

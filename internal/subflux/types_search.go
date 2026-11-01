@@ -213,9 +213,8 @@ func (o *LangOutcome) Found() bool { return len(o.Paths) > 0 }
 // SearchResult holds the outcome of a SearchTargets call: one typed entry
 // per language group plus the coverage-inventory flag.
 type SearchResult struct {
-	// WriteFailure is the first folder fault a save in this call learned (a
-	// *mediawrite.UnwritableError; read it with errors.As). Nil when targets
-	// were only skipped for an already-known fault.
+	// WriteFailure is the first folder fault a save in this call learned; nil
+	// when targets were only skipped for an already-known fault.
 	WriteFailure    error
 	Langs           []LangOutcome // one entry per language group, in target order
 	CoverageChanged bool          // true if RecordSubtitleFiles detected changes on disk
