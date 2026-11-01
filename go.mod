@@ -1,6 +1,6 @@
 module github.com/cplieger/subflux
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/cplieger/arrapi/v2 v2.3.0
@@ -27,7 +27,7 @@ require (
 	github.com/ulikunitz/xz v0.5.17
 	go.etcd.io/bbolt v1.5.0
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/term v0.47.0
 	pgregory.net/rapid v1.3.0
@@ -36,7 +36,7 @@ require (
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.6 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/webauthn v0.18.2 // indirect
 	github.com/go-webauthn/x v0.3.1 // indirect
