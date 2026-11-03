@@ -1,0 +1,370 @@
+{
+ "title": "Firefly",
+ "originalTitle": "Firefly",
+ "tvdbId": 78874,
+ "tmdbId": 1437,
+ "tvRageId": 3548,
+ "tvMazeId": 180,
+ "imdbId": "tt0303461",
+ "slug": "firefly",
+ "formats": [
+  "unknown"
+ ],
+ "originalCountry": "usa",
+ "originalLanguage": "eng",
+ "language": "eng",
+ "firstAired": "2002-09-20",
+ "lastAired": "2003-07-28",
+ "malIds": [],
+ "anidbIds": [],
+ "aniListIds": [],
+ "lastUpdated": "2026-10-27T00:56:09Z",
+ "status": "Ended",
+ "runtime": 48,
+ "originalNetwork": "FOX",
+ "network": "FOX",
+ "genres": [
+  "Adventure",
+  "Drama",
+  "Science Fiction"
+ ],
+ "contentRating": "TV-14",
+ "rating": {
+  "count": 305472,
+  "value": "8.9"
+ },
+ "alternativeTitles": [
+  {
+   "title": "Serenity"
+  }
+ ],
+ "translations": [
+  {
+   "language": "ces",
+   "title": "Firefly"
+  },
+  {
+   "language": "deu",
+   "title": "Firefly"
+  },
+  {
+   "language": "eng",
+   "title": "Firefly"
+  },
+  {
+   "language": "fra",
+   "title": "Firefly"
+  },
+  {
+   "language": "heb",
+   "title": "פיירפלי"
+  },
+  {
+   "language": "hun",
+   "title": "Firefly"
+  },
+  {
+   "language": "ita",
+   "title": "Firefly"
+  },
+  {
+   "language": "kor",
+   "title": "파이어플라이"
+  },
+  {
+   "language": "nld",
+   "title": "Firefly"
+  },
+  {
+   "language": "pol",
+   "title": "Firefly"
+  },
+  {
+   "language": "por",
+   "title": "Firefly"
+  },
+  {
+   "language": "rus",
+   "title": "Светлячок"
+  },
+  {
+   "language": "spa",
+   "title": "Firefly"
+  },
+  {
+   "language": "swe",
+   "title": "Firefly"
+  },
+  {
+   "language": "zho",
+   "title": "萤火虫"
+  },
+  {
+   "language": "hrv",
+   "title": "Firefly"
+  },
+  {
+   "language": "pt",
+   "title": "Firefly"
+  },
+  {
+   "language": "fin",
+   "title": "Firefly"
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  },
+  {
+   "name": "DVD Order",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  }
+ ],
+ "seasons": [
+  {
+   "seasonNumber": 0,
+   "year": 2003
+  },
+  {
+   "seasonNumber": 1,
+   "year": 2002
+  }
+ ],
+ "episodes": [
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 415679,
+   "seasonNumber": 0,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 15,
+   "airedAfterSeasonNumber": 1,
+   "title": "Serenity",
+   "airDate": "2005-09-03",
+   "airDateUtc": "2005-09-03T04:00:00Z",
+   "runtime": 119,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 967981,
+   "seasonNumber": 0,
+   "episodeNumber": 2,
+   "title": "Done the Impossible",
+   "airDate": "2006-07-28",
+   "airDateUtc": "2006-07-28T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 4360465,
+   "seasonNumber": 0,
+   "episodeNumber": 3,
+   "title": "Browncoats Unite",
+   "airDate": "2012-11-11",
+   "airDateUtc": "2012-11-11T05:00:00Z",
+   "runtime": 45,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 8894465,
+   "seasonNumber": 0,
+   "episodeNumber": 4,
+   "title": "R. Tam Sessions",
+   "airDate": "2005-09-07",
+   "airDateUtc": "2005-09-07T04:00:00Z",
+   "runtime": 8
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 9296666,
+   "seasonNumber": 0,
+   "episodeNumber": 5,
+   "title": "Here's How It Was: The Making of 'Firefly'",
+   "airDate": "2003-12-09",
+   "airDateUtc": "2003-12-09T05:00:00Z",
+   "runtime": 28
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 9296672,
+   "seasonNumber": 0,
+   "episodeNumber": 6,
+   "airedAfterSeasonNumber": 1,
+   "title": "Serenity: The 10th Character",
+   "airDate": "2003-12-09",
+   "airDateUtc": "2003-12-09T05:00:00Z",
+   "runtime": 10,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297989,
+   "seasonNumber": 1,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 2,
+   "title": "The Train Job",
+   "airDate": "2002-09-20",
+   "airDateUtc": "2002-09-20T04:00:00Z",
+   "runtime": 44
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297990,
+   "seasonNumber": 1,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 3,
+   "title": "Bushwhacked",
+   "airDate": "2002-09-27",
+   "airDateUtc": "2002-09-27T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297991,
+   "seasonNumber": 1,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 6,
+   "title": "Our Mrs. Reynolds",
+   "airDate": "2002-10-04",
+   "airDateUtc": "2002-10-04T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297992,
+   "seasonNumber": 1,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 7,
+   "title": "Jaynestown",
+   "airDate": "2002-10-18",
+   "airDateUtc": "2002-10-18T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297993,
+   "seasonNumber": 1,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 8,
+   "title": "Out of Gas",
+   "airDate": "2002-10-25",
+   "airDateUtc": "2002-10-25T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297994,
+   "seasonNumber": 1,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 4,
+   "title": "Shindig",
+   "airDate": "2002-11-01",
+   "airDateUtc": "2002-11-01T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297995,
+   "seasonNumber": 1,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 5,
+   "title": "Safe",
+   "airDate": "2002-11-08",
+   "airDateUtc": "2002-11-08T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297996,
+   "seasonNumber": 1,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 9,
+   "title": "Ariel",
+   "airDate": "2002-11-15",
+   "airDateUtc": "2002-11-15T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297997,
+   "seasonNumber": 1,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 10,
+   "title": "War Stories",
+   "airDate": "2002-12-06",
+   "airDateUtc": "2002-12-06T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297998,
+   "seasonNumber": 1,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 14,
+   "title": "Objects in Space",
+   "airDate": "2002-12-13",
+   "airDateUtc": "2002-12-13T05:00:00Z",
+   "runtime": 46,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297999,
+   "seasonNumber": 1,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 1,
+   "title": "Serenity",
+   "airDate": "2002-12-20",
+   "airDateUtc": "2002-12-20T05:00:00Z",
+   "runtime": 87
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298001,
+   "seasonNumber": 1,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 13,
+   "title": "Heart of Gold",
+   "airDate": "2003-06-23",
+   "airDateUtc": "2003-06-23T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298002,
+   "seasonNumber": 1,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 11,
+   "title": "Trash",
+   "airDate": "2003-07-21",
+   "airDateUtc": "2003-07-21T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298003,
+   "seasonNumber": 1,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 12,
+   "title": "The Message",
+   "airDate": "2003-07-28",
+   "airDateUtc": "2003-07-28T04:00:00Z",
+   "runtime": 45,
+   "finaleType": "series"
+  }
+ ],
+ "metadataSource": "tvdb"
+}

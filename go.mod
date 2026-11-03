@@ -3,6 +3,7 @@ module github.com/cplieger/subflux
 go 1.27.3
 
 require (
+	github.com/cplieger/arrapi/v3 v3.1.0
 	github.com/cplieger/atomicfile/v4 v4.2.0
 	github.com/cplieger/envx/yamlenv/v2 v2.3.0
 	github.com/cplieger/health v1.10.0
