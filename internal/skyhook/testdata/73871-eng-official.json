@@ -1,0 +1,2151 @@
+{
+ "title": "Futurama",
+ "originalTitle": "Futurama",
+ "tvdbId": 73871,
+ "tmdbId": 615,
+ "tvRageId": 3628,
+ "tvMazeId": 538,
+ "imdbId": "tt0149460",
+ "slug": "futurama",
+ "formats": [
+  "unknown"
+ ],
+ "originalCountry": "usa",
+ "originalLanguage": "eng",
+ "language": "eng",
+ "firstAired": "1999-03-28",
+ "lastAired": "2026-09-28",
+ "malIds": [],
+ "anidbIds": [],
+ "aniListIds": [],
+ "lastUpdated": "2026-10-24T11:27:10Z",
+ "status": "Continuing",
+ "runtime": 23,
+ "timeOfDay": {
+  "hours": 6,
+  "minutes": 0
+ },
+ "originalNetwork": "FOX",
+ "network": "Hulu",
+ "genres": [
+  "Adventure",
+  "Animation",
+  "Comedy",
+  "Science Fiction"
+ ],
+ "contentRating": "TV-14",
+ "rating": {
+  "count": 281358,
+  "value": "8.5"
+ },
+ "translations": [
+  {
+   "language": "ces",
+   "title": "Futurama"
+  },
+  {
+   "language": "deu",
+   "title": "Futurama"
+  },
+  {
+   "language": "eng",
+   "title": "Futurama"
+  },
+  {
+   "language": "fin",
+   "title": "Futurama"
+  },
+  {
+   "language": "fra",
+   "title": "Futurama"
+  },
+  {
+   "language": "heb",
+   "title": "פיוצ'רמה"
+  },
+  {
+   "language": "hun",
+   "title": "Futurama"
+  },
+  {
+   "language": "ita",
+   "title": "Futurama"
+  },
+  {
+   "language": "kor",
+   "title": "퓨처라마"
+  },
+  {
+   "language": "nld",
+   "title": "Futurama"
+  },
+  {
+   "language": "nor",
+   "title": "Futurama"
+  },
+  {
+   "language": "pol",
+   "title": "Futurama"
+  },
+  {
+   "language": "por",
+   "title": "Futurama"
+  },
+  {
+   "language": "rus",
+   "title": "Футурама"
+  },
+  {
+   "language": "spa",
+   "title": "Futurama"
+  },
+  {
+   "language": "swe",
+   "title": "Futurama"
+  },
+  {
+   "language": "tur",
+   "title": "Futurama"
+  },
+  {
+   "language": "zho",
+   "title": "飞出个未来"
+  },
+  {
+   "language": "pt",
+   "title": "Futurama"
+  },
+  {
+   "language": "ara",
+   "title": "فيوتشوراما"
+  },
+  {
+   "language": "srp",
+   "title": "Футурама"
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "episodeCount": 164
+  },
+  {
+   "name": "DVD Volumes",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "episodeCount": 164
+  },
+  {
+   "name": "Streaming Order",
+   "type": "alternate",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+   ],
+   "episodeCount": 180
+  },
+  {
+   "name": "Production Order",
+   "type": "regional",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "episodeCount": 180
+  }
+ ],
+ "seasons": [
+  {
+   "seasonNumber": 0,
+   "year": 2007
+  },
+  {
+   "seasonNumber": 1,
+   "year": 1999
+  },
+  {
+   "seasonNumber": 2,
+   "year": 1999
+  },
+  {
+   "seasonNumber": 3,
+   "year": 2000
+  },
+  {
+   "seasonNumber": 4,
+   "year": 2001
+  },
+  {
+   "seasonNumber": 5,
+   "year": 2002
+  },
+  {
+   "seasonNumber": 6,
+   "year": 2010
+  },
+  {
+   "seasonNumber": 7,
+   "year": 2012
+  },
+  {
+   "seasonNumber": 8,
+   "year": 2023
+  },
+  {
+   "seasonNumber": 9,
+   "year": 2024
+  },
+  {
+   "seasonNumber": 10,
+   "year": 2025
+  },
+  {
+   "seasonNumber": 11,
+   "year": 2026
+  }
+ ],
+ "episodes": [
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 389457,
+   "seasonNumber": 0,
+   "episodeNumber": 1,
+   "airedAfterSeasonNumber": 5,
+   "title": "Everybody Loves Hypnotoad",
+   "airDate": "2007-11-27",
+   "airDateUtc": "2007-11-27T11:00:00Z",
+   "runtime": 20
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 342888,
+   "seasonNumber": 0,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 74,
+   "airedAfterSeasonNumber": 5,
+   "title": "Bender's Big Score",
+   "airDate": "2007-11-27",
+   "airDateUtc": "2007-11-27T11:00:00Z",
+   "runtime": 88
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 359477,
+   "seasonNumber": 0,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 75,
+   "airedAfterSeasonNumber": 5,
+   "title": "The Beast With A Billion Backs",
+   "airDate": "2008-06-30",
+   "airDateUtc": "2008-06-30T10:00:00Z",
+   "runtime": 90
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 372786,
+   "seasonNumber": 0,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 73,
+   "airedAfterSeasonNumber": 5,
+   "title": "The Lost Adventure",
+   "airDate": "2008-06-24",
+   "airDateUtc": "2008-06-24T10:00:00Z",
+   "runtime": 30
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 395236,
+   "seasonNumber": 0,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 76,
+   "airedAfterSeasonNumber": 5,
+   "title": "Bender's Game",
+   "airDate": "2008-11-03",
+   "airDateUtc": "2008-11-03T11:00:00Z",
+   "runtime": 88
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 427447,
+   "seasonNumber": 0,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 77,
+   "airedAfterSeasonNumber": 5,
+   "title": "Into the Wild Green Yonder",
+   "airDate": "2009-02-24",
+   "airDateUtc": "2009-02-24T11:00:00Z",
+   "runtime": 89,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131174,
+   "seasonNumber": 1,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 1,
+   "title": "Space Pilot 3000",
+   "airDate": "1999-03-28",
+   "airDateUtc": "1999-03-28T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131175,
+   "seasonNumber": 1,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 2,
+   "title": "The Series Has Landed",
+   "airDate": "1999-04-04",
+   "airDateUtc": "1999-04-04T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131176,
+   "seasonNumber": 1,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 3,
+   "title": "I, Roommate",
+   "airDate": "1999-04-06",
+   "airDateUtc": "1999-04-06T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131177,
+   "seasonNumber": 1,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 4,
+   "title": "Love's Labors Lost in Space",
+   "airDate": "1999-04-13",
+   "airDateUtc": "1999-04-13T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131178,
+   "seasonNumber": 1,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 5,
+   "title": "Fear of a Bot Planet",
+   "airDate": "1999-04-20",
+   "airDateUtc": "1999-04-20T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131179,
+   "seasonNumber": 1,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 6,
+   "title": "A Fishful of Dollars",
+   "airDate": "1999-04-27",
+   "airDateUtc": "1999-04-27T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131180,
+   "seasonNumber": 1,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 7,
+   "title": "My Three Suns",
+   "airDate": "1999-05-04",
+   "airDateUtc": "1999-05-04T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131181,
+   "seasonNumber": 1,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 8,
+   "title": "A Big Piece of Garbage",
+   "airDate": "1999-05-11",
+   "airDateUtc": "1999-05-11T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131182,
+   "seasonNumber": 1,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 9,
+   "title": "Hell is Other Robots",
+   "airDate": "1999-05-18",
+   "airDateUtc": "1999-05-18T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131183,
+   "seasonNumber": 2,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 10,
+   "title": "A Flight to Remember",
+   "airDate": "1999-09-26",
+   "airDateUtc": "1999-09-26T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131184,
+   "seasonNumber": 2,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 11,
+   "title": "Mars University",
+   "airDate": "1999-10-03",
+   "airDateUtc": "1999-10-03T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131185,
+   "seasonNumber": 2,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 12,
+   "title": "When Aliens Attack",
+   "airDate": "1999-11-07",
+   "airDateUtc": "1999-11-07T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131186,
+   "seasonNumber": 2,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 13,
+   "title": "Fry & the Slurm Factory",
+   "airDate": "1999-11-14",
+   "airDateUtc": "1999-11-14T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131187,
+   "seasonNumber": 2,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 14,
+   "title": "I Second That Emotion",
+   "airDate": "1999-11-21",
+   "airDateUtc": "1999-11-21T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131188,
+   "seasonNumber": 2,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 15,
+   "title": "Brannigan, Begin Again",
+   "airDate": "1999-11-28",
+   "airDateUtc": "1999-11-28T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131189,
+   "seasonNumber": 2,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 16,
+   "title": "A Head in the Polls",
+   "airDate": "1999-12-12",
+   "airDateUtc": "1999-12-12T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131190,
+   "seasonNumber": 2,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 17,
+   "title": "Xmas Story",
+   "airDate": "1999-12-19",
+   "airDateUtc": "1999-12-19T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131191,
+   "seasonNumber": 2,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 18,
+   "title": "Why Must I Be a Crustacean in Love",
+   "airDate": "2000-02-06",
+   "airDateUtc": "2000-02-06T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131192,
+   "seasonNumber": 2,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 20,
+   "title": "Put Your Head on My Shoulder",
+   "airDate": "2000-02-13",
+   "airDateUtc": "2000-02-13T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131193,
+   "seasonNumber": 2,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 19,
+   "title": "Lesser of Two Evils",
+   "airDate": "2000-02-20",
+   "airDateUtc": "2000-02-20T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131194,
+   "seasonNumber": 2,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 21,
+   "title": "Raging Bender",
+   "airDate": "2000-02-27",
+   "airDateUtc": "2000-02-27T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131195,
+   "seasonNumber": 2,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 22,
+   "title": "A Bicyclops Built for Two",
+   "airDate": "2000-03-19",
+   "airDateUtc": "2000-03-19T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131196,
+   "seasonNumber": 2,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 24,
+   "title": "How Hermes Requisitioned His Groove Back",
+   "airDate": "2000-04-02",
+   "airDateUtc": "2000-04-02T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131197,
+   "seasonNumber": 2,
+   "episodeNumber": 15,
+   "absoluteEpisodeNumber": 23,
+   "title": "A Clone of My Own",
+   "airDate": "2000-04-09",
+   "airDateUtc": "2000-04-09T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131198,
+   "seasonNumber": 2,
+   "episodeNumber": 16,
+   "absoluteEpisodeNumber": 25,
+   "title": "The Deep South",
+   "airDate": "2000-04-16",
+   "airDateUtc": "2000-04-16T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131199,
+   "seasonNumber": 2,
+   "episodeNumber": 17,
+   "absoluteEpisodeNumber": 26,
+   "title": "Bender Gets Made",
+   "airDate": "2000-04-30",
+   "airDateUtc": "2000-04-30T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131200,
+   "seasonNumber": 2,
+   "episodeNumber": 18,
+   "absoluteEpisodeNumber": 28,
+   "title": "The Problem With Popplers",
+   "airDate": "2000-05-07",
+   "airDateUtc": "2000-05-07T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131201,
+   "seasonNumber": 2,
+   "episodeNumber": 19,
+   "absoluteEpisodeNumber": 27,
+   "title": "Mother's Day",
+   "airDate": "2000-05-14",
+   "airDateUtc": "2000-05-14T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131202,
+   "seasonNumber": 2,
+   "episodeNumber": 20,
+   "absoluteEpisodeNumber": 29,
+   "title": "Anthology of Interest I",
+   "airDate": "2000-05-21",
+   "airDateUtc": "2000-05-21T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131203,
+   "seasonNumber": 3,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 31,
+   "title": "The Honking",
+   "airDate": "2000-11-05",
+   "airDateUtc": "2000-11-05T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131204,
+   "seasonNumber": 3,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 30,
+   "title": "War Is the H-Word",
+   "airDate": "2000-11-26",
+   "airDateUtc": "2000-11-26T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131205,
+   "seasonNumber": 3,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 32,
+   "title": "The Cryonic Woman",
+   "airDate": "2000-12-03",
+   "airDateUtc": "2000-12-03T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131206,
+   "seasonNumber": 3,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 34,
+   "title": "Parasites Lost",
+   "airDate": "2001-01-21",
+   "airDateUtc": "2001-01-21T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131207,
+   "seasonNumber": 3,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 33,
+   "title": "Amazon Women in the Mood",
+   "airDate": "2001-02-04",
+   "airDateUtc": "2001-02-04T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131208,
+   "seasonNumber": 3,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 38,
+   "title": "Bendless Love",
+   "airDate": "2001-02-11",
+   "airDateUtc": "2001-02-11T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131209,
+   "seasonNumber": 3,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 39,
+   "title": "The Day the Earth Stood Stupid",
+   "airDate": "2001-02-18",
+   "airDateUtc": "2001-02-18T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131210,
+   "seasonNumber": 3,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 40,
+   "title": "That's Lobstertainment!",
+   "airDate": "2001-02-25",
+   "airDateUtc": "2001-02-25T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131211,
+   "seasonNumber": 3,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 37,
+   "title": "The Birdbot of Ice Catraz",
+   "airDate": "2001-03-04",
+   "airDateUtc": "2001-03-04T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131212,
+   "seasonNumber": 3,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 36,
+   "title": "The Luck of the Fryrish",
+   "airDate": "2001-03-11",
+   "airDateUtc": "2001-03-11T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131213,
+   "seasonNumber": 3,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 41,
+   "title": "The Cyber House Rules",
+   "airDate": "2001-04-01",
+   "airDateUtc": "2001-04-01T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131214,
+   "seasonNumber": 3,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 43,
+   "title": "Insane in the Mainframe",
+   "airDate": "2001-04-08",
+   "airDateUtc": "2001-04-08T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131215,
+   "seasonNumber": 3,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 45,
+   "title": "Bendin' in the Wind",
+   "airDate": "2001-04-22",
+   "airDateUtc": "2001-04-22T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131216,
+   "seasonNumber": 3,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 46,
+   "title": "Time Keeps on Slipping",
+   "airDate": "2001-05-06",
+   "airDateUtc": "2001-05-06T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131217,
+   "seasonNumber": 3,
+   "episodeNumber": 15,
+   "absoluteEpisodeNumber": 47,
+   "title": "I Dated a Robot",
+   "airDate": "2001-05-13",
+   "airDateUtc": "2001-05-13T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131218,
+   "seasonNumber": 4,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 51,
+   "title": "Roswell That Ends Well",
+   "airDate": "2001-12-09",
+   "airDateUtc": "2001-12-09T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131219,
+   "seasonNumber": 4,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 35,
+   "title": "A Tale of Two Santas",
+   "airDate": "2001-12-23",
+   "airDateUtc": "2001-12-23T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131220,
+   "seasonNumber": 4,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 50,
+   "title": "Anthology of Interest II",
+   "airDate": "2002-01-06",
+   "airDateUtc": "2002-01-06T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131221,
+   "seasonNumber": 4,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 57,
+   "title": "Love and Rocket",
+   "airDate": "2002-02-10",
+   "airDateUtc": "2002-02-10T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131222,
+   "seasonNumber": 4,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 56,
+   "title": "Leela's Homeworld",
+   "airDate": "2002-02-17",
+   "airDateUtc": "2002-02-17T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131223,
+   "seasonNumber": 4,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 42,
+   "title": "Where the Buggalo Roam",
+   "airDate": "2002-03-03",
+   "airDateUtc": "2002-03-03T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131224,
+   "seasonNumber": 4,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 49,
+   "title": "A Pharaoh to Remember",
+   "airDate": "2002-03-10",
+   "airDateUtc": "2002-03-10T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131225,
+   "seasonNumber": 4,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 52,
+   "title": "Godfellas",
+   "airDate": "2002-03-17",
+   "airDateUtc": "2002-03-17T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131226,
+   "seasonNumber": 4,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 53,
+   "title": "Future Stock",
+   "airDate": "2002-03-31",
+   "airDateUtc": "2002-03-31T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131227,
+   "seasonNumber": 4,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 48,
+   "title": "A Leela of Her Own",
+   "airDate": "2002-04-07",
+   "airDateUtc": "2002-04-07T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131228,
+   "seasonNumber": 4,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 54,
+   "title": "The 30% Iron Chef",
+   "airDate": "2002-04-14",
+   "airDateUtc": "2002-04-14T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131229,
+   "seasonNumber": 4,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 65,
+   "title": "Where No Fan Has Gone Before",
+   "airDate": "2002-04-21",
+   "airDateUtc": "2002-04-21T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131230,
+   "seasonNumber": 5,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 62,
+   "title": "Crimes of the Hot",
+   "airDate": "2002-11-10",
+   "airDateUtc": "2002-11-10T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131231,
+   "seasonNumber": 5,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 61,
+   "title": "Jurassic Bark",
+   "airDate": "2002-11-17",
+   "airDateUtc": "2002-11-17T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131232,
+   "seasonNumber": 5,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 44,
+   "title": "The Route of All Evil",
+   "airDate": "2002-12-08",
+   "airDateUtc": "2002-12-08T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131233,
+   "seasonNumber": 5,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 59,
+   "title": "A Taste of Freedom",
+   "airDate": "2002-12-22",
+   "airDateUtc": "2002-12-22T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131234,
+   "seasonNumber": 5,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 55,
+   "title": "Kif Gets Knocked Up a Notch",
+   "airDate": "2003-01-12",
+   "airDateUtc": "2003-01-12T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131235,
+   "seasonNumber": 5,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 58,
+   "title": "Less Than Hero",
+   "airDate": "2003-03-02",
+   "airDateUtc": "2003-03-02T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131236,
+   "seasonNumber": 5,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 63,
+   "title": "Teenage Mutant Leela's Hurdles",
+   "airDate": "2003-03-30",
+   "airDateUtc": "2003-03-30T11:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131237,
+   "seasonNumber": 5,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 64,
+   "title": "The Why of Fry",
+   "airDate": "2003-04-06",
+   "airDateUtc": "2003-04-06T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131238,
+   "seasonNumber": 5,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 66,
+   "title": "The Sting",
+   "airDate": "2003-06-01",
+   "airDateUtc": "2003-06-01T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131239,
+   "seasonNumber": 5,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 69,
+   "title": "The Farnsworth Parabox",
+   "airDate": "2003-06-08",
+   "airDateUtc": "2003-06-08T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131240,
+   "seasonNumber": 5,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 70,
+   "title": "Three Hundred Big Boys",
+   "airDate": "2003-06-15",
+   "airDateUtc": "2003-06-15T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131241,
+   "seasonNumber": 5,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 71,
+   "title": "Spanish Fry",
+   "airDate": "2003-07-13",
+   "airDateUtc": "2003-07-13T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131242,
+   "seasonNumber": 5,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 67,
+   "title": "Bend Her",
+   "airDate": "2003-07-20",
+   "airDateUtc": "2003-07-20T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131243,
+   "seasonNumber": 5,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 68,
+   "title": "Obsoletely Fabulous",
+   "airDate": "2003-07-27",
+   "airDateUtc": "2003-07-27T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131244,
+   "seasonNumber": 5,
+   "episodeNumber": 15,
+   "absoluteEpisodeNumber": 60,
+   "title": "Bender Should Not Be Allowed on TV",
+   "airDate": "2003-08-03",
+   "airDateUtc": "2003-08-03T10:00:00Z",
+   "runtime": 23
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 131245,
+   "seasonNumber": 5,
+   "episodeNumber": 16,
+   "absoluteEpisodeNumber": 72,
+   "title": "The Devil's Hands Are Idle Playthings",
+   "airDate": "2003-08-10",
+   "airDateUtc": "2003-08-10T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 1051911,
+   "seasonNumber": 6,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 78,
+   "title": "Rebirth",
+   "airDate": "2010-06-24",
+   "airDateUtc": "2010-06-24T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 1349211,
+   "seasonNumber": 6,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 79,
+   "title": "In-A-Gadda-Da-Leela",
+   "airDate": "2010-06-24",
+   "airDateUtc": "2010-06-24T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2394061,
+   "seasonNumber": 6,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 80,
+   "title": "Attack of the Killer App!",
+   "airDate": "2010-07-01",
+   "airDateUtc": "2010-07-01T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2394071,
+   "seasonNumber": 6,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 81,
+   "title": "Proposition Infinity",
+   "airDate": "2010-07-08",
+   "airDateUtc": "2010-07-08T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2394081,
+   "seasonNumber": 6,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 82,
+   "title": "The Duh-Vinci Code",
+   "airDate": "2010-07-15",
+   "airDateUtc": "2010-07-15T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2394091,
+   "seasonNumber": 6,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 83,
+   "title": "Lethal Inspection",
+   "airDate": "2010-07-22",
+   "airDateUtc": "2010-07-22T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2394101,
+   "seasonNumber": 6,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 84,
+   "title": "The Late Philip J. Fry",
+   "airDate": "2010-07-29",
+   "airDateUtc": "2010-07-29T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2419591,
+   "seasonNumber": 6,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 85,
+   "title": "That Darn Katz!",
+   "airDate": "2010-08-05",
+   "airDateUtc": "2010-08-05T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2419611,
+   "seasonNumber": 6,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 86,
+   "title": "A Clockwork Origin",
+   "airDate": "2010-08-12",
+   "airDateUtc": "2010-08-12T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2419631,
+   "seasonNumber": 6,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 87,
+   "title": "The Prisoner of Benda",
+   "airDate": "2010-08-19",
+   "airDateUtc": "2010-08-19T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2419641,
+   "seasonNumber": 6,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 88,
+   "title": "Lrrreconcilable Ndndifferences",
+   "airDate": "2010-08-26",
+   "airDateUtc": "2010-08-26T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2419651,
+   "seasonNumber": 6,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 89,
+   "title": "The Mutants Are Revolting",
+   "airDate": "2010-09-02",
+   "airDateUtc": "2010-09-02T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 2779401,
+   "seasonNumber": 6,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 90,
+   "title": "The Futurama Holiday Spectacular",
+   "airDate": "2010-11-21",
+   "airDateUtc": "2010-11-21T11:00:00Z",
+   "runtime": 22,
+   "finaleType": "midseason"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4095404,
+   "seasonNumber": 6,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 97,
+   "title": "Neutopia",
+   "airDate": "2011-06-23",
+   "airDateUtc": "2011-06-23T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4095424,
+   "seasonNumber": 6,
+   "episodeNumber": 15,
+   "absoluteEpisodeNumber": 94,
+   "title": "Benderama",
+   "airDate": "2011-06-23",
+   "airDateUtc": "2011-06-23T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4095425,
+   "seasonNumber": 6,
+   "episodeNumber": 16,
+   "absoluteEpisodeNumber": 96,
+   "title": "Ghost in the Machines",
+   "airDate": "2011-06-30",
+   "airDateUtc": "2011-06-30T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4105083,
+   "seasonNumber": 6,
+   "episodeNumber": 17,
+   "absoluteEpisodeNumber": 93,
+   "title": "Law and Oracle",
+   "airDate": "2011-07-07",
+   "airDateUtc": "2011-07-07T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4105084,
+   "seasonNumber": 6,
+   "episodeNumber": 18,
+   "absoluteEpisodeNumber": 91,
+   "title": "The Silence of the Clamps",
+   "airDate": "2011-07-14",
+   "airDateUtc": "2011-07-14T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4105085,
+   "seasonNumber": 6,
+   "episodeNumber": 19,
+   "absoluteEpisodeNumber": 98,
+   "title": "Yo Leela Leela",
+   "airDate": "2011-07-21",
+   "airDateUtc": "2011-07-21T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4105086,
+   "seasonNumber": 6,
+   "episodeNumber": 20,
+   "absoluteEpisodeNumber": 100,
+   "title": "All the Presidents' Heads",
+   "airDate": "2011-07-28",
+   "airDateUtc": "2011-07-28T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4105087,
+   "seasonNumber": 6,
+   "episodeNumber": 21,
+   "absoluteEpisodeNumber": 92,
+   "title": "Mobius Dick",
+   "airDate": "2011-08-04",
+   "airDateUtc": "2011-08-04T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4140531,
+   "seasonNumber": 6,
+   "episodeNumber": 22,
+   "absoluteEpisodeNumber": 99,
+   "title": "Fry Am the Egg Man",
+   "airDate": "2011-08-11",
+   "airDateUtc": "2011-08-11T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4140532,
+   "seasonNumber": 6,
+   "episodeNumber": 23,
+   "absoluteEpisodeNumber": 95,
+   "title": "The Tip of the Zoidberg",
+   "airDate": "2011-08-18",
+   "airDateUtc": "2011-08-18T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4140533,
+   "seasonNumber": 6,
+   "episodeNumber": 24,
+   "absoluteEpisodeNumber": 101,
+   "title": "Cold Warriors",
+   "airDate": "2011-08-25",
+   "airDateUtc": "2011-08-25T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4140534,
+   "seasonNumber": 6,
+   "episodeNumber": 25,
+   "absoluteEpisodeNumber": 102,
+   "title": "Overclockwise",
+   "airDate": "2011-09-01",
+   "airDateUtc": "2011-09-01T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4140535,
+   "seasonNumber": 6,
+   "episodeNumber": 26,
+   "absoluteEpisodeNumber": 103,
+   "title": "Reincarnation",
+   "airDate": "2011-09-08",
+   "airDateUtc": "2011-09-08T10:00:00Z",
+   "runtime": 22,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4319164,
+   "seasonNumber": 7,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 104,
+   "title": "The Bots and the Bees",
+   "airDate": "2012-06-20",
+   "airDateUtc": "2012-06-20T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4319163,
+   "seasonNumber": 7,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 105,
+   "title": "A Farewell to Arms",
+   "airDate": "2012-06-20",
+   "airDateUtc": "2012-06-20T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4319165,
+   "seasonNumber": 7,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 106,
+   "title": "Decision 3012",
+   "airDate": "2012-06-27",
+   "airDateUtc": "2012-06-27T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4319465,
+   "seasonNumber": 7,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 107,
+   "title": "The Thief of Baghead",
+   "airDate": "2012-07-04",
+   "airDateUtc": "2012-07-04T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4319466,
+   "seasonNumber": 7,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 108,
+   "title": "Zapp Dingbat",
+   "airDate": "2012-07-11",
+   "airDateUtc": "2012-07-11T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336564,
+   "seasonNumber": 7,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 109,
+   "title": "The Butterjunk Effect",
+   "airDate": "2012-07-18",
+   "airDateUtc": "2012-07-18T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336565,
+   "seasonNumber": 7,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 110,
+   "title": "The Six Million Dollar Mon",
+   "airDate": "2012-07-25",
+   "airDateUtc": "2012-07-25T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336566,
+   "seasonNumber": 7,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 111,
+   "title": "Fun on a Bun",
+   "airDate": "2012-08-01",
+   "airDateUtc": "2012-08-01T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336567,
+   "seasonNumber": 7,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 112,
+   "title": "Free Will Hunting",
+   "airDate": "2012-08-08",
+   "airDateUtc": "2012-08-08T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336568,
+   "seasonNumber": 7,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 113,
+   "title": "Near-Death Wish",
+   "airDate": "2012-08-15",
+   "airDateUtc": "2012-08-15T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336569,
+   "seasonNumber": 7,
+   "episodeNumber": 11,
+   "absoluteEpisodeNumber": 115,
+   "title": "Viva Mars Vegas",
+   "airDate": "2012-08-22",
+   "airDateUtc": "2012-08-22T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336570,
+   "seasonNumber": 7,
+   "episodeNumber": 12,
+   "absoluteEpisodeNumber": 114,
+   "title": "31st Century Fox",
+   "airDate": "2012-08-29",
+   "airDateUtc": "2012-08-29T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4336571,
+   "seasonNumber": 7,
+   "episodeNumber": 13,
+   "absoluteEpisodeNumber": 116,
+   "title": "Naturama",
+   "airDate": "2012-08-29",
+   "airDateUtc": "2012-08-29T10:00:00Z",
+   "runtime": 22,
+   "finaleType": "midseason"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515489,
+   "seasonNumber": 7,
+   "episodeNumber": 14,
+   "absoluteEpisodeNumber": 118,
+   "title": "2-D Blacktop",
+   "airDate": "2013-06-19",
+   "airDateUtc": "2013-06-19T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515490,
+   "seasonNumber": 7,
+   "episodeNumber": 15,
+   "absoluteEpisodeNumber": 120,
+   "title": "Fry and Leela's Big Fling",
+   "airDate": "2013-06-19",
+   "airDateUtc": "2013-06-19T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515493,
+   "seasonNumber": 7,
+   "episodeNumber": 16,
+   "absoluteEpisodeNumber": 119,
+   "title": "T.: The Terrestrial",
+   "airDate": "2013-06-26",
+   "airDateUtc": "2013-06-26T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515495,
+   "seasonNumber": 7,
+   "episodeNumber": 17,
+   "absoluteEpisodeNumber": 117,
+   "title": "Forty Percent Leadbelly",
+   "airDate": "2013-07-03",
+   "airDateUtc": "2013-07-03T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515497,
+   "seasonNumber": 7,
+   "episodeNumber": 18,
+   "absoluteEpisodeNumber": 121,
+   "title": "The Inhuman Torch",
+   "airDate": "2013-07-10",
+   "airDateUtc": "2013-07-10T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515500,
+   "seasonNumber": 7,
+   "episodeNumber": 19,
+   "absoluteEpisodeNumber": 122,
+   "title": "Saturday Morning Fun Pit",
+   "airDate": "2013-07-17",
+   "airDateUtc": "2013-07-17T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515502,
+   "seasonNumber": 7,
+   "episodeNumber": 20,
+   "absoluteEpisodeNumber": 123,
+   "title": "Calculon 2.0",
+   "airDate": "2013-07-24",
+   "airDateUtc": "2013-07-24T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515504,
+   "seasonNumber": 7,
+   "episodeNumber": 21,
+   "absoluteEpisodeNumber": 124,
+   "title": "Assie Come Home",
+   "airDate": "2013-07-31",
+   "airDateUtc": "2013-07-31T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515505,
+   "seasonNumber": 7,
+   "episodeNumber": 22,
+   "absoluteEpisodeNumber": 125,
+   "title": "Leela and the Genestalk",
+   "airDate": "2013-08-07",
+   "airDateUtc": "2013-08-07T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515507,
+   "seasonNumber": 7,
+   "episodeNumber": 23,
+   "absoluteEpisodeNumber": 126,
+   "title": "Game of Tones",
+   "airDate": "2013-08-14",
+   "airDateUtc": "2013-08-14T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515509,
+   "seasonNumber": 7,
+   "episodeNumber": 24,
+   "absoluteEpisodeNumber": 127,
+   "title": "Murder on the Planet Express",
+   "airDate": "2013-08-21",
+   "airDateUtc": "2013-08-21T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515511,
+   "seasonNumber": 7,
+   "episodeNumber": 25,
+   "absoluteEpisodeNumber": 128,
+   "title": "Stench and Stenchibility",
+   "airDate": "2013-08-28",
+   "airDateUtc": "2013-08-28T10:00:00Z",
+   "runtime": 22
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 4515513,
+   "seasonNumber": 7,
+   "episodeNumber": 26,
+   "absoluteEpisodeNumber": 129,
+   "title": "Meanwhile",
+   "airDate": "2013-09-04",
+   "airDateUtc": "2013-09-04T10:00:00Z",
+   "runtime": 22,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326352,
+   "seasonNumber": 8,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 130,
+   "title": "The Impossible Stream",
+   "airDate": "2023-07-24",
+   "airDateUtc": "2023-07-24T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326357,
+   "seasonNumber": 8,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 131,
+   "title": "Children of a Lesser Bog",
+   "airDate": "2023-07-31",
+   "airDateUtc": "2023-07-31T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326358,
+   "seasonNumber": 8,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 132,
+   "title": "How the West Was 1010001",
+   "airDate": "2023-08-07",
+   "airDateUtc": "2023-08-07T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326360,
+   "seasonNumber": 8,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 133,
+   "title": "Parasites Regained",
+   "airDate": "2023-08-14",
+   "airDateUtc": "2023-08-14T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326356,
+   "seasonNumber": 8,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 134,
+   "title": "Related to Items You've Viewed",
+   "airDate": "2023-08-21",
+   "airDateUtc": "2023-08-21T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326359,
+   "seasonNumber": 8,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 135,
+   "title": "I Know What You Did Next Xmas",
+   "airDate": "2023-08-28",
+   "airDateUtc": "2023-08-28T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326353,
+   "seasonNumber": 8,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 136,
+   "title": "Rage Against the Vaccine",
+   "airDate": "2023-09-04",
+   "airDateUtc": "2023-09-04T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326354,
+   "seasonNumber": 8,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 137,
+   "title": "Zapp Gets Canceled",
+   "airDate": "2023-09-11",
+   "airDateUtc": "2023-09-11T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326355,
+   "seasonNumber": 8,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 138,
+   "title": "The Prince and the Product",
+   "airDate": "2023-09-18",
+   "airDateUtc": "2023-09-18T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 9326361,
+   "seasonNumber": 8,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 139,
+   "title": "All The Way Down",
+   "airDate": "2023-09-25",
+   "airDateUtc": "2023-09-25T10:00:00Z",
+   "runtime": 23,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425337,
+   "seasonNumber": 9,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 140,
+   "title": "The One Amigo",
+   "airDate": "2024-07-29",
+   "airDateUtc": "2024-07-29T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425406,
+   "seasonNumber": 9,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 141,
+   "title": "Quids Game",
+   "airDate": "2024-08-05",
+   "airDateUtc": "2024-08-05T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425407,
+   "seasonNumber": 9,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 142,
+   "title": "The Temp",
+   "airDate": "2024-08-12",
+   "airDateUtc": "2024-08-12T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425408,
+   "seasonNumber": 9,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 143,
+   "title": "Beauty and The Bug",
+   "airDate": "2024-08-19",
+   "airDateUtc": "2024-08-19T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425409,
+   "seasonNumber": 9,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 144,
+   "title": "One is Silicon and the Other Gold",
+   "airDate": "2024-08-26",
+   "airDateUtc": "2024-08-26T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425410,
+   "seasonNumber": 9,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 145,
+   "title": "Attack of the Clothes",
+   "airDate": "2024-09-02",
+   "airDateUtc": "2024-09-02T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425411,
+   "seasonNumber": 9,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 146,
+   "title": "Planet Espresso",
+   "airDate": "2024-09-09",
+   "airDateUtc": "2024-09-09T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425412,
+   "seasonNumber": 9,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 147,
+   "title": "Cuteness Overload",
+   "airDate": "2024-09-16",
+   "airDateUtc": "2024-09-16T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425413,
+   "seasonNumber": 9,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 148,
+   "title": "The Futurama Mystery Liberry",
+   "airDate": "2024-09-23",
+   "airDateUtc": "2024-09-23T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 10425414,
+   "seasonNumber": 9,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 149,
+   "title": "Otherwise",
+   "airDate": "2024-09-30",
+   "airDateUtc": "2024-09-30T10:00:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254166,
+   "seasonNumber": 10,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 150,
+   "title": "Destroy Tall Monsters",
+   "airDate": "2025-09-15",
+   "airDateUtc": "2025-09-15T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254167,
+   "seasonNumber": 10,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 151,
+   "title": "The World Is Hot Enough",
+   "airDate": "2025-09-15",
+   "airDateUtc": "2025-09-15T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254168,
+   "seasonNumber": 10,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 152,
+   "title": "Fifty Shades of Green",
+   "airDate": "2025-09-22",
+   "airDateUtc": "2025-09-22T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254169,
+   "seasonNumber": 10,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 153,
+   "title": "The Numberland Gap",
+   "airDate": "2025-09-22",
+   "airDateUtc": "2025-09-22T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254170,
+   "seasonNumber": 10,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 154,
+   "title": "Scared Screenless",
+   "airDate": "2025-09-29",
+   "airDateUtc": "2025-09-29T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254171,
+   "seasonNumber": 10,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 155,
+   "title": "Wicked Human",
+   "airDate": "2025-09-29",
+   "airDateUtc": "2025-09-29T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254172,
+   "seasonNumber": 10,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 156,
+   "title": "Murderoni",
+   "airDate": "2025-10-06",
+   "airDateUtc": "2025-10-06T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254173,
+   "seasonNumber": 10,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 157,
+   "title": "Crab Splatter",
+   "airDate": "2025-10-06",
+   "airDateUtc": "2025-10-06T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254174,
+   "seasonNumber": 10,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 158,
+   "title": "The Trouble with Truffles",
+   "airDate": "2025-10-13",
+   "airDateUtc": "2025-10-13T10:00:00Z",
+   "runtime": 26
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11254175,
+   "seasonNumber": 10,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 159,
+   "title": "The White Hole",
+   "airDate": "2025-10-13",
+   "airDateUtc": "2025-10-13T10:00:00Z",
+   "runtime": 26,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793062,
+   "seasonNumber": 11,
+   "episodeNumber": 1,
+   "absoluteEpisodeNumber": 162,
+   "title": "Beef",
+   "airDate": "2026-08-03",
+   "airDateUtc": "2026-08-03T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793067,
+   "seasonNumber": 11,
+   "episodeNumber": 2,
+   "absoluteEpisodeNumber": 167,
+   "title": "Catfish Hunter",
+   "airDate": "2026-08-03",
+   "airDateUtc": "2026-08-03T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793061,
+   "seasonNumber": 11,
+   "episodeNumber": 3,
+   "absoluteEpisodeNumber": 161,
+   "title": "Our Flag Means Medical Coverage",
+   "airDate": "2026-08-10",
+   "airDateUtc": "2026-08-10T10:00:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793011,
+   "seasonNumber": 11,
+   "episodeNumber": 4,
+   "absoluteEpisodeNumber": 160,
+   "title": "Lords of the Ring",
+   "airDate": "2026-08-17",
+   "airDateUtc": "2026-08-17T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793063,
+   "seasonNumber": 11,
+   "episodeNumber": 5,
+   "absoluteEpisodeNumber": 163,
+   "title": "The Charm Offensive",
+   "airDate": "2026-08-24",
+   "airDateUtc": "2026-08-24T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793065,
+   "seasonNumber": 11,
+   "episodeNumber": 6,
+   "absoluteEpisodeNumber": 165,
+   "title": "Late Bloomers",
+   "airDate": "2026-08-31",
+   "airDateUtc": "2026-08-31T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793064,
+   "seasonNumber": 11,
+   "episodeNumber": 7,
+   "absoluteEpisodeNumber": 164,
+   "title": "Lord Nibbler in the Nothingverse",
+   "airDate": "2026-09-07",
+   "airDateUtc": "2026-09-07T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793066,
+   "seasonNumber": 11,
+   "episodeNumber": 8,
+   "absoluteEpisodeNumber": 166,
+   "title": "Oceans Three",
+   "airDate": "2026-09-14",
+   "airDateUtc": "2026-09-14T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793068,
+   "seasonNumber": 11,
+   "episodeNumber": 9,
+   "absoluteEpisodeNumber": 168,
+   "title": "A New New York Yankee in King Elfo's Court",
+   "airDate": "2026-09-21",
+   "airDateUtc": "2026-09-21T10:00:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 73871,
+   "tvdbId": 11793069,
+   "seasonNumber": 11,
+   "episodeNumber": 10,
+   "absoluteEpisodeNumber": 169,
+   "title": "Final Ending: The Last Conclusion",
+   "airDate": "2026-09-28",
+   "airDateUtc": "2026-09-28T10:00:00Z",
+   "runtime": 25,
+   "finaleType": "series"
+  }
+ ],
+ "metadataSource": "tvdb"
+}

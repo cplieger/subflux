@@ -1,0 +1,981 @@
+{
+ "title": "Game of Thrones",
+ "originalTitle": "Game of Thrones",
+ "tvdbId": 121361,
+ "tmdbId": 1399,
+ "tvRageId": 24493,
+ "tvMazeId": 82,
+ "imdbId": "tt0944947",
+ "slug": "game-of-thrones",
+ "formats": [
+  "scripted"
+ ],
+ "originalCountry": "usa",
+ "originalLanguage": "eng",
+ "language": "eng",
+ "firstAired": "2011-04-17",
+ "lastAired": "2019-05-19",
+ "malIds": [],
+ "anidbIds": [],
+ "aniListIds": [],
+ "lastUpdated": "2026-11-01T14:26:26Z",
+ "status": "Ended",
+ "runtime": 57,
+ "timeOfDay": {
+  "hours": 21,
+  "minutes": 0
+ },
+ "originalNetwork": "HBO",
+ "network": "HBO",
+ "genres": [
+  "Action",
+  "Adventure",
+  "Drama",
+  "Fantasy"
+ ],
+ "contentRating": "TV-MA",
+ "rating": {
+  "count": 2680559,
+  "value": "9.2"
+ },
+ "alternativeTitles": [
+  {
+   "title": "GoT"
+  }
+ ],
+ "translations": [
+  {
+   "language": "ces",
+   "title": "Hra o trůny"
+  },
+  {
+   "language": "dan",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "deu",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "ell",
+   "title": "Το Παιχνίδι του Στέμματος"
+  },
+  {
+   "language": "eng",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "fin",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "fra",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "heb",
+   "title": "משחקי הכס"
+  },
+  {
+   "language": "hrv",
+   "title": "Igra prijestolja"
+  },
+  {
+   "language": "hun",
+   "title": "Trónok harca"
+  },
+  {
+   "language": "ita",
+   "title": "Il Trono di Spade"
+  },
+  {
+   "language": "jpn",
+   "title": "ゲーム・オブ・スローンズ"
+  },
+  {
+   "language": "kor",
+   "title": "왕좌의 게임"
+  },
+  {
+   "language": "nld",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "pol",
+   "title": "Gra o tron"
+  },
+  {
+   "language": "por",
+   "title": "A Guerra dos Tronos"
+  },
+  {
+   "language": "rus",
+   "title": "Игра престолов"
+  },
+  {
+   "language": "spa",
+   "title": "Juego de Tronos"
+  },
+  {
+   "language": "swe",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "tur",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "zho",
+   "title": "冰與火之歌 : 權力的遊戲"
+  },
+  {
+   "language": "bul",
+   "title": "Игра на тронове"
+  },
+  {
+   "language": "est",
+   "title": "Troonide mäng"
+  },
+  {
+   "language": "slk",
+   "title": "Hra o Tróny"
+  },
+  {
+   "language": "pt",
+   "title": "Game of Thrones"
+  },
+  {
+   "language": "ara",
+   "title": "لعبة العروش"
+  },
+  {
+   "language": "yue",
+   "title": "权力的游戏"
+  },
+  {
+   "language": "zhtw",
+   "title": "权力的游戏"
+  },
+  {
+   "language": "kur",
+   "title": "یاری شاکان"
+  },
+  {
+   "language": "vie",
+   "title": "Trò Chơi Vương Quyền"
+  },
+  {
+   "language": "fas",
+   "title": "بازی تاج و تخت"
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "episodeCount": 73
+  },
+  {
+   "name": "DVD Order",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "episodeCount": 73
+  }
+ ],
+ "seasons": [
+  {
+   "seasonNumber": 1,
+   "year": 2011
+  },
+  {
+   "seasonNumber": 2,
+   "year": 2012
+  },
+  {
+   "seasonNumber": 3,
+   "year": 2013
+  },
+  {
+   "seasonNumber": 4,
+   "year": 2014
+  },
+  {
+   "seasonNumber": 5,
+   "year": 2015
+  },
+  {
+   "seasonNumber": 6,
+   "year": 2016
+  },
+  {
+   "seasonNumber": 7,
+   "year": 2017
+  },
+  {
+   "seasonNumber": 8,
+   "year": 2019
+  }
+ ],
+ "episodes": [
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3254641,
+   "seasonNumber": 1,
+   "episodeNumber": 1,
+   "title": "Winter Is Coming",
+   "airDate": "2011-04-17",
+   "airDateUtc": "2011-04-18T01:00:00Z",
+   "runtime": 61
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436411,
+   "seasonNumber": 1,
+   "episodeNumber": 2,
+   "title": "The Kingsroad",
+   "airDate": "2011-04-24",
+   "airDateUtc": "2011-04-25T01:00:00Z",
+   "runtime": 55
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436421,
+   "seasonNumber": 1,
+   "episodeNumber": 3,
+   "title": "Lord Snow",
+   "airDate": "2011-05-01",
+   "airDateUtc": "2011-05-02T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436431,
+   "seasonNumber": 1,
+   "episodeNumber": 4,
+   "title": "Cripples, Bastards, and Broken Things",
+   "airDate": "2011-05-08",
+   "airDateUtc": "2011-05-09T01:00:00Z",
+   "runtime": 55
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436441,
+   "seasonNumber": 1,
+   "episodeNumber": 5,
+   "title": "The Wolf and the Lion",
+   "airDate": "2011-05-15",
+   "airDateUtc": "2011-05-16T01:00:00Z",
+   "runtime": 54
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436451,
+   "seasonNumber": 1,
+   "episodeNumber": 6,
+   "title": "A Golden Crown",
+   "airDate": "2011-05-22",
+   "airDateUtc": "2011-05-23T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3436461,
+   "seasonNumber": 1,
+   "episodeNumber": 7,
+   "title": "You Win or You Die",
+   "airDate": "2011-05-29",
+   "airDateUtc": "2011-05-30T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 3360391,
+   "seasonNumber": 1,
+   "episodeNumber": 8,
+   "title": "The Pointy End",
+   "airDate": "2011-06-05",
+   "airDateUtc": "2011-06-06T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4063481,
+   "seasonNumber": 1,
+   "episodeNumber": 9,
+   "title": "Baelor",
+   "airDate": "2011-06-12",
+   "airDateUtc": "2011-06-13T01:00:00Z",
+   "runtime": 56
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4063491,
+   "seasonNumber": 1,
+   "episodeNumber": 10,
+   "title": "Fire and Blood",
+   "airDate": "2011-06-19",
+   "airDateUtc": "2011-06-20T01:00:00Z",
+   "runtime": 52,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4161693,
+   "seasonNumber": 2,
+   "episodeNumber": 1,
+   "title": "The North Remembers",
+   "airDate": "2012-04-01",
+   "airDateUtc": "2012-04-02T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245771,
+   "seasonNumber": 2,
+   "episodeNumber": 2,
+   "title": "The Night Lands",
+   "airDate": "2012-04-08",
+   "airDateUtc": "2012-04-09T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245772,
+   "seasonNumber": 2,
+   "episodeNumber": 3,
+   "title": "What Is Dead May Never Die",
+   "airDate": "2012-04-15",
+   "airDateUtc": "2012-04-16T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245773,
+   "seasonNumber": 2,
+   "episodeNumber": 4,
+   "title": "Garden of Bones",
+   "airDate": "2012-04-22",
+   "airDateUtc": "2012-04-23T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245774,
+   "seasonNumber": 2,
+   "episodeNumber": 5,
+   "title": "The Ghost of Harrenhal",
+   "airDate": "2012-04-29",
+   "airDateUtc": "2012-04-30T01:00:00Z",
+   "runtime": 54
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245775,
+   "seasonNumber": 2,
+   "episodeNumber": 6,
+   "title": "The Old Gods and the New",
+   "airDate": "2012-05-06",
+   "airDateUtc": "2012-05-07T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245776,
+   "seasonNumber": 2,
+   "episodeNumber": 7,
+   "title": "A Man Without Honor",
+   "airDate": "2012-05-13",
+   "airDateUtc": "2012-05-14T01:00:00Z",
+   "runtime": 56
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245777,
+   "seasonNumber": 2,
+   "episodeNumber": 8,
+   "title": "The Prince of Winterfell",
+   "airDate": "2012-05-20",
+   "airDateUtc": "2012-05-21T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245778,
+   "seasonNumber": 2,
+   "episodeNumber": 9,
+   "title": "Blackwater",
+   "airDate": "2012-05-27",
+   "airDateUtc": "2012-05-28T01:00:00Z",
+   "runtime": 54
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4245779,
+   "seasonNumber": 2,
+   "episodeNumber": 10,
+   "title": "Valar Morghulis",
+   "airDate": "2012-06-03",
+   "airDateUtc": "2012-06-04T01:00:00Z",
+   "runtime": 63,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4293685,
+   "seasonNumber": 3,
+   "episodeNumber": 1,
+   "title": "Valar Dohaeris",
+   "airDate": "2013-03-31",
+   "airDateUtc": "2013-04-01T01:00:00Z",
+   "runtime": 54
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517458,
+   "seasonNumber": 3,
+   "episodeNumber": 2,
+   "title": "Dark Wings, Dark Words",
+   "airDate": "2013-04-07",
+   "airDateUtc": "2013-04-08T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517459,
+   "seasonNumber": 3,
+   "episodeNumber": 3,
+   "title": "Walk of Punishment",
+   "airDate": "2013-04-14",
+   "airDateUtc": "2013-04-15T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517460,
+   "seasonNumber": 3,
+   "episodeNumber": 4,
+   "title": "And Now His Watch Is Ended",
+   "airDate": "2013-04-21",
+   "airDateUtc": "2013-04-22T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517461,
+   "seasonNumber": 3,
+   "episodeNumber": 5,
+   "title": "Kissed by Fire",
+   "airDate": "2013-04-28",
+   "airDateUtc": "2013-04-29T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517462,
+   "seasonNumber": 3,
+   "episodeNumber": 6,
+   "title": "The Climb",
+   "airDate": "2013-05-05",
+   "airDateUtc": "2013-05-06T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517463,
+   "seasonNumber": 3,
+   "episodeNumber": 7,
+   "title": "The Bear and the Maiden Fair",
+   "airDate": "2013-05-12",
+   "airDateUtc": "2013-05-13T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517464,
+   "seasonNumber": 3,
+   "episodeNumber": 8,
+   "title": "Second Sons",
+   "airDate": "2013-05-19",
+   "airDateUtc": "2013-05-20T01:00:00Z",
+   "runtime": 56
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517465,
+   "seasonNumber": 3,
+   "episodeNumber": 9,
+   "title": "The Rains of Castamere",
+   "airDate": "2013-06-02",
+   "airDateUtc": "2013-06-03T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4517466,
+   "seasonNumber": 3,
+   "episodeNumber": 10,
+   "title": "Mhysa",
+   "airDate": "2013-06-09",
+   "airDateUtc": "2013-06-10T01:00:00Z",
+   "runtime": 62,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4721938,
+   "seasonNumber": 4,
+   "episodeNumber": 1,
+   "title": "Two Swords",
+   "airDate": "2014-04-06",
+   "airDateUtc": "2014-04-07T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801602,
+   "seasonNumber": 4,
+   "episodeNumber": 2,
+   "title": "The Lion and the Rose",
+   "airDate": "2014-04-13",
+   "airDateUtc": "2014-04-14T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801603,
+   "seasonNumber": 4,
+   "episodeNumber": 3,
+   "title": "Breaker of Chains",
+   "airDate": "2014-04-20",
+   "airDateUtc": "2014-04-21T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801604,
+   "seasonNumber": 4,
+   "episodeNumber": 4,
+   "title": "Oathkeeper",
+   "airDate": "2014-04-27",
+   "airDateUtc": "2014-04-28T01:00:00Z",
+   "runtime": 55
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801605,
+   "seasonNumber": 4,
+   "episodeNumber": 5,
+   "title": "First of His Name",
+   "airDate": "2014-05-04",
+   "airDateUtc": "2014-05-05T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801606,
+   "seasonNumber": 4,
+   "episodeNumber": 6,
+   "title": "The Laws of Gods and Men",
+   "airDate": "2014-05-11",
+   "airDateUtc": "2014-05-12T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801607,
+   "seasonNumber": 4,
+   "episodeNumber": 7,
+   "title": "Mockingbird",
+   "airDate": "2014-05-18",
+   "airDateUtc": "2014-05-19T01:00:00Z",
+   "runtime": 51
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801608,
+   "seasonNumber": 4,
+   "episodeNumber": 8,
+   "title": "The Mountain and the Viper",
+   "airDate": "2014-06-01",
+   "airDateUtc": "2014-06-02T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801609,
+   "seasonNumber": 4,
+   "episodeNumber": 9,
+   "title": "The Watchers on the Wall",
+   "airDate": "2014-06-08",
+   "airDateUtc": "2014-06-09T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 4801610,
+   "seasonNumber": 4,
+   "episodeNumber": 10,
+   "title": "The Children",
+   "airDate": "2014-06-15",
+   "airDateUtc": "2014-06-16T01:00:00Z",
+   "runtime": 65,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5083694,
+   "seasonNumber": 5,
+   "episodeNumber": 1,
+   "title": "The Wars To Come",
+   "airDate": "2015-04-12",
+   "airDateUtc": "2015-04-13T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5150174,
+   "seasonNumber": 5,
+   "episodeNumber": 2,
+   "title": "The House of Black and White",
+   "airDate": "2015-04-19",
+   "airDateUtc": "2015-04-20T01:00:00Z",
+   "runtime": 55
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5150175,
+   "seasonNumber": 5,
+   "episodeNumber": 3,
+   "title": "High Sparrow",
+   "airDate": "2015-04-26",
+   "airDateUtc": "2015-04-27T01:00:00Z",
+   "runtime": 59
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5150183,
+   "seasonNumber": 5,
+   "episodeNumber": 4,
+   "title": "Sons of the Harpy",
+   "airDate": "2015-05-03",
+   "airDateUtc": "2015-05-04T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5171022,
+   "seasonNumber": 5,
+   "episodeNumber": 5,
+   "title": "Kill the Boy",
+   "airDate": "2015-05-10",
+   "airDateUtc": "2015-05-11T01:00:00Z",
+   "runtime": 56
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5171023,
+   "seasonNumber": 5,
+   "episodeNumber": 6,
+   "title": "Unbowed, Unbent, Unbroken",
+   "airDate": "2015-05-17",
+   "airDateUtc": "2015-05-18T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5171024,
+   "seasonNumber": 5,
+   "episodeNumber": 7,
+   "title": "The Gift",
+   "airDate": "2015-05-24",
+   "airDateUtc": "2015-05-25T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5194184,
+   "seasonNumber": 5,
+   "episodeNumber": 8,
+   "title": "Hardhome",
+   "airDate": "2015-05-31",
+   "airDateUtc": "2015-06-01T01:00:00Z",
+   "runtime": 60
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5194187,
+   "seasonNumber": 5,
+   "episodeNumber": 9,
+   "title": "The Dance of Dragons",
+   "airDate": "2015-06-07",
+   "airDateUtc": "2015-06-08T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5194188,
+   "seasonNumber": 5,
+   "episodeNumber": 10,
+   "title": "Mother's Mercy",
+   "airDate": "2015-06-14",
+   "airDateUtc": "2015-06-15T01:00:00Z",
+   "runtime": 60,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5469015,
+   "seasonNumber": 6,
+   "episodeNumber": 1,
+   "title": "The Red Woman",
+   "airDate": "2016-04-24",
+   "airDateUtc": "2016-04-25T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5579002,
+   "seasonNumber": 6,
+   "episodeNumber": 2,
+   "title": "Home",
+   "airDate": "2016-05-01",
+   "airDateUtc": "2016-05-02T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5579003,
+   "seasonNumber": 6,
+   "episodeNumber": 3,
+   "title": "Oathbreaker",
+   "airDate": "2016-05-08",
+   "airDateUtc": "2016-05-09T01:00:00Z",
+   "runtime": 52
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5599364,
+   "seasonNumber": 6,
+   "episodeNumber": 4,
+   "title": "Book of the Stranger",
+   "airDate": "2016-05-15",
+   "airDateUtc": "2016-05-16T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5600132,
+   "seasonNumber": 6,
+   "episodeNumber": 5,
+   "title": "The Door",
+   "airDate": "2016-05-22",
+   "airDateUtc": "2016-05-23T01:00:00Z",
+   "runtime": 56
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5615733,
+   "seasonNumber": 6,
+   "episodeNumber": 6,
+   "title": "Blood of My Blood",
+   "airDate": "2016-05-29",
+   "airDateUtc": "2016-05-30T01:00:00Z",
+   "runtime": 51
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5615734,
+   "seasonNumber": 6,
+   "episodeNumber": 7,
+   "title": "The Broken Man",
+   "airDate": "2016-06-05",
+   "airDateUtc": "2016-06-06T01:00:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5624259,
+   "seasonNumber": 6,
+   "episodeNumber": 8,
+   "title": "No One",
+   "airDate": "2016-06-12",
+   "airDateUtc": "2016-06-13T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5624260,
+   "seasonNumber": 6,
+   "episodeNumber": 9,
+   "title": "Battle of the Bastards",
+   "airDate": "2016-06-19",
+   "airDateUtc": "2016-06-20T01:00:00Z",
+   "runtime": 59
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 5624261,
+   "seasonNumber": 6,
+   "episodeNumber": 10,
+   "title": "The Winds of Winter",
+   "airDate": "2016-06-26",
+   "airDateUtc": "2016-06-27T01:00:00Z",
+   "runtime": 67,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6185708,
+   "seasonNumber": 7,
+   "episodeNumber": 1,
+   "title": "Dragonstone",
+   "airDate": "2017-07-16",
+   "airDateUtc": "2017-07-17T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6132445,
+   "seasonNumber": 7,
+   "episodeNumber": 2,
+   "title": "Stormborn",
+   "airDate": "2017-07-23",
+   "airDateUtc": "2017-07-24T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6132453,
+   "seasonNumber": 7,
+   "episodeNumber": 3,
+   "title": "The Queen's Justice",
+   "airDate": "2017-07-30",
+   "airDateUtc": "2017-07-31T01:00:00Z",
+   "runtime": 62
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6235145,
+   "seasonNumber": 7,
+   "episodeNumber": 4,
+   "title": "The Spoils of War",
+   "airDate": "2017-08-06",
+   "airDateUtc": "2017-08-07T01:00:00Z",
+   "runtime": 49
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6132455,
+   "seasonNumber": 7,
+   "episodeNumber": 5,
+   "title": "Eastwatch",
+   "airDate": "2017-08-13",
+   "airDateUtc": "2017-08-14T01:00:00Z",
+   "runtime": 58
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6132456,
+   "seasonNumber": 7,
+   "episodeNumber": 6,
+   "title": "Beyond the Wall",
+   "airDate": "2017-08-20",
+   "airDateUtc": "2017-08-21T01:00:00Z",
+   "runtime": 70
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 6275142,
+   "seasonNumber": 7,
+   "episodeNumber": 7,
+   "title": "The Dragon and the Wolf",
+   "airDate": "2017-08-27",
+   "airDateUtc": "2017-08-28T01:00:00Z",
+   "runtime": 79,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7117386,
+   "seasonNumber": 8,
+   "episodeNumber": 1,
+   "title": "Winterfell",
+   "airDate": "2019-04-14",
+   "airDateUtc": "2019-04-15T01:00:00Z",
+   "runtime": 53
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7121401,
+   "seasonNumber": 8,
+   "episodeNumber": 2,
+   "title": "A Knight of the Seven Kingdoms",
+   "airDate": "2019-04-21",
+   "airDateUtc": "2019-04-22T01:00:00Z",
+   "runtime": 57
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7121402,
+   "seasonNumber": 8,
+   "episodeNumber": 3,
+   "title": "The Long Night",
+   "airDate": "2019-04-28",
+   "airDateUtc": "2019-04-29T01:00:00Z",
+   "runtime": 81
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7121403,
+   "seasonNumber": 8,
+   "episodeNumber": 4,
+   "title": "The Last of the Starks",
+   "airDate": "2019-05-05",
+   "airDateUtc": "2019-05-06T01:00:00Z",
+   "runtime": 77
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7121404,
+   "seasonNumber": 8,
+   "episodeNumber": 5,
+   "title": "The Bells",
+   "airDate": "2019-05-12",
+   "airDateUtc": "2019-05-13T01:00:00Z",
+   "runtime": 77
+  },
+  {
+   "tvdbShowId": 121361,
+   "tvdbId": 7121405,
+   "seasonNumber": 8,
+   "episodeNumber": 6,
+   "title": "The Iron Throne",
+   "airDate": "2019-05-19",
+   "airDateUtc": "2019-05-20T01:00:00Z",
+   "runtime": 78,
+   "finaleType": "series"
+  }
+ ],
+ "metadataSource": "tvdb"
+}

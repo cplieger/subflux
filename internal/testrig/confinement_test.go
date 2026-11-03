@@ -15,12 +15,15 @@ import (
 const modulePath = "github.com/cplieger/subflux"
 
 // importRule confines a dependency to the packages allowed to import it
-// directly. imported and each allowed entry match a path or, ending in
-// "/...", a path and everything beneath it. everyPackage extends the check
-// from this module's packages to every non-stdlib package in the build.
+// directly or, when forbidden is set, keeps it out of those importers
+// alone. imported and each allowed or forbidden entry match a path or,
+// ending in "/...", a path and everything beneath it. everyPackage extends
+// the check from this module's packages to every non-stdlib package in the
+// build.
 type importRule struct {
 	imported     string
 	allowed      []string
+	forbidden    []string
 	everyPackage bool
 }
 
@@ -31,6 +34,18 @@ var importRules []importRule
 // providerHTTPRoots are trees whose subpackages may not build a raw net/http
 // client or transport; the provider boundary owns the one client.
 var providerHTTPRoots []string
+
+// scheduleRule keeps scan out of settings, which holds the scan section's
+// Schedule from mediasource: scan imports status, so settings importing scan
+// would make a cycle once status is built over settings.
+var scheduleRule = importRule{imported: modulePath + "/internal/scan", forbidden: []string{modulePath + "/internal/settings/..."}}
+
+func TestScheduleLivesInMediasource(t *testing.T) {
+	pkgs := goList(t, absDir(t, moduleRoot), "./...")
+	for _, v := range importViolations(pkgs, modulePath, []importRule{scheduleRule}) {
+		t.Error(v)
+	}
+}
 
 func TestImportConfinement(t *testing.T) {
 	pkgs := goList(t, absDir(t, moduleRoot), "./...")
@@ -50,6 +65,16 @@ func TestProviderHTTP(t *testing.T) {
 	}
 }
 
+// TestConfinementRulesSetOneList: violation reads forbidden alone when it is
+// set, so a rule setting both lists would check only half of what it says.
+func TestConfinementRulesSetOneList(t *testing.T) {
+	for _, r := range append(slices.Clone(importRules), scheduleRule) {
+		if len(r.allowed) > 0 && len(r.forbidden) > 0 {
+			t.Errorf("rule for %s sets both allowed and forbidden", r.imported)
+		}
+	}
+}
+
 func TestConfinementChecker(t *testing.T) {
 	const fixture = "example.com/confinement"
 	pkgs := goList(t, absDir(t, "testdata/confinement"), "./...")
@@ -66,6 +91,17 @@ func TestConfinementChecker(t *testing.T) {
 		rules := []importRule{{imported: fixture + "/b", allowed: []string{fixture + "/..."}}}
 		if got := importViolations(pkgs, fixture, rules); len(got) != 0 {
 			t.Errorf("violations = %q, want none", got)
+		}
+	})
+	t.Run("forbidden importer", func(t *testing.T) {
+		rules := []importRule{{imported: fixture + "/b", forbidden: []string{fixture + "/a"}}}
+		want := []string{fixture + "/a imports " + fixture + "/b, forbidden in [" + fixture + "/a]"}
+		if got := importViolations(pkgs, fixture, rules); !slices.Equal(got, want) {
+			t.Errorf("violations = %q, want %q", got, want)
+		}
+		rules[0].forbidden = []string{fixture + "/c/..."}
+		if got := importViolations(pkgs, fixture, rules); len(got) != 0 {
+			t.Errorf("another importer forbidden: violations = %q, want none", got)
 		}
 	})
 	t.Run("every package", func(t *testing.T) {
@@ -109,17 +145,32 @@ func importViolations(pkgs []listedPackage, module string, rules []importRule) [
 			}
 			for _, imp := range p.Imports {
 				imp = basePackage(imp)
-				if !matchPath(r.imported, imp) || slices.ContainsFunc(r.allowed, func(a string) bool { return matchPath(a, importer) }) {
+				if !matchPath(r.imported, imp) {
 					continue
 				}
-				v := fmt.Sprintf("%s imports %s, allowed only in %v", importer, imp, r.allowed)
-				if !slices.Contains(out, v) {
+				v := r.violation(importer, imp)
+				if v != "" && !slices.Contains(out, v) {
 					out = append(out, v)
 				}
 			}
 		}
 	}
 	return out
+}
+
+// violation describes importer's import of imp if r refuses it, else "".
+func (r importRule) violation(importer, imp string) string {
+	matches := func(p string) bool { return matchPath(p, importer) }
+	if len(r.forbidden) > 0 {
+		if slices.ContainsFunc(r.forbidden, matches) {
+			return fmt.Sprintf("%s imports %s, forbidden in %v", importer, imp, r.forbidden)
+		}
+		return ""
+	}
+	if slices.ContainsFunc(r.allowed, matches) {
+		return ""
+	}
+	return fmt.Sprintf("%s imports %s, allowed only in %v", importer, imp, r.allowed)
 }
 
 // rawHTTPViolations parses the non-test files of every module package beneath

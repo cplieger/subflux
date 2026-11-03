@@ -72,6 +72,28 @@ var retained = []struct{ pattern, until string }{
 	{"internal/media#*", "ST-1"},
 	{"internal/mediaserver#*", "AP-1"},
 	{"internal/mediasource#*", "ST-1"},
+	{"internal/mediasource#CheckSaved", "MS-2"},
+	{"internal/mediasource#Config.Index", "MS-2"},
+	{"internal/mediasource#Config.Values", "MS-2"},
+	{"internal/mediasource#DefaultSchedule", "MS-2"},
+	{"internal/mediasource#Deps.HTTP", "MS-2"},
+	{"internal/mediasource#ErrAiredOrderUnavailable", "MS-2"},
+	{"internal/mediasource#JoinQuery*", "MS-2"},
+	{"internal/mediasource#Joined*", "MS-2"},
+	{"internal/mediasource#Listed.*", "MS-2"},
+	{"internal/mediasource#ParseConfigs", "MS-2"},
+	{"internal/mediasource#ParseSchedule", "MS-2"},
+	{"internal/mediasource#PingEntry", "MS-2"},
+	{"internal/mediasource#Schedule", "MS-2"},
+	{"internal/mediasource#Schedule.Change", "MS-2"},
+	{"internal/mediasource#Schedule.Whole", "MS-2"},
+	{"internal/mediasource#ScheduleSchema", "MS-2"},
+	{"internal/mediasource#Set.Inherit", "MS-2"},
+	{"internal/mediasource#Set.LocalPath", "MS-2"},
+	{"internal/mediasource#Set.MediaRoots", "MS-2"},
+	{"internal/mediasource#Set.Sources", "MS-2"},
+	{"internal/mediasource/arr#*", "MS-2"},
+	{"internal/mediasource/sourcetest#*", "MS-2"},
 	{"internal/obs#Metrics.Register", "AP-1"},
 	{"internal/provider#*", "SE-2"},
 	{"internal/provider/*", "SE-2"},
@@ -85,6 +107,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/settings#Service.Merge", "AP-1"},
 	{"internal/settings#Service.Save", "PA-2"},
 	{"internal/settings#Snapshot.Document", "PA-2"},
+	{"internal/skyhook#*", "MS-2"},
 	{"internal/status#*", "PAS-1"},
 	{"internal/status#StartCodes", "SE-2"},
 	{"internal/subflux#*", "SE-2"},
@@ -141,6 +164,35 @@ func matchRef(pattern, ref string) bool {
 	return regexp.MustCompile(`(?s)^` + expr + "$").MatchString(ref)
 }
 
+// rowFor answers the narrowest retained row whose pattern matches ref, so a
+// symbol a later landing calls first is adjudicated by its own row, not by
+// its package's.
+func rowFor(ref string) (pattern, until string, ok bool) {
+	for _, r := range retained {
+		if matchRef(r.pattern, ref) && len(r.pattern) > len(pattern) {
+			pattern, until, ok = r.pattern, r.until, true
+		}
+	}
+	return pattern, until, ok
+}
+
+func TestRowForPrefersTheNarrowestPattern(t *testing.T) {
+	for _, c := range []struct{ name, ref, pattern, until string }{
+		{"its own row over its package's", "internal/mediasource#ScheduleSchema", "internal/mediasource#ScheduleSchema", "MS-2"},
+		{"its package's row alone", "internal/mediasource#Cursor", "internal/mediasource#*", "ST-1"},
+		{"an exported variable's own row", "internal/status#StartCodes", "internal/status#StartCodes", "SE-2"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if pattern, until, ok := rowFor(c.ref); !ok || pattern != c.pattern || until != c.until {
+				t.Errorf("rowFor(%q) = %q, %q, %v; want %q, %q", c.ref, pattern, until, ok, c.pattern, c.until)
+			}
+		})
+	}
+	if _, _, ok := rowFor("internal/app#Run"); ok {
+		t.Error("rowFor matched a symbol no row retains")
+	}
+}
+
 func TestMatchRef(t *testing.T) {
 	cases := []struct {
 		name, pattern, ref string
@@ -178,11 +230,8 @@ func TestRetainedAdjudicationsNameTheirRow(t *testing.T) {
 	for _, e := range cfg.Ignore {
 		rel, _ := strings.CutPrefix(e.Symbol, refPrefix)
 		want := ""
-		for _, r := range retained {
-			if matchRef(r.pattern, rel) {
-				want = "Retained until " + r.until + " (" + r.pattern + "): "
-				break
-			}
+		if pattern, until, ok := rowFor(rel); ok {
+			want = "Retained until " + until + " (" + pattern + "): "
 		}
 		switch {
 		case want != "" && !strings.HasPrefix(e.Reason, want):
