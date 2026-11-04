@@ -97,8 +97,17 @@ func TestRetryProvider_error_classification(t *testing.T) {
 			wantCalls: 2,
 		},
 		{
-			name:      "no_retry_on_500",
-			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 500}}},
+			name: "retry_on_500",
+			dlResults: []dlResult{
+				{err: &httpwire.HTTPStatusError{Code: 500}},
+				{err: nil},
+			},
+			wantErr:   false,
+			wantCalls: 2,
+		},
+		{
+			name:      "no_retry_on_501",
+			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 501}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},

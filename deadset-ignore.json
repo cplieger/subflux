@@ -711,12 +711,6 @@
     },
     {
       "code": "DS1403",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Secret",
-      "path": "internal/formschema/values.go",
-      "reason": "Retained until PA-2 (internal/formschema#Values.Secret): a by-key lookup answers (value, found), and the first optional Secret field, which lands there, reads found."
-    },
-    {
-      "code": "DS1403",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
       "path": "internal/formschema/values.go",
       "reason": "Retained until PA-2 (internal/formschema#Values.Duration): a by-key lookup answers (value, found), and the first optional Duration field, which lands there, reads found."
@@ -744,12 +738,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Bool",
       "path": "internal/formschema/values.go",
       "reason": "Retained until PA-2 (internal/formschema#Values.Bool): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
-      "path": "internal/formschema/values.go",
-      "reason": "Retained until PA-2 (internal/formschema#Values.Duration): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -1148,12 +1136,6 @@
       "reason": "A target's variant: Variant.Flags' first caller outside the package, in TS-1, names it."
     },
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Parse",
-      "path": "internal/language/tag.go",
-      "reason": "The one canonicalizer, live through the languages section; its first caller outside the package, storage's tag decoding, lands in ST-1."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Grade.Reason",
       "path": "internal/language/grade_types.go",
@@ -1311,51 +1293,159 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Cursor",
-      "path": "internal/mediasource/cursor.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Cause",
-      "path": "internal/mediasource/errors.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#SourceError",
-      "path": "internal/mediasource/errors.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#NativeID",
-      "path": "internal/mediasource/facts.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#NativeRef",
-      "path": "internal/mediasource/facts.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Order",
-      "path": "internal/mediasource/facts.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TagRef",
-      "path": "internal/mediasource/facts.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Listed",
       "path": "internal/mediasource/join.go",
       "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Schedule.Change",
+      "path": "internal/mediasource/schedule.go",
+      "reason": "Retained until MS-2 (internal/mediasource#Schedule.Change): scan's per-source loop, its first reader outside the tests, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Schedule.Whole",
+      "path": "internal/mediasource/schedule.go",
+      "reason": "Retained until MS-2 (internal/mediasource#Schedule.Whole): scan's per-source loop, its first reader outside the tests, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ScheduleSchema",
+      "path": "internal/mediasource/schedule.go",
+      "reason": "Retained until MS-2 (internal/mediasource#ScheduleSchema): the scan section's row in settings, its first caller outside the file, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#MaxPosterBytes",
+      "path": "internal/mediasource/arr/poster.go",
+      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first callers outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Event",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Event.Seq",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.Remove",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.SetTags",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.SetFolders",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.Snapshot",
+      "path": "internal/mediasource/sourcetest/library.go",
+      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Client",
+      "path": "internal/skyhook/client.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#New",
+      "path": "internal/skyhook/client.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Client.Show",
+      "path": "internal/skyhook/client.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#MaxBody",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Show",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order.Type",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order.Name",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.AirDate",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Title",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.ID",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Season",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Number",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Absolute",
+      "path": "internal/skyhook/show.go",
+      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
     }
   ]
 }

@@ -1,0 +1,1704 @@
+{
+ "title": "Monogatari",
+ "originalTitle": "物語シリーズ",
+ "tvdbId": 102261,
+ "tmdbId": 46195,
+ "tvRageId": 22985,
+ "tvMazeId": 4202,
+ "imdbId": "tt1480925",
+ "slug": "monogatari",
+ "formats": [
+  "unknown"
+ ],
+ "originalCountry": "jpn",
+ "originalLanguage": "jpn",
+ "language": "eng",
+ "firstAired": "2009-07-03",
+ "lastAired": "2024-12-29",
+ "malIds": [
+  5081,
+  11597,
+  17074,
+  15689,
+  21855,
+  28025,
+  31181,
+  32268,
+  35247,
+  57864
+ ],
+ "anidbIds": [
+  6327,
+  8357,
+  8658,
+  9183,
+  9453,
+  10046,
+  10891,
+  11350,
+  11827,
+  13033,
+  13691,
+  18424
+ ],
+ "aniListIds": [
+  5081,
+  11597,
+  17074,
+  15689,
+  20593,
+  20918,
+  21262,
+  21520,
+  21745,
+  173533
+ ],
+ "lastUpdated": "2026-10-20T19:24:04Z",
+ "status": "Continuing",
+ "runtime": 25,
+ "timeOfDay": {
+  "hours": 21,
+  "minutes": 30
+ },
+ "originalNetwork": "Tokyo MX",
+ "network": "Tokyo MX",
+ "genres": [
+  "Action",
+  "Animation",
+  "Anime",
+  "Comedy",
+  "Drama",
+  "Fantasy",
+  "Romance"
+ ],
+ "contentRating": "TV-14",
+ "rating": {
+  "count": 8426,
+  "value": "8.0"
+ },
+ "alternativeTitles": [
+  {
+   "title": "Ghostory"
+  },
+  {
+   "title": "Tsukimonogatari: Yotsugi Doll"
+  },
+  {
+   "title": "Bakemonogatari"
+  },
+  {
+   "title": "Zenmonogatari"
+  },
+  {
+   "title": "Hanamonogatari"
+  },
+  {
+   "title": "Zoku Owarimonogatari"
+  },
+  {
+   "title": "Kabukimonogatari"
+  },
+  {
+   "title": "Kizumonogatari"
+  },
+  {
+   "title": "Koimonogatari"
+  },
+  {
+   "title": "Koyomimonogatari"
+  },
+  {
+   "title": "Monogatari Series"
+  },
+  {
+   "title": "Monogatari Series: First Season"
+  },
+  {
+   "title": "Monogatari Series: Second Season"
+  },
+  {
+   "title": "Monogatari Series: Final Season"
+  },
+  {
+   "title": "Nekomonogatari"
+  },
+  {
+   "title": "Nisemonogatari"
+  },
+  {
+   "title": "Onimonogatari"
+  },
+  {
+   "title": "Otorimonogatari"
+  },
+  {
+   "title": "Owarimonogatari"
+  },
+  {
+   "title": "Tsukimonogatari: Yotsugi Doll"
+  },
+  {
+   "title": "Zenmonogatari"
+  },
+  {
+   "title": "Zoku Owarimonogatari"
+  },
+  {
+   "title": "MONOGATARI Series OFF & MONSTER Season"
+  }
+ ],
+ "translations": [
+  {
+   "language": "deu",
+   "title": "Monogatari"
+  },
+  {
+   "language": "eng",
+   "title": "Monogatari"
+  },
+  {
+   "language": "fra",
+   "title": "Monogatari"
+  },
+  {
+   "language": "heb",
+   "title": "בקמונוגטארי"
+  },
+  {
+   "language": "ita",
+   "title": "Monogatari"
+  },
+  {
+   "language": "jpn",
+   "title": "物語シリーズ"
+  },
+  {
+   "language": "kor",
+   "title": "모노가타리"
+  },
+  {
+   "language": "rus",
+   "title": "Истории"
+  },
+  {
+   "language": "spa",
+   "title": "Monogatari"
+  },
+  {
+   "language": "zho",
+   "title": "物语系列"
+  },
+  {
+   "language": "zhtw",
+   "title": "物語系列"
+  },
+  {
+   "language": "ukr",
+   "title": "Історії"
+  },
+  {
+   "language": "pt",
+   "title": "Monogatari"
+  },
+  {
+   "language": "ara",
+   "title": "مونوغاتاري"
+  },
+  {
+   "language": "fas",
+   "title": "مونوگاتاری"
+  },
+  {
+   "language": "vie",
+   "title": "Những Câu Chuyện Huyền Bí"
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "episodeCount": 83
+  },
+  {
+   "name": "DVD Order",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "episodeCount": 127
+  },
+  {
+   "name": "Book Order",
+   "type": "alternate",
+   "seasonNumbers": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+   ],
+   "episodeCount": 125
+  }
+ ],
+ "seasons": [
+  {
+   "seasonNumber": 1,
+   "year": 2009,
+   "title": "Bakemonogatari"
+  },
+  {
+   "seasonNumber": 2,
+   "year": 2016,
+   "title": "Kizumonogatari"
+  },
+  {
+   "seasonNumber": 3,
+   "year": 2012,
+   "title": "Nisemonogatari"
+  },
+  {
+   "seasonNumber": 4,
+   "year": 2012,
+   "title": "Nekomonogatari Black"
+  },
+  {
+   "seasonNumber": 5,
+   "year": 2013,
+   "title": "Nekomonogatari White"
+  },
+  {
+   "seasonNumber": 6,
+   "year": 2013,
+   "title": "Kabukimonogatari"
+  },
+  {
+   "seasonNumber": 7,
+   "year": 2014,
+   "title": "Hanamonogatari"
+  },
+  {
+   "seasonNumber": 8,
+   "year": 2013,
+   "title": "Otorimonogatari"
+  },
+  {
+   "seasonNumber": 9,
+   "year": 2013,
+   "title": "Onimonogatari"
+  },
+  {
+   "seasonNumber": 10,
+   "year": 2013,
+   "title": "Koimonogatari"
+  },
+  {
+   "seasonNumber": 11,
+   "year": 2014,
+   "title": "Tsukimonogatari"
+  },
+  {
+   "seasonNumber": 12,
+   "year": 2016,
+   "title": "Koyomimonogatari"
+  },
+  {
+   "seasonNumber": 13,
+   "year": 2015,
+   "title": "Owarimonogatari"
+  },
+  {
+   "seasonNumber": 14,
+   "year": 2018,
+   "title": "Zoku Owarimonogatari"
+  },
+  {
+   "seasonNumber": 15,
+   "year": 2024,
+   "title": "Orokamonogatari"
+  },
+  {
+   "seasonNumber": 16,
+   "year": 2024,
+   "title": "Wazamonogatari"
+  },
+  {
+   "seasonNumber": 17,
+   "year": 2024,
+   "title": "Nademonogatari"
+  },
+  {
+   "seasonNumber": 18,
+   "year": 2024,
+   "title": "Shinobumonogatari"
+  }
+ ],
+ "episodes": [
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 830421,
+   "seasonNumber": 1,
+   "episodeNumber": 1,
+   "title": "Hitagi Crab - Part 1",
+   "airDate": "2009-07-03",
+   "airDateUtc": "2009-07-03T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 830451,
+   "seasonNumber": 1,
+   "episodeNumber": 2,
+   "title": "Hitagi Crab - Part 2",
+   "airDate": "2009-07-10",
+   "airDateUtc": "2009-07-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 882021,
+   "seasonNumber": 1,
+   "episodeNumber": 3,
+   "title": "Mayoi Snail - Part 1",
+   "airDate": "2009-07-17",
+   "airDateUtc": "2009-07-17T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 908301,
+   "seasonNumber": 1,
+   "episodeNumber": 4,
+   "title": "Mayoi Snail - Part 2",
+   "airDate": "2009-07-24",
+   "airDateUtc": "2009-07-24T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 935411,
+   "seasonNumber": 1,
+   "episodeNumber": 5,
+   "title": "Mayoi Snail - Part 3",
+   "airDate": "2009-07-31",
+   "airDateUtc": "2009-07-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 960831,
+   "seasonNumber": 1,
+   "episodeNumber": 6,
+   "title": "Suruga Monkey - Part 1",
+   "airDate": "2009-08-09",
+   "airDateUtc": "2009-08-09T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 966311,
+   "seasonNumber": 1,
+   "episodeNumber": 7,
+   "title": "Suruga Monkey - Part 2",
+   "airDate": "2009-08-21",
+   "airDateUtc": "2009-08-21T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 966321,
+   "seasonNumber": 1,
+   "episodeNumber": 8,
+   "title": "Suruga Monkey - Part 3",
+   "airDate": "2009-08-28",
+   "airDateUtc": "2009-08-28T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 966331,
+   "seasonNumber": 1,
+   "episodeNumber": 9,
+   "title": "Nadeko Snake - Part 1",
+   "airDate": "2009-09-04",
+   "airDateUtc": "2009-09-04T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 1056211,
+   "seasonNumber": 1,
+   "episodeNumber": 10,
+   "title": "Nadeko Snake - Part 2",
+   "airDate": "2009-09-11",
+   "airDateUtc": "2009-09-11T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 1074891,
+   "seasonNumber": 1,
+   "episodeNumber": 11,
+   "title": "Tsubasa Cat - Part 1",
+   "airDate": "2009-09-18",
+   "airDateUtc": "2009-09-18T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 1074901,
+   "seasonNumber": 1,
+   "episodeNumber": 12,
+   "title": "Tsubasa Cat - Part 2",
+   "airDate": "2009-09-25",
+   "airDateUtc": "2009-09-25T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 1124541,
+   "seasonNumber": 1,
+   "episodeNumber": 13,
+   "title": "Tsubasa Cat - Part 3",
+   "airDate": "2009-11-02",
+   "airDateUtc": "2009-11-02T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 1327321,
+   "seasonNumber": 1,
+   "episodeNumber": 14,
+   "title": "Tsubasa Cat - Part 4",
+   "airDate": "2010-02-23",
+   "airDateUtc": "2010-02-23T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 2409291,
+   "seasonNumber": 1,
+   "episodeNumber": 15,
+   "title": "Tsubasa Cat - Part 5",
+   "airDate": "2010-06-25",
+   "airDateUtc": "2010-06-25T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 3406651,
+   "seasonNumber": 1,
+   "episodeNumber": 16,
+   "airedBeforeSeasonNumber": 1,
+   "airedBeforeEpisodeNumber": 6,
+   "title": "Episode 5.5 (Recap)",
+   "airDate": "2009-08-07",
+   "airDateUtc": "2009-08-07T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4139150,
+   "seasonNumber": 2,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 2,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Kizumonogatari I: Iron Blood Arc",
+   "airDate": "2016-01-08",
+   "airDateUtc": "2016-01-08T12:30:00Z",
+   "runtime": 64
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356163,
+   "seasonNumber": 2,
+   "episodeNumber": 2,
+   "airedBeforeSeasonNumber": 2,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Kizumonogatari II: Passionate Blood Arc",
+   "airDate": "2016-08-19",
+   "airDateUtc": "2016-08-19T12:30:00Z",
+   "runtime": 68
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356165,
+   "seasonNumber": 2,
+   "episodeNumber": 3,
+   "airedBeforeSeasonNumber": 2,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Kizumonogatari III: Cold Blood Arc",
+   "airDate": "2017-01-06",
+   "airDateUtc": "2017-01-06T12:30:00Z",
+   "runtime": 82,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10851253,
+   "seasonNumber": 2,
+   "episodeNumber": 4,
+   "title": "Kizumonogatari: Koyomi Vamp",
+   "airDate": "2024-01-12",
+   "airDateUtc": "2024-01-12T12:30:00Z",
+   "runtime": 144
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4229864,
+   "seasonNumber": 3,
+   "episodeNumber": 1,
+   "title": "Karen Bee - Part 1",
+   "airDate": "2012-01-07",
+   "airDateUtc": "2012-01-07T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4230994,
+   "seasonNumber": 3,
+   "episodeNumber": 2,
+   "title": "Karen Bee - Part 2",
+   "airDate": "2012-01-14",
+   "airDateUtc": "2012-01-14T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4230993,
+   "seasonNumber": 3,
+   "episodeNumber": 3,
+   "title": "Karen Bee - Part 3",
+   "airDate": "2012-01-21",
+   "airDateUtc": "2012-01-21T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4230992,
+   "seasonNumber": 3,
+   "episodeNumber": 4,
+   "title": "Karen Bee - Part 4",
+   "airDate": "2012-01-28",
+   "airDateUtc": "2012-01-28T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246705,
+   "seasonNumber": 3,
+   "episodeNumber": 5,
+   "title": "Karen Bee - Part 5",
+   "airDate": "2012-02-04",
+   "airDateUtc": "2012-02-04T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246706,
+   "seasonNumber": 3,
+   "episodeNumber": 6,
+   "title": "Karen Bee - Part 6",
+   "airDate": "2012-02-11",
+   "airDateUtc": "2012-02-11T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246707,
+   "seasonNumber": 3,
+   "episodeNumber": 7,
+   "title": "Karen Bee - Part 7",
+   "airDate": "2012-02-18",
+   "airDateUtc": "2012-02-18T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246708,
+   "seasonNumber": 3,
+   "episodeNumber": 8,
+   "title": "Tsukihi Phoenix - Part 1",
+   "airDate": "2012-02-26",
+   "airDateUtc": "2012-02-26T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246709,
+   "seasonNumber": 3,
+   "episodeNumber": 9,
+   "title": "Tsukihi Phoenix - Part 2",
+   "airDate": "2012-03-04",
+   "airDateUtc": "2012-03-04T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246710,
+   "seasonNumber": 3,
+   "episodeNumber": 10,
+   "title": "Tsukihi Phoenix - Part 3",
+   "airDate": "2012-03-10",
+   "airDateUtc": "2012-03-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4246711,
+   "seasonNumber": 3,
+   "episodeNumber": 11,
+   "title": "Tsukihi Phoenix - Part 4",
+   "airDate": "2012-03-17",
+   "airDateUtc": "2012-03-17T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4450835,
+   "seasonNumber": 4,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Tsubasa Family - Part 1",
+   "airDate": "2012-12-31",
+   "airDateUtc": "2012-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4450836,
+   "seasonNumber": 4,
+   "episodeNumber": 2,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Tsubasa Family - Part 2",
+   "airDate": "2012-12-31",
+   "airDateUtc": "2012-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4450837,
+   "seasonNumber": 4,
+   "episodeNumber": 3,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Tsubasa Family - Part 3",
+   "airDate": "2012-12-31",
+   "airDateUtc": "2012-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4450838,
+   "seasonNumber": 4,
+   "episodeNumber": 4,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Tsubasa Family - Part 4",
+   "airDate": "2012-12-31",
+   "airDateUtc": "2012-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4318918,
+   "seasonNumber": 5,
+   "episodeNumber": 1,
+   "title": "Tsubasa Tiger - Part 1",
+   "airDate": "2013-07-07",
+   "airDateUtc": "2013-07-07T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590169,
+   "seasonNumber": 5,
+   "episodeNumber": 2,
+   "title": "Tsubasa Tiger - Part 2",
+   "airDate": "2013-07-14",
+   "airDateUtc": "2013-07-14T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590170,
+   "seasonNumber": 5,
+   "episodeNumber": 3,
+   "title": "Tsubasa Tiger - Part 3",
+   "airDate": "2013-07-21",
+   "airDateUtc": "2013-07-21T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590171,
+   "seasonNumber": 5,
+   "episodeNumber": 4,
+   "title": "Tsubasa Tiger - Part 4",
+   "airDate": "2013-07-28",
+   "airDateUtc": "2013-07-28T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590172,
+   "seasonNumber": 5,
+   "episodeNumber": 5,
+   "title": "Tsubasa Tiger - Part 5",
+   "airDate": "2013-08-04",
+   "airDateUtc": "2013-08-04T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4632072,
+   "seasonNumber": 5,
+   "episodeNumber": 6,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 6,
+   "title": "Summary I",
+   "airDate": "2013-08-11",
+   "airDateUtc": "2013-08-11T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590173,
+   "seasonNumber": 6,
+   "episodeNumber": 1,
+   "title": "Mayoi Jiangshi - Part 1",
+   "airDate": "2013-08-18",
+   "airDateUtc": "2013-08-18T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590174,
+   "seasonNumber": 6,
+   "episodeNumber": 2,
+   "title": "Mayoi Jiangshi - Part 2",
+   "airDate": "2013-08-25",
+   "airDateUtc": "2013-08-25T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590175,
+   "seasonNumber": 6,
+   "episodeNumber": 3,
+   "title": "Mayoi Jiangshi - Part 3",
+   "airDate": "2013-09-01",
+   "airDateUtc": "2013-09-01T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590176,
+   "seasonNumber": 6,
+   "episodeNumber": 4,
+   "title": "Mayoi Jiangshi - Part 4",
+   "airDate": "2013-09-08",
+   "airDateUtc": "2013-09-08T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4653110,
+   "seasonNumber": 6,
+   "episodeNumber": 5,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Summary II",
+   "airDate": "2013-09-15",
+   "airDateUtc": "2013-09-15T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4653123,
+   "seasonNumber": 7,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Suruga Devil - Part 1",
+   "airDate": "2014-08-16",
+   "airDateUtc": "2014-08-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4834515,
+   "seasonNumber": 7,
+   "episodeNumber": 2,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Suruga Devil - Part 2",
+   "airDate": "2014-08-16",
+   "airDateUtc": "2014-08-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4834516,
+   "seasonNumber": 7,
+   "episodeNumber": 3,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Suruga Devil - Part 3",
+   "airDate": "2014-08-16",
+   "airDateUtc": "2014-08-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4834517,
+   "seasonNumber": 7,
+   "episodeNumber": 4,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Suruga Devil - Part 4",
+   "airDate": "2014-08-16",
+   "airDateUtc": "2014-08-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4834518,
+   "seasonNumber": 7,
+   "episodeNumber": 5,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 10,
+   "title": "Suruga Devil - Part 5",
+   "airDate": "2014-08-16",
+   "airDateUtc": "2014-08-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590177,
+   "seasonNumber": 8,
+   "episodeNumber": 1,
+   "title": "Nadeko Medusa - Part 1",
+   "airDate": "2013-09-22",
+   "airDateUtc": "2013-09-22T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4590178,
+   "seasonNumber": 8,
+   "episodeNumber": 2,
+   "title": "Nadeko Medusa - Part 2",
+   "airDate": "2013-09-29",
+   "airDateUtc": "2013-09-29T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4641341,
+   "seasonNumber": 8,
+   "episodeNumber": 3,
+   "title": "Nadeko Medusa - Part 3",
+   "airDate": "2013-10-06",
+   "airDateUtc": "2013-10-06T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4667938,
+   "seasonNumber": 8,
+   "episodeNumber": 4,
+   "title": "Nadeko Medusa - Part 4",
+   "airDate": "2013-10-13",
+   "airDateUtc": "2013-10-13T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4664003,
+   "seasonNumber": 8,
+   "episodeNumber": 5,
+   "airedBeforeSeasonNumber": 3,
+   "airedBeforeEpisodeNumber": 14,
+   "title": "Summary III",
+   "airDate": "2013-10-20",
+   "airDateUtc": "2013-10-20T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4667939,
+   "seasonNumber": 9,
+   "episodeNumber": 1,
+   "title": "Shinobu Time - Part 1",
+   "airDate": "2013-10-27",
+   "airDateUtc": "2013-10-27T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4667940,
+   "seasonNumber": 9,
+   "episodeNumber": 2,
+   "title": "Shinobu Time - Part 2",
+   "airDate": "2013-11-03",
+   "airDateUtc": "2013-11-03T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4667941,
+   "seasonNumber": 9,
+   "episodeNumber": 3,
+   "title": "Shinobu Time - Part 3",
+   "airDate": "2013-11-10",
+   "airDateUtc": "2013-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4676676,
+   "seasonNumber": 9,
+   "episodeNumber": 4,
+   "title": "Shinobu Time - Part 4",
+   "airDate": "2013-11-17",
+   "airDateUtc": "2013-11-17T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4676677,
+   "seasonNumber": 10,
+   "episodeNumber": 1,
+   "title": "Hitagi End - Part 1",
+   "airDate": "2013-11-24",
+   "airDateUtc": "2013-11-24T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4676678,
+   "seasonNumber": 10,
+   "episodeNumber": 2,
+   "title": "Hitagi End - Part 2",
+   "airDate": "2013-12-01",
+   "airDateUtc": "2013-12-01T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4676679,
+   "seasonNumber": 10,
+   "episodeNumber": 3,
+   "title": "Hitagi End - Part 3",
+   "airDate": "2013-12-08",
+   "airDateUtc": "2013-12-08T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4714691,
+   "seasonNumber": 10,
+   "episodeNumber": 4,
+   "title": "Hitagi End - Part 4",
+   "airDate": "2013-12-15",
+   "airDateUtc": "2013-12-15T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4714694,
+   "seasonNumber": 10,
+   "episodeNumber": 5,
+   "title": "Hitagi End - Part 5",
+   "airDate": "2013-12-22",
+   "airDateUtc": "2013-12-22T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 4732908,
+   "seasonNumber": 10,
+   "episodeNumber": 6,
+   "title": "Hitagi End - Part 6",
+   "airDate": "2013-12-29",
+   "airDateUtc": "2013-12-29T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5020935,
+   "seasonNumber": 11,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Yotsugi Doll - Part 1",
+   "airDate": "2014-12-31",
+   "airDateUtc": "2014-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5087115,
+   "seasonNumber": 11,
+   "episodeNumber": 2,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Yotsugi Doll - Part 2",
+   "airDate": "2014-12-31",
+   "airDateUtc": "2014-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5087116,
+   "seasonNumber": 11,
+   "episodeNumber": 3,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Yotsugi Doll - Part 3",
+   "airDate": "2014-12-31",
+   "airDateUtc": "2014-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5087117,
+   "seasonNumber": 11,
+   "episodeNumber": 4,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Yotsugi Doll - Part 4",
+   "airDate": "2014-12-31",
+   "airDateUtc": "2014-12-31T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5442151,
+   "seasonNumber": 12,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Stone",
+   "airDate": "2016-01-09",
+   "airDateUtc": "2016-01-09T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5474009,
+   "seasonNumber": 12,
+   "episodeNumber": 2,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Flower",
+   "airDate": "2016-01-16",
+   "airDateUtc": "2016-01-16T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5483454,
+   "seasonNumber": 12,
+   "episodeNumber": 3,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Sand",
+   "airDate": "2016-01-23",
+   "airDateUtc": "2016-01-23T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484971,
+   "seasonNumber": 12,
+   "episodeNumber": 4,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Water",
+   "airDate": "2016-01-30",
+   "airDateUtc": "2016-01-30T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484972,
+   "seasonNumber": 12,
+   "episodeNumber": 5,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Wind",
+   "airDate": "2016-02-06",
+   "airDateUtc": "2016-02-06T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484973,
+   "seasonNumber": 12,
+   "episodeNumber": 6,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Tree",
+   "airDate": "2016-02-13",
+   "airDateUtc": "2016-02-13T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484974,
+   "seasonNumber": 12,
+   "episodeNumber": 7,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Tea",
+   "airDate": "2016-02-20",
+   "airDateUtc": "2016-02-20T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484976,
+   "seasonNumber": 12,
+   "episodeNumber": 8,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Mountain",
+   "airDate": "2016-02-27",
+   "airDateUtc": "2016-02-27T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484977,
+   "seasonNumber": 12,
+   "episodeNumber": 9,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Torus",
+   "airDate": "2016-03-05",
+   "airDateUtc": "2016-03-05T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484978,
+   "seasonNumber": 12,
+   "episodeNumber": 10,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Seed",
+   "airDate": "2016-03-12",
+   "airDateUtc": "2016-03-12T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484979,
+   "seasonNumber": 12,
+   "episodeNumber": 11,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Nothing",
+   "airDate": "2016-03-19",
+   "airDateUtc": "2016-03-19T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5484980,
+   "seasonNumber": 12,
+   "episodeNumber": 12,
+   "airedBeforeSeasonNumber": 4,
+   "airedBeforeEpisodeNumber": 1,
+   "title": "Koyomi Dead",
+   "airDate": "2016-03-26",
+   "airDateUtc": "2016-03-26T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5276091,
+   "seasonNumber": 13,
+   "episodeNumber": 1,
+   "title": "Ougi Formula - Parts 1 & 2",
+   "airDate": "2015-10-04",
+   "airDateUtc": "2015-10-04T12:30:00Z",
+   "runtime": 50
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5325616,
+   "seasonNumber": 13,
+   "episodeNumber": 2,
+   "title": "Sodachi Riddle - Part 1",
+   "airDate": "2015-10-11",
+   "airDateUtc": "2015-10-11T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5325617,
+   "seasonNumber": 13,
+   "episodeNumber": 3,
+   "title": "Sodachi Riddle - Part 2",
+   "airDate": "2015-10-18",
+   "airDateUtc": "2015-10-18T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5325618,
+   "seasonNumber": 13,
+   "episodeNumber": 4,
+   "title": "Sodachi Lost - Part 1",
+   "airDate": "2015-10-25",
+   "airDateUtc": "2015-10-25T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5325619,
+   "seasonNumber": 13,
+   "episodeNumber": 5,
+   "title": "Sodachi Lost - Part 2",
+   "airDate": "2015-11-01",
+   "airDateUtc": "2015-11-01T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356170,
+   "seasonNumber": 13,
+   "episodeNumber": 6,
+   "title": "Sodachi Lost - Part 3",
+   "airDate": "2015-11-08",
+   "airDateUtc": "2015-11-08T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356171,
+   "seasonNumber": 13,
+   "episodeNumber": 7,
+   "title": "Shinobu Mail - Part 1",
+   "airDate": "2015-11-15",
+   "airDateUtc": "2015-11-15T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356172,
+   "seasonNumber": 13,
+   "episodeNumber": 8,
+   "title": "Shinobu Mail - Part 2",
+   "airDate": "2015-11-22",
+   "airDateUtc": "2015-11-22T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356173,
+   "seasonNumber": 13,
+   "episodeNumber": 9,
+   "title": "Shinobu Mail - Part 3",
+   "airDate": "2015-11-29",
+   "airDateUtc": "2015-11-29T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356174,
+   "seasonNumber": 13,
+   "episodeNumber": 10,
+   "title": "Shinobu Mail - Part 4",
+   "airDate": "2015-12-06",
+   "airDateUtc": "2015-12-06T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356176,
+   "seasonNumber": 13,
+   "episodeNumber": 11,
+   "title": "Shinobu Mail - Part 5",
+   "airDate": "2015-12-13",
+   "airDateUtc": "2015-12-13T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 5356177,
+   "seasonNumber": 13,
+   "episodeNumber": 12,
+   "title": "Shinobu Mail - Part 6",
+   "airDate": "2015-12-20",
+   "airDateUtc": "2015-12-20T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6253102,
+   "seasonNumber": 13,
+   "episodeNumber": 13,
+   "title": "Mayoi Hell - Part 1",
+   "airDate": "2017-08-12",
+   "airDateUtc": "2017-08-12T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6277681,
+   "seasonNumber": 13,
+   "episodeNumber": 14,
+   "title": "Mayoi Hell - Part 2",
+   "airDate": "2017-08-12",
+   "airDateUtc": "2017-08-12T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6253103,
+   "seasonNumber": 13,
+   "episodeNumber": 15,
+   "title": "Hitagi Rendezvous - Part 1",
+   "airDate": "2017-08-12",
+   "airDateUtc": "2017-08-12T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6277689,
+   "seasonNumber": 13,
+   "episodeNumber": 16,
+   "title": "Hitagi Rendezvous - Part 2",
+   "airDate": "2017-08-12",
+   "airDateUtc": "2017-08-12T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6277745,
+   "seasonNumber": 13,
+   "episodeNumber": 17,
+   "title": "Ougi Dark - Part 1",
+   "airDate": "2017-08-13",
+   "airDateUtc": "2017-08-13T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6277744,
+   "seasonNumber": 13,
+   "episodeNumber": 18,
+   "title": "Ougi Dark - Part 2",
+   "airDate": "2017-08-13",
+   "airDateUtc": "2017-08-13T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 6253482,
+   "seasonNumber": 13,
+   "episodeNumber": 19,
+   "title": "Ougi Dark - Part 3",
+   "airDate": "2017-08-13",
+   "airDateUtc": "2017-08-13T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "series"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7857261,
+   "seasonNumber": 13,
+   "episodeNumber": 20,
+   "title": "Ougi Formula - Part 1",
+   "airDate": "2015-10-04",
+   "airDateUtc": "2015-10-04T12:30:00Z",
+   "runtime": 27
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7857262,
+   "seasonNumber": 13,
+   "episodeNumber": 21,
+   "title": "Ougi Formula - Part 2",
+   "airDate": "2015-10-04",
+   "airDateUtc": "2015-10-04T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7110187,
+   "seasonNumber": 14,
+   "episodeNumber": 1,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 1",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7111621,
+   "seasonNumber": 14,
+   "episodeNumber": 2,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 2",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7111624,
+   "seasonNumber": 14,
+   "episodeNumber": 3,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 3",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7111625,
+   "seasonNumber": 14,
+   "episodeNumber": 4,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 4",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7111626,
+   "seasonNumber": 14,
+   "episodeNumber": 5,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 5",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 7111627,
+   "seasonNumber": 14,
+   "episodeNumber": 6,
+   "airedAfterSeasonNumber": 5,
+   "title": "Koyomi Reverse - Part 6",
+   "airDate": "2018-11-10",
+   "airDateUtc": "2018-11-10T12:30:00Z",
+   "runtime": 25,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601303,
+   "seasonNumber": 15,
+   "episodeNumber": 1,
+   "title": "OROKAMONOGATARI: Tsukihi Undo",
+   "airDate": "2024-09-29",
+   "airDateUtc": "2024-09-29T12:30:00Z",
+   "runtime": 32
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10641492,
+   "seasonNumber": 16,
+   "episodeNumber": 1,
+   "airedBeforeSeasonNumber": 6,
+   "airedBeforeEpisodeNumber": 7,
+   "title": "A Cruel Fairy Tale: The Beautiful Princess",
+   "airDate": "2024-08-17",
+   "airDateUtc": "2024-08-17T12:30:00Z",
+   "runtime": 13,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601322,
+   "seasonNumber": 16,
+   "episodeNumber": 2,
+   "title": "WAZAMONOGATARI: Acerola Bon Appétit (1)",
+   "airDate": "2024-11-10",
+   "airDateUtc": "2024-11-10T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601323,
+   "seasonNumber": 16,
+   "episodeNumber": 3,
+   "title": "WAZAMONOGATARI: Acerola Bon Appétit (2)",
+   "airDate": "2024-11-17",
+   "airDateUtc": "2024-11-17T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 11283266,
+   "seasonNumber": 16,
+   "episodeNumber": 4,
+   "title": "WAZAMONOGATARI: Karen Ogre"
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601304,
+   "seasonNumber": 17,
+   "episodeNumber": 1,
+   "title": "NADEMONOGATARI: Nadeko Draw (1)",
+   "airDate": "2024-10-06",
+   "airDateUtc": "2024-10-06T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601305,
+   "seasonNumber": 17,
+   "episodeNumber": 2,
+   "title": "NADEMONOGATARI: Nadeko Draw (2)",
+   "airDate": "2024-10-13",
+   "airDateUtc": "2024-10-13T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601306,
+   "seasonNumber": 17,
+   "episodeNumber": 3,
+   "title": "NADEMONOGATARI: Nadeko Draw (3)",
+   "airDate": "2024-10-20",
+   "airDateUtc": "2024-10-20T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601320,
+   "seasonNumber": 17,
+   "episodeNumber": 4,
+   "title": "NADEMONOGATARI: Nadeko Draw (4)",
+   "airDate": "2024-10-27",
+   "airDateUtc": "2024-10-27T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601321,
+   "seasonNumber": 17,
+   "episodeNumber": 5,
+   "title": "NADEMONOGATARI: Nadeko Draw (5)",
+   "airDate": "2024-11-03",
+   "airDateUtc": "2024-11-03T12:30:00Z",
+   "runtime": 27
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601324,
+   "seasonNumber": 18,
+   "episodeNumber": 1,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (1)",
+   "airDate": "2024-11-24",
+   "airDateUtc": "2024-11-24T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601325,
+   "seasonNumber": 18,
+   "episodeNumber": 2,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (2)",
+   "airDate": "2024-12-01",
+   "airDateUtc": "2024-12-01T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601326,
+   "seasonNumber": 18,
+   "episodeNumber": 3,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (3)",
+   "airDate": "2024-12-08",
+   "airDateUtc": "2024-12-08T12:30:00Z",
+   "runtime": 24
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601328,
+   "seasonNumber": 18,
+   "episodeNumber": 4,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (4)",
+   "airDate": "2024-12-15",
+   "airDateUtc": "2024-12-15T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601329,
+   "seasonNumber": 18,
+   "episodeNumber": 5,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (5)",
+   "airDate": "2024-12-22",
+   "airDateUtc": "2024-12-22T12:30:00Z",
+   "runtime": 25
+  },
+  {
+   "tvdbShowId": 102261,
+   "tvdbId": 10601331,
+   "seasonNumber": 18,
+   "episodeNumber": 6,
+   "title": "SHINOBUMONOGATARI: Shinobu Mustard (6)",
+   "airDate": "2024-12-29",
+   "airDateUtc": "2024-12-29T12:30:00Z",
+   "runtime": 26,
+   "finaleType": "season"
+  }
+ ],
+ "metadataSource": "tvdb"
+}

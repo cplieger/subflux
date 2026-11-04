@@ -1,0 +1,321 @@
+{
+ "title": "Firefly",
+ "originalTitle": "Firefly",
+ "tvdbId": 78874,
+ "tmdbId": 1437,
+ "tvRageId": 3548,
+ "tvMazeId": 180,
+ "imdbId": "tt0303461",
+ "slug": "firefly",
+ "formats": [
+  "unknown"
+ ],
+ "originalCountry": "usa",
+ "originalLanguage": "eng",
+ "language": "fra",
+ "firstAired": "2002-09-20",
+ "lastAired": "2003-07-28",
+ "malIds": [],
+ "anidbIds": [],
+ "aniListIds": [],
+ "lastUpdated": "2026-10-27T00:56:09Z",
+ "status": "Ended",
+ "runtime": 48,
+ "originalNetwork": "FOX",
+ "network": "FOX",
+ "genres": [
+  "Adventure",
+  "Drama",
+  "Science Fiction"
+ ],
+ "contentRating": "TV-14",
+ "rating": {
+  "count": 305472,
+  "value": "8.9"
+ },
+ "alternativeTitles": [
+  {
+   "title": "Serenity"
+  }
+ ],
+ "translations": [
+  {
+   "language": "ces",
+   "title": "Firefly"
+  },
+  {
+   "language": "deu",
+   "title": "Firefly"
+  },
+  {
+   "language": "eng",
+   "title": "Firefly"
+  },
+  {
+   "language": "fra",
+   "title": "Firefly"
+  },
+  {
+   "language": "heb",
+   "title": "פיירפלי"
+  },
+  {
+   "language": "hun",
+   "title": "Firefly"
+  },
+  {
+   "language": "ita",
+   "title": "Firefly"
+  },
+  {
+   "language": "kor",
+   "title": "파이어플라이"
+  },
+  {
+   "language": "nld",
+   "title": "Firefly"
+  },
+  {
+   "language": "pol",
+   "title": "Firefly"
+  },
+  {
+   "language": "por",
+   "title": "Firefly"
+  },
+  {
+   "language": "rus",
+   "title": "Светлячок"
+  },
+  {
+   "language": "spa",
+   "title": "Firefly"
+  },
+  {
+   "language": "swe",
+   "title": "Firefly"
+  },
+  {
+   "language": "zho",
+   "title": "萤火虫"
+  },
+  {
+   "language": "hrv",
+   "title": "Firefly"
+  },
+  {
+   "language": "pt",
+   "title": "Firefly"
+  },
+  {
+   "language": "fin",
+   "title": "Firefly"
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  },
+  {
+   "name": "DVD Order",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  }
+ ],
+ "seasons": [
+  {
+   "seasonNumber": 0,
+   "year": 2005
+  },
+  {
+   "seasonNumber": 1,
+   "year": 2002
+  }
+ ],
+ "episodes": [
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 415679,
+   "seasonNumber": 0,
+   "episodeNumber": 1,
+   "airedAfterSeasonNumber": 1,
+   "title": "Serenity",
+   "airDate": "2005-09-03",
+   "airDateUtc": "2005-09-03T04:00:00Z",
+   "runtime": 119,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 967981,
+   "seasonNumber": 0,
+   "episodeNumber": 2,
+   "airDate": "2006-07-28",
+   "airDateUtc": "2006-07-28T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 4360465,
+   "seasonNumber": 0,
+   "episodeNumber": 3,
+   "airDate": "2012-11-11",
+   "airDateUtc": "2012-11-11T05:00:00Z",
+   "runtime": 45,
+   "finaleType": "season"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297999,
+   "seasonNumber": 1,
+   "episodeNumber": 1,
+   "title": "Les nouveaux passagers",
+   "airDate": "2002-12-20",
+   "airDateUtc": "2002-12-20T05:00:00Z",
+   "runtime": 87
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297989,
+   "seasonNumber": 1,
+   "episodeNumber": 2,
+   "title": "L'attaque du train",
+   "airDate": "2002-09-20",
+   "airDateUtc": "2002-09-20T04:00:00Z",
+   "runtime": 44
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297990,
+   "seasonNumber": 1,
+   "episodeNumber": 3,
+   "title": "Pilleurs d'épave",
+   "airDate": "2002-09-27",
+   "airDateUtc": "2002-09-27T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297994,
+   "seasonNumber": 1,
+   "episodeNumber": 4,
+   "title": "Le duel",
+   "airDate": "2002-11-01",
+   "airDateUtc": "2002-11-01T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297995,
+   "seasonNumber": 1,
+   "episodeNumber": 5,
+   "title": "Sains et saufs",
+   "airDate": "2002-11-08",
+   "airDateUtc": "2002-11-08T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297991,
+   "seasonNumber": 1,
+   "episodeNumber": 6,
+   "title": "La femme du commandant",
+   "airDate": "2002-10-04",
+   "airDateUtc": "2002-10-04T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297992,
+   "seasonNumber": 1,
+   "episodeNumber": 7,
+   "title": "De la boue et des hommes",
+   "airDate": "2002-10-18",
+   "airDateUtc": "2002-10-18T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297993,
+   "seasonNumber": 1,
+   "episodeNumber": 8,
+   "title": "La panne",
+   "airDate": "2002-10-25",
+   "airDateUtc": "2002-10-25T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297996,
+   "seasonNumber": 1,
+   "episodeNumber": 9,
+   "title": "Intrusion",
+   "airDate": "2002-11-15",
+   "airDateUtc": "2002-11-15T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297997,
+   "seasonNumber": 1,
+   "episodeNumber": 10,
+   "title": "Histoires anciennes",
+   "airDate": "2002-12-06",
+   "airDateUtc": "2002-12-06T05:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298002,
+   "seasonNumber": 1,
+   "episodeNumber": 11,
+   "title": "Déchet précieux",
+   "airDate": "2003-07-21",
+   "airDateUtc": "2003-07-21T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298003,
+   "seasonNumber": 1,
+   "episodeNumber": 12,
+   "title": "Le message",
+   "airDate": "2003-07-28",
+   "airDateUtc": "2003-07-28T04:00:00Z",
+   "runtime": 45,
+   "finaleType": "series"
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 298001,
+   "seasonNumber": 1,
+   "episodeNumber": 13,
+   "title": "Mission secours",
+   "airDate": "2003-06-23",
+   "airDateUtc": "2003-06-23T04:00:00Z",
+   "runtime": 45
+  },
+  {
+   "tvdbShowId": 78874,
+   "tvdbId": 297998,
+   "seasonNumber": 1,
+   "episodeNumber": 14,
+   "title": "Objet Volant Identifié",
+   "airDate": "2002-12-13",
+   "airDateUtc": "2002-12-13T05:00:00Z",
+   "runtime": 46,
+   "finaleType": "season"
+  }
+ ],
+ "metadataSource": "tvdb"
+}
