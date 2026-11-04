@@ -26,8 +26,8 @@ github.com/cplieger/webhttp/v3 v3.0.3 h1:2N07M8hpw6VuYRKDqtqs63OcwXu99vV09XKELcE
 github.com/cplieger/webhttp/v3 v3.0.3/go.mod h1:ETPjIF1JDXhcOx3RnfiDS1Fn4//9unvo2TnYtYbr3M0=
 github.com/cplieger/xmlx v1.1.0 h1:kfRja1WrmQRogjDTJWNEIw9+MCINHu3wYU9EPHT82uA=
 github.com/cplieger/xmlx v1.1.0/go.mod h1:723FiLyXl8KuaAPuY7x2QQh3bAxuoN0/1UBaQATK95U=
-github.com/nwaples/rardecode/v2 v2.4.5 h1:e8/ULrr78nRuktZw2SmnuOjRUnDp4rpzoc+KTz7q2N8=
-github.com/nwaples/rardecode/v2 v2.4.5/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
+github.com/nwaples/rardecode/v2 v2.4.6 h1:ddDMXtry2leooYMOXn0F8RzCvt+9tfq6SpleiRRvS1o=
+github.com/nwaples/rardecode/v2 v2.4.6/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
 github.com/ulikunitz/xz v0.5.17 h1:flR0y/x1hgM8EGV1AW3Xll6T413G0glV8UfBwR617V4=
 github.com/ulikunitz/xz v0.5.17/go.mod h1:H9Rt/W6/Qj27PGauhQc6nfCDy7vHpzsOThBSaYDoEhw=
 go.yaml.in/yaml/v3 v3.0.6 h1:zcDfvjXEqTQmpjniUBLc91xYJMB2c4QOFxEF/LCEckM=
