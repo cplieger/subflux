@@ -38,11 +38,11 @@ func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 	return nil
 }
 
-// bodyTagged reports a tag other than the one n's text resolves to, or one
-// written explicit. go-yaml's encoders differ on such a tag: v3 writes it
-// explicit, v4 drops a mismatched !!int or !!float and writes the bare text
-// (internal/libyaml/desolver.go), which would commit it as a string. !!str
-// is exempt: both quote the text so it reads back a string.
+// bodyTagged reports a tag written explicit, or one other than the tag n's
+// text resolves to in its style. go-yaml's encoders differ on such a tag:
+// v3 writes it explicit, v4 drops a mismatched !!int or !!float and writes
+// the bare text (internal/libyaml/desolver.go), which would commit it as a
+// string. !!str is exempt: both quote the text so it reads back a string.
 func bodyTagged(n *yaml.Node) bool {
 	if n.Style&yaml.TaggedStyle != 0 {
 		return true
@@ -51,7 +51,7 @@ func bodyTagged(n *yaml.Node) bool {
 	if n.Kind == yaml.ScalarNode && t == tagStr {
 		return false
 	}
-	return t != (&yaml.Node{Kind: n.Kind, Value: n.Value}).ShortTag()
+	return t != (&yaml.Node{Kind: n.Kind, Style: n.Style, Value: n.Value}).ShortTag()
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken

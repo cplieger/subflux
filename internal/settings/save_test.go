@@ -606,6 +606,9 @@ func TestSaveBodyShapes(t *testing.T) {
 			tagged = append(tagged, bodyCase{fmt.Sprintf("%s set in code, explicit %t", tag, explicit), n, []string{"server.log_format"}, msgTagged})
 		}
 	}
+	quoted := node(t, "server: {log_format: \"5\"}\n"+validLanguages)
+	quoted.Content[1].Content[1].Tag = "!!int"
+	tagged = append(tagged, bodyCase{"!!int on quoted text set in code", quoted, []string{"server.log_format"}, msgTagged})
 	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},

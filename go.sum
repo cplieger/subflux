@@ -6,8 +6,8 @@ github.com/cplieger/go/health v1.0.0-dev.1 h1:nf+UtWxFasAo1LLcUkJVI1oxIuZHM9BLxM
 github.com/cplieger/go/health v1.0.0-dev.1/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
 github.com/cplieger/go/httpclient v1.0.0-dev.3 h1:gxGUwZYy8NvQNJm3m2pt9OAOwByp0fjo95lA9ZXAlkE=
 github.com/cplieger/go/httpclient v1.0.0-dev.3/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
-github.com/cplieger/go/httpserver v1.0.0-dev.1 h1:SLG/nPmwxpn/V6WuRzXVc5rdtxFzErqQg0mfCnljwr4=
-github.com/cplieger/go/httpserver v1.0.0-dev.1/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
+github.com/cplieger/go/httpserver v1.0.0-dev.2 h1:y24UT+M8GtLM6HHs5oxMpNqZ0MznDpwb1chjTvCGSZk=
+github.com/cplieger/go/httpserver v1.0.0-dev.2/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
 github.com/cplieger/go/jsonx v1.0.0-dev.2 h1:XP5vemRQ+PWJT+kX5aZtHm1U/aLi36sZPwgMSjMxaVI=
 github.com/cplieger/go/jsonx v1.0.0-dev.2/go.mod h1:ank2TTHUDI/GrTBZ/KAwU72ECOdrCCDDYqlRSuR/+BQ=
 github.com/cplieger/go/keyenc v1.2.0-dev.1 h1:n3EFRTPr1LBVvfjPeGxgE4VS009JNGdWtaBT2rAN6y0=
@@ -26,8 +26,8 @@ github.com/cplieger/go/yamlenv v1.0.0-dev.1 h1:KA0t52zn3GJRWu4RnUaTx64QzSwsJjRsT
 github.com/cplieger/go/yamlenv v1.0.0-dev.1/go.mod h1:rpijBJ7LqjTnmwWZpxX2O/htMilzJZOnMc6o1z7fOlc=
 github.com/cplieger/langtag/v3 v3.2.0-dev.1 h1:gXHAaMDLaJQRxiIC9cQMEsEmN9Y6g+8eMUFvkkCoHXc=
 github.com/cplieger/langtag/v3 v3.2.0-dev.1/go.mod h1:l9xswWicp31qquRod3FKzweWF0gJ06XKj/rqsNGESAQ=
-github.com/dlclark/regexp2/v2 v2.8.4 h1:yfDDXTn4oxyLDC10/ieOBNDCCdIVWS9WbT6ddVXsPKI=
-github.com/dlclark/regexp2/v2 v2.8.4/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
+github.com/dlclark/regexp2/v2 v2.12.0 h1:GsCgDZZeHluUDHASr2yqQonZk4Tma5LFmLH9CSsFFEE=
+github.com/dlclark/regexp2/v2 v2.12.0/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/nwaples/rardecode/v2 v2.4.6 h1:ddDMXtry2leooYMOXn0F8RzCvt+9tfq6SpleiRRvS1o=
 github.com/nwaples/rardecode/v2 v2.4.6/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
 github.com/ulikunitz/xz v0.5.17 h1:flR0y/x1hgM8EGV1AW3Xll6T413G0glV8UfBwR617V4=
