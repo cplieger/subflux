@@ -151,8 +151,8 @@ func mergeSequence(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Fiel
 }
 
 // inFlow is v as parent's child: inside a flow collection an empty plain null
-// becomes ~, because the encoder writes an empty plain scalar there as '',
-// which reads back a string.
+// becomes ~, because the encoder writes an empty plain scalar there as a
+// quoted empty string, which reads back a string.
 func inFlow(parent, v *yaml.Node) *yaml.Node {
 	if v == nil || parent.Style&yaml.FlowStyle == 0 || v.Kind != yaml.ScalarNode || v.Value != "" || v.Style != 0 {
 		return v
