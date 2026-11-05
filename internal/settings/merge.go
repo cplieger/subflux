@@ -38,40 +38,41 @@ func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 	return nil
 }
 
-// bodyTagged reports a tag written explicit, or one n would not read back
-// with once written untagged. go-yaml's encoders differ on such a tag: v3
-// writes it explicit, v4 drops a mismatched !!int or !!float and writes the
-// bare text (internal/libyaml/desolver.go), which would commit it as a
-// string. The resolution is the writer's own (implicitTag), because v4's
-// ShortTag reads every untagged scalar as !!str.
+// bodyTagged reports a tag written explicit, the non-specific ! (which v4
+// writes back unresolved), or a collection tagged as another kind. A scalar's
+// own tag is checked against the written file by retagged.
 func bodyTagged(n *yaml.Node) bool {
-	if n.Style&yaml.TaggedStyle != 0 {
+	if n.Style&yaml.TaggedStyle != 0 || n.Tag == "!" {
 		return true
 	}
-	if n.Tag == "" || n.Tag == "!" {
-		return false
-	}
-	t := n.ShortTag()
-	if n.Kind != yaml.ScalarNode {
-		return t != (&yaml.Node{Kind: n.Kind}).ShortTag()
-	}
-	return t != tagStr && t != implicitTag(n)
+	return n.Kind != yaml.ScalarNode && n.Tag != "" && n.ShortTag() != (&yaml.Node{Kind: n.Kind}).ShortTag()
 }
 
-// implicitTag is the tag scalar n's text, in its style, reads back with once
-// encode writes it untagged, or "" when that text cannot be written or read
-// back. It writes n in block context, as Save writes a body (inFlow covers
-// the one flow difference).
-func implicitTag(n *yaml.Node) string {
-	m := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
-		{Kind: yaml.ScalarNode, Value: "k"},
-		{Kind: yaml.ScalarNode, Style: n.Style, Value: n.Value},
-	}}
-	back, err := reread(m)
-	if err != nil || back.Kind != yaml.MappingNode || len(back.Content) != 2 {
-		return ""
+// retagged refuses, at its path, each tagged scalar of m that back, m written
+// by encode and parsed again, does not read with the same tag. go-yaml's
+// encoders write such a tag differently: v3 explicit, v4 dropping a
+// mismatched !!int or !!float (internal/libyaml/desolver.go), and both
+// quoting text a flow collection cannot hold plain.
+func retagged(m, back *yaml.Node, path string) []formschema.FieldError {
+	if m == nil || back == nil || m.Kind != back.Kind {
+		return nil
 	}
-	return back.Content[1].ShortTag()
+	var errs []formschema.FieldError
+	switch m.Kind {
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(m.Content) && i+1 < len(back.Content); i += 2 {
+			errs = append(errs, retagged(m.Content[i+1], back.Content[i+1], child(path, m.Content[i].Value))...)
+		}
+	case yaml.SequenceNode:
+		for i := range min(len(m.Content), len(back.Content)) {
+			errs = append(errs, retagged(m.Content[i], back.Content[i], index(path, i))...)
+		}
+	case yaml.ScalarNode:
+		if m.Tag != "" && m.ShortTag() != back.ShortTag() {
+			errs = append(errs, formschema.FieldError{Path: path, Message: msgTagged})
+		}
+	}
+	return errs
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken
@@ -84,7 +85,17 @@ func mergeDocument(stored, body *yaml.Node) (*yaml.Node, []formschema.FieldError
 	if errs := walkShapes(body, "", bodyShape); len(errs) > 0 {
 		return nil, errs
 	}
-	return mergeNode(body, stored, "")
+	merged, errs := mergeNode(body, stored, "")
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	// A merged document that does not read back is refused by Save's own parse.
+	if back, err := reread(merged); err == nil {
+		if errs := retagged(merged, back, ""); len(errs) > 0 {
+			return nil, errs
+		}
+	}
+	return merged, nil
 }
 
 // mergeNode copies b, without comments, taking each unchanged scalar from st,
@@ -140,7 +151,7 @@ func mergeSequence(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Fiel
 }
 
 // inFlow is v as parent's child: inside a flow collection an empty plain null
-// becomes ~, because the encoder writes an empty plain scalar there as ”,
+// becomes ~, because the encoder writes an empty plain scalar there as '',
 // which reads back a string.
 func inFlow(parent, v *yaml.Node) *yaml.Node {
 	if v == nil || parent.Style&yaml.FlowStyle == 0 || v.Kind != yaml.ScalarNode || v.Value != "" || v.Style != 0 {

@@ -116,6 +116,9 @@ func (s *Service) Merge(section string, entry *yaml.Node, parse func(expanded *y
 	if err != nil {
 		return []formschema.FieldError{{Path: section, Message: msgUnreadable}}
 	}
+	if errs := retagged(merged, out, section); len(errs) > 0 {
+		return errs
+	}
 	if errs := walkShapes(out, section, fileShape); len(errs) > 0 {
 		return errs
 	}

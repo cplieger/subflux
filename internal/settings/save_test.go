@@ -609,6 +609,12 @@ func TestSaveBodyShapes(t *testing.T) {
 	quoted := node(t, "server: {log_format: \"5\"}\n"+validLanguages)
 	quoted.Content[1].Content[1].Tag = "!!int"
 	tagged = append(tagged, bodyCase{"!!int on quoted text set in code", quoted, []string{"server.log_format"}, msgTagged})
+	bang := node(t, "server: {log_format: \"true\"}\n"+validLanguages)
+	bang.Content[1].Content[1].Tag, bang.Content[1].Content[1].Style = "!", 0
+	tagged = append(tagged, bodyCase{"the non-specific tag set in code", bang, []string{"server.log_format"}, msgTagged})
+	stamp := node(t, "server: {log_format: x}\n"+validLanguages)
+	stamp.Content[1].Content[1].Tag, stamp.Content[1].Content[1].Value = "!!timestamp", "2001-12-14 12:00:00"
+	tagged = append(tagged, bodyCase{"a timestamp a flow mapping cannot hold plain", stamp, []string{"server.log_format"}, msgTagged})
 	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
@@ -657,27 +663,36 @@ func TestNewServiceOfZeroSnapshotRefusesSaves(t *testing.T) {
 	}
 }
 
-// TestBodyTaggedMatchesTheReread pins bodyTagged to the writer: a scalar it
-// accepts reads back from encode with the tag and text it carried.
-func TestBodyTaggedMatchesTheReread(t *testing.T) {
-	values := []string{"true", "False", "12", "012", "0x1F", "1.5", ".inf", "~", "null", "", "text", "yes", "2001-12-14", "a: b", "#x"}
+// TestAnAcceptedBodyTagReadsBack pins the tag rule to the writer, in a block
+// and a flow mapping: a scalar mergeDocument accepts reads back from encode
+// with the tag and text it carried, or explicitly tagged, which Save's parse
+// refuses.
+func TestAnAcceptedBodyTagReadsBack(t *testing.T) {
+	values := []string{"true", "False", "12", "012", "0x1F", "1.5", ".inf", "~", "null", "", "text", "yes", "2001-12-14", "2001-12-14 12:00:00", "a: b", "#x"}
 	styles := []yaml.Style{0, yaml.DoubleQuotedStyle, yaml.SingleQuotedStyle, yaml.LiteralStyle, yaml.FoldedStyle}
-	tags := []string{"!!str", "!!int", "!!float", "!!bool", "!!null", "!!timestamp", "!foo"}
-	for _, value := range values {
-		for _, style := range styles {
-			for _, tag := range tags {
-				n := &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Style: style, Value: value}
-				if bodyTagged(n) {
-					continue
-				}
-				back, err := reread(&yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "k"}, n}})
-				if err != nil {
-					t.Errorf("%s %q style %d: reread: %v", tag, value, style, err)
-					continue
-				}
-				got := back.Content[1]
-				if got.ShortTag() != tag || got.Value != value || got.Style&yaml.TaggedStyle != 0 {
-					t.Errorf("%s %q style %d accepted, reads back %s %q style %d", tag, value, style, got.ShortTag(), got.Value, got.Style)
+	tags := []string{"!!str", "!!int", "!!float", "!!bool", "!!null", "!!timestamp", "!foo", "!"}
+	for _, flow := range []yaml.Style{0, yaml.FlowStyle} {
+		for _, value := range values {
+			for _, style := range styles {
+				for _, tag := range tags {
+					n := &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Style: style, Value: value}
+					inner := &yaml.Node{Kind: yaml.MappingNode, Style: flow, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "k"}, n}}
+					body := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "q"}, inner}}
+					merged, errs := mergeDocument(nil, body)
+					if errs != nil {
+						continue
+					}
+					back, err := reread(merged)
+					if err != nil {
+						continue
+					}
+					got := back.Content[1].Content[1]
+					if got.Style&yaml.TaggedStyle != 0 {
+						continue
+					}
+					if got.ShortTag() != n.ShortTag() || got.Value != value && got.ShortTag() != tagNull {
+						t.Errorf("flow %d: %s %q style %d accepted, reads back %s %q style %d", flow, tag, value, style, got.ShortTag(), got.Value, got.Style)
+					}
 				}
 			}
 		}
