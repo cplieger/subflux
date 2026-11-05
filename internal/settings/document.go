@@ -4,7 +4,7 @@ import (
 	"regexp"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // wholeReference is a scalar that is exactly one ${NAME}, yamlenv's grammar.

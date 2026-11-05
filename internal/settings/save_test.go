@@ -16,7 +16,7 @@ import (
 
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var errActivate = errors.New("store update failed")
@@ -581,6 +581,16 @@ func TestSaveRefusesStaleBase(t *testing.T) {
 	}
 	if fileText(t, path) != "server: {log_level: error}\n" || s.Snapshot().p != first.p {
 		t.Error("a stale save wrote the file or replaced the snapshot")
+	}
+}
+
+// TestEncodeKeepsLongValueOnOneLine pins that a Save never folds a long
+// plain value: the file keeps the shape its owner wrote.
+func TestEncodeKeepsLongValueOnOneLine(t *testing.T) {
+	const text = "a: /media/My TV Shows/" + "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty\n"
+	got, err := encode(node(t, text))
+	if err != nil || string(got) != text {
+		t.Errorf("encode = %q, %v; want %q", got, err, text)
 	}
 }
 

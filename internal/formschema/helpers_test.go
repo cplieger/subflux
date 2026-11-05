@@ -3,7 +3,7 @@ package formschema
 import (
 	"testing"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // section parses src as one YAML document and returns its root mapping.

@@ -6,7 +6,7 @@ import (
 	"github.com/cplieger/arrapi/v3"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/mediasource/arr"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func decodeArr(t *testing.T, doc string) formschema.Values {

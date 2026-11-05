@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // The YAML core-schema tags the walks read.
