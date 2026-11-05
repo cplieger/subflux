@@ -219,6 +219,24 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 	})
 }
 
+// TestPolicyErrorsNeverEchoExpandedValues pins that a languages field error
+// names its path and never the scalar an environment reference expanded to.
+func TestPolicyErrorsNeverEchoExpandedValues(t *testing.T) {
+	t.Setenv("SUBFLUX_S", "hunter2SECRET")
+	errs, ok := loadText(t, "languages: {default: [{tag: en, variants: [\"${SUBFLUX_S}\"]}]}\n").Failure()
+	if !ok || len(errs) == 0 {
+		t.Fatalf("Failure() = %v, %v; want the bad variant refused", errs, ok)
+	}
+	for _, e := range errs {
+		if strings.Contains(e.Path+e.Message, "hunter2SECRET") {
+			t.Errorf("field error %q: %q echoes the expanded value", e.Path, e.Message)
+		}
+	}
+	if errs[0].Path != "languages.default[0].variants[0]" {
+		t.Errorf("Failure()[0].Path = %q, want languages.default[0].variants[0]", errs[0].Path)
+	}
+}
+
 func TestExpandedDigitsStayStrings(t *testing.T) {
 	got, _ := testSection(t)
 	t.Setenv("SUBFLUX_KEY", "0123")
