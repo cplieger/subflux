@@ -3,7 +3,7 @@ package betaseries
 import (
 	"context"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/provider"
 )
 
@@ -26,6 +26,6 @@ func (p *source) CheckCredentials(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	httpx.DrainClose(body)
+	httpclient.DrainClose(body)
 	return nil
 }

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -338,21 +338,21 @@ func (p *source) doFetch(ctx context.Context, subID string) ([]byte, error) {
 		ctx, http.MethodGet, dlURL, http.NoBody,
 	)
 	if err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, httpx.Secret(p.passkey))
+		return nil, httpclient.RedactTransportError(err, "hdbits download "+subID, httpclient.Secret(p.passkey))
 	}
 	defer resp.Body.Close()
 
 	if httpErr := httpwire.CheckHTTPStatus(resp); httpErr != nil {
-		return nil, httpx.RedactSecret(httpErr, p.passkey)
+		return nil, httpclient.RedactSecret(httpErr, p.passkey)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
-		return nil, httpx.RedactSecret(err, p.passkey)
+		return nil, httpclient.RedactSecret(err, p.passkey)
 	}
 	if err := p.downloadVerdict(data); err != nil {
 		return nil, err
@@ -481,5 +481,5 @@ func (p *source) downloadVerdict(data []byte) error {
 // redact prepares upstream text for an error: the request carried the
 // username and passkey, so the text may echo either.
 func (p *source) redact(s string) string {
-	return logsafe.RedactedField(s, httpx.Secret(p.username), httpx.Secret(p.passkey))
+	return logsafe.RedactedField(s, httpclient.Secret(p.username), httpclient.Secret(p.passkey))
 }

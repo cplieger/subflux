@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -93,8 +93,8 @@ func TestIsTransient_api_errors(t *testing.T) {
 		{name: "nil", err: nil, want: false},
 		{name: "subflux.AuthError not transient", err: &subflux.AuthError{Msg: "bad"}, want: false},
 		{name: "subflux.RateLimitError not transient", err: &subflux.RateLimitError{Msg: "slow"}, want: false},
-		{name: "httpx.HTTPStatusError 502 transient", err: &httpx.HTTPStatusError{Code: 502}, want: true},
-		{name: "httpx.HTTPStatusError 400 not transient", err: &httpx.HTTPStatusError{Code: 400}, want: false},
+		{name: "httpclient.StatusError 502 transient", err: &httpclient.StatusError{Code: 502}, want: true},
+		{name: "httpclient.StatusError 400 not transient", err: &httpclient.StatusError{Code: 400}, want: false},
 		{name: "generic error not transient", err: errors.New("something"), want: false},
 	}
 	for _, tt := range tests {
@@ -109,21 +109,22 @@ func TestIsTransient_api_errors(t *testing.T) {
 
 func TestIsTransient_suffixBypassFixed(t *testing.T) {
 	t.Parallel()
-	// Verify httpx.HTTPStatusError (from httpx.CheckHTTPStatus) is correctly
+	// Verify httpclient.StatusError (from httpclient.CheckStatus) is correctly
 	// classified as transient for 502/503/504 — this confirms the suffix-bypass
-	// security fix is in effect since we now delegate to httpx.
+	// security fix is in effect since we now delegate to httpclient.
 	for _, code := range []int{502, 503, 504} {
-		err := &httpx.HTTPStatusError{Code: code}
+		err := &httpclient.StatusError{Code: code}
 		if !IsTransient(err) {
-			t.Errorf("IsTransient(HTTPStatusError{%d}) = false, want true", code)
+			t.Errorf("IsTransient(StatusError{%d}) = false, want true", code)
 		}
 	}
 }
 
 // TestRetryOnRateLimit_retriesAPIRateLimitError verifies the subflux.RateLimitError
-// -> httpx.RateLimitError bridge: that conversion is the only reason an
-// subflux.RateLimitError drives httpx's retry loop. Without the bridge the error
-// would be returned on the first attempt instead of retried.
+// -> 429 httpclient.StatusError bridge: that conversion is the only reason a
+// subflux.RateLimitError drives httpclient's retry loop. Without the bridge the error
+// would be returned on the first attempt instead of retried. Once the attempts
+// run out, the caller gets the subflux error back.
 func TestRetryOnRateLimit_retriesAPIRateLimitError(t *testing.T) {
 	t.Parallel()
 	calls := 0
@@ -137,10 +138,13 @@ func TestRetryOnRateLimit_retriesAPIRateLimitError(t *testing.T) {
 	if err == nil || err.Error() != "429" {
 		t.Errorf("RetryOnRateLimit returned %v, want the rate-limit error after exhausting retries", err)
 	}
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
+		t.Errorf("RetryOnRateLimit returned %T, want *subflux.RateLimitError", err)
+	}
 }
 
 // TestRetryOnRateLimit_passesThroughNonRateLimitError verifies the bridge is
-// scoped: a non-rate-limit error is not converted, so httpx returns it
+// scoped: a non-rate-limit error is not converted, so httpclient returns it
 // immediately without retrying.
 func TestRetryOnRateLimit_passesThroughNonRateLimitError(t *testing.T) {
 	t.Parallel()

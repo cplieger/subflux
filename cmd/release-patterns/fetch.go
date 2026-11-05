@@ -14,7 +14,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 const (
@@ -123,7 +123,7 @@ func (u *upstream) head(ctx context.Context, repo, branch string) (string, error
 	}
 	sha := strings.TrimSpace(string(b))
 	if !commitHex.MatchString(sha) {
-		return "", fmt.Errorf("%s %s: head %q is not a 40-hex commit", repo, branch, runesafe.SanitizeSingleLineBounded(sha, 80))
+		return "", fmt.Errorf("%s %s: head %q is not a 40-hex commit", repo, branch, textsafe.SanitizeSingleLineBounded(sha, 80))
 	}
 	return sha, nil
 }

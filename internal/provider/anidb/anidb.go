@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/go/xmlx"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/xmlx"
 	"golang.org/x/sync/singleflight"
 )
 

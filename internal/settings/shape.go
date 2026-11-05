@@ -11,6 +11,7 @@ import (
 const (
 	tagMap   = "!!map"
 	tagMerge = "!!merge"
+	tagStr   = "!!str"
 )
 
 const (
@@ -31,7 +32,7 @@ type shapes struct {
 
 // checkShapes refuses, at their paths, an explicitly tagged node, a key held
 // twice in one mapping, and an anchor, alias or merge key: yamlenv expands
-// only untagged scalars and a tag would forge a mark, yaml.v3's Node keeps
+// only untagged scalars and a tag would forge a mark, go-yaml's Node keeps
 // duplicates, and a shared node would let a mark through one path unmask a
 // secret at another. It follows no alias.
 func checkShapes(root *yaml.Node) shapes {

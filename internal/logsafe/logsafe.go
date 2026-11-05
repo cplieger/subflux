@@ -1,11 +1,11 @@
-// Package logsafe binds runesafe's single-line preset to Subflux's log
+// Package logsafe binds textsafe's single-line preset to Subflux's log
 // surface, so every untrusted string reaches slog through one policy.
 //
 // The threat is log-record forgery. A request-controlled value — a URL path, a
 // query parameter, a JSON body field, an OIDC state, an error text that
 // interpolates one of those — carries a raw newline straight through slog into
 // the operator's log, where the reader cannot tell an injected line from one
-// the server wrote. The other three runesafe classes ride the same channel: C1
+// the server wrote. The other three textsafe classes ride the same channel: C1
 // controls and ESC introduce terminal escape sequences that retitle a terminal
 // or write to its clipboard, Bidi_Control runes reorder what a human reads
 // without changing what compares, and U+2028/U+2029 split a record for a
@@ -19,7 +19,7 @@
 // attributes off the end of a log line.
 //
 // This is the emit-side half only. A field whose provenance is worth carrying
-// through compute as well as emission takes runesafe.Untrusted at its decode
+// through compute as well as emission takes textsafe.Untrusted at its decode
 // struct instead, the way the opensubtitles and subdl responses do; reach for
 // this package where the value arrives as a plain string from net/http and is
 // logged near where it is read.
@@ -29,44 +29,44 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/textsafe"
 )
 
 // maxFieldBytes bounds one sanitized attribute.
 const maxFieldBytes = 256
 
-// Field prepares one untrusted string for a slog attribute: runesafe's
+// Field prepares one untrusted string for a slog attribute: textsafe's
 // single-line preset, then a cap on a rune boundary with a "..." marker.
 //
 // Route every untrusted attribute through it rather than picking the ones that
 // look dangerous. A reader of a handler should not have to prove which of four
 // attributes is safe, and the cost is one call.
 func Field(s string) string {
-	return runesafe.SanitizeSingleLineBounded(s, maxFieldBytes)
+	return textsafe.SanitizeSingleLineBounded(s, maxFieldBytes)
 }
 
 // RedactedField is Field for upstream text answering a request that carried
 // secrets, for an error value as well as a slog attribute. The order is
-// redact, normalize, redact, cap (httpx.RedactSecretString states the rule).
+// redact, normalize, redact, cap (httpclient.RedactSecretString states the rule).
 // Pass every credential the request carried in one call so no cap runs
 // between them. Longer values go first: a shorter one inside a longer one
 // would break the longer match and leave the rest of it behind.
-func RedactedField(s string, secrets ...httpx.Secret) string {
-	ordered := slices.SortedStableFunc(slices.Values(secrets), func(a, b httpx.Secret) int {
+func RedactedField(s string, secrets ...httpclient.Secret) string {
+	ordered := slices.SortedStableFunc(slices.Values(secrets), func(a, b httpclient.Secret) int {
 		return cmp.Compare(len(b), len(a))
 	})
-	text := runesafe.SanitizeSingleLine(redactAll(s, ordered))
+	text := textsafe.SanitizeSingleLine(redactAll(s, ordered))
 	text = redactAll(text, ordered)
 	if len(text) <= maxFieldBytes {
 		return text
 	}
-	return runesafe.CapBytes(text, maxFieldBytes) + "..."
+	return textsafe.CapBytes(text, maxFieldBytes) + "..."
 }
 
-func redactAll(s string, secrets []httpx.Secret) string {
+func redactAll(s string, secrets []httpclient.Secret) string {
 	for _, secret := range secrets {
-		s = httpx.RedactSecretString(s, secret)
+		s = httpclient.RedactSecretString(s, secret)
 	}
 	return s
 }

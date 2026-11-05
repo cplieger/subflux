@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cplieger/arrapi/v3"
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
@@ -20,7 +20,7 @@ func Classify(err error) *mediasource.SourceError {
 	var (
 		changed     *arrapi.ServerChangedError
 		unsupported *arrapi.UnsupportedAPIError
-		refused     *httpx.RedirectRefusedError
+		refused     *httpclient.RedirectRefusedError
 		tooLarge    *arrapi.ResponseTooLargeError
 		status      *arrapi.StatusError
 	)
@@ -66,12 +66,12 @@ func statusCause(code int) mediasource.Cause {
 // redirectError renders a refused redirect as the fix the user makes: the
 // hop cap as a loop, any other refusal as the origin to set url to.
 type redirectError struct {
-	refused *httpx.RedirectRefusedError
+	refused *httpclient.RedirectRefusedError
 	err     error
 }
 
 func (e redirectError) Error() string {
-	if e.refused.Reason == httpx.RedirectTooMany {
+	if e.refused.Reason == httpclient.RedirectTooMany {
 		return "redirects too many times; check url for a redirect loop"
 	}
 	return "redirects to " + e.refused.Origin + "; set url to that address"

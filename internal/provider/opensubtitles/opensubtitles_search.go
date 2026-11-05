@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -145,11 +145,11 @@ func (p *source) paginatedSearch(ctx context.Context, params url.Values,
 
 		var resp searchResponse
 		if err := json.NewDecoder(body).Decode(&resp); err != nil {
-			httpx.DrainClose(body)
+			httpclient.DrainClose(body)
 			warnPartial(page, err)
 			return allResults, fmt.Errorf("decode page %d: %w", page, err)
 		}
-		httpx.DrainClose(body)
+		httpclient.DrainClose(body)
 
 		slog.Debug("opensubtitles page results",
 			"page", page, "total_pages", resp.TotalPages,

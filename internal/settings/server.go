@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/formschema"
-	"github.com/cplieger/webhttp/v3"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -25,7 +25,7 @@ const (
 )
 
 // rootEntry is the host-list entry a root-level failure passes to
-// webhttp.ParseHostList: non-blank so the policy engages, and refused by
+// httpserver.ParseHostList: non-blank so the policy engages, and refused by
 // CanonicalHost so it admits no Host.
 const rootEntry = "(root)"
 
@@ -58,7 +58,7 @@ var serverSchema = formschema.Schema{Fields: []formschema.Field{
 type Server struct{ p *server }
 
 type server struct {
-	hosts   *webhttp.HostPolicy
+	hosts   *httpserver.HostPolicy
 	format  string
 	proxies []netip.Prefix
 	allowed []string
@@ -74,12 +74,12 @@ func (s Server) TrustedProxies() []netip.Prefix {
 	return slices.Clone(s.p.proxies)
 }
 
-// Hosts is webhttp.ParseHostList over allowed_hosts with
+// Hosts is httpserver.ParseHostList over allowed_hosts with
 // WithLoopbackExempt(true), so a loopback peer naming a loopback Host is
 // admitted: inactive only when no file exists or it is one mapping whose list
 // is absent, null or empty. A list with any element but no valid entry, or a
 // root-level failure, denies every Host, a loopback peer's included.
-func (s Server) Hosts() *webhttp.HostPolicy {
+func (s Server) Hosts() *httpserver.HostPolicy {
 	if s.p == nil {
 		return nil
 	}
@@ -128,7 +128,7 @@ func parseServer(n *yaml.Node) (Server, []formschema.FieldError) {
 	}
 	hosts := vals.StringList(keyAllowedHosts)
 	for i, e := range hosts {
-		if webhttp.CanonicalHost(strings.TrimSpace(e)) == "" {
+		if httpserver.CanonicalHost(strings.TrimSpace(e)) == "" {
 			errs = append(errs, formschema.FieldError{Path: index(keyAllowedHosts, i), Message: "must be a host name or address, with an optional port, such as nas.lan or nas.lan:8374"})
 		}
 	}
@@ -165,10 +165,10 @@ func parseProxy(e string) (netip.Prefix, bool) {
 // hostPolicy is ParseHostList over entries, and the canonical hosts it
 // accepted, once each in file order: the keys its policy matches, a port
 // dropped.
-func hostPolicy(entries []string, loopbackExempt bool) (policy *webhttp.HostPolicy, allowed []string) {
-	policy, _ = webhttp.ParseHostList(entries, webhttp.WithLoopbackExempt(loopbackExempt))
+func hostPolicy(entries []string, loopbackExempt bool) (policy *httpserver.HostPolicy, allowed []string) {
+	policy, _ = httpserver.ParseHostList(entries, httpserver.WithLoopbackExempt(loopbackExempt))
 	for _, e := range entries {
-		if h := webhttp.CanonicalHost(strings.TrimSpace(e)); h != "" && !slices.Contains(allowed, h) {
+		if h := httpserver.CanonicalHost(strings.TrimSpace(e)); h != "" && !slices.Contains(allowed, h) {
 			allowed = append(allowed, h)
 		}
 	}
@@ -178,7 +178,7 @@ func hostPolicy(entries []string, loopbackExempt bool) (policy *webhttp.HostPoli
 // denyAllServer is a root-level failure's fail-closed value: default log
 // fields, no trusted proxy, every Host refused.
 func denyAllServer() Server {
-	p, _ := webhttp.ParseHostList([]string{rootEntry})
+	p, _ := httpserver.ParseHostList([]string{rootEntry})
 	return Server{&server{hosts: p, level: slog.LevelInfo, format: formatJSON}}
 }
 

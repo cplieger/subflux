@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cplieger/atomicfile/v4"
+	"github.com/cplieger/go/filesafe"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v3"
 )
@@ -35,7 +35,7 @@ func (f fileState) same(g fileState) bool {
 
 // writeFile is the one write seam: Save's persist and its restore both call it.
 var writeFile = func(ctx context.Context, path string, data []byte) error {
-	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600), atomicfile.WithMaxBytes(maxFileBytes))
+	_, err := filesafe.WriteFile(ctx, path, data, filesafe.WithMode(0o600), filesafe.WithMaxBytes(maxFileBytes))
 	return err
 }
 
@@ -143,7 +143,7 @@ func removeFile(path string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	if rerr := atomicfile.RemoveFileInRoot(root, filepath.Base(path)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+	if rerr := filesafe.RemoveFileInRoot(root, filepath.Base(path)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
 		return rerr
 	}
 	dir, err := root.Open(".")
@@ -156,7 +156,7 @@ func removeFile(path string) error {
 
 // readFile reads the file as Save's baseline.
 func readFile(path string) fileState {
-	data, err := atomicfile.ReadBounded(context.Background(), path, maxFileBytes)
+	data, err := filesafe.ReadBounded(context.Background(), path, maxFileBytes)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return fileState{known: true}

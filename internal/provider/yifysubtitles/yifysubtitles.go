@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"

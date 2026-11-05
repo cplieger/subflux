@@ -20,8 +20,7 @@ const (
 
 // bodyShape is a Save or Merge body's node rule, refusing what the merge
 // would drop or cannot encode: an anchor or alias, text on an unchanged
-// scalar, invalid UTF-8. Every other tag is kept, re-encodes explicit, and
-// the parse of the encoded result refuses it as the file's shape rules do.
+// scalar, a tag (bodyTagged), invalid UTF-8.
 func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 	if n.Kind == yaml.AliasNode || n.Anchor != "" {
 		return []formschema.FieldError{{Path: path, Message: msgShared}}
@@ -31,10 +30,28 @@ func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 		if n.Value != "" {
 			return []formschema.FieldError{{Path: path, Message: msgUnchanged}}
 		}
+	case bodyTagged(n):
+		return []formschema.FieldError{{Path: path, Message: msgTagged}}
 	case n.Kind == yaml.ScalarNode && !utf8.ValidString(n.Value):
 		return []formschema.FieldError{{Path: path, Message: msgUTF8}}
 	}
 	return nil
+}
+
+// bodyTagged reports a tag other than the one n's text resolves to, or one
+// written explicit. go-yaml's encoders differ on such a tag: v3 writes it
+// explicit, v4 drops a mismatched !!int or !!float and writes the bare text
+// (internal/libyaml/desolver.go), which would commit it as a string. !!str
+// is exempt: both quote the text so it reads back a string.
+func bodyTagged(n *yaml.Node) bool {
+	if n.Style&yaml.TaggedStyle != 0 {
+		return true
+	}
+	t := n.ShortTag()
+	if n.Kind == yaml.ScalarNode && t == tagStr {
+		return false
+	}
+	return t != (&yaml.Node{Kind: n.Kind, Value: n.Value}).ShortTag()
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken

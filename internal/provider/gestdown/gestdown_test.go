@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )

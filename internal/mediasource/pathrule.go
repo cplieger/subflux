@@ -5,18 +5,18 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 // validPath is the path rule every reported and configured path meets:
 // absolute, clean, at most maxPathBytes, valid UTF-8 and free of every rune
-// runesafe.IsUnsafeSingleLine reports. A path breaking it is refused, never
+// textsafe.IsUnsafeSingleLine reports. A path breaking it is refused, never
 // rewritten, since a rewritten path names another file.
 func validPath(p string) bool {
 	if len(p) > maxPathBytes || !filepath.IsAbs(p) || filepath.Clean(p) != p || !utf8.ValidString(p) {
 		return false
 	}
-	return !strings.ContainsFunc(p, runesafe.IsUnsafeSingleLine)
+	return !strings.ContainsFunc(p, textsafe.IsUnsafeSingleLine)
 }
 
 // validNativeID reports whether id is 1 to maxNativeID bytes of

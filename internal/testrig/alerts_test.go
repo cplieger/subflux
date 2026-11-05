@@ -10,8 +10,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/obs"
-	"github.com/cplieger/webhttp/v3"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -33,7 +33,7 @@ var (
 func exportedSeries(t *testing.T) []string {
 	t.Helper()
 	m := obs.New()
-	m.RecordHTTP(webhttp.RequestMetric{Method: http.MethodGet, Path: "/", Status: http.StatusOK})
+	m.RecordHTTP(httpserver.RequestMetric{Method: http.MethodGet, Path: "/", Status: http.StatusOK})
 	rec := httptest.NewRecorder()
 	m.Handler()(rec, httptest.NewRequest(http.MethodGet, "/metrics", http.NoBody))
 	body, err := io.ReadAll(rec.Result().Body)

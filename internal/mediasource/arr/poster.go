@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
@@ -21,7 +21,7 @@ const MaxPosterBytes = 2 << 20
 // WithTimeout bounds the adapters' undeadlined reads.
 const posterBudget = 30 * time.Second
 
-// maxPosterHops caps the redirects of one fetch across both legs, httpx's
+// maxPosterHops caps the redirects of one fetch across both legs, httpclient's
 // default.
 const maxPosterHops = 5
 
@@ -52,15 +52,15 @@ func NewPoster(arr *http.Client) *Poster {
 // or, when it has none, 30 s. A 404 answers false; a body over
 // MaxPosterBytes is Protocol.
 func (p *Poster) Fetch(ctx context.Context, url, apiKey string) (body io.ReadCloser, contentType string, found bool, err error) {
-	ctx, cancel := httpx.ContextWithDefaultTimeout(ctx, posterBudget)
+	ctx, cancel := httpclient.ContextWithDefaultTimeout(ctx, posterBudget)
 	defer cancel()
 	hops := 0
-	sameOrigin := httpx.RedirectPolicyFunc(httpx.WithSameOrigin(true), httpx.WithMaxHops(maxPosterHops))
+	sameOrigin := httpclient.RedirectPolicyFunc(httpclient.WithSameOrigin(true), httpclient.WithMaxHops(maxPosterHops))
 	arr := *p.arr
 	arr.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		var refused *httpx.RedirectRefusedError
+		var refused *httpclient.RedirectRefusedError
 		verdict := sameOrigin(req, via)
-		if errors.As(verdict, &refused) && refused.Reason != httpx.RedirectTooMany {
+		if errors.As(verdict, &refused) && refused.Reason != httpclient.RedirectTooMany {
 			return http.ErrUseLastResponse
 		}
 		if verdict == nil {
@@ -75,7 +75,7 @@ func (p *Poster) Fetch(ctx context.Context, url, apiKey string) (body io.ReadClo
 	req.Header.Set("X-Api-Key", apiKey)
 	resp, err := arr.Do(req) // #nosec G704 -- url is the configured arr origin's; CheckRedirect stops before any other origin
 	if err != nil {
-		return nil, "", false, Classify(httpx.RedactTransportError(err, "poster", httpx.Secret(apiKey)))
+		return nil, "", false, Classify(httpclient.RedactTransportError(err, "poster", httpclient.Secret(apiKey)))
 	}
 	defer drain(resp)
 	if !isRedirect(resp.StatusCode) {
@@ -122,7 +122,7 @@ func (p *Poster) refetchPublic(ctx context.Context, redirect *http.Response, hop
 	case errors.As(err, &serr):
 		return nil, sourceError(mediasource.Protocol, fmt.Errorf("poster redirect refused: %w", serr))
 	case err != nil:
-		return nil, Classify(httpx.LogSafeError(err))
+		return nil, Classify(httpclient.LogSafeError(err))
 	}
 	return resp, nil
 }
@@ -138,7 +138,7 @@ func readPoster(resp *http.Response) (body io.ReadCloser, contentType string, fo
 	b, err := io.ReadAll(io.LimitReader(resp.Body, MaxPosterBytes+1))
 	switch {
 	case err != nil:
-		return nil, "", false, sourceError(mediasource.Unreachable, fmt.Errorf("poster read: %w", httpx.LogSafeError(err)))
+		return nil, "", false, sourceError(mediasource.Unreachable, fmt.Errorf("poster read: %w", httpclient.LogSafeError(err)))
 	case len(b) > MaxPosterBytes:
 		return nil, "", false, sourceError(mediasource.Protocol, errPosterTooLarge)
 	}

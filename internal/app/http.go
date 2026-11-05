@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/cplieger/health"
+	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/obs"
-	"github.com/cplieger/webhttp/v3"
 )
 
 //go:embed placeholder.html
@@ -30,12 +30,12 @@ func handler(m *obs.Metrics, marker health.Signal, routes func(*http.ServeMux)) 
 		routes(mux)
 	}
 	logOpt, recoverOpt := httpMetrics(m)
-	return webhttp.Chain(mux, webhttp.Logging(logOpt), webhttp.Recoverer(recoverOpt))
+	return httpserver.Chain(mux, httpserver.Logging(logOpt), httpserver.Recoverer(recoverOpt))
 }
 
-func httpMetrics(m *obs.Metrics) (webhttp.LogOption, webhttp.RecoverOption) {
-	return webhttp.WithRecordRouteMetric(m.RecordHTTP),
-		webhttp.WithPanicHook(func(any, []byte) { m.RecordPanic() })
+func httpMetrics(m *obs.Metrics) (httpserver.LogOption, httpserver.RecoverOption) {
+	return httpserver.WithRecordRouteMetric(m.RecordHTTP),
+		httpserver.WithPanicHook(func(any, []byte) { m.RecordPanic() })
 }
 
 // httpComponent serves srv on ln until its stop shuts srv down. Serve

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 )
@@ -194,14 +194,14 @@ func validSeriesNumbering(k media.Kind, n media.Numbering) bool {
 }
 
 func line(s string, n int) string {
-	out, _ := runesafe.SanitizeSingleLineCapped(s, n, cutMarker)
+	out, _ := textsafe.SanitizeSingleLineCapped(s, n, cutMarker)
 	return out
 }
 
 // link keeps an absolute http or https URL that is one safe line within
 // maxTitleBytes; cutting or cleaning a URL would change where it points.
 func link(s string) string {
-	if s == "" || len(s) > maxTitleBytes || strings.ContainsFunc(s, runesafe.IsUnsafeSingleLine) {
+	if s == "" || len(s) > maxTitleBytes || strings.ContainsFunc(s, textsafe.IsUnsafeSingleLine) {
 		return ""
 	}
 	u, err := url.Parse(s)
@@ -211,4 +211,4 @@ func link(s string) string {
 	return s
 }
 
-func quote(s string) string { return runesafe.CapBytes(s, quoteMax) }
+func quote(s string) string { return textsafe.CapBytes(s, quoteMax) }

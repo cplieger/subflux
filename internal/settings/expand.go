@@ -4,7 +4,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/cplieger/envx/yamlenv/v2"
+	"github.com/cplieger/go/yamlenv"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v3"
 )

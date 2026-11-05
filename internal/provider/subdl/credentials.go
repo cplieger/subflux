@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -29,11 +29,11 @@ func (p *source) CheckCredentials(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		apiURL+"/me?"+params.Encode(), http.NoBody)
 	if err != nil {
-		return httpx.RedactSecret(err, p.apiKey)
+		return httpclient.RedactSecret(err, p.apiKey)
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return httpx.RedactTransportError(err, "subdl credential check", httpx.Secret(p.apiKey))
+		return httpclient.RedactTransportError(err, "subdl credential check", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 

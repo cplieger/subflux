@@ -14,7 +14,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v3"
 )
@@ -589,12 +589,24 @@ func TestSaveBodyShapes(t *testing.T) {
 	forged.Content[1].Content[1].Tag = formschema.PlainTag
 	binary := node(t, "server: {log_level: debug}\n"+validLanguages)
 	binary.Content[1].Content[1].Tag, binary.Content[1].Content[1].Value = "!!binary", "not base64"
-	cases := []struct {
+	type bodyCase struct {
 		name  string
 		body  *yaml.Node
 		paths []string
 		msg   string
-	}{
+	}
+	var tagged []bodyCase
+	for _, tag := range []string{"!!int", "!!float", "!!bool", "!!null", "!foo", formschema.PlainTag} {
+		for _, explicit := range []bool{false, true} {
+			n := node(t, "server: {log_format: text}\n"+validLanguages)
+			n.Content[1].Content[1].Tag = tag
+			if explicit {
+				n.Content[1].Content[1].Style = yaml.TaggedStyle
+			}
+			tagged = append(tagged, bodyCase{fmt.Sprintf("%s set in code, explicit %t", tag, explicit), n, []string{"server.log_format"}, msgTagged})
+		}
+	}
+	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
 		{"a mark set in code", forged, []string{"server.log_level"}, ""},
@@ -611,7 +623,7 @@ func TestSaveBodyShapes(t *testing.T) {
 		}}, []string{"server.log_level"}, msgUTF8},
 		{"a list at the root", node(t, "[a]\n"), []string{""}, ""},
 		{"no document", nil, []string{""}, ""},
-	}
+	}...)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			const before = "server: {log_level: info}\n" + validLanguages

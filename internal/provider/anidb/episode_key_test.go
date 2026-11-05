@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/keyenc"
+	"github.com/cplieger/go/keyenc"
 )
 
 // oldEpisodeCacheKey is the fmt.Sprintf form both episodeCache builders used,

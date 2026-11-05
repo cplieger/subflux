@@ -1,6 +1,6 @@
 package opensubtitles
 
-import "github.com/cplieger/runesafe/v3"
+import "github.com/cplieger/go/textsafe"
 
 // --- Language Mapping ---
 
@@ -31,7 +31,7 @@ type loginResponse struct {
 	Token string `json:"token"`
 	// BaseURL is an upstream-controlled redirect host, tagged at the decode
 	// boundary: validation and use read Raw(); any emit sanitizes itself.
-	BaseURL runesafe.Untrusted `json:"base_url"`
+	BaseURL textsafe.Untrusted `json:"base_url"`
 	User    loginUser          `json:"user"`
 }
 

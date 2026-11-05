@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 )
 
 func TestSourceErrorUnwraps(t *testing.T) {
@@ -15,10 +15,10 @@ func TestSourceErrorUnwraps(t *testing.T) {
 			t.Errorf("errors.Is(%v, DeadlineExceeded) = false", err)
 		}
 	})
-	t.Run("httpx.IsTransient sees a wrapped 503", func(t *testing.T) {
-		err := error(&SourceError{Source: "sonarr", Op: "Items", Cause: Unreachable, Err: &httpx.HTTPStatusError{Code: 503}})
-		if !httpx.IsTransient(err) {
-			t.Errorf("httpx.IsTransient(%v) = false", err)
+	t.Run("httpclient.IsTransient sees a wrapped 503", func(t *testing.T) {
+		err := error(&SourceError{Source: "sonarr", Op: "Items", Cause: Unreachable, Err: &httpclient.StatusError{Code: 503}})
+		if !httpclient.IsTransient(err) {
+			t.Errorf("httpclient.IsTransient(%v) = false", err)
 		}
 	})
 }
