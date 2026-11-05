@@ -17,7 +17,7 @@ require (
 	github.com/cplieger/ssrf/v4 v4.6.0
 	github.com/cplieger/webhttp/v3 v3.0.3
 	github.com/cplieger/xmlx v1.1.0
-	github.com/dlclark/regexp2/v2 v2.8.4
+	github.com/dlclark/regexp2/v2 v2.12.0
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/ulikunitz/xz v0.5.17
 	go.yaml.in/yaml/v3 v3.0.6
