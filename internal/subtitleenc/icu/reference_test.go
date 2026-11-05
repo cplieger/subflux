@@ -79,7 +79,6 @@ func detectAll(data []byte) []Match {
 // bytes reaching a branch the corpus does not.
 type reference struct {
 	ICU   string `json:"icu"`
-	PyICU string `json:"pyicu"`
 	Cases []struct {
 		Case  string `json:"case"`
 		Parts []struct {

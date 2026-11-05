@@ -111,7 +111,6 @@ func checkGroups(id string, re *netregex.Regexp, declared []string) *refusal {
 // cfFile is a TRaSH custom format file, as far as the import reads it.
 type cfFile struct {
 	TrashID        string   `json:"trash_id"`
-	Name           string   `json:"name"`
 	Specifications []cfSpec `json:"specifications"`
 }
 
