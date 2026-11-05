@@ -53,8 +53,8 @@ func bodyTagged(n *yaml.Node) bool {
 // mismatched !!int or !!float (internal/libyaml/desolver.go), and both
 // majors quote text holding a ':' in a flow collection. v3 writes a mismatch
 // explicit, which the file's own shape walk refuses. A mismatch inside a flow
-// collection first rewrites that collection block style, which keeps a
-// file's own timestamp a timestamp.
+// collection first rewrites the flow collections on its path block style,
+// which keeps a file's own timestamp a timestamp.
 func settleTags(merged *yaml.Node, path string) []formschema.FieldError {
 	bad, ok := mismatches(merged, path)
 	if !ok || len(bad) == 0 {
@@ -62,8 +62,8 @@ func settleTags(merged *yaml.Node, path string) []formschema.FieldError {
 	}
 	reflowed := false
 	for _, b := range bad {
-		if b.flow != nil {
-			unflow(b.flow)
+		for _, c := range b.flow {
+			c.Style &^= yaml.FlowStyle
 			reflowed = true
 		}
 	}
@@ -89,19 +89,19 @@ func mismatches(merged *yaml.Node, path string) ([]mismatch, bool) {
 	return retagged(merged, back, path, nil), true
 }
 
-// mismatch is a scalar retagged found, with the outermost flow collection
-// holding it (nil in block context).
+// mismatch is a scalar retagged found, with the collections from the
+// outermost flow one holding it down to its parent (none in block context).
 type mismatch struct {
-	flow *yaml.Node
 	path string
+	flow []*yaml.Node
 }
 
-func retagged(m, back *yaml.Node, path string, flow *yaml.Node) []mismatch {
+func retagged(m, back *yaml.Node, path string, flow []*yaml.Node) []mismatch {
 	if m == nil || back == nil || m.Kind != back.Kind {
 		return nil
 	}
-	if flow == nil && m.Kind != yaml.ScalarNode && m.Style&yaml.FlowStyle != 0 {
-		flow = m
+	if m.Kind != yaml.ScalarNode && (len(flow) > 0 || m.Style&yaml.FlowStyle != 0) {
+		flow = append(slices.Clip(flow), m)
 	}
 	var bad []mismatch
 	switch m.Kind {
@@ -116,22 +116,16 @@ func retagged(m, back *yaml.Node, path string, flow *yaml.Node) []mismatch {
 			bad = append(bad, retagged(m.Content[i], back.Content[i], index(path, i), flow)...)
 		}
 	case yaml.ScalarNode:
-		if m.Tag != "" && m.ShortTag() != back.ShortTag() {
+		want := m.ShortTag()
+		if m.Tag == "" && m.Style == 0 && m.Value == "" {
+			// An empty plain scalar is a null; the encoder quotes one in flow.
+			want = tagNull
+		}
+		if (m.Tag != "" || want == tagNull) && want != back.ShortTag() {
 			bad = append(bad, mismatch{flow: flow, path: path})
 		}
 	}
 	return bad
-}
-
-// unflow writes n and every collection beneath it block style: the emitter
-// writes each child of a flow collection in flow.
-func unflow(n *yaml.Node) {
-	if n.Kind != yaml.ScalarNode {
-		n.Style &^= yaml.FlowStyle
-	}
-	for _, c := range n.Content {
-		unflow(c)
-	}
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken

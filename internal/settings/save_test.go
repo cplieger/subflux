@@ -614,8 +614,8 @@ func TestSaveBodyShapes(t *testing.T) {
 	tagged = append(tagged, bodyCase{"the non-specific tag set in code", bang, []string{"server.log_format"}, msgTagged})
 	stamp := node(t, "server: {log_format: x}\n"+validLanguages)
 	stamp.Content[1].Content[1].Tag, stamp.Content[1].Content[1].Value = "!!timestamp", "2001-12-14 12:00:00"
-	// Written block style, it reaches the section as a timestamp, which an enum refuses.
-	tagged = append(tagged, bodyCase{"a timestamp in a flow mapping keeps its type", stamp, []string{"server.log_format"}, ""})
+	// Written block style, it reaches the section as a timestamp, which the enum refuses.
+	tagged = append(tagged, bodyCase{"a timestamp in a flow mapping keeps its type", stamp, []string{"server.log_format"}, "must be one of json, text"})
 	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
