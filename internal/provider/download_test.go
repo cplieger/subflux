@@ -123,7 +123,7 @@ func TestExtractAndValidate_unreadableContainerStillDescribesTheBytes(t *testing
 //
 // A member whose deflate stream is cut short is the HAZARD: the header records
 // the real uncompressed size, so the reader runs out of input and returns
-// io.ErrUnexpectedEOF, which httpx.IsTransient reads as a reason to re-download.
+// io.ErrUnexpectedEOF, which httpclient.IsTransient reads as a reason to re-download.
 // A real pack can carry both, and then the second member is what would have made
 // the whole archive look retryable.
 //
@@ -234,7 +234,7 @@ func (c *clippedDeflate) Close() error {
 //
 // memberReadError wraps its per-member causes so a caller can find
 // zip.ErrAlgorithm with errors.Is. It collects EVERY matched member's failure, so
-// one truncated member contributes an io.ErrUnexpectedEOF that httpx.IsTransient
+// one truncated member contributes an io.ErrUnexpectedEOF that httpclient.IsTransient
 // reads as a reason to re-download, even when another member holds the real
 // diagnosis. The archive bytes are identical on every attempt, so a retry burns
 // two more provider requests and delays the fall-through to the next candidate,

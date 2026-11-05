@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 // Issue text quotes upstream strings only through these helpers: sanitized
@@ -21,7 +21,7 @@ const (
 )
 
 func codeSpan(s string) string {
-	s = runesafe.SanitizeSingleLineBounded(s, maxSpanRunes)
+	s = textsafe.SanitizeSingleLineBounded(s, maxSpanRunes)
 	if s == "" {
 		return "(empty)"
 	}
@@ -32,7 +32,7 @@ func codeSpan(s string) string {
 	return fence + s + fence
 }
 
-func runesafeName(s string) string { return runesafe.SanitizeSingleLineBounded(s, maxSpanRunes) }
+func runesafeName(s string) string { return textsafe.SanitizeSingleLineBounded(s, maxSpanRunes) }
 
 // codeBlock fences at most max lines, saying how many it left out.
 func codeBlock(lang string, lines []string, limit int) string {
@@ -43,7 +43,7 @@ func codeBlock(lang string, lines []string, limit int) string {
 	clean := make([]string, len(lines))
 	run := 0
 	for i, l := range lines {
-		clean[i] = runesafe.SanitizeSingleLine(l)
+		clean[i] = textsafe.SanitizeSingleLine(l)
 		run = max(run, longestRun(clean[i], '`'))
 	}
 	fence := strings.Repeat("`", max(3, run+1))

@@ -26,7 +26,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/cplieger/atomicfile/v4"
+	"github.com/cplieger/go/filesafe"
 )
 
 const (
@@ -109,7 +109,7 @@ func (o *outputs) write(ctx context.Context, dir string) error {
 		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 			return err
 		}
-		if _, err := atomicfile.WriteFile(ctx, target, f.data, atomicfile.WithMode(0o644)); err != nil {
+		if _, err := filesafe.WriteFile(ctx, target, f.data, filesafe.WithMode(0o644)); err != nil {
 			return err
 		}
 	}

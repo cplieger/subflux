@@ -10,8 +10,8 @@ import (
 // deletes its row; "" when none does, its successor having another path.
 var retiredModules = []struct{ module, until string }{
 	{"github.com/cplieger/auth/v6", ""},
-	{"github.com/cplieger/wiregen/v3", ""},
-	{"github.com/cplieger/sse", "AP-1"},
+	{"github.com/cplieger/go/wiregen", ""},
+	{"github.com/cplieger/go/sse", "AP-1"},
 	{"github.com/evanw/esbuild", "WC-1"},
 }
 

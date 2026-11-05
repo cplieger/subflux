@@ -236,6 +236,19 @@ func TestPolicyErrorsNeverEchoExpandedValues(t *testing.T) {
 	}
 }
 
+// TestLoadSyntaxErrorWithholdsValue pins the root error a syntax error
+// gives: a location, never the text around it.
+func TestLoadSyntaxErrorWithholdsValue(t *testing.T) {
+	errs, ok := loadText(t, "server:\n  log_level: \"hunter2-SECRET\n").Failure()
+	if !ok || len(errs) != 1 || errs[0].Path != "" {
+		t.Fatalf("Failure() = %v, %v; want one root error", errs, ok)
+	}
+	m := errs[0].Message
+	if !strings.HasPrefix(m, "config.yaml is not valid YAML: line ") || !strings.Contains(m, "details withheld") || strings.Contains(m, "hunter2") {
+		t.Errorf("message %q, want a line number and the details withheld", m)
+	}
+}
+
 func TestExpandedDigitsStayStrings(t *testing.T) {
 	got, _ := testSection(t)
 	t.Setenv("SUBFLUX_KEY", "0123")

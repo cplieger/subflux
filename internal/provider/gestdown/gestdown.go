@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/keyenc"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/keyenc"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"

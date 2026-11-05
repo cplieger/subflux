@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/slogx/capture"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"

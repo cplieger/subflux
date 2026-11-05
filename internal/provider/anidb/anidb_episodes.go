@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/keyenc"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/keyenc"
+	"github.com/cplieger/go/xmlx"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/xmlx"
 )
 
 // buildEpisodeCacheKey builds the episodeCache key for a series and
@@ -142,7 +142,7 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	}
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return httpx.RedactTransportError(err, "anidb episodes", httpx.Secret(m.clientKey))
+		return httpclient.RedactTransportError(err, "anidb episodes", httpclient.Secret(m.clientKey))
 	}
 	defer resp.Body.Close()
 
@@ -218,7 +218,7 @@ func (m *Mapper) apiError(data []byte, seriesID int) error {
 // upstreamText prepares AniDB's error text for an error or a log line. The
 // request carried the client key, so the text may echo it.
 func (m *Mapper) upstreamText(s string) string {
-	return logsafe.RedactedField(s, httpx.Secret(m.clientKey))
+	return logsafe.RedactedField(s, httpclient.Secret(m.clientKey))
 }
 
 // rejectClient latches the client-key refusal, logging it the first time,

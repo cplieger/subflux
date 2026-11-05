@@ -17,10 +17,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/jsonx/v2"
-	"github.com/cplieger/keyenc"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/jsonx"
+	"github.com/cplieger/go/keyenc"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -104,7 +104,7 @@ func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subf
 		g.Go(func() error {
 			subs, queryErr := p.querySubtitles(gctx, titleID, le.ss, le.iso, req)
 			if queryErr != nil {
-				slog.Warn("subsource query failed", "lang", le.iso, "error", httpx.RedactSecret(queryErr, p.apiKey))
+				slog.Warn("subsource query failed", "lang", le.iso, "error", httpclient.RedactSecret(queryErr, p.apiKey))
 				perLang[i] = langResult{err: queryErr}
 			} else {
 				perLang[i] = langResult{subs: subs}
@@ -178,12 +178,12 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, http.NoBody)
 	if err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource download", httpx.Secret(p.apiKey))
+		return nil, httpclient.RedactTransportError(err, "subsource download", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
@@ -191,12 +191,12 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 	// Retry-After header on 429 (via httpwire.ParseRetryAfter) and returns
 	// *subflux.AuthError for 401/403 just like the search path.
 	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
-		return nil, httpx.RedactSecret(statusErr, p.apiKey)
+		return nil, httpclient.RedactSecret(statusErr, p.apiKey)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 	if len(data) == 0 {
 		return nil, fmt.Errorf("subsource: empty response body for subtitle %s", sub.ID)
@@ -363,22 +363,22 @@ func (p *source) doSearch(ctx context.Context, params url.Values) ([]searchResul
 	u := baseURL + "/movies/search?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("subsource title search: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("subsource title search: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource title search", httpx.Secret(p.apiKey))
+		return nil, httpclient.RedactTransportError(err, "subsource title search", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
 	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 
 	var result searchResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
 	}
 	if result.Success != nil && !*result.Success {
 		return nil, p.apiFailure(result.Error)
@@ -397,7 +397,7 @@ var (
 // *subflux.AuthError, a not-found answer is no error (no results), anything
 // else a plain error. The text is redacted of the API key and bounded.
 func (p *source) apiFailure(msg string) error {
-	text := logsafe.RedactedField(msg, httpx.Secret(p.apiKey))
+	text := logsafe.RedactedField(msg, httpclient.Secret(p.apiKey))
 	lower := strings.ToLower(text)
 	switch {
 	case containsAny(lower, keyRefusalPatterns):
@@ -447,22 +447,22 @@ func (p *source) querySubtitles(ctx context.Context, titleID int, ssLang, isoLan
 	u := baseURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("subsource subtitles: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("subsource subtitles: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource subtitles", httpx.Secret(p.apiKey))
+		return nil, httpclient.RedactTransportError(err, "subsource subtitles", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
 	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 
 	var result subtitleResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
 	}
 
 	if !result.Success {

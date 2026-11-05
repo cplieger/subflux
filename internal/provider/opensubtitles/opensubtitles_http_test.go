@@ -55,7 +55,7 @@ func TestSetHeaders(t *testing.T) {
 func TestCheckStatus(t *testing.T) {
 	t.Parallel()
 
-	// Success is EXACTLY 2xx (httpx v4). A 3xx here means the redirect chain
+	// Success is EXACTLY 2xx. A 3xx here means the redirect chain
 	// was refused or exhausted, not that the body is a payload — the shared
 	// provider client follows redirects, so this path only sees a 3xx when
 	// something went wrong.

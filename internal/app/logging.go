@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cplieger/slogx"
+	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/settings"
 )
 

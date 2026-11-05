@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 )
 
 func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
@@ -22,7 +22,7 @@ func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := RedactedField(tt.in, httpx.Secret(tt.secret))
+			got := RedactedField(tt.in, httpclient.Secret(tt.secret))
 			if strings.Contains(got, "placeh") {
 				t.Errorf("RedactedField(%q) = %q, carries a fragment of the secret", tt.in, got)
 			}
@@ -38,7 +38,7 @@ func TestRedactedField_leaves_no_fragment_of_the_secret(t *testing.T) {
 
 func TestRedactedField_marks_a_cut_value(t *testing.T) {
 	t.Parallel()
-	got := RedactedField(strings.Repeat("y", maxFieldBytes+10), httpx.Secret("placeholder-key"))
+	got := RedactedField(strings.Repeat("y", maxFieldBytes+10), httpclient.Secret("placeholder-key"))
 	if want := strings.Repeat("y", maxFieldBytes) + "..."; got != want {
 		t.Errorf("RedactedField(long) = %q, want %q", got, want)
 	}
@@ -49,22 +49,22 @@ func TestRedactedField_redacts_every_secret_passed(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      string
-		secrets []httpx.Secret
+		secrets []httpclient.Secret
 	}{
 		{
 			name:    "each_echoed",
 			in:      "bad pair placeholder-user / placeholder-pass",
-			secrets: []httpx.Secret{"placeholder-user", "placeholder-pass"},
+			secrets: []httpclient.Secret{"placeholder-user", "placeholder-pass"},
 		},
 		{
 			name:    "one_assembled_by_the_normalization",
 			in:      "bad pair placeholder\nuser / placeholder-pass",
-			secrets: []httpx.Secret{"placeholder user", "placeholder-pass"},
+			secrets: []httpclient.Secret{"placeholder user", "placeholder-pass"},
 		},
 		{
 			name:    "a_shorter_inside_a_longer",
 			in:      "bad pair placeholder-pass-user",
-			secrets: []httpx.Secret{"user", "placeholder-pass-user"},
+			secrets: []httpclient.Secret{"user", "placeholder-pass-user"},
 		},
 	}
 	for _, tt := range tests {

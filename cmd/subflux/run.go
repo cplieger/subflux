@@ -9,7 +9,7 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/app"
 )
 
@@ -30,7 +30,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 		defer stop()
 		if err := runApp(ctx, app.Config{Paths: paths}); err != nil {
-			_, _ = fmt.Fprintln(stderr, "subflux: "+runesafe.SanitizeSingleLine(err.Error()))
+			_, _ = fmt.Fprintln(stderr, "subflux: "+textsafe.SanitizeSingleLine(err.Error()))
 			return 1
 		}
 		return 0

@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/runesafe/v3"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -180,7 +180,7 @@ func (p *source) checkAPIStatus(result *apiResponse, label string) ([]subtitleIt
 	if result.Status {
 		return result.Subtitles, nil
 	}
-	msg := logsafe.RedactedField(result.Error.Raw(), httpx.Secret(p.apiKey))
+	msg := logsafe.RedactedField(result.Error.Raw(), httpclient.Secret(p.apiKey))
 	if isAuthRefusal(msg) {
 		return nil, &subflux.AuthError{Msg: "subdl API: " + msg}
 	}
@@ -250,12 +250,12 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, http.NoBody)
 	if err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl download", httpx.Secret(p.apiKey))
+		return nil, httpclient.RedactTransportError(err, "subdl download", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
@@ -264,7 +264,7 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 		if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 			slog.Warn("subdl: download rate limited", "url", fullURL)
 		}
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 	slog.Debug("subdl download complete", "id", sub.ID, "bytes", len(data))
 	return data, nil
@@ -278,22 +278,22 @@ func (p *source) doAPIRequest(ctx context.Context, params url.Values) (*apiRespo
 	u := apiURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("subdl search: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("subdl search: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl search", httpx.Secret(p.apiKey))
+		return nil, httpclient.RedactTransportError(err, "subdl search", httpclient.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
 	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpx.RedactSecret(err, p.apiKey)
+		return nil, httpclient.RedactSecret(err, p.apiKey)
 	}
 
 	var result apiResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httpx.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
+		return nil, httpclient.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
 	}
 	return &result, nil
 }
@@ -337,7 +337,7 @@ func handleDownloadResponse(resp *http.Response, want epmarker.Target) ([]byte, 
 type apiResponse struct {
 	// Error is upstream-controlled text, tagged at the decode boundary;
 	// checkAPIStatus redacts and bounds it before any error carries it.
-	Error     runesafe.Untrusted `json:"error"`
+	Error     textsafe.Untrusted `json:"error"`
 	Subtitles []subtitleItem     `json:"subtitles"`
 	Status    bool               `json:"status"`
 }

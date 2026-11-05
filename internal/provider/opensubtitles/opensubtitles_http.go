@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -104,7 +104,7 @@ func (p *source) invalidateTokenOn401(err error) {
 	p.token = ""
 	p.tokenMu.Unlock()
 	slog.Warn("opensubtitles: token invalidated after 401",
-		"reason", runesafe.SanitizeSingleLineBounded(authErr.Error(), 256))
+		"reason", textsafe.SanitizeSingleLineBounded(authErr.Error(), 256))
 }
 
 // doPostUnauthed performs a rate-limited POST request to the default

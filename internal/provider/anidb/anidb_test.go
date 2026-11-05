@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/xmlx"
+	"github.com/cplieger/go/slogx/capture"
+	"github.com/cplieger/go/xmlx"
 	"pgregory.net/rapid"
 )
 

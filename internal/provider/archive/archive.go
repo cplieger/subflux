@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subtitleenc"
@@ -151,7 +151,7 @@ func summarizeNames(names []string) string {
 	}
 	safe := make([]string, 0, len(shown)+1)
 	for _, n := range shown {
-		safe = append(safe, runesafe.SanitizeSingleLineBounded(n, maxNameBytes))
+		safe = append(safe, textsafe.SanitizeSingleLineBounded(n, maxNameBytes))
 	}
 	if len(names) > len(shown) {
 		safe = append(safe, fmt.Sprintf("(+%d more)", len(names)-len(shown)))

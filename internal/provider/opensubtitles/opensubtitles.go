@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
@@ -216,7 +216,7 @@ func (p *source) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQ
 	if err != nil {
 		return 0, fmt.Errorf("show count: %w", err)
 	}
-	defer func() { httpx.DrainClose(body) }()
+	defer func() { httpclient.DrainClose(body) }()
 
 	var resp searchResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
@@ -257,7 +257,7 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("request download (file_id %d): %w", fileID, err)
 	}
-	defer httpx.DrainClose(body)
+	defer httpclient.DrainClose(body)
 
 	var dlResp downloadResponse
 	if err := json.NewDecoder(body).Decode(&dlResp); err != nil {

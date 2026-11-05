@@ -20,8 +20,7 @@ const (
 
 // bodyShape is a Save or Merge body's node rule, refusing what the merge
 // would drop or cannot encode: an anchor or alias, text on an unchanged
-// scalar, invalid UTF-8. Every other tag is kept, re-encodes explicit, and
-// the parse of the encoded result refuses it as the file's shape rules do.
+// scalar, a tag (bodyTagged), invalid UTF-8.
 func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 	if n.Kind == yaml.AliasNode || n.Anchor != "" {
 		return []formschema.FieldError{{Path: path, Message: msgShared}}
@@ -31,10 +30,107 @@ func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 		if n.Value != "" {
 			return []formschema.FieldError{{Path: path, Message: msgUnchanged}}
 		}
+	case bodyTagged(n):
+		return []formschema.FieldError{{Path: path, Message: msgTagged}}
 	case n.Kind == yaml.ScalarNode && !utf8.ValidString(n.Value):
 		return []formschema.FieldError{{Path: path, Message: msgUTF8}}
 	}
 	return nil
+}
+
+// bodyTagged reports a tag written explicit, the non-specific ! (which v4
+// writes back unresolved), or a collection tagged as another kind. A scalar's
+// own tag is checked against the written file by retagged.
+func bodyTagged(n *yaml.Node) bool {
+	if n.Style&yaml.TaggedStyle != 0 || n.Tag == "!" {
+		return true
+	}
+	return n.Kind != yaml.ScalarNode && n.Tag != "" && n.ShortTag() != (&yaml.Node{Kind: n.Kind}).ShortTag()
+}
+
+// settleTags refuses, at its path, each tagged scalar of merged whose reread
+// (merged written by encode and parsed again) has another tag: v4 drops a
+// mismatched !!int or !!float (internal/libyaml/desolver.go), and both
+// majors quote text holding a ':' in a flow collection. v3 writes a mismatch
+// explicit, which the file's own shape walk refuses. A mismatch inside a flow
+// collection first rewrites the flow collections on its path block style,
+// which keeps a file's own timestamp a timestamp.
+func settleTags(merged *yaml.Node, path string) []formschema.FieldError {
+	bad, ok := mismatches(merged, path)
+	if !ok || len(bad) == 0 {
+		return nil
+	}
+	reflowed := false
+	for _, b := range bad {
+		for _, c := range b.flow {
+			c.Style &^= yaml.FlowStyle
+			reflowed = true
+		}
+	}
+	if reflowed {
+		if bad, ok = mismatches(merged, path); !ok {
+			return nil
+		}
+	}
+	errs := make([]formschema.FieldError, 0, len(bad))
+	for _, b := range bad {
+		errs = append(errs, formschema.FieldError{Path: b.path, Message: msgTagged})
+	}
+	return errs
+}
+
+// mismatches is retagged over merged's reread. ok is false when merged does
+// not read back, which the caller's own parse of the written file reports.
+func mismatches(merged *yaml.Node, path string) ([]mismatch, bool) {
+	back, err := reread(merged)
+	if err != nil {
+		return nil, false
+	}
+	return retagged(merged, back, path, nil), true
+}
+
+// readsAnother reports whether back, scalar m reread, reads another type than
+// m's tag, or than null for an untagged empty plain m, which the encoder quotes
+// in flow.
+func readsAnother(m, back *yaml.Node) bool {
+	if m.Tag == "" && m.Style == 0 && m.Value == "" {
+		return back.ShortTag() != tagNull
+	}
+	return m.Tag != "" && m.ShortTag() != back.ShortTag()
+}
+
+// mismatch is a scalar retagged found, with the collections from the
+// outermost flow one holding it down to its parent (none in block context).
+type mismatch struct {
+	path string
+	flow []*yaml.Node
+}
+
+func retagged(m, back *yaml.Node, path string, flow []*yaml.Node) []mismatch {
+	if m == nil || back == nil || m.Kind != back.Kind {
+		return nil
+	}
+	if m.Kind != yaml.ScalarNode && (len(flow) > 0 || m.Style&yaml.FlowStyle != 0) {
+		flow = append(slices.Clip(flow), m)
+	}
+	var bad []mismatch
+	switch m.Kind {
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(m.Content) && i+1 < len(back.Content); i += 2 {
+			at := child(path, m.Content[i].Value)
+			bad = append(bad, retagged(m.Content[i], back.Content[i], at, flow)...)
+			bad = append(bad, retagged(m.Content[i+1], back.Content[i+1], at, flow)...)
+		}
+	case yaml.SequenceNode:
+		for i := range min(len(m.Content), len(back.Content)) {
+			bad = append(bad, retagged(m.Content[i], back.Content[i], index(path, i), flow)...)
+		}
+	case yaml.ScalarNode:
+		if readsAnother(m, back) {
+			bad = append(bad, mismatch{flow: flow, path: path})
+		}
+	}
+	return bad
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken
@@ -47,7 +143,14 @@ func mergeDocument(stored, body *yaml.Node) (*yaml.Node, []formschema.FieldError
 	if errs := walkShapes(body, "", bodyShape); len(errs) > 0 {
 		return nil, errs
 	}
-	return mergeNode(body, stored, "")
+	merged, errs := mergeNode(body, stored, "")
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	if errs := settleTags(merged, ""); len(errs) > 0 {
+		return nil, errs
+	}
+	return merged, nil
 }
 
 // mergeNode copies b, without comments, taking each unchanged scalar from st,
@@ -78,7 +181,7 @@ func mergeMapping(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Field
 		k := b.Content[i]
 		v, verrs := mergeNode(b.Content[i+1], mappingValue(st, k.Value), child(path, k.Value))
 		errs = append(errs, verrs...)
-		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: k.Tag, Style: k.Style, Value: k.Value}, v)
+		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: k.Tag, Style: k.Style, Value: k.Value}, inFlow(n, v))
 	}
 	return n, errs
 }
@@ -97,9 +200,22 @@ func mergeSequence(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Fiel
 		}
 		v, verrs := mergeNode(e, se, index(path, i))
 		errs = append(errs, verrs...)
-		n.Content = append(n.Content, v)
+		n.Content = append(n.Content, inFlow(n, v))
 	}
 	return n, errs
+}
+
+// inFlow is v as parent's child: inside a flow collection an empty plain null
+// becomes ~, because the encoder writes an empty plain scalar there as a
+// quoted empty string, which reads back a string.
+func inFlow(parent, v *yaml.Node) *yaml.Node {
+	if v == nil || parent.Style&yaml.FlowStyle == 0 || v.Kind != yaml.ScalarNode || v.Value != "" || v.Style != 0 {
+		return v
+	}
+	if v.Tag == "" || v.ShortTag() == tagNull {
+		v.Value = "~"
+	}
+	return v
 }
 
 // mappingValue is st's value for key when st is a mapping holding key once.

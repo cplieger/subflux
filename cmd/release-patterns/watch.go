@@ -19,7 +19,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/atomicfile/v4"
+	"github.com/cplieger/go/filesafe"
 )
 
 // maxOpens bounds the issues one run creates or reopens; the rest are
@@ -85,7 +85,7 @@ func watch(ctx context.Context, dir, existing, out string, up *upstream, stdout 
 	if err != nil {
 		return err
 	}
-	if _, err := atomicfile.WriteFile(ctx, target, append(b, '\n'), atomicfile.WithMode(0o644)); err != nil {
+	if _, err := filesafe.WriteFile(ctx, target, append(b, '\n'), filesafe.WithMode(0o644)); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "%d actions planned\n", len(actions))

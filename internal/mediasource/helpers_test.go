@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"

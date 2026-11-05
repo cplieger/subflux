@@ -14,7 +14,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/slogx/capture"
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v3"
 )
@@ -589,12 +589,34 @@ func TestSaveBodyShapes(t *testing.T) {
 	forged.Content[1].Content[1].Tag = formschema.PlainTag
 	binary := node(t, "server: {log_level: debug}\n"+validLanguages)
 	binary.Content[1].Content[1].Tag, binary.Content[1].Content[1].Value = "!!binary", "not base64"
-	cases := []struct {
+	type bodyCase struct {
 		name  string
 		body  *yaml.Node
 		paths []string
 		msg   string
-	}{
+	}
+	var tagged []bodyCase
+	for _, tag := range []string{"!!int", "!!float", "!!bool", "!!null", "!foo", formschema.PlainTag} {
+		for _, explicit := range []bool{false, true} {
+			n := node(t, "server: {log_format: text}\n"+validLanguages)
+			n.Content[1].Content[1].Tag = tag
+			if explicit {
+				n.Content[1].Content[1].Style = yaml.TaggedStyle
+			}
+			tagged = append(tagged, bodyCase{fmt.Sprintf("%s set in code, explicit %t", tag, explicit), n, []string{"server.log_format"}, msgTagged})
+		}
+	}
+	quoted := node(t, "server: {log_format: \"5\"}\n"+validLanguages)
+	quoted.Content[1].Content[1].Tag = "!!int"
+	tagged = append(tagged, bodyCase{"!!int on quoted text set in code", quoted, []string{"server.log_format"}, msgTagged})
+	bang := node(t, "server: {log_format: \"true\"}\n"+validLanguages)
+	bang.Content[1].Content[1].Tag, bang.Content[1].Content[1].Style = "!", 0
+	tagged = append(tagged, bodyCase{"the non-specific tag set in code", bang, []string{"server.log_format"}, msgTagged})
+	stamp := node(t, "server: {log_format: x}\n"+validLanguages)
+	stamp.Content[1].Content[1].Tag, stamp.Content[1].Content[1].Value = "!!timestamp", "2001-12-14 12:00:00"
+	// Written block style, it reaches the section as a timestamp, which the enum refuses.
+	tagged = append(tagged, bodyCase{"a timestamp in a flow mapping keeps its type", stamp, []string{"server.log_format"}, "must be one of json, text"})
+	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
 		{"a mark set in code", forged, []string{"server.log_level"}, ""},
@@ -611,7 +633,7 @@ func TestSaveBodyShapes(t *testing.T) {
 		}}, []string{"server.log_level"}, msgUTF8},
 		{"a list at the root", node(t, "[a]\n"), []string{""}, ""},
 		{"no document", nil, []string{""}, ""},
-	}
+	}...)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			const before = "server: {log_level: info}\n" + validLanguages
@@ -639,5 +661,84 @@ func TestNewServiceOfZeroSnapshotRefusesSaves(t *testing.T) {
 	}
 	if _, errs, err := save(t, s, "server: {}\n"+validLanguages); err != nil || len(errs) != 1 || errs[0].Message != msgUnreadAtStart {
 		t.Errorf("Save = %v, %v; want the unread-at-start error", errs, err)
+	}
+}
+
+// TestAnAcceptedBodyTagReadsBack pins the tag rule to the writer, in a block
+// and a flow mapping: a scalar mergeDocument accepts reads back from encode
+// with the tag and text it carried, or explicitly tagged, which Save's parse
+// refuses.
+func TestAnAcceptedBodyTagReadsBack(t *testing.T) {
+	values := []string{"true", "False", "12", "012", "0x1F", "1.5", ".inf", "~", "null", "", "text", "yes", "2001-12-14", "2001-12-14 12:00:00", "a: b", "#x"}
+	styles := []yaml.Style{0, yaml.DoubleQuotedStyle, yaml.SingleQuotedStyle, yaml.LiteralStyle, yaml.FoldedStyle}
+	tags := []string{"!!str", "!!int", "!!float", "!!bool", "!!null", "!!timestamp", "!foo", "!"}
+	for _, flow := range []yaml.Style{0, yaml.FlowStyle} {
+		for _, value := range values {
+			for _, style := range styles {
+				for _, tag := range tags {
+					n := &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Style: style, Value: value}
+					inner := &yaml.Node{Kind: yaml.MappingNode, Style: flow, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "k"}, n}}
+					body := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "q"}, inner}}
+					merged, errs := mergeDocument(nil, body)
+					if errs != nil {
+						continue
+					}
+					back, err := reread(merged)
+					if err != nil {
+						continue
+					}
+					got := back.Content[1].Content[1]
+					if got.Style&yaml.TaggedStyle != 0 {
+						continue
+					}
+					if got.ShortTag() != n.ShortTag() || got.Value != value && got.ShortTag() != tagNull {
+						t.Errorf("flow %d: %s %q style %d accepted, reads back %s %q style %d", flow, tag, value, style, got.ShortTag(), got.Value, got.Style)
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestMergeKeepsAFlowNullNull pins inFlow: an empty null inside a flow
+// collection reads back null after a Save, not the string the encoder's
+// quoted ” would give.
+func TestMergeKeepsAFlowNullNull(t *testing.T) {
+	body := node(t, "q: {r: , s: 1}\nl: [a]\n")
+	seq := body.Content[3]
+	seq.Style = yaml.FlowStyle
+	seq.Content = append(seq.Content, &yaml.Node{Kind: yaml.ScalarNode})
+	merged, errs := mergeDocument(nil, body)
+	if errs != nil {
+		t.Fatalf("mergeDocument = %v", errs)
+	}
+	back, err := reread(merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []*yaml.Node{back.Content[1].Content[1], back.Content[3].Content[1]} {
+		if n.ShortTag() != tagNull {
+			t.Errorf("reread %q as %s, want %s", n.Value, n.ShortTag(), tagNull)
+		}
+	}
+}
+
+// TestSaveKeepsAFlowTimestampATimestamp pins settleTags' block rewrite: the
+// encoder quotes a ':' inside a flow collection, so a file's own timestamp
+// there would read back a string.
+func TestSaveKeepsAFlowTimestampATimestamp(t *testing.T) {
+	testSection(t)
+	path := fixture(t, "t: {a: shown, b: 2024-01-02T03:04:05Z}\n"+validLanguages)
+	s := serve(path, nil, nil)
+	if m := s.Snapshot().Mode(); m != ModeActive {
+		failure, _ := s.Snapshot().Failure()
+		t.Fatalf("fixture mode %v (%v), want active", m, failure)
+	}
+	if _, errs, err := s.Save(t.Context(), s.Snapshot().Document(), s.Snapshot().Revision()); err != nil || errs != nil {
+		t.Fatalf("Save(Document()) = %v, %v", errs, err)
+	}
+	b := Load(path, Registries{}).p.doc.Content[1].Content[3]
+	if b.ShortTag() != "!!timestamp" || b.Value != "2024-01-02T03:04:05Z" {
+		t.Errorf("t.b reads back %s %q, want the timestamp kept", b.ShortTag(), b.Value)
 	}
 }

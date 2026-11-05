@@ -68,7 +68,7 @@ func (e *SourceError) Error() string {
 	return b.String()
 }
 
-// Unwrap returns Err, so errors.Is and httpx.IsTransient see the cause.
+// Unwrap returns Err, so errors.Is and httpclient.IsTransient see the cause.
 func (e *SourceError) Unwrap() error { return e.Err }
 
 // ErrRescanOutcomeUnknown wraps a Rescan the source may have run; the caller

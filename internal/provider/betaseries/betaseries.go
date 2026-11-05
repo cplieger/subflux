@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
@@ -87,7 +87,7 @@ func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subf
 
 	if len(resp.Errors) > 0 {
 		slog.Warn("betaseries: API returned errors",
-			"errors", logsafe.RedactedField(fmt.Sprint(resp.Errors), httpx.Secret(p.token)),
+			"errors", logsafe.RedactedField(fmt.Sprint(resp.Errors), httpclient.Secret(p.token)),
 			"tvdb_id", req.TvdbID,
 			"season", req.Season,
 			"episode", req.Episode)
