@@ -58,8 +58,10 @@ func bodyTagged(n *yaml.Node) bool {
 	return t != tagStr && t != implicitTag(n)
 }
 
-// implicitTag is the tag scalar n's text, in its style, reads back with from
-// a file encode writes it into untagged, or "" when that cannot be written.
+// implicitTag is the tag scalar n's text, in its style, reads back with once
+// encode writes it untagged, or "" when that text cannot be written or read
+// back. It writes n in block context, as Save writes a body (inFlow covers
+// the one flow difference).
 func implicitTag(n *yaml.Node) string {
 	m := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
 		{Kind: yaml.ScalarNode, Value: "k"},
@@ -113,7 +115,7 @@ func mergeMapping(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Field
 		k := b.Content[i]
 		v, verrs := mergeNode(b.Content[i+1], mappingValue(st, k.Value), child(path, k.Value))
 		errs = append(errs, verrs...)
-		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: k.Tag, Style: k.Style, Value: k.Value}, v)
+		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: k.Tag, Style: k.Style, Value: k.Value}, inFlow(n, v))
 	}
 	return n, errs
 }
@@ -132,9 +134,22 @@ func mergeSequence(b, st *yaml.Node, path string) (*yaml.Node, []formschema.Fiel
 		}
 		v, verrs := mergeNode(e, se, index(path, i))
 		errs = append(errs, verrs...)
-		n.Content = append(n.Content, v)
+		n.Content = append(n.Content, inFlow(n, v))
 	}
 	return n, errs
+}
+
+// inFlow is v as parent's child: inside a flow collection an empty plain null
+// becomes ~, because the encoder writes an empty plain scalar there as ”,
+// which reads back a string.
+func inFlow(parent, v *yaml.Node) *yaml.Node {
+	if v == nil || parent.Style&yaml.FlowStyle == 0 || v.Kind != yaml.ScalarNode || v.Value != "" || v.Style != 0 {
+		return v
+	}
+	if v.Tag == "" || v.ShortTag() == tagNull {
+		v.Value = "~"
+	}
+	return v
 }
 
 // mappingValue is st's value for key when st is a mapping holding key once.

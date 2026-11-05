@@ -683,3 +683,26 @@ func TestBodyTaggedMatchesTheReread(t *testing.T) {
 		}
 	}
 }
+
+// TestMergeKeepsAFlowNullNull pins inFlow: an empty null inside a flow
+// collection reads back null after a Save, not the string the encoder's
+// quoted ” would give.
+func TestMergeKeepsAFlowNullNull(t *testing.T) {
+	body := node(t, "q: {r: , s: 1}\nl: [a]\n")
+	seq := body.Content[3]
+	seq.Style = yaml.FlowStyle
+	seq.Content = append(seq.Content, &yaml.Node{Kind: yaml.ScalarNode})
+	merged, errs := mergeDocument(nil, body)
+	if errs != nil {
+		t.Fatalf("mergeDocument = %v", errs)
+	}
+	back, err := reread(merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []*yaml.Node{back.Content[1].Content[1], back.Content[3].Content[1]} {
+		if n.ShortTag() != tagNull {
+			t.Errorf("reread %q as %s, want %s", n.Value, n.ShortTag(), tagNull)
+		}
+	}
+}
