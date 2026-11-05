@@ -1139,7 +1139,7 @@
       "code": "DS1102",
       "symbol": "go://github.com/cplieger/subflux/internal/language#exceptionRow.evidence",
       "path": "internal/language/filename.go",
-      "reason": "Each read exception row carries its evidence of common use as data (languages design 3.6), which TestExceptionRows requires; no production path reads it."
+      "reason": "Each read exception row carries its evidence of common use as data, which TestExceptionRows requires; no production path reads it."
     },
     {
       "code": "DS1301",
