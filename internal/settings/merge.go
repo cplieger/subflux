@@ -38,20 +38,38 @@ func bodyShape(n *yaml.Node, path string) []formschema.FieldError {
 	return nil
 }
 
-// bodyTagged reports a tag written explicit, or one other than the tag n's
-// text resolves to in its style. go-yaml's encoders differ on such a tag:
-// v3 writes it explicit, v4 drops a mismatched !!int or !!float and writes
-// the bare text (internal/libyaml/desolver.go), which would commit it as a
-// string. !!str is exempt: both quote the text so it reads back a string.
+// bodyTagged reports a tag written explicit, or one n would not read back
+// with once written untagged. go-yaml's encoders differ on such a tag: v3
+// writes it explicit, v4 drops a mismatched !!int or !!float and writes the
+// bare text (internal/libyaml/desolver.go), which would commit it as a
+// string. The resolution is the writer's own (implicitTag), because v4's
+// ShortTag reads every untagged scalar as !!str.
 func bodyTagged(n *yaml.Node) bool {
 	if n.Style&yaml.TaggedStyle != 0 {
 		return true
 	}
-	t := n.ShortTag()
-	if n.Kind == yaml.ScalarNode && t == tagStr {
+	if n.Tag == "" || n.Tag == "!" {
 		return false
 	}
-	return t != (&yaml.Node{Kind: n.Kind, Style: n.Style, Value: n.Value}).ShortTag()
+	t := n.ShortTag()
+	if n.Kind != yaml.ScalarNode {
+		return t != (&yaml.Node{Kind: n.Kind}).ShortTag()
+	}
+	return t != tagStr && t != implicitTag(n)
+}
+
+// implicitTag is the tag scalar n's text, in its style, reads back with from
+// a file encode writes it into untagged, or "" when that cannot be written.
+func implicitTag(n *yaml.Node) string {
+	m := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
+		{Kind: yaml.ScalarNode, Value: "k"},
+		{Kind: yaml.ScalarNode, Style: n.Style, Value: n.Value},
+	}}
+	back, err := reread(m)
+	if err != nil || back.Kind != yaml.MappingNode || len(back.Content) != 2 {
+		return ""
+	}
+	return back.Content[1].ShortTag()
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken

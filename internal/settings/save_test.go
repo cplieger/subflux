@@ -656,3 +656,30 @@ func TestNewServiceOfZeroSnapshotRefusesSaves(t *testing.T) {
 		t.Errorf("Save = %v, %v; want the unread-at-start error", errs, err)
 	}
 }
+
+// TestBodyTaggedMatchesTheReread pins bodyTagged to the writer: a scalar it
+// accepts reads back from encode with the tag and text it carried.
+func TestBodyTaggedMatchesTheReread(t *testing.T) {
+	values := []string{"true", "False", "12", "012", "0x1F", "1.5", ".inf", "~", "null", "", "text", "yes", "2001-12-14", "a: b", "#x"}
+	styles := []yaml.Style{0, yaml.DoubleQuotedStyle, yaml.SingleQuotedStyle, yaml.LiteralStyle, yaml.FoldedStyle}
+	tags := []string{"!!str", "!!int", "!!float", "!!bool", "!!null", "!!timestamp", "!foo"}
+	for _, value := range values {
+		for _, style := range styles {
+			for _, tag := range tags {
+				n := &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Style: style, Value: value}
+				if bodyTagged(n) {
+					continue
+				}
+				back, err := reread(&yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "k"}, n}})
+				if err != nil {
+					t.Errorf("%s %q style %d: reread: %v", tag, value, style, err)
+					continue
+				}
+				got := back.Content[1]
+				if got.ShortTag() != tag || got.Value != value || got.Style&yaml.TaggedStyle != 0 {
+					t.Errorf("%s %q style %d accepted, reads back %s %q style %d", tag, value, style, got.ShortTag(), got.Value, got.Style)
+				}
+			}
+		}
+	}
+}
