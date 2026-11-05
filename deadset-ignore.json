@@ -710,18 +710,6 @@
       "reason": "The element type of the exported Values map; callers read it through the Values getters, and an unexported element would hide the map's type from them."
     },
     {
-      "code": "DS1803",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
-      "path": "internal/formschema/values.go",
-      "reason": "Retained until PA-2 (internal/formschema#Values.Duration): a by-key lookup answers (value, found), and the first optional Duration field, which lands there, reads found."
-    },
-    {
-      "code": "DS1803",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.StringList",
-      "path": "internal/formschema/values.go",
-      "reason": "A by-key lookup answers (value, found): the server section reads a nil list as absent, and a list with no absent meaning reads found."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Label",
       "path": "internal/formschema/schema.go",
@@ -1296,6 +1284,24 @@
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Listed",
       "path": "internal/mediasource/join.go",
       "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/release#override.upstream",
+      "path": "internal/release/overrides.go",
+      "reason": "Retained until SE-2 (internal/release#*): cmd/release-patterns reads it from the source through go/ast to refuse a stale override, and TestGeneratedTableMatchesManifest checks it, so no Go reader exists."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/release/netregex#input.steps",
+      "path": "internal/release/netregex/exec.go",
+      "reason": "The cost counter TestWorstCaseAtTheClamp reads to pin the package doc's O(n²·m) bound; one increment per queue insertion, no production reader by design."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Facts.SeasonPack",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): Compare writes it, and its first production reader, ST1-8's Provenance codec storing rank.Facts, lands there."
     },
     {
       "code": "DS1301",

@@ -23,11 +23,22 @@ func TestMarkPlainThenNodeDecodeFails(t *testing.T) {
 }
 
 func TestDecodeReadsMarkedScalars(t *testing.T) {
-	s := Schema{Fields: []Field{{Key: "on", Kind: Bool}, {Key: "n", Kind: Int}, {Key: "d", Kind: DurationMs}, {Key: "l", Kind: StringList}, {Key: "e", Kind: Enum, Enum: []string{"a"}}}}
-	m := section(t, "on: true\nn: 5\nd: 2s\nl: [x]\ne: a\n")
+	s := Schema{Fields: []Field{
+		{Key: "on", Kind: Bool},
+		{Key: "n", Kind: Int},
+		{Key: "d", Kind: DurationMs},
+		{Key: "l", Kind: StringList},
+		{Key: "e", Kind: Enum, Enum: []string{"a"}},
+		{Key: "k", Kind: Int, Default: "7"},
+		{Key: "s", Kind: String},
+	}}
+	m := section(t, "on: true\nn: 5\nd: 2s\nl: [x]\ne: a\nk: ~\ns: !!str ~\n")
 	first, errs := s.Decode(m)
 	if len(errs) != 0 {
 		t.Fatalf("errors: %v", errs)
+	}
+	if first.Int("k") != 7 || first.String("s") != "~" {
+		t.Fatalf("first decode: k %d, s %q; want the default 7 and the string ~", first.Int("k"), first.String("s"))
 	}
 	again, errs := s.Decode(m)
 	if len(errs) != 0 || !maps.EqualFunc(first, again, valueEqual) {

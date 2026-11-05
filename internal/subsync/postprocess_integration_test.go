@@ -136,7 +136,6 @@ func TestIntegration_PostProcessBytes_normalizes_when_enabled(t *testing.T) {
 	}{
 		{"UTF-16LE with BOM", utf16LE(srt), "Hello world"},
 		{"UTF-16BE with BOM", utf16BE(srt), "Hello world"},
-		{"Windows-1252", []byte("1\n00:00:01,000 --> 00:00:04,000\ncaf\xe9\n\n"), "café"},
 		{"UTF-8 with BOM", append([]byte{0xEF, 0xBB, 0xBF}, srt...), "Hello world"},
 	}
 	for _, tt := range tests {
@@ -153,6 +152,16 @@ func TestIntegration_PostProcessBytes_normalizes_when_enabled(t *testing.T) {
 				t.Errorf("PostProcessBytes(%s) = %q, want it to contain %q", tt.name, got, tt.want)
 			}
 		})
+	}
+}
+
+// A legacy page needs the subtitle's language to be named, which
+// PostProcessBytes does not have, so its bytes are never converted.
+func TestIntegration_PostProcessBytes_keeps_a_legacy_page(t *testing.T) {
+	t.Parallel()
+	in := []byte("1\n00:00:01,000 --> 00:00:04,000\ncaf\xe9\n\n")
+	if got := PostProcessBytes(bytes.Clone(in), PostProcessOptions{NormalizeEncoding: true}); !bytes.Equal(got, in) {
+		t.Errorf("PostProcessBytes(Windows-1252) = %q, want the bytes unchanged", got)
 	}
 }
 

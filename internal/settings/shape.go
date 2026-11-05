@@ -11,7 +11,6 @@ import (
 const (
 	tagMap   = "!!map"
 	tagMerge = "!!merge"
-	tagNull  = "!!null"
 )
 
 const (

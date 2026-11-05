@@ -1,0 +1,2164 @@
+{
+  "version": 1,
+  "upstreams": {
+    "trash": {
+      "repo": "TRaSH-Guides/Guides",
+      "pin": "trashCommit"
+    },
+    "sonarr": {
+      "repo": "Sonarr/Sonarr",
+      "pin": "sonarrCommit"
+    },
+    "radarr": {
+      "repo": "Radarr/Radarr",
+      "pin": "radarrCommit"
+    }
+  },
+  "symbols": [
+    {
+      "id": "source/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "SourceRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase",
+        "IgnorePatternWhitespace"
+      ],
+      "groups": {
+        "bluray": "BluRay",
+        "webdl": "WebDL",
+        "webrip": "WebRip",
+        "hdtv": "HDTV",
+        "bdrip": "BDRip",
+        "brrip": "BRRip",
+        "dvd": "DVDSource",
+        "dsr": "DSR",
+        "pdtv": "PDTV",
+        "sdtv": "SDTV",
+        "tvrip": "TVRip"
+      }
+    },
+    {
+      "id": "source-other/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "OtherSourceRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "groups": {
+        "hdtv": "HDTV",
+        "sdtv": "SDTV"
+      }
+    },
+    {
+      "id": "anime-bluray/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "AnimeBlurayRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "anime-webdl/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "AnimeWebDlRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "remux/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "RemuxRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "rawhd/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "RawHDRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "group/release/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "override": "overrideReleaseGroupSonarr"
+    },
+    {
+      "id": "group/invalid/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "InvalidReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "group/anime/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "AnimeReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "subgroup"
+      ]
+    },
+    {
+      "id": "group/exception-exact/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ExceptionReleaseGroupRegexExact",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "releasegroup"
+      ]
+    },
+    {
+      "id": "group/exception/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ExceptionReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "releasegroup"
+      ]
+    },
+    {
+      "id": "group/clean/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "CleanReleaseGroupRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "prefix/website/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ParserCommon.cs",
+      "symbol": "WebsitePrefixRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "suffix/torrent/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Parser/ParserCommon.cs",
+      "symbol": "CleanTorrentSuffixRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "extension/pattern/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/MediaFiles/FileExtensions.cs",
+      "symbol": "FileExtensionRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "extension/media/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/MediaFiles/MediaFileExtensions.cs",
+      "symbol": "FileExtensions",
+      "kind": "list"
+    },
+    {
+      "id": "extension/usenet/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/MediaFiles/FileExtensions.cs",
+      "symbol": "UsenetExtensions",
+      "kind": "list"
+    },
+    {
+      "id": "source-enum/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core/Qualities/QualitySource.cs",
+      "symbol": "QualitySource",
+      "kind": "enum",
+      "members": {
+        "Unknown": [
+          "SourceUnknown"
+        ],
+        "Television": [
+          "HDTV",
+          "SDTV",
+          "PDTV",
+          "DSR",
+          "TVRip"
+        ],
+        "TelevisionRaw": [
+          "RawHD"
+        ],
+        "Web": [
+          "WebDL"
+        ],
+        "WebRip": [
+          "WebRip"
+        ],
+        "DVD": [
+          "DVDSource"
+        ],
+        "Bluray": [
+          "BluRay",
+          "BDRip",
+          "BRRip"
+        ],
+        "BlurayRaw": [
+          "Remux"
+        ]
+      }
+    },
+    {
+      "id": "source/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "SourceRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase",
+        "IgnorePatternWhitespace"
+      ],
+      "groups": {
+        "bluray": "BluRay",
+        "webdl": "WebDL",
+        "webrip": "WebRip",
+        "hdtv": "HDTV",
+        "bdrip": "BDRip",
+        "brrip": "BRRip",
+        "dvd": "DVDSource",
+        "dsr": "DSR",
+        "pdtv": "PDTV",
+        "sdtv": "SDTV",
+        "tvrip": "TVRip",
+        "dvdr": "DVDR",
+        "regional": "Regional",
+        "scr": "Screener",
+        "ts": "Telesync",
+        "tc": "Telecine",
+        "cam": "Cam",
+        "wp": "Workprint"
+      }
+    },
+    {
+      "id": "source-other/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "OtherSourceRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "groups": {
+        "hdtv": "HDTV",
+        "sdtv": "SDTV"
+      }
+    },
+    {
+      "id": "anime-bluray/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "AnimeBlurayRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "anime-webdl/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "AnimeWebDlRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "remux/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "RemuxRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "rawhd/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/QualityParser.cs",
+      "symbol": "RawHDRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "group/release/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "override": "overrideReleaseGroupRadarr"
+    },
+    {
+      "id": "group/invalid/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "InvalidReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "group/anime/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "AnimeReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "subgroup"
+      ]
+    },
+    {
+      "id": "group/exception-exact/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ExceptionReleaseGroupRegexExact",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "releasegroup"
+      ]
+    },
+    {
+      "id": "group/exception/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "ExceptionReleaseGroupRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "releasegroup"
+      ]
+    },
+    {
+      "id": "group/clean/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ReleaseGroupParser.cs",
+      "symbol": "CleanReleaseGroupRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "prefix/website/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ParserCommon.cs",
+      "symbol": "WebsitePrefixRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "suffix/torrent/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/ParserCommon.cs",
+      "symbol": "CleanTorrentSuffixRegex",
+      "kind": "replace",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "extension/pattern/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/MediaFiles/FileExtensions.cs",
+      "symbol": "FileExtensionRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ]
+    },
+    {
+      "id": "extension/media/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/MediaFiles/MediaFileExtensions.cs",
+      "symbol": "FileExtensions",
+      "kind": "list"
+    },
+    {
+      "id": "extension/usenet/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/MediaFiles/FileExtensions.cs",
+      "symbol": "UsenetExtensions",
+      "kind": "list"
+    },
+    {
+      "id": "edition/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Parser/Parser.cs",
+      "symbol": "EditionRegex",
+      "kind": "regex",
+      "options": [
+        "IgnoreCase"
+      ],
+      "captures": [
+        "edition"
+      ]
+    },
+    {
+      "id": "source-enum/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core/Qualities/QualitySource.cs",
+      "symbol": "QualitySource",
+      "kind": "enum",
+      "members": {
+        "UNKNOWN": [
+          "SourceUnknown"
+        ],
+        "CAM": [
+          "Cam"
+        ],
+        "TELESYNC": [
+          "Telesync"
+        ],
+        "TELECINE": [
+          "Telecine"
+        ],
+        "WORKPRINT": [
+          "Workprint"
+        ],
+        "DVD": [
+          "DVDSource",
+          "DVDR",
+          "Screener",
+          "Regional"
+        ],
+        "TV": [
+          "HDTV",
+          "SDTV",
+          "PDTV",
+          "DSR",
+          "TVRip",
+          "RawHD"
+        ],
+        "WEBDL": [
+          "WebDL"
+        ],
+        "WEBRIP": [
+          "WebRip"
+        ],
+        "BLURAY": [
+          "BluRay",
+          "Remux",
+          "BDRip",
+          "BRRip"
+        ]
+      }
+    }
+  ],
+  "custom_formats": [
+    {
+      "id": "streaming/4od",
+      "label": "4OD",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/4od.json",
+          "trash_id": "bbcaf03147de0f73be2be4a9078dfa03",
+          "specs": [
+            "4OD",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/all4",
+      "label": "ALL4",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/all4.json",
+          "trash_id": "fcc09418f67ccaddcf3b641a22c5cfd7",
+          "specs": [
+            "ALL4",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/amzn",
+      "label": "AMZN",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/amzn.json",
+          "trash_id": "d660701077794679fd59e8bdf4ce3a29",
+          "specs": [
+            "Amazon",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/amzn.json",
+          "trash_id": "b3b3a6ac74ecbd56bcdbefa4799fb9df",
+          "specs": [
+            "Amazon",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/atv",
+      "label": "ATV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/atv.json",
+          "trash_id": "d9e511921c8cedc7282e291b0209cdc5",
+          "specs": [
+            "Apple TV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/atv.json",
+          "trash_id": "df13ed57843877b21ad969184ab6888f",
+          "specs": [
+            "Apple TV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/atvp",
+      "label": "ATVP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/atvp.json",
+          "trash_id": "f67c9ca88f463a48346062e8ad07713f",
+          "specs": [
+            "Apple TV+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/atvp.json",
+          "trash_id": "40e9380490e748672c2522eaaeb692f7",
+          "specs": [
+            "Apple TV+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/aubc",
+      "label": "AUBC",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/aubc.json",
+          "trash_id": "e6e299075e22ac8f541f722254c8350a",
+          "specs": [
+            "AUBC",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/aubc.json",
+          "trash_id": "3bf143ecd06f66ed88da4c704350af1d",
+          "specs": [
+            "AUBC",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/bcore",
+      "label": "BCORE",
+      "files": {
+        "radarr": {
+          "path": "docs/json/radarr/cf/bcore.json",
+          "trash_id": "cc5e51a9e85a6296ceefe097a77f12f4",
+          "specs": [
+            "Bravia Core",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/cbc",
+      "label": "CBC",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/cbc.json",
+          "trash_id": "defb0b4c8b3f6a15927c0f14c6e69c94",
+          "specs": [
+            "CBC",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/cbc.json",
+          "trash_id": "d9058beaae2e147183870304dd526761",
+          "specs": [
+            "CBC",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/cc",
+      "label": "CC",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/cc.json",
+          "trash_id": "77a7b25585c18af08f60b1547bb9b4fb",
+          "specs": [
+            "CC Rename",
+            "Comedy Central",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/cnlp",
+      "label": "CNLP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/cnlp.json",
+          "trash_id": "543b0fb529e6b102837b8a9facdd82fb",
+          "specs": [
+            "CNLP",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/cnlp.json",
+          "trash_id": "1f9dfb4b8d9cae1f6dc0099547d53513",
+          "specs": [
+            "CNLP",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/cpng",
+      "label": "CPNG",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/cpng.json",
+          "trash_id": "d17ea3d84c15299474b76fe85aa02a26",
+          "specs": [
+            "CPNG",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/cpng.json",
+          "trash_id": "017fadff92b872622448dae34a4de0c0",
+          "specs": [
+            "CPNG",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/crav",
+      "label": "CRAV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/crav.json",
+          "trash_id": "4e9a630db98d5391aec1368a0256e2fe",
+          "specs": [
+            "Crave",
+            "Crave Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/crav.json",
+          "trash_id": "f6ff65b3f4b464a79dcc75950fe20382",
+          "specs": [
+            "Crave",
+            "Crave Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/crit",
+      "label": "CRiT",
+      "files": {
+        "radarr": {
+          "path": "docs/json/radarr/cf/crit.json",
+          "trash_id": "16622a6911d1ab5d5b8b713d5b0036d4",
+          "specs": [
+            "CRiT",
+            "Not Criterion RlsGrp",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/dcu",
+      "label": "DCU",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/dcu.json",
+          "trash_id": "36b72f59f4ea20aad9316f475f2d9fbb",
+          "specs": [
+            "DC Universe",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/dmm-tv",
+      "label": "DMM-TV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/dmm-tv.json",
+          "trash_id": "940e98773ac068f2088688f95a88ea66",
+          "specs": [
+            "DMM-TV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/dscp",
+      "label": "DSCP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/dscp.json",
+          "trash_id": "dc5f2bb0e0262155b5fedd0f6c5d2b55",
+          "specs": [
+            "DSCP Rename",
+            "Discovery+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/dsnp",
+      "label": "DSNP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/dsnp.json",
+          "trash_id": "89358767a60cc28783cdc3d0be9388a4",
+          "specs": [
+            "Disney+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/dsnp.json",
+          "trash_id": "84272245b2988854bfb76a16e60baea5",
+          "specs": [
+            "Disney+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/fah",
+      "label": "FAH",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/fah.json",
+          "trash_id": "1f233ed024e7c35cf50fbd739a82de4b",
+          "specs": [
+            "Fandango",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/fah.json",
+          "trash_id": "6c6af63910e3e4e8ff32a85102a94c11",
+          "specs": [
+            "Fandango",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/fod",
+      "label": "FOD",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/fod.json",
+          "trash_id": "7be9c0572d8cd4f81785dacf7e85985e",
+          "specs": [
+            "FOD",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/fod.json",
+          "trash_id": "917d1f2c845b2b466036b0cc2d7c72a3",
+          "specs": [
+            "FOD",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/friday",
+      "label": "friDay",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/friday.json",
+          "trash_id": "e261d9c9c2d177c9664f24f81da8135a",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "friDay"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/friday.json",
+          "trash_id": "d9e2c70e855131799525cab2a80d4414",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "friDay"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/funi",
+      "label": "FUNi",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/funi.json",
+          "trash_id": "1284d18e693de8efe0fe7d6b3e0b9170",
+          "specs": [
+            "Funimation",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/funi.json",
+          "trash_id": "88c93b568b6079fa087077a788b1b7a3",
+          "specs": [
+            "Funimation",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/hami",
+      "label": "Hami",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/hami.json",
+          "trash_id": "b61e27491a46c1e23bfb2f2497870495",
+          "specs": [
+            "Hami",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/hami.json",
+          "trash_id": "7102f809eb01bd66352573805a74731a",
+          "specs": [
+            "Hami",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/hbo",
+      "label": "HBO",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/hbo.json",
+          "trash_id": "7a235133c87f7da4c8cccceca7e3c7a6",
+          "specs": [
+            "HBO",
+            "HBO Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/hbo.json",
+          "trash_id": "509e5f41146e278f9eab1ddaceb34515",
+          "specs": [
+            "HBO",
+            "HBO Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/hmax",
+      "label": "HMAX",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/hmax.json",
+          "trash_id": "a880d6abc21e7c16884f3ae393f84179",
+          "specs": [
+            "HBO Max",
+            "HMAX Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/hmax.json",
+          "trash_id": "5763d1b0ce84aff3b21038eea8e9b8ad",
+          "specs": [
+            "HBO Max",
+            "HMAX Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/htsr",
+      "label": "HTSR",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/htsr.json",
+          "trash_id": "4404ad44d87ccbb82746e180713112fb",
+          "specs": [
+            "Hotstar",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/htsr.json",
+          "trash_id": "834b2c0ba0a8596029b4479a29e1a032",
+          "specs": [
+            "Hotstar",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/hulu",
+      "label": "HULU",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/hulu.json",
+          "trash_id": "f6cce30f1733d5c8194222a7507909bb",
+          "specs": [
+            "Hulu",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/hulu.json",
+          "trash_id": "526d445d4c16214309f0fd2b3be18a89",
+          "specs": [
+            "Hulu",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/ip",
+      "label": "IP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/ip.json",
+          "trash_id": "dc503e2425126fa1d0a9ad6168c83b3f",
+          "specs": [
+            "BBC iPlayer",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/ip.json",
+          "trash_id": "6185878161f1e2eef9cd0641a0d09eae",
+          "specs": [
+            "BBC iPlayer",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/iqiy",
+      "label": "iQIY",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/iqiy.json",
+          "trash_id": "6123bfd18480b3b0d038caaa38cfa35f",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "iQIY"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/iqiy.json",
+          "trash_id": "203a756cc50e67ee050f646eb15a1da0",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "iQIY"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/it",
+      "label": "iT",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/it.json",
+          "trash_id": "0ac24a2a68a9700bcb7eeca8e5cd644c",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "iT Rename",
+            "iTunes"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/it.json",
+          "trash_id": "e0ec9672be6cac914ffad34a6b077209",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "iT Rename",
+            "iTunes"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/itvx",
+      "label": "ITVX",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/itvx.json",
+          "trash_id": "fa5a16b951004c23e980d2913694a137",
+          "specs": [
+            "ITVX",
+            "ITVX Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/itvx.json",
+          "trash_id": "c3492a26af412e385404eade438ec51c",
+          "specs": [
+            "ITVX",
+            "ITVX Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/kcw",
+      "label": "KCW",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/kcw.json",
+          "trash_id": "8620e171f1a67cff092e86e65bb29c76",
+          "specs": [
+            "KCW",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/kcw.json",
+          "trash_id": "41ad0687b0d469346adedfddee7f5f98",
+          "specs": [
+            "KCW",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/kktv",
+      "label": "KKTV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/kktv.json",
+          "trash_id": "dc44a5d07db7938a84e4401a7b5059bc",
+          "specs": [
+            "KKTV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/kktv.json",
+          "trash_id": "e048c45be447e3248ac2200161993078",
+          "specs": [
+            "KKTV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/linetv",
+      "label": "LINETV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/linetv.json",
+          "trash_id": "f3e4d3733b4dce640081977b8c500f19",
+          "specs": [
+            "LINETV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/linetv.json",
+          "trash_id": "89e533a9c418b22dc993d9695f0e38bd",
+          "specs": [
+            "LINETV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/ma",
+      "label": "MA",
+      "files": {
+        "radarr": {
+          "path": "docs/json/radarr/cf/ma.json",
+          "trash_id": "2a6039655313bf5dab1e43523b62c374",
+          "specs": [
+            "Movies Anywhere"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/max",
+      "label": "MAX",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/max.json",
+          "trash_id": "81d1fbf600e2540cee87f3a23f9d3c1c",
+          "specs": [
+            "MAX Rename",
+            "Max",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/max.json",
+          "trash_id": "6a061313d22e51e0f25b7cd4dc065233",
+          "specs": [
+            "MAX Rename",
+            "Max",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/my5",
+      "label": "MY5",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/my5.json",
+          "trash_id": "9f72dc1059a6b277c21cee6a1f15f13f",
+          "specs": [
+            "My5",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/my5.json",
+          "trash_id": "eacd2cb6c6d4a93e459df2cec6d7b97a",
+          "specs": [
+            "My5",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/mytvsuper",
+      "label": "MyTVSuper",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/mytvsuper.json",
+          "trash_id": "6e14bcd243960ebe991e475ab86fd44e",
+          "specs": [
+            "MyTVSuper",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/mytvsuper.json",
+          "trash_id": "35c398e07fa34a626c39d998c4a2d9f1",
+          "specs": [
+            "MyTVSuper",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/nf",
+      "label": "NF",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/nf.json",
+          "trash_id": "d34870697c9db575f17700212167be23",
+          "specs": [
+            "Netflix",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/nf.json",
+          "trash_id": "170b1d363bd8516fbf3a3eb05d4faff6",
+          "specs": [
+            "Netflix",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/nlz",
+      "label": "NLZ",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/nlz.json",
+          "trash_id": "b2b980877494b560443631eb1f473867",
+          "specs": [
+            "NLZiet",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/now",
+      "label": "NOW",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/now.json",
+          "trash_id": "b66a699fba6f9df91becab798d7502e5",
+          "specs": [
+            "NOW",
+            "NOW Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/now.json",
+          "trash_id": "3dce1fce9ac06d1349dfbd9186289385",
+          "specs": [
+            "NOW",
+            "NOW Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/ovid",
+      "label": "OViD",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/ovid.json",
+          "trash_id": "fb1a91cdc0f26f7ca0696e0e95274645",
+          "specs": [
+            "OViD",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/ovid.json",
+          "trash_id": "fbca986396c5e695ef7b2def3c755d01",
+          "specs": [
+            "OViD",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/pathe",
+      "label": "Pathe",
+      "files": {
+        "radarr": {
+          "path": "docs/json/radarr/cf/pathe.json",
+          "trash_id": "bf7e73dd1d85b12cc527dc619761c840",
+          "specs": [
+            "Pathé",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/pcok",
+      "label": "PCOK",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/pcok.json",
+          "trash_id": "1656adc6d7bb2c8cca6acfb6592db421",
+          "specs": [
+            "Peacock TV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/pcok.json",
+          "trash_id": "c9fd353f8f5f1baf56dc601c4cb29920",
+          "specs": [
+            "Peacock TV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/play",
+      "label": "PLAY",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/play.json",
+          "trash_id": "6eb71887a8db6e783dd398446eb0e65d",
+          "specs": [
+            "PLAY",
+            "PLAY Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/play.json",
+          "trash_id": "350e9170619683a55cb9191d0b1ababa",
+          "specs": [
+            "PLAY",
+            "PLAY Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/pmtp",
+      "label": "PMTP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/pmtp.json",
+          "trash_id": "c67a75ae4a1715f2bb4d492755ba4195",
+          "specs": [
+            "Paramount+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/pmtp.json",
+          "trash_id": "e36a0ba1bc902b26ee40818a1d59b8bd",
+          "specs": [
+            "Paramount+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/qibi",
+      "label": "QIBI",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/qibi.json",
+          "trash_id": "3ac5d84fce98bab1b531393e9c82f467",
+          "specs": [
+            "Quibi",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/red",
+      "label": "RED",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/red.json",
+          "trash_id": "c30d2958827d1867c73318a5a2957eb1",
+          "specs": [
+            "RED Rename",
+            "WEBDL",
+            "WEBRIP",
+            "YouTube Red"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/roku",
+      "label": "ROKU",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/roku.json",
+          "trash_id": "da393fd4e2c0cce7c9dc2669c43e0593",
+          "specs": [
+            "ROKU",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/roku.json",
+          "trash_id": "44c2b54d7c81c1a442a8b2cabeaef54f",
+          "specs": [
+            "ROKU",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/sho",
+      "label": "SHO",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/sho.json",
+          "trash_id": "ae58039e1319178e6be73caab5c42166",
+          "specs": [
+            "SHO Rename",
+            "SHOWTIME",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/stan",
+      "label": "STAN",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/stan.json",
+          "trash_id": "1efe8da11bfd74fbbcd4d8117ddb9213",
+          "specs": [
+            "Stan",
+            "Stan Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/stan.json",
+          "trash_id": "c2863d2a50c9acad1fb50e53ece60817",
+          "specs": [
+            "Stan",
+            "Stan Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/strp",
+      "label": "STRP",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/strp.json",
+          "trash_id": "fe4062eac43d4ea75955f8ae48adcf1e",
+          "specs": [
+            "Star+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/strp.json",
+          "trash_id": "ab56ccdc473a1f2897c76187ea365be2",
+          "specs": [
+            "Star+",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/syfy",
+      "label": "SYFY",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/syfy.json",
+          "trash_id": "9623c5c9cac8e939c1b9aedd32f640bf",
+          "specs": [
+            "SYFY",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/tver",
+      "label": "TVer",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/tver.json",
+          "trash_id": "d100ea972d1af2150b65b1cffb80f6b5",
+          "specs": [
+            "TVer",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/tver.json",
+          "trash_id": "f1b0bae9bc222dab32c1b38b5a7a1088",
+          "specs": [
+            "TVer",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/tving",
+      "label": "TVING",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/tving.json",
+          "trash_id": "86f8d3b8761de651aa355d46d5d8db3e",
+          "specs": [
+            "TVING",
+            "TVING Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/tving.json",
+          "trash_id": "26df36e3d2a96de2f8b7166ae37d3c33",
+          "specs": [
+            "TVING",
+            "TVING Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/u-next",
+      "label": "U-NEXT",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/u-next.json",
+          "trash_id": "0e99e7cc719a8a73b2668c3a0c3fe10c",
+          "specs": [
+            "U-NEXT",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/u-next.json",
+          "trash_id": "279bda7434fd9075786de274e6c3c202",
+          "specs": [
+            "U-NEXT",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/vdl",
+      "label": "VDL",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/vdl.json",
+          "trash_id": "5d2317d99af813b6529c7ebf01c83533",
+          "specs": [
+            "Videoland",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/vdl.json",
+          "trash_id": "996e8ce50025e8b1e8fa95fcb28c4e5a",
+          "specs": [
+            "Videoland",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/viki",
+      "label": "Viki",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/viki.json",
+          "trash_id": "932d0a3499cc4c529fb86e3adf1326d9",
+          "specs": [
+            "Viki",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/viki.json",
+          "trash_id": "e1f7cf734899b3cad9bceb342a7c40cb",
+          "specs": [
+            "Viki",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/viu",
+      "label": "VIU",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/viu.json",
+          "trash_id": "93c9d1e566dca8b34d57f5efbbf85f28",
+          "specs": [
+            "VIU",
+            "VIU Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/viu.json",
+          "trash_id": "1b355ff093fd1064b75ea98c616881b1",
+          "specs": [
+            "VIU",
+            "VIU Rename",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/vrv",
+      "label": "VRV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/vrv.json",
+          "trash_id": "44a8ee6403071dd7b8a3a8dd3fe8cb20",
+          "specs": [
+            "VRV",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/vrv.json",
+          "trash_id": "60f6d50cbd3cfc3e9a8c00e3a30c3114",
+          "specs": [
+            "VRV",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/wavve",
+      "label": "WAVVE",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/wavve.json",
+          "trash_id": "50421fc8b3734d2863561714d343e449",
+          "specs": [
+            "WAVVE",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/wavve.json",
+          "trash_id": "cb114293d1ab229ca9d52b9f92f93e9b",
+          "specs": [
+            "WAVVE",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/wetv",
+      "label": "WETV",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/wetv.json",
+          "trash_id": "932fafe503110be779ae49342dfad30b",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "WETV"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/wetv.json",
+          "trash_id": "e0ae51a2508ab62ffb1af027f3717486",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "WETV"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/youku",
+      "label": "YOUKU",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/youku.json",
+          "trash_id": "e9e79cb37b02f8296976f3ed3128c8cf",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "YOUKU"
+          ]
+        },
+        "radarr": {
+          "path": "docs/json/radarr/cf/youku.json",
+          "trash_id": "02d24b392bdb901822d95c96e9fa30f1",
+          "specs": [
+            "WEBDL",
+            "WEBRIP",
+            "YOUKU"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/abema",
+      "label": "ABEMA",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/abema.json",
+          "trash_id": "a370d974bc7b80374de1d9ba7519760b",
+          "specs": [
+            "ABEMA",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/bglobal",
+      "label": "B-Global",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/bglobal.json",
+          "trash_id": "7dd31f3dee6d2ef8eeaa156e23c3857e",
+          "specs": [
+            "B-Global",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/bilibili",
+      "label": "Bilibili",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/bilibili.json",
+          "trash_id": "4c67ff059210182b59cdd41697b8cb08",
+          "specs": [
+            "Bilibili",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/cr",
+      "label": "CR",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/cr.json",
+          "trash_id": "3e0b26604165f463f3e8e192261e7284",
+          "specs": [
+            "Crunchyroll",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/hidive",
+      "label": "HIDIVE",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/hidive.json",
+          "trash_id": "570b03b3145a25011bf073274a407259",
+          "specs": [
+            "HIDIVE",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/french-adn",
+      "label": "ADN",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/french-adn.json",
+          "trash_id": "d54cd2bf1326287275b56bccedb72ee2",
+          "specs": [
+            "ADN",
+            "WEB",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/french-auvio",
+      "label": "AUViO",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/french-auvio.json",
+          "trash_id": "b0d6195c23ae254932da00512db7e8a8",
+          "specs": [
+            "AUViO",
+            "Radio Télévision Belge Francophone",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/french-mycanal",
+      "label": "MyCANAL",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/french-mycanal.json",
+          "trash_id": "f27d46a831e6b16fa3fee2c4e5d10984",
+          "specs": [
+            "CANAL+",
+            "MyCANAL",
+            "Not MyCanal RlsGrp",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/french-salto",
+      "label": "SALTO",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/french-salto.json",
+          "trash_id": "0455d6519a550dbf648c97b56e7231d2",
+          "specs": [
+            "SALTO",
+            "WEBDL",
+            "WEBRIP"
+          ]
+        }
+      }
+    },
+    {
+      "id": "streaming/french-wkn",
+      "label": "WKN",
+      "files": {
+        "sonarr": {
+          "path": "docs/json/sonarr/cf/french-wkn.json",
+          "trash_id": "e5e6405d439dcd1af90962538acd4fe0",
+          "specs": [
+            "WEB",
+            "WEBDL",
+            "WEBRIP",
+            "WKN"
+          ]
+        }
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "quality/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core.Test/ParserTests/QualityParserFixture.cs"
+    },
+    {
+      "id": "group/episode",
+      "upstream": "sonarr",
+      "path": "src/NzbDrone.Core.Test/ParserTests/ReleaseGroupParserFixture.cs"
+    },
+    {
+      "id": "quality/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core.Test/ParserTests/QualityParserFixture.cs"
+    },
+    {
+      "id": "group/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core.Test/ParserTests/ReleaseGroupParserFixture.cs"
+    },
+    {
+      "id": "edition/movie",
+      "upstream": "radarr",
+      "path": "src/NzbDrone.Core.Test/ParserTests/EditionParserFixture.cs"
+    }
+  ],
+  "watch": {
+    "classes": [
+      {
+        "key": "audio",
+        "title": "audio",
+        "reason": "audio coding and channel layout do not move picture timing.",
+        "stems": [
+          "aac",
+          "dd",
+          "ddplus*",
+          "dts*",
+          "flac",
+          "mp3",
+          "opus",
+          "pcm",
+          "truehd*",
+          "atmos-undefined",
+          "[0-9][0-9]-*"
+        ]
+      },
+      {
+        "key": "video",
+        "title": "video encoding",
+        "reason": "codec, grading, resolution and bit depth are encoder choices over one timeline.",
+        "stems": [
+          "hdr*",
+          "dv-*",
+          "sdr*",
+          "hlg",
+          "x26*",
+          "av1",
+          "vc-1",
+          "mpeg2",
+          "vp9",
+          "10bit",
+          "720p",
+          "1080p",
+          "2160p",
+          "generated-dynamic-hdr",
+          "upscaled",
+          "*-boost"
+        ]
+      },
+      {
+        "key": "groups-language",
+        "title": "release group and language",
+        "reason": "group quality tiers, indexer flags and audio or subtitle language are not timing facts.",
+        "stems": [
+          "*-tier-*",
+          "lq*",
+          "*-lq*",
+          "german*",
+          "french-*",
+          "language-*",
+          "not-*",
+          "multi",
+          "dubs-only",
+          "*dual-audio*",
+          "bad-dual-groups",
+          "wrong-language",
+          "fansub",
+          "fastsub",
+          "line-mic-dubbed",
+          "anime-raws",
+          "bhdstudio",
+          "flux",
+          "framestor",
+          "hallowed",
+          "mainframe",
+          "sic",
+          "thefarm",
+          "no-rlsgroup",
+          "obfuscated",
+          "retags",
+          "scene",
+          "web-scene",
+          "internal",
+          "p2p-internal",
+          "freeleech"
+        ]
+      }
+    ]
+  }
+}

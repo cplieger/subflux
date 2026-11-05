@@ -194,8 +194,7 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 		if s.Mode() != ModeActive {
 			t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 		}
-		a, _ := got.String("a")
-		b, _ := got.String("b")
+		a, b := got.String("a"), got.String("b")
 		if a != "a${b" || b != "x-${SUBFLUX_PASS}" {
 			t.Errorf("a = %q, b = %q; want a${b and x-${SUBFLUX_PASS}", a, b)
 		}
@@ -227,10 +226,8 @@ func TestExpandedDigitsStayStrings(t *testing.T) {
 	if s.Mode() != ModeActive {
 		t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 	}
-	a, _ := got.String("a")
-	sec, _ := got.Secret("s")
-	n, ok := got.Int("n")
-	if a != "0123" || sec != "0123" || !ok || n != 42 {
-		t.Errorf("a = %q, s = %q, n = %d %v; want 0123, 0123, 42", a, sec, n, ok)
+	a, sec, n := got.String("a"), got.Secret("s"), got.Int("n")
+	if a != "0123" || sec != "0123" || n != 42 {
+		t.Errorf("a = %q, s = %q, n = %d; want 0123, 0123, 42", a, sec, n)
 	}
 }

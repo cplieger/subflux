@@ -64,12 +64,6 @@ func TestPreMarkedNodeParsesSame(t *testing.T) {
 		t.Fatalf("pre-marked: %v", errs)
 	}
 	quoted := mustPolicy(t, strings.Replace(validSection, "close_varieties: true", `close_varieties: "true"`, 1))
-	nulls := section(t, validSection+"    - audio: fr\n      targets:\n        - tag: fr\n          variants:\n")
-	retag(nulls)
-	withNull, errs := ParsePolicy(nulls)
-	if len(errs) > 0 {
-		t.Fatalf("pre-marked null: %v", errs)
-	}
 	for name, p := range map[string]Policy{"pre-marked": premarked, "quoted true": quoted} {
 		t.Run(name, func(t *testing.T) {
 			if p.Digest() != loaded.Digest() || !p.CloseVarieties() {
@@ -77,14 +71,25 @@ func TestPreMarkedNodeParsesSame(t *testing.T) {
 			}
 		})
 	}
-	t.Run("pre-marked null reads as absent", func(t *testing.T) {
-		if got := withNull.TargetsFor(mustParse(t, "fr"), nil); len(got) != 1 || !slices.Equal(got[0].Variants, []Variant{Standard}) {
+}
+
+func TestNullFieldIsAbsent(t *testing.T) {
+	fr := "    - audio: fr\n      targets:\n        - tag: fr\n          variants: "
+	t.Run("a null reads as absent", func(t *testing.T) {
+		p := mustPolicy(t, validSection+fr+"~\n")
+		if got := p.TargetsFor(mustParse(t, "fr"), nil); len(got) != 1 || !slices.Equal(got[0].Variants, []Variant{Standard}) {
 			t.Errorf("TargetsFor(fr) = %v; want fr with the default variant", got)
+		}
+	})
+	t.Run("a !!str ~ is a string", func(t *testing.T) {
+		_, errs := ParsePolicy(section(t, validSection+fr+"!!str ~\n"))
+		if len(errs) != 1 || errs[0].Path != "languages.rules[2].targets[0].variants" {
+			t.Errorf("errors = %v, want the variants refused", errs)
 		}
 	})
 }
 
-// retag marks every scalar under n PlainTag, as a Document round trip does.
+// retag marks every scalar under n PlainTag, as a section parse leaves it.
 func retag(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
 		n.Tag = formschema.PlainTag
