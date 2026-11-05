@@ -551,13 +551,23 @@ func TestFileMatchesEpisode(t *testing.T) {
 		// directly after either is still inside a word.
 		{"e-prefix after the letter a", "Sae08.mkv", 1, 8, false},
 		{"e-prefix after the letter z", "Blaze08.mkv", 1, 8, false},
-		// A multibyte title character is not a letter as far as the ASCII range
-		// test goes, so it is a word boundary like a space or a dot.
+		// A multibyte title character is not an ASCII letter, so it is a word
+		// boundary like a space or a dot.
 		{"e-prefix after a multibyte character", "日e08.mkv", 1, 8, true},
+		{"e-prefix after an e inside a word", "Premiere08 e08.mkv", 1, 8, true},
+		{"e-prefix glued to a letter", "Show e08x.mkv", 1, 8, false},
+		{"dash number is read whole", "Show - 012.mkv", 1, 1, false},
+		{"dash resolution is no episode", "[Group] Show - 1080p.mkv", 1, 10, false},
+		{"dash number inside brackets", "Show [01 - 12].mkv", 1, 12, false},
+		{"dash number with a version", "[Grp] Show - 05v2 [1080p].mkv", 1, 5, true},
+		{"dash number after a season statement", "[SubsPlease] Show S2 - 05 (1080p).mkv", 2, 5, true},
 		{"e-prefix at filename start", "e08 - Show Title.mkv", 1, 8, true},
 		{"padded number match", "Show 08 [720p].mkv", 1, 8, true},
 		{"padded number wrong episode", "Show 03 [720p].mkv", 1, 8, false},
 		{"multiple SxxExx, a later one matches", "Show.S09E09.S01E05.mkv", 1, 5, true},
+		{"e-prefix after a codec hyphen", "Show.S02.x264-E05.mkv", 2, 5, true},
+		{"episode word", "Show Episode 08.mkv", 1, 8, true},
+		{"EP number", "[Grp] Show EP08 [1080p].mkv", 1, 8, true},
 	}
 
 	for _, tt := range tests {
@@ -696,9 +706,7 @@ func TestFilterAttachments_season_pack(t *testing.T) {
 func TestFileMatchesEpisode_case_insensitive(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		// Restrict to ASCII so ToLower/ToUpper round-trip cleanly. The matcher
-		// lowercases internally and uses a case-insensitive regex, so its
-		// verdict must never depend on the filename's letter case.
+		// Restrict to ASCII so ToLower/ToUpper round-trip cleanly.
 		name := rapid.StringMatching(`[A-Za-z0-9 .-]{0,40}`).Draw(t, "filename")
 		season := rapid.IntRange(0, 30).Draw(t, "season")
 		episode := rapid.IntRange(0, 300).Draw(t, "episode")

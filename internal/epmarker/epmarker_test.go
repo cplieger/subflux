@@ -55,6 +55,23 @@ func TestViews(t *testing.T) {
 		{"season pack", "Show.S04.Complete.720p-GRP", nil, -1, 4, true},
 		{"lowercase season pack", "show.s01.complete-grp", nil, -1, 1, true},
 		{"two-digit season pack", "Show.S12.Complete-GRP", nil, -1, 12, true},
+		{"season pack after an underscore", "Show_S03_1080p-GRP", nil, -1, 3, true},
+
+		// An s and a digit inside a word state no season: audio tags and
+		// title words on single-episode names.
+		{"audio tag on an absolute episode", "[Group] Show - 05 [BD 1080p HEVC DTS5.1]", nil, -1, 0, false},
+		{"opus tag on an absolute episode", "[Group] Show - 105 [1080p x265 Opus2.0]", nil, -1, 0, false},
+		{"audio tag after a bare episode", "Show.E05.1080p.WEB-DL.DTS5.1-GRP", nil, -1, 0, false},
+		{"title word ending in s and a digit", "Mars2.Show.1080p.WEB-DL-GRP", nil, -1, 0, false},
+		// An S## followed by a letter is a word too: a group named S3RL.
+		{"group token starting with s and a digit", "Show.1080p.WEB-DL-S3RL", nil, -1, 0, false},
+		{"lone season after such a token", "Show.S3RL.S02.Complete", nil, -1, 2, true},
+		{"audio tag before a marker", "Show.DTS5.1.S02E03.1080p", []epmarker.Marker{{Season: 2, Episode: 3}}, 12, 2, true},
+		// The first season statement decides, a lone one or a marker's.
+		{"lone season before a marker", "Show S03 Bonus S01E02.mkv", []epmarker.Marker{{Season: 1, Episode: 2}}, 15, 3, true},
+		{"glued marker before a lone season", "TheOfficeS01E05 (S02 subs).srt", []epmarker.Marker{{Season: 1, Episode: 5}}, 9, 1, true},
+		// A marker glued to the title is still a marker, and Season reads it.
+		{"marker glued to the title", "TheOfficeS01E05.srt", []epmarker.Marker{{Season: 1, Episode: 5}}, 9, 1, true},
 
 		// Names carrying no marker at all (animetosho's absolute-number gate).
 		{"movie name", "Movie.2024.BluRay.1080p-GRP", nil, -1, 0, false},
@@ -201,13 +218,26 @@ func TestCaseInsensitive_ASCII(t *testing.T) {
 			t.Fatalf("Season(%q) case mismatch: lower=(%d,%v) upper=(%d,%v)",
 				name, loSeason, loOK, upSeason, upOK)
 		}
+		if lo, up := epmarker.Claims(lower), epmarker.Claims(upper); !slices.Equal(lo, up) {
+			t.Fatalf("Claims(%q) case mismatch: lower=%v upper=%v", name, lo, up)
+		}
+		if lo, up := epmarker.StatesEpisode(lower), epmarker.StatesEpisode(upper); lo != up {
+			t.Fatalf("StatesEpisode(%q) case mismatch: lower=%v upper=%v", name, lo, up)
+		}
+		loEp, loOK := epmarker.Absolute(lower)
+		upEp, upOK := epmarker.Absolute(upper)
+		if loEp != upEp || loOK != upOK {
+			t.Fatalf("Absolute(%q) case mismatch: lower=(%d,%v) upper=(%d,%v)",
+				name, loEp, loOK, upEp, upOK)
+		}
 	})
 }
 
 // FuzzViewsAgree asserts the invariants that let the three sites mix views
-// freely: a readable marker implies marker shape, FirstIndex is a real index
-// into the name whenever a marker is present, and no view ever reports a
-// negative number.
+// freely: a readable marker implies marker shape, marker shape or a claim
+// states an episode, marker shape rules out an absolute number, FirstIndex is a real index into
+// the name whenever a marker is present, and no view ever reports a negative
+// number.
 func FuzzViewsAgree(f *testing.F) {
 	f.Add("Show.S01E05.720p")
 	f.Add("show s02e10.srt")
@@ -219,6 +249,16 @@ func FuzzViewsAgree(f *testing.F) {
 	f.Add("S123E45 S01E01")
 	f.Add("Show S01E01E02.srt")
 	f.Add("Show.S00E00.mkv")
+	f.Add("Show.DTS5.1.S02E03.1080p")
+	f.Add("[SubsPlease] Show S2 - 05v2 (1080p).ass")
+	f.Add("Show [01 - 12] - 03 ~ 04 e05 06 ")
+	f.Add("Show.S01.720p.HDTV.x264-E02")
+	f.Add("Show.S02.H.264-E05")
+	f.Add("[Grp] Show S2 EP01-EP12 [1080p]")
+	f.Add("Show.Season.2.E01E02 - 2014-06-02")
+	f.Add("[Grp] Show S2 [01 - 12] (E0123456)")
+	f.Add("Show.Season.2.E05-E03 S01E01 01-60")
+	f.Add("Show S01 - 01-03 S02 [Vol.1-6] (04 ~ 06)")
 	f.Add("")
 
 	f.Fuzz(func(t *testing.T, name string) {
@@ -242,6 +282,16 @@ func FuzzViewsAgree(f *testing.F) {
 		}
 		if season, ok := epmarker.Season(name); ok && season < 0 {
 			t.Fatalf("Season(%q) = %d, want >= 0", name, season)
+		}
+		states := epmarker.StatesEpisode(name)
+		if present && !states {
+			t.Fatalf("Present(%q) = true but StatesEpisode = false", name)
+		}
+		if claims := epmarker.Claims(name); len(claims) > 0 && !states {
+			t.Fatalf("Claims(%q) = %v but StatesEpisode = false", name, claims)
+		}
+		if ep, ok := epmarker.Absolute(name); ok && (present || ep < 0) {
+			t.Fatalf("Absolute(%q) = %d with Present = %v", name, ep, present)
 		}
 	})
 }
@@ -364,6 +414,64 @@ func TestClaims(t *testing.T) {
 			[]epmarker.Marker{{Season: 1, Episode: 1}},
 		},
 		{"no marker", "Movie.2024.BluRay.srt", nil},
+		{
+			"three concatenated episodes", "Show S01E01E02E03.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}, {Season: 1, Episode: 3}},
+		},
+		{
+			"dotted range", "Show S01E05.E06.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 5}, {Season: 1, Episode: 6}},
+		},
+		{
+			"separated marker range", "Firefly [S01 E01-E02].srt",
+			[]epmarker.Marker{{Season: 1, Episode: 1}, {Season: 1, Episode: 2}},
+		},
+		// A date is no range: its numbers decrease.
+		{"date after a marker", "Show.S01E01.2014-06-02.srt", []epmarker.Marker{{Season: 1, Episode: 1}}},
+		// A codec's digits open no range.
+		{"codec before an E", "Show.S01E01.x264-E02.srt", []epmarker.Marker{{Season: 1, Episode: 1}}},
+		// Beside a marker, bare digits are a title's or a part's.
+		{"part range after a marker", "Show.S01E05.Part.1-2.srt", []epmarker.Marker{{Season: 1, Episode: 5}}},
+		{"title range after a marker", "Show.S01E03.1-800.Ghost.srt", []epmarker.Marker{{Season: 1, Episode: 3}}},
+		{"dash range after a marker", "Show - S01E07 - 1-2-3.srt", []epmarker.Marker{{Season: 1, Episode: 7}}},
+		// Outside brackets a " - " parts a title's number from the episode's.
+		{"spaced hyphen after a season", "[Grp] Show S2 01 - 12 [1080p]", []epmarker.Marker{{Season: 2, Episode: 12}}},
+
+		// With no marker, an episode stated after the season claims under it.
+		{"episode word after a season word", "Show.Season.2.Episode.5.srt", []epmarker.Marker{{Season: 2, Episode: 5}}},
+		{"dash number after a season", "[SubsPlease] Show S2 - 05 (1080p).ass", []epmarker.Marker{{Season: 2, Episode: 5}}},
+		{
+			"range in brackets after a season", "[Grp] Show S2 [01-03].ass",
+			[]epmarker.Marker{{Season: 2, Episode: 1}, {Season: 2, Episode: 2}, {Season: 2, Episode: 3}},
+		},
+		{"dash number before the season", "[Grp] Show - 05 S2.ass", nil},
+		{"range past the span bound claims its first", "Show.Season.2.E01-E60.srt", []epmarker.Marker{{Season: 2, Episode: 1}}},
+		{
+			"cross range", "Show - 01x05-06 - Title.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 5}, {Season: 1, Episode: 6}},
+		},
+		// A range claims under its own marker's season, any other run under the
+		// latest season statement before it.
+		{
+			"range after a later marker", "Show S02E01 S01E05-E06.srt",
+			[]epmarker.Marker{{Season: 1, Episode: 5}, {Season: 1, Episode: 6}, {Season: 2, Episode: 1}},
+		},
+		{
+			"episode words after two season words", "Season 2 Episode 5 Season 3 Episode 6",
+			[]epmarker.Marker{{Season: 2, Episode: 5}, {Season: 3, Episode: 6}},
+		},
+		{
+			"eNN ranges after two season words", "Show.Season.1.E01-E03.Season.2.E04-E06",
+			append(seasonEpisodes(1, 1, 3), seasonEpisodes(2, 4, 6)...),
+		},
+		{
+			"dash ranges after two seasons", "Show S01 - 01-03 S02 - 04-06",
+			append(seasonEpisodes(1, 1, 3), seasonEpisodes(2, 4, 6)...),
+		},
+		{
+			"one range under each of two season words", "Season 1 - 01-12 Season 2 - 01-12",
+			append(seasonEpisodes(1, 1, 12), seasonEpisodes(2, 1, 12)...),
+		},
 
 		// Claims come back ordered by season, then episode, whatever order the
 		// name states them in.
@@ -408,6 +516,14 @@ func TestClaims(t *testing.T) {
 			}
 		})
 	}
+}
+
+func seasonEpisodes(season, first, last int) []epmarker.Marker {
+	var out []epmarker.Marker
+	for ep := first; ep <= last; ep++ {
+		out = append(out, epmarker.Marker{Season: season, Episode: ep})
+	}
+	return out
 }
 
 func TestClaims_a_fifty_episode_span_reaches_its_last_episode(t *testing.T) {
@@ -591,6 +707,8 @@ func TestSeparatedMarker(t *testing.T) {
 		{"audio tag has no digit after its S", "Show.S01E05.DTS 5.1 EAC3.srt", []epmarker.Marker{{Season: 1, Episode: 5}}},
 		{"edition word has no digit after its E", "Show.S01 Edition.srt", nil},
 		{"separator too long to bridge", "Show.S01 - - - E05.srt", nil},
+		// The S## half must be a token of its own: an audio tag is not.
+		{"S and a digit inside a token", "Show.DTS5 E05.srt", nil},
 		{"no marker at all", "Movie.2024.BluRay.srt", nil},
 	}
 	for _, tt := range tests {
@@ -620,6 +738,7 @@ func TestSeason_reads_the_word_form(t *testing.T) {
 		{"word form two digits", "Show - Season 10 - Complete", 10, true},
 		{"word form dotted", "Show.Season.02.Complete", 2, true},
 		{"compact form still wins", "Black Sails Season 1 S01 (1080p BluRay x265 RCVR)", 1, true},
+		{"compact form wins a disagreement", "Show Season 1 S02.srt", 2, true},
 		// A multi-season bundle names no single season, so it must stay unread
 		// rather than claiming the first number it can find.
 		{"plural is not one season", "Show Seasons 1-9 Complete", 0, false},
@@ -632,6 +751,170 @@ func TestSeason_reads_the_word_form(t *testing.T) {
 			if season != tt.wantSeason || ok != tt.wantOK {
 				t.Errorf("Season(%q) = (%d, %v), want (%d, %v)",
 					tt.input, season, ok, tt.wantSeason, tt.wantOK)
+			}
+		})
+	}
+}
+
+// TestStatesEpisode pins which names state an episode, the half of a season
+// pack the season alone cannot answer.
+func TestStatesEpisode(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"marker", "Show.S01E02.1080p.WEB-DL-GRP", true},
+		{"separated marker", "Show.S01.E05.720p.HDTV-GRP", true},
+		{"cross form", "Show - 01x08 - Title.HDTV-GRP", true},
+		{"unreadable marker", "Show.S01E99999999999999999999.HDTV-GRP", true},
+		{"EP after a season", "Show.S02.EP05.1080p", true},
+		{"Ep with a separator", "Show.S02.Ep.05", true},
+		{"Episode N", "Show.Season.2.Episode.5", true},
+		{"eNN", "Show Season 2 E05 1080p", true},
+		{"dash number after a lone season", "[SubsPlease] Mushoku Tensei S2 - 05 (1080p) [ABCD1234].mkv", true},
+		{"dash number with a version", "[SubsPlease] Show S2 - 05v2 (1080p).ass", true},
+		{"dash number after a season word", "[Grp] Show Season 2 - 05 [1080p]", true},
+		// An E## after a codec, a resolution or audio digits is a number of its
+		// own, as after any other token; the arrs refuse E02 as a group.
+		{"eNN after a codec hyphen", "Show.S01.720p.HDTV.x264-E02", true},
+		{"eNN after a dotted codec", "Show.S02.H.264-E05", true},
+		{"eNN after audio digits", "Show.S01.DDP5.1-E02", true},
+		{"eNN after a resolution", "Show.S01.720p-E02", true},
+		{"eNN after a source", "Show.S01.Complete.BluRay-E02", true},
+		// A range states an episode set in every notation.
+		{"dash range after a season", "[Grp] Show S2 - 01 ~ 12 [1080p]", true},
+		{"glued dash range after a season", "[Grp] Show S2 - 01-12 [Batch]", true},
+		{"double episode after a season", "[Grp] Show S2 - 05-06 [1080p]", true},
+		{"eNN range after a season word", "Show.Season.2.E01-E12.1080p", true},
+		{"concatenated eNN after a season word", "Show.Season.2.E01E02.1080p", true},
+		{"EP range", "[Grp] Show S2 EP01-EP12 [1080p]", true},
+		{"EP range with a bare end", "[Grp] Show S2 EP01-12 [1080p]", true},
+		{"one-digit eN range", "Show.S02.E1-E2", true},
+		// The span bound limits only how far Claims expands, and brackets
+		// hide no range.
+		{"span past the range bound", "Show.Season.2.E01-E60", true},
+		{"decreasing eNN run", "Show.Season.2.E05-E03", true},
+		{"EP range past the span bound", "[Grp] Show S2 EP01-EP60 [1080p]", true},
+		{"dash range in brackets", "Show S2 [01 - 12]", true},
+		{"range in brackets", "[Grp] Show S2 [01-12] [1080p]", true},
+		{"range in parentheses", "[Grp] Show S2 (01-12) [1080p]", true},
+		{"bare range", "[Grp] Show S2 01-12 [1080p]", true},
+		{"spaced range", "[Grp] Show S2 01 ~ 12 [1080p]", true},
+		{"range in brackets after a season word", "[Grp] Show Season 2 [01-12]", true},
+		{"range opening a later bracket", "[Grp] Show S2 [1080p] [01-12]", true},
+		{"EP in brackets", "[Grp] Show S2 [EP05] [1080p]", true},
+
+		{"season pack", "Show.S04.Complete.1080p.BluRay-GRP", false},
+		{"season word pack", "Show.Season.2.720p.WEB-DL-GRP", false},
+		{"dash number before the season", "[Grp] Show - 05 S2 Batch", false},
+		{"dash number with no season", "[Group] Show - 26 [1080p].mkv", false},
+		{"dash range before the season", "[Grp] Show - 01 ~ 12 S2", false},
+		{"dash date after a season", "Show S02 - 2014-06-02", false},
+		{"dash word after a season word", "[Grp] Show 2nd Season - 05 [1080p]", false},
+		{"dash resolution after a season", "Show S02 - 1080p", false},
+		{"bare number in brackets", "[Grp] Show S2 [05] [1080p]", false},
+		{"digit crc in brackets", "[Grp] Show S2 [1080p][E0123456]", false},
+		{"spaced number is no episode", "Show S02 Complete 10 bit-GRP", false},
+		{"ep inside a word", "Show.S02.Step.05", false},
+		{"e and a digit inside a word", "Show.S02.Release01", false},
+		{"crc in brackets", "[Grp] Show S2 [BD 1080p][E5A2C3D1]", false},
+		{"one-digit eN", "Show.S03.DDP5.1.Atmos-E1", false},
+		// Bare digits state an episode set only right after the season or
+		// opening a bracket, and from two digits, as one number does.
+		{"volume range", "Show S01 Vol.1-6 [1080p]", false},
+		{"disc range", "Show.S01.Disc.1-4", false},
+		{"volume range in brackets", "[Grp] Show S2 [BD Vol.1-3] [1080p]", false},
+		{"spaced range after a word", "Show S01 Vol 01 ~ 06", false},
+		{"one-digit bare range", "[Grp] Show S2 1-2 [1080p]", false},
+		{"one-digit dash range", "[Grp] Show S2 - 5-6 [1080p]", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := epmarker.StatesEpisode(tt.input); got != tt.want {
+				t.Errorf("StatesEpisode(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAbsolute pins the absolute-number form: the last " - NN", else the first
+// E##, EP## or Episode N, else the first " NN "; never a bare number in
+// brackets, never a range and never for a name a marker shapes.
+func TestAbsolute(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		input  string
+		wantEp int
+		wantOK bool
+	}{
+		{"dash number", "[Group] Show - 26 [1080p].mkv", 26, true},
+		{"dash number at the end", "Show - 08.mkv", 8, true},
+		{"three digits", "Show - 100.mkv", 100, true},
+		{"version suffix", "[Grp] Show - 05v2 [1080p]", 5, true},
+		{"the last dash number", "Mob Psycho 100 - 05 - 26.mkv", 26, true},
+		{"dash after a season statement", "[SubsPlease] Show S2 - 05 (1080p)", 5, true},
+		{"dash after a season word", "[Grp] Show 2nd Season - 05 [1080p]", 5, true},
+		{"spaced number", "Show 08 [720p].mkv", 8, true},
+		{"dash before spaced", "Show 03 - 08 [720p].mkv", 8, true},
+		{"the first spaced number", "[Miaou] Series Title 02 VOSTFR FHD 10 bits", 2, true},
+		{"eNN", "Show e08.mkv", 8, true},
+		{"eNN at the start", "e08 - Show Title.mkv", 8, true},
+		{"eNN after a multibyte character", "日e08.mkv", 8, true},
+		{"eNN after an e inside a word", "Premiere08 e08.mkv", 8, true},
+		{"zero", "Show - 00.mkv", 0, true},
+		{"eNN after a codec hyphen", "Show.720p.x264-E02.mkv", 2, true},
+		{"eNN after a dotted codec", "Show.H.264-E05.mkv", 5, true},
+		{"eNN after audio digits", "Show.DDP5.1-E02.mkv", 2, true},
+		{"EP number", "Show EP05 [720p].mkv", 5, true},
+		{"Ep and a separated number", "Show Ep 05 [720p].mkv", 5, true},
+		{"Episode N", "Show Episode 8.mkv", 8, true},
+		{"eNN before a spaced number", "Show e08 10 bits.mkv", 8, true},
+		{"spaced number with a version", "Show 05v2 [720p].mkv", 5, true},
+		{"eNN beside a dash range", "Show - 01-12 x264-E02.mkv", 2, true},
+		{"EP in brackets", "Show [EP05] [720p].mkv", 5, true},
+
+		{"dash resolution", "[Group] Show - 1080p.mkv", 0, false},
+		{"dash number glued to a letter", "Show - 05x.mkv", 0, false},
+		{"dash range", "Show - 01 ~ 12.mkv", 0, false},
+		{"glued dash range", "Show - 01-12.mkv", 0, false},
+		{"spaced end of a dash range", "[Erai-raws] Series - 0955 ~ 1005 [1080p]", 0, false},
+		{"eNN range", "Show E01-E02.srt", 0, false},
+		{"concatenated eNN", "Show E01E02.srt", 0, false},
+		{"EP range", "Show EP01-EP02.srt", 0, false},
+		{"Episodes is no word", "Show Episodes 01-12.mkv", 0, false},
+		{"dash date", "The Series Title - 2014-06-02 - Thomas Piketty.mkv", 0, false},
+		{"bracketed dash number", "Show [01 - 12].mkv", 0, false},
+		{"bracketed spaced number", "Show ( 08 ) x.mkv", 0, false},
+		{"bracketed crc", "[Grp] Movie [BD 1080p][E5A2C3D1]", 0, false},
+		{"bracketed digit crc", "[Grp] Movie [BD 1080p][E0123456]", 0, false},
+		{"bracketed range", "Show [01-12].mkv", 0, false},
+		{"spaced range", "Show Vol 01 ~ 06 [720p].mkv", 0, false},
+		{"one digit", "Show - 5.mkv", 0, false},
+		{"e inside a word", "Release01.mkv", 0, false},
+		{"e after a", "Sae08.mkv", 0, false},
+		{"e after z", "Blaze08.mkv", 0, false},
+		{"e after a digit", "Show2e08.mkv", 0, false},
+		{"eNN glued to a letter", "Show e08x.mkv", 0, false},
+		{"spaced number needs both spaces", "Show 08.mkv", 0, false},
+		{"marker shape", "Show S01E01 - 26.mkv", 0, false},
+		{"unreadable marker shape", "Show S99999999999999999999E01 - 26.mkv", 0, false},
+		{"cross marker", "Show 01x08 - 26.mkv", 0, false},
+		{"unreadable number", "Show - 99999999999999999999.mkv", 0, false},
+		{"nothing", "some random file.mkv", 0, false},
+		{"empty", "", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ep, ok := epmarker.Absolute(tt.input)
+			if ep != tt.wantEp || ok != tt.wantOK {
+				t.Errorf("Absolute(%q) = (%d, %v), want (%d, %v)",
+					tt.input, ep, ok, tt.wantEp, tt.wantOK)
 			}
 		})
 	}

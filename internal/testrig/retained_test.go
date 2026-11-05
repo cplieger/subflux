@@ -97,6 +97,8 @@ var retained = []struct{ pattern, until string }{
 	{"internal/obs#Metrics.Register", "AP-1"},
 	{"internal/provider#*", "SE-2"},
 	{"internal/provider/*", "SE-2"},
+	{"internal/rank#*", "ST-1"},
+	{"internal/release#*", "SE-2"},
 	{"internal/search/release#*", "SE-2"},
 	{"internal/settings#Active.Languages", "ST-1"},
 	{"internal/settings#Mode.UnmarshalText", "AP-1"},
@@ -113,7 +115,8 @@ var retained = []struct{ pattern, until string }{
 	{"internal/subflux#*", "SE-2"},
 	{"internal/subsync#*", "TS-2"},
 	{"internal/subsync/*", "TS-2"},
-	{"internal/subtitleenc#*", "SE-1"},
+	{"internal/subtitleenc#Encoding.ASCIITransparent", "TS-1"},
+	{"internal/subtitleenc#Encoding.Encode", "TS-1"},
 	{"internal/subtitleext#*", "TS-1"},
 	{"internal/subtitlefile#*", "TS-1"},
 }

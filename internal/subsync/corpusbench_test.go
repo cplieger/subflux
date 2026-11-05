@@ -55,8 +55,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // corpusManifestPath is the committed manifest location, relative to the
@@ -184,7 +182,7 @@ func runCorpusCase(t *testing.T, root string, c corpusCase) corpusRecord {
 		return corpusRecord{winnerSource: "none", transform: "none", trace: corpusRefNone}
 	}
 
-	incCues, err := ParseSRT(strings.NewReader(string(subtitleenc.Normalize(raw))))
+	incCues, err := ParseSRT(strings.NewReader(string(decodeView(raw))))
 	if err != nil || len(incCues) < MinCuesForSync {
 		return errRecord(fmt.Sprintf("subtitle unusable: err=%v cues=%d", err, len(incCues)))
 	}

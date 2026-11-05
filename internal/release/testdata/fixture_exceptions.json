@@ -1,0 +1,182 @@
+{
+  "quality/episode": {
+    "My Title - S01E01 - EpTitle [4k HEVC DTSHD-MA-6ch]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "My Title - S01E01 - EpTitle [HEVC 4k DTSHD-MA-6ch]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "My Title - S01E01 - EpTitle [HEVC-4k DTSHD-MA-6ch]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "S07E23 .avi ": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "S07E23.mkv ": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Series Slayer 04 vostfr FHD.mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Series.Title.1x01.ITA.720p.x264-RlsGrp [01/54] - \"series.title.1x01.ita.720p.x264-rlsgrp.nfo\"": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The Big Series.S03E01.The Sonarr Can Opener.m2ts": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The Online Series Alicization 04 vostfr FHD": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S01E13.x264-CtrlSD": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S02E15.720p": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S02E15.avi": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S02E15.divx": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S02E15.mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "The.Series.S02E15.xvid": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Under the Series S01E10 Let the Sonarr Begin 1080p": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[CR] The Series - 004 [480p][48CE2D0F]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Doki] The Series - 07 (1280x720 Hi10P AAC) [80AF7DDE]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Doremi].The.Series.5.Go.Go!.31.[1280x720].[C65D4B1F].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Erai-raws] Series Title [540p][Multiple Subtitle].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Eveyuu] Series Title - 10 [Hi10P 1280x720 H264][10B23BD8]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[GM-Team][国漫][诛仙][Series Title][2022][19][HEVC][GB][4K]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Hatsuyuki] The Series - 363 [848x480][ADE35E38]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[HorribleSubs] Series Title - 32 [1080p]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[HorribleSubs] The Series - 03 [360p].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[HorribleSubs] The Series - 32 [480p]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[HorribleSubs]_Series_Title_-_145_[720p]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Kousei]_One_Series_ - _609_[FHD][648A87C7].mp4": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Miaou] Series Title 02 VOSTFR FHD 10 bits": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Onii-ChanSub] The.Series - 02 vostfr (FHD 1080p 10bits).mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[SubsPlease] Series Title (540p) [AB649D32].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[TMS-Remux].Series.Title.X.21.720p.[76EA1C53].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[Underwater-FFF] The Series - 01 (720p) [27AAA0A0]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[mhastream.com]_Episode_05_FHD.mp4": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    }
+  },
+  "quality/movie": {
+    "Movie Name.S03E01.The Electric Can Opener Fluctuation.m2ts": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "S07E23 .avi ": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Some.Movie.S02E15.avi": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Some.Movie.S02E15.divx": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "Some.Movie.S02E15.xvid": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "This.Wonderful.Movie.1991.German.ML.1080p.BluRay.AVC-GeRMaNSCeNEGRoUP": {
+      "reason": "GermanRemuxRegex is not imported (watched); its disc family holds.",
+      "want": "source BluRay"
+    },
+    "This.Wonderful.Movie.1991.German.ML.2160p.BluRay.HEVC-GeRMaNSCeNEGRoUP": {
+      "reason": "GermanRemuxRegex is not imported (watched); its disc family holds.",
+      "want": "source BluRay"
+    },
+    "[Erai-raws] Movie Title [540p][Multiple Subtitle].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[NOGRP][国漫][诛仙][Movie Title 2022][19][HEVC][GB][4K]": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    },
+    "[SubsPlease] Movie Title (540p) [AB649D32].mkv": {
+      "reason": "The arr guesses this source from the resolution, the codec or the file extension; Parse reports only a source the name states.",
+      "want": "source SourceUnknown"
+    }
+  }
+}

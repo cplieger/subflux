@@ -710,18 +710,6 @@
       "reason": "The element type of the exported Values map; callers read it through the Values getters, and an unexported element would hide the map's type from them."
     },
     {
-      "code": "DS1803",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.Duration",
-      "path": "internal/formschema/values.go",
-      "reason": "Retained until PA-2 (internal/formschema#Values.Duration): a by-key lookup answers (value, found), and the first optional Duration field, which lands there, reads found."
-    },
-    {
-      "code": "DS1803",
-      "symbol": "go://github.com/cplieger/subflux/internal/formschema#Values.StringList",
-      "path": "internal/formschema/values.go",
-      "reason": "A by-key lookup answers (value, found): the server section reads a nil list as absent, and a list with no absent meaning reads found."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Label",
       "path": "internal/formschema/schema.go",
@@ -1299,6 +1287,102 @@
     },
     {
       "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/release#override.upstream",
+      "path": "internal/release/overrides.go",
+      "reason": "Retained until SE-2 (internal/release#*): cmd/release-patterns reads it from the source through go/ast to refuse a stale override, and TestGeneratedTableMatchesManifest checks it, so no Go reader exists."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/release#MaxNameLen",
+      "path": "internal/release/release.go",
+      "reason": "Retained until SE-2 (internal/release#*): Parse's caller contract, how much of a name it reads; the adapters and the engine, its first callers outside the package, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/release/netregex#input.steps",
+      "path": "internal/release/netregex/exec.go",
+      "reason": "The cost counter TestWorstCaseAtTheClamp reads to pin the package doc's O(n²·m) bound; one increment per queue insertion, no production reader by design."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Facts.SeasonPack",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): Compare writes it, and its first production reader, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Tri",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#MatchedBy",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Facts",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Fit",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Compare",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#FitOf",
+      "path": "internal/rank/rank.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#RateFamily",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#RateUnknown",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#PAL",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#Film",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#RateTolerance",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/rank#RateFamilyOf",
+      "path": "internal/rank/rate.go",
+      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
+    },
+    {
+      "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Schedule.Change",
       "path": "internal/mediasource/schedule.go",
       "reason": "Retained until MS-2 (internal/mediasource#Schedule.Change): scan's per-source loop, its first reader outside the tests, lands there."
@@ -1320,6 +1404,18 @@
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#MaxPosterBytes",
       "path": "internal/mediasource/arr/poster.go",
       "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first callers outside the package, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.APIKey",
+      "path": "internal/mediasource/arr/schema.go",
+      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.URL",
+      "path": "internal/mediasource/arr/schema.go",
+      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
     },
     {
       "code": "DS1101",
@@ -1446,6 +1542,36 @@
       "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Absolute",
       "path": "internal/skyhook/show.go",
       "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.Encode",
+      "path": "internal/subtitleenc/codec.go",
+      "reason": "Retained until TS-1 (internal/subtitleenc#Encoding.Encode): timing-sync's Writer, its first caller outside the package, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.ASCIITransparent",
+      "path": "internal/subtitleenc/codec.go",
+      "reason": "Retained until TS-1 (internal/subtitleenc#Encoding.ASCIITransparent): timing-sync's Writer, its first caller outside the package, lands there."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#ErrUndecodable",
+      "path": "internal/subtitleenc/subtitleenc.go",
+      "reason": "Decode's and Encode's sentinel, for errors.Is at a caller; timing-sync's Writer, the first caller that handles it, lands in TS-1."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#SampleBytes",
+      "path": "internal/subtitleenc/detect.go",
+      "reason": "Detect's caller contract: it reads only this many leading bytes, so a caller may pass that prefix alone."
+    },
+    {
+      "code": "DS1101",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#SiblingMargin",
+      "path": "internal/subtitleenc/detect.go",
+      "reason": "Detect's documented tie rule: two legacy pages scoring within this margin that decode differently answer Unknown."
     }
   ]
 }

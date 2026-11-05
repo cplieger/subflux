@@ -521,7 +521,7 @@ func TestExpandedSecretStaysInParse(t *testing.T) {
 		if err != nil || errs != nil {
 			t.Fatalf("Save = %v, %v", errs, err)
 		}
-		if v, _ := values.Secret("s"); v != secret {
+		if v := values.Secret("s"); v != secret {
 			t.Errorf("the section parsed %q, want the resolved value", v)
 		}
 		text := fileText(t, tpath)

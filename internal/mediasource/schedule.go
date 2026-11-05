@@ -46,7 +46,7 @@ func ParseSchedule(n *yaml.Node) (Schedule, []formschema.FieldError) {
 	if len(errs) > 0 {
 		return Schedule{}, formschema.Prefix("scan", errs)
 	}
-	change, _ := vals.Duration("change_interval")
-	whole, _ := vals.Duration("whole_interval")
+	change := vals.Duration("change_interval")
+	whole := vals.Duration("whole_interval")
 	return Schedule{Change: change, Whole: whole}, nil
 }

@@ -1,0 +1,3870 @@
+{
+ "icu": "69.1",
+ "pyicu": "2.7.4",
+ "cases": [
+  {
+   "case": "ar-cp1256",
+   "parts": [
+    {
+     "file": "ar-cp1256",
+     "times": 1
+    }
+   ],
+   "size": 3570,
+   "matches": [
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 34
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 28
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 26
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 14
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 5
+    }
+   ]
+  },
+  {
+   "case": "ar-iso88596",
+   "parts": [
+    {
+     "file": "ar-iso88596",
+     "times": 1
+    }
+   ],
+   "size": 3570,
+   "matches": [
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 26
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 16
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 14
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 5
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "bg-cp1251",
+   "parts": [
+    {
+     "file": "bg-cp1251",
+     "times": 1
+    }
+   ],
+   "size": 4058,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 35
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 11
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "no",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "cs-cp1250",
+   "parts": [
+    {
+     "file": "cs-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 3895,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 41
+    },
+    {
+     "charset": "windows-1252",
+     "language": "it",
+     "confidence": 27
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 9
+    }
+   ]
+  },
+  {
+   "case": "cs-iso88592-under-de",
+   "parts": [
+    {
+     "file": "cs-iso88592-under-de",
+     "times": 1
+    }
+   ],
+   "size": 3895,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 39
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 27
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 9
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "cs-iso88592",
+   "parts": [
+    {
+     "file": "cs-iso88592",
+     "times": 1
+    }
+   ],
+   "size": 3895,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 39
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 27
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 9
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "de-cp1252",
+   "parts": [
+    {
+     "file": "de-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4460,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "de",
+     "confidence": 79
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 26
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 19
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "el-cp1253-c1",
+   "parts": [
+    {
+     "file": "el-cp1253-c1",
+     "times": 1
+    }
+   ],
+   "size": 3734,
+   "matches": [
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 47
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 17
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 7
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "el-cp1253-noc1-akou",
+   "parts": [
+    {
+     "file": "el-cp1253-noc1-akou",
+     "times": 1
+    }
+   ],
+   "size": 3520,
+   "matches": [
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 48
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 4
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 4
+    }
+   ]
+  },
+  {
+   "case": "el-cp1253-under-ru",
+   "parts": [
+    {
+     "file": "el-cp1253-under-ru",
+     "times": 1
+    }
+   ],
+   "size": 4070,
+   "matches": [
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 50
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 14
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 14
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "el-cp1253",
+   "parts": [
+    {
+     "file": "el-cp1253",
+     "times": 1
+    }
+   ],
+   "size": 4070,
+   "matches": [
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 50
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 14
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 14
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "el-iso88597",
+   "parts": [
+    {
+     "file": "el-iso88597",
+     "times": 1
+    }
+   ],
+   "size": 4070,
+   "matches": [
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 50
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 14
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 14
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "en-ascii-literal-hz",
+   "parts": [
+    {
+     "file": "en-ascii-literal-hz",
+     "times": 1
+    }
+   ],
+   "size": 3878,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "en",
+     "confidence": 66
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 26
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 17
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "en-cp1252-acute",
+   "parts": [
+    {
+     "file": "en-cp1252-acute",
+     "times": 1
+    }
+   ],
+   "size": 3810,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "en",
+     "confidence": 62
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 22
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "en-cp1252-short",
+   "parts": [
+    {
+     "file": "en-cp1252-short",
+     "times": 1
+    }
+   ],
+   "size": 426,
+   "matches": [
+    {
+     "charset": "windows-1252",
+     "language": "en",
+     "confidence": 72
+    },
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 23
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "en-cp1252-smart",
+   "parts": [
+    {
+     "file": "en-cp1252-smart",
+     "times": 1
+    }
+   ],
+   "size": 4250,
+   "matches": [
+    {
+     "charset": "windows-1252",
+     "language": "en",
+     "confidence": 63
+    },
+    {
+     "charset": "windows-1250",
+     "language": "ro",
+     "confidence": 22
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 11
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "en-utf8-literal-hz",
+   "parts": [
+    {
+     "file": "en-utf8-literal-hz",
+     "times": 1
+    }
+   ],
+   "size": 3970,
+   "matches": [
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 100
+    },
+    {
+     "charset": "windows-1252",
+     "language": "en",
+     "confidence": 59
+    },
+    {
+     "charset": "windows-1250",
+     "language": "ro",
+     "confidence": 27
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 17
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "es-cp1252",
+   "parts": [
+    {
+     "file": "es-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4034,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "es",
+     "confidence": 70
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 36
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 11
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "fr-cp1252-noc1",
+   "parts": [
+    {
+     "file": "fr-cp1252-noc1",
+     "times": 1
+    }
+   ],
+   "size": 4322,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 64
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 44
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 20
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "fr-cp1252",
+   "parts": [
+    {
+     "file": "fr-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4251,
+   "matches": [
+    {
+     "charset": "windows-1252",
+     "language": "fr",
+     "confidence": 63
+    },
+    {
+     "charset": "windows-1250",
+     "language": "ro",
+     "confidence": 43
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 19
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "fr-iso885915",
+   "parts": [
+    {
+     "file": "fr-iso885915",
+     "times": 1
+    }
+   ],
+   "size": 4251,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 63
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 43
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 19
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "fr-latin1",
+   "parts": [
+    {
+     "file": "fr-latin1",
+     "times": 1
+    }
+   ],
+   "size": 4322,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 64
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 44
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 20
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "he-cp1255-niqqud",
+   "parts": [
+    {
+     "file": "he-cp1255-niqqud",
+     "times": 1
+    }
+   ],
+   "size": 4300,
+   "matches": [
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 28
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 25
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "he-cp1255",
+   "parts": [
+    {
+     "file": "he-cp1255",
+     "times": 1
+    }
+   ],
+   "size": 3560,
+   "matches": [
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 61
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 21
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 3
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "he-iso88598-df",
+   "parts": [
+    {
+     "file": "he-iso88598-df",
+     "times": 1
+    }
+   ],
+   "size": 3432,
+   "matches": [
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 64
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 21
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "he-iso88598-plain",
+   "parts": [
+    {
+     "file": "he-iso88598-plain",
+     "times": 1
+    }
+   ],
+   "size": 3560,
+   "matches": [
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 61
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 21
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 3
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "hr-cp1250",
+   "parts": [
+    {
+     "file": "hr-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 3884,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 35
+    },
+    {
+     "charset": "windows-1252",
+     "language": "it",
+     "confidence": 25
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "hu-cp1250",
+   "parts": [
+    {
+     "file": "hu-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 4145,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 65
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "nl",
+     "confidence": 20
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "hu-iso88592",
+   "parts": [
+    {
+     "file": "hu-iso88592",
+     "times": 1
+    }
+   ],
+   "size": 4145,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 65
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "nl",
+     "confidence": 20
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "it-cp1252",
+   "parts": [
+    {
+     "file": "it-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4142,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 75
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 38
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 20
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM424_ltr",
+     "language": "he",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "ja-eucjp",
+   "parts": [
+    {
+     "file": "ja-eucjp",
+     "times": 1
+    }
+   ],
+   "size": 3928,
+   "matches": [
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 100
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 83
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 78
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 36
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 6
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 6
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 4
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "ja-iso2022jp",
+   "parts": [
+    {
+     "file": "ja-iso2022jp",
+     "times": 1
+    }
+   ],
+   "size": 4288,
+   "matches": [
+    {
+     "charset": "ISO-2022-JP",
+     "language": "",
+     "confidence": 100
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 7
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 5
+    }
+   ]
+  },
+  {
+   "case": "ja-sjis",
+   "parts": [
+    {
+     "file": "ja-sjis",
+     "times": 1
+    }
+   ],
+   "size": 3928,
+   "matches": [
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 100
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 7
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 5
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "ko-euckr",
+   "parts": [
+    {
+     "file": "ko-euckr",
+     "times": 1
+    }
+   ],
+   "size": 3810,
+   "matches": [
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 100
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 62
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 9
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 7
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 6
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 5
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "no",
+     "confidence": 1
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "IBM420_rtl",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "lt-cp1257",
+   "parts": [
+    {
+     "file": "lt-cp1257",
+     "times": 1
+    }
+   ],
+   "size": 3910,
+   "matches": [
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 21
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 20
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 13
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "lt-iso885913",
+   "parts": [
+    {
+     "file": "lt-iso885913",
+     "times": 1
+    }
+   ],
+   "size": 3910,
+   "matches": [
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 21
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 20
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 13
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "lv-cp1257",
+   "parts": [
+    {
+     "file": "lv-cp1257",
+     "times": 1
+    }
+   ],
+   "size": 4028,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 25
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 21
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 19
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "mk-cp1251",
+   "parts": [
+    {
+     "file": "mk-cp1251",
+     "times": 1
+    }
+   ],
+   "size": 4002,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 32
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 11
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1252",
+     "language": "no",
+     "confidence": 4
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "nl-cp1252",
+   "parts": [
+    {
+     "file": "nl-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4406,
+   "matches": [
+    {
+     "charset": "windows-1252",
+     "language": "nl",
+     "confidence": 66
+    },
+    {
+     "charset": "windows-1250",
+     "language": "hu",
+     "confidence": 28
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 21
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "pl-cp1250-noc1-maz",
+   "parts": [
+    {
+     "file": "pl-cp1250-noc1-maz",
+     "times": 1
+    }
+   ],
+   "size": 3356,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 53
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 27
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 5
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "pl-cp1250-short",
+   "parts": [
+    {
+     "file": "pl-cp1250-short",
+     "times": 1
+    }
+   ],
+   "size": 438,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "pl",
+     "confidence": 68
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 23
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 6
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 2
+    }
+   ]
+  },
+  {
+   "case": "pl-cp1250-under-en",
+   "parts": [
+    {
+     "file": "pl-cp1250-under-en",
+     "times": 1
+    }
+   ],
+   "size": 4186,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "pl",
+     "confidence": 58
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 25
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 4
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "pl-cp1250",
+   "parts": [
+    {
+     "file": "pl-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 4186,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "pl",
+     "confidence": 58
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 25
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 4
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "pl-iso88592-short",
+   "parts": [
+    {
+     "file": "pl-iso88592-short",
+     "times": 1
+    }
+   ],
+   "size": 438,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 67
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 23
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 2
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "pl-iso88592",
+   "parts": [
+    {
+     "file": "pl-iso88592",
+     "times": 1
+    }
+   ],
+   "size": 4186,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 57
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 25
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 4
+    }
+   ]
+  },
+  {
+   "case": "pl-utf8",
+   "parts": [
+    {
+     "file": "pl-utf8",
+     "times": 1
+    }
+   ],
+   "size": 4406,
+   "matches": [
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 100
+    },
+    {
+     "charset": "windows-1250",
+     "language": "pl",
+     "confidence": 52
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 17
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 4
+    }
+   ]
+  },
+  {
+   "case": "pt-cp1252",
+   "parts": [
+    {
+     "file": "pt-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 4142,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 85
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 35
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 18
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "ro-cp1250",
+   "parts": [
+    {
+     "file": "ro-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 3968,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 52
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 32
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 9
+    }
+   ]
+  },
+  {
+   "case": "ro-iso88592",
+   "parts": [
+    {
+     "file": "ro-iso88592",
+     "times": 1
+    }
+   ],
+   "size": 3968,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 52
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 32
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 9
+    }
+   ]
+  },
+  {
+   "case": "ru-cp1251-short-under-en",
+   "parts": [
+    {
+     "file": "ru-cp1251-short-under-en",
+     "times": 1
+    }
+   ],
+   "size": 407,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 51
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 8
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "ru-cp1251-under-en",
+   "parts": [
+    {
+     "file": "ru-cp1251-under-en",
+     "times": 1
+    }
+   ],
+   "size": 4026,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 56
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 2
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "ru-cp1251",
+   "parts": [
+    {
+     "file": "ru-cp1251",
+     "times": 1
+    }
+   ],
+   "size": 4026,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 56
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 2
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "ru-koi8r",
+   "parts": [
+    {
+     "file": "ru-koi8r",
+     "times": 1
+    }
+   ],
+   "size": 4026,
+   "matches": [
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 56
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "sk-cp1250",
+   "parts": [
+    {
+     "file": "sk-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 3902,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 38
+    },
+    {
+     "charset": "windows-1252",
+     "language": "it",
+     "confidence": 27
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "sl-cp1250",
+   "parts": [
+    {
+     "file": "sl-cp1250",
+     "times": 1
+    }
+   ],
+   "size": 3908,
+   "matches": [
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 40
+    },
+    {
+     "charset": "windows-1252",
+     "language": "it",
+     "confidence": 28
+    },
+    {
+     "charset": "windows-1254",
+     "language": "tr",
+     "confidence": 21
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "sr-cp1251",
+   "parts": [
+    {
+     "file": "sr-cp1251",
+     "times": 1
+    }
+   ],
+   "size": 3897,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 28
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 12
+    },
+    {
+     "charset": "windows-1255",
+     "language": "he",
+     "confidence": 11
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1252",
+     "language": "no",
+     "confidence": 3
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 3
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "sv-cp1252",
+   "parts": [
+    {
+     "file": "sv-cp1252",
+     "times": 1
+    }
+   ],
+   "size": 3998,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "sv",
+     "confidence": 76
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 33
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 24
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "th-cp874",
+   "parts": [
+    {
+     "file": "th-cp874",
+     "times": 1
+    }
+   ],
+   "size": 3800,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 67
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 53
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 53
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 42
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 35
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 20
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 4
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 2
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "tr-cp1254",
+   "parts": [
+    {
+     "file": "tr-cp1254",
+     "times": 1
+    }
+   ],
+   "size": 4043,
+   "matches": [
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 47
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "da",
+     "confidence": 22
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 18
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "tr-iso88599",
+   "parts": [
+    {
+     "file": "tr-iso88599",
+     "times": 1
+    }
+   ],
+   "size": 4043,
+   "matches": [
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 47
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "da",
+     "confidence": 22
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "hu",
+     "confidence": 18
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "uk-cp1251",
+   "parts": [
+    {
+     "file": "uk-cp1251",
+     "times": 1
+    }
+   ],
+   "size": 3917,
+   "matches": [
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 34
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 8
+    },
+    {
+     "charset": "ISO-8859-8",
+     "language": "he",
+     "confidence": 8
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 7
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 6
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "uk-koi8u-under-ru",
+   "parts": [
+    {
+     "file": "uk-koi8u-under-ru",
+     "times": 1
+    }
+   ],
+   "size": 3917,
+   "matches": [
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 35
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 6
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "uk-koi8u",
+   "parts": [
+    {
+     "file": "uk-koi8u",
+     "times": 1
+    }
+   ],
+   "size": 3917,
+   "matches": [
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 35
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 6
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "fr",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "zhhans-gb18030",
+   "parts": [
+    {
+     "file": "zhhans-gb18030",
+     "times": 1
+    }
+   ],
+   "size": 3500,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 72
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 51
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 41
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "zhhant-big5",
+   "parts": [
+    {
+     "file": "zhhant-big5",
+     "times": 1
+    }
+   ],
+   "size": 3476,
+   "matches": [
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 24
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 2
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 1
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "zhhant-gb18030",
+   "parts": [
+    {
+     "file": "zhhant-gb18030",
+     "times": 1
+    }
+   ],
+   "size": 3476,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 41
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "zhhant-gbk",
+   "parts": [
+    {
+     "file": "zhhant-gbk",
+     "times": 1
+    }
+   ],
+   "size": 3476,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 41
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "composite-c1-after-buffer",
+   "parts": [
+    {
+     "file": "el-cp1253-noc1-akou",
+     "times": 3
+    },
+    {
+     "file": "el-cp1253-c1",
+     "times": 1
+    }
+   ],
+   "size": 14294,
+   "matches": [
+    {
+     "charset": "ISO-8859-7",
+     "language": "el",
+     "confidence": 48
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-8-I",
+     "language": "he",
+     "confidence": 9
+    },
+    {
+     "charset": "ISO-8859-6",
+     "language": "ar",
+     "confidence": 4
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 4
+    }
+   ]
+  },
+  {
+   "case": "composite-sjis-long",
+   "parts": [
+    {
+     "file": "ja-sjis",
+     "times": 4
+    }
+   ],
+   "size": 15712,
+   "matches": [
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 100
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1252",
+     "language": "pt",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 7
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 5
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "composite-gb18030-long",
+   "parts": [
+    {
+     "file": "zhhans-gb18030",
+     "times": 4
+    }
+   ],
+   "size": 14000,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 77
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 60
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 51
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 2
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 1
+    },
+    {
+     "charset": "windows-1256",
+     "language": "ar",
+     "confidence": 1
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 1
+    }
+   ]
+  },
+  {
+   "case": "composite-iso2022jp-long",
+   "parts": [
+    {
+     "file": "ja-iso2022jp",
+     "times": 4
+    }
+   ],
+   "size": 17152,
+   "matches": [
+    {
+     "charset": "ISO-2022-JP",
+     "language": "",
+     "confidence": 100
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 8
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 5
+    }
+   ]
+  },
+  {
+   "case": "synthetic-gb18030-trail-7f",
+   "bytes": "ztKyu9aqtcDO0sPDw8O3osn6wcvKssO0ysKho7WxyLujrM7Su+HF48TjyKWztdW+oaPO0r71tcOyu8rmt/6jrM7StcPMyc/CwLSho7B/sX+yfw==",
+   "size": 82,
+   "matches": [
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 100
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "ISO-8859-5",
+     "language": "ru",
+     "confidence": 3
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "synthetic-big5-trail-7f-ff",
+   "bytes": "p9qko6q+uUSn2qlmqWa1b6XNpEaksLvyqMahQ7fttU2hQafat3yzradBpWiorq+4oUOn2sSxsW+ko7XOqkGhQafasW+99qRVqNOhQ6R/pf+mfw==",
+   "size": 82,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 27
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "IBM420_ltr",
+     "language": "ar",
+     "confidence": 6
+    }
+   ]
+  },
+  {
+   "case": "synthetic-eucjp-ss2-bad",
+   "bytes": "y+Wky7K/pKykoqTDpL+kzqSryqykq6TppMqkpKGjpOKkwaTtpPOhorHYpN6kx7Dsve+ky7nUpK+k6KGjtaTKrKSssK2kpKGisqOky6TKpOmkyqStpOOho44gjiCOIA==",
+   "size": 94,
+   "matches": [
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 8
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 3
+    }
+   ]
+  },
+  {
+   "case": "synthetic-sjis-early-bail",
+   "bytes": "gSCBIJaFgsmJvYKqgqCCwYK9gsyCqZWqgqmC54LIgqKBQoLggr+C64LxgUGJd4LcgsWI6o+PgsmNc4KtguaBQotDlaqCqoirgqKBQYmhgsmCyILngsiCq4LhgUKWhYLJib2CqoKggsGCvYLMgqmVqoKpgueCyIKigUKC4IK/guuC8YFBiXeC3ILFiOqPj4LJjXOCrYLmgUKLQ5WqgqqIq4KigUGJoYLJgsiC54LIgquC4YFCloWCyYm9gqqCoILBgr2CzIKplaqCqYLngsiCooFCguCCv4LrgvGBQYl3gtyCxYjqj4+CyY1zgq2C5oFCi0OVqoKqiKuCooFBiaGCyYLIgueCyIKrguGBQpaFgsmJvYKqgqCCwYK9gsyCqZWqgqmC54LIgqKBQoLggr+C64LxgUGJd4LcgsWI6o+PgsmNc4KtguaBQotDlaqCqoirgqKBQYmhgsmCyILngsiCq4LhgUI=",
+   "size": 356,
+   "matches": [
+    {
+     "charset": "KOI8-R",
+     "language": "ru",
+     "confidence": 17
+    },
+    {
+     "charset": "windows-1251",
+     "language": "ru",
+     "confidence": 12
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "windows-1252",
+     "language": "en",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1253",
+     "language": "el",
+     "confidence": 9
+    },
+    {
+     "charset": "windows-1250",
+     "language": "cs",
+     "confidence": 8
+    }
+   ]
+  },
+  {
+   "case": "synthetic-ngram-cap",
+   "bytes": "dGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCB0aGUgYW5kIHRoZSBhbmQgdGhhdCB0aGUgYW5kIHRoZSBhbmQgdGhlIGFuZCB0aGF0IHRoZSBhbmQgdGhlIGFuZCB0aGUgYW5kIHRoYXQgdGhlIGFuZCA=",
+   "size": 1160,
+   "matches": [
+    {
+     "charset": "ISO-8859-1",
+     "language": "en",
+     "confidence": 98
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "ro",
+     "confidence": 41
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "synthetic-iso2022jp-few-escapes",
+   "bytes": "SGVsbG8gGyRCOEA4bBsoQiB3b3JsZC4=",
+   "size": 23,
+   "matches": [
+    {
+     "charset": "ISO-2022-JP",
+     "language": "",
+     "confidence": 70
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "it",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "synthetic-iso2022jp-unknown-escape",
+   "bytes": "YRskQjhAGyhCIGIbJFogYxsoQhskQjhsGyhCGyhKLg==",
+   "size": 31,
+   "matches": [
+    {
+     "charset": "ISO-2022-JP",
+     "language": "",
+     "confidence": 71
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 13
+    },
+    {
+     "charset": "ISO-8859-9",
+     "language": "tr",
+     "confidence": 13
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "Shift_JIS",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "GB18030",
+     "language": "zh",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-JP",
+     "language": "ja",
+     "confidence": 10
+    },
+    {
+     "charset": "EUC-KR",
+     "language": "ko",
+     "confidence": 10
+    },
+    {
+     "charset": "Big5",
+     "language": "zh",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "synthetic-short-ascii",
+   "bytes": "SGkgeW91Lg==",
+   "size": 7,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "cs",
+     "confidence": 37
+    },
+    {
+     "charset": "UTF-8",
+     "language": "",
+     "confidence": 15
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  },
+  {
+   "case": "synthetic-spaces",
+   "bytes": "TmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoKTmllICB3aWVtLCAgIGNvICAgIHNp6iAgICAgc3Rhs28uCgoK",
+   "size": 1080,
+   "matches": [
+    {
+     "charset": "ISO-8859-2",
+     "language": "pl",
+     "confidence": 98
+    },
+    {
+     "charset": "ISO-8859-1",
+     "language": "pt",
+     "confidence": 54
+    },
+    {
+     "charset": "UTF-16BE",
+     "language": "",
+     "confidence": 10
+    },
+    {
+     "charset": "UTF-16LE",
+     "language": "",
+     "confidence": 10
+    }
+   ]
+  }
+ ]
+}

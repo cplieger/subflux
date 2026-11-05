@@ -25,7 +25,7 @@ type pinger struct {
 
 func (p *pinger) kind(typ string, schema formschema.Schema) mediasource.AdapterKind {
 	return mediasource.AdapterKind{Type: typ, Schema: schema, New: func(cfg mediasource.Config, _ mediasource.Deps) (mediasource.Adapter, error) {
-		url, _ := cfg.Values.String("url")
+		url := cfg.Values.String("url")
 		return &script{caps: allCaps, ping: func(context.Context) error {
 			p.mu.Lock()
 			p.pinged = append(p.pinged, string(cfg.ID))

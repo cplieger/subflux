@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
@@ -18,8 +19,9 @@ type PostProcessOptions struct {
 	// StripTags removes HTML-like tags: <i>, </i>, <b>, </b>, <u>, </u>, <font ...>, </font>.
 	StripTags bool
 
-	// NormalizeEncoding converts the subtitle to UTF-8 from any detected encoding
-	// (UTF-16 LE/BE, Windows-1252, ISO-8859-1). Also strips UTF-8 BOM.
+	// NormalizeEncoding converts the subtitle to UTF-8 from what subtitleenc
+	// names with no language hint (UTF-16, ISO-2022-JP) and strips a UTF-8 BOM;
+	// bytes in a legacy page stay as they arrived.
 	NormalizeEncoding bool
 
 	// NormalizeLineEndings converts all line endings to CRLF (SRT standard)
@@ -106,7 +108,7 @@ func cleanCueText(text string, opts PostProcessOptions) string {
 // to raw subtitle bytes. Call this before parsing, or on the final output.
 func PostProcessBytes(data []byte, opts PostProcessOptions) []byte {
 	if opts.NormalizeEncoding {
-		data = subtitleenc.Normalize(data)
+		data = decodeView(data)
 	}
 	if opts.NormalizeLineEndings {
 		data = normalizeLineEndings(data)
@@ -246,4 +248,14 @@ func normalizeLineEndings(data []byte) []byte {
 		data = append(data, '\r', '\n')
 	}
 	return data
+}
+
+// decodeView returns data unchanged when Detect, with no hint, cannot name
+// and decode it.
+func decodeView(data []byte) []byte {
+	text, err := subtitleenc.Detect(data, language.Tag{}).Decode(data)
+	if err != nil {
+		return data
+	}
+	return text
 }

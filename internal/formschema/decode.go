@@ -14,15 +14,18 @@ const msgRequired = "required"
 
 // Decode reads n, a section's mapping (nil when the section is absent), by
 // the schema. Every scalar is read from its text by its field's Kind,
-// whatever its YAML tag, and a null is absent. Unknown and repeated keys,
-// anchors and aliases, and values failing their field's rules are field
-// errors at section-relative paths. Each scalar it reads for a non-Secret
-// field is retagged PlainTag in n, whatever errors other fields have.
+// whatever its YAML tag, and a scalar tagged !!null (IsNull) is absent, so an
+// explicit !!str ~ is the string ~. Unknown and repeated keys, anchors and
+// aliases, and values failing their field's rules are field errors at
+// section-relative paths; Values holds every field whatever the errors. Each
+// non-null scalar it reads for a non-Secret field is retagged PlainTag in n,
+// whatever errors other fields have.
 func (s Schema) Decode(n *yaml.Node) (Values, []FieldError) {
 	present, errs := s.collect(n)
 	vals := Values{}
 	for i := range s.Fields {
 		f := &s.Fields[i]
+		vals[f.Key] = Value{kind: f.Kind}
 		v, ok := present[f.Key]
 		if !ok || IsNull(v) {
 			errs = append(errs, s.absent(f, vals)...)
@@ -202,18 +205,13 @@ func markScalars(kind Kind, v *yaml.Node) {
 	}
 }
 
-// IsNull reports whether n, which must not be nil, is a YAML 1.2 core-schema
-// null read by its text whatever its tag (a plain "", ~, null, Null or NULL),
-// so a null retagged PlainTag still reads as absent.
+// IsNull reports whether n, which must not be nil, is a scalar tagged
+// !!null, written or resolved: a plain "", ~, null, Null or NULL, or an
+// explicit !!null. A tag decides, so !!str ~ and a PlainTag mark are not
+// null; no mark reaches a null, since Decode and the hand walks read before
+// they mark.
 func IsNull(n *yaml.Node) bool {
-	if n.Kind != yaml.ScalarNode || n.Style&(yaml.SingleQuotedStyle|yaml.DoubleQuotedStyle|yaml.LiteralStyle|yaml.FoldedStyle) != 0 {
-		return false
-	}
-	switch n.Value {
-	case "", "~", "null", "Null", "NULL":
-		return true
-	}
-	return false
+	return n.Kind == yaml.ScalarNode && n.ShortTag() == "!!null"
 }
 
 // ParseBool reads a YAML 1.2 core-schema boolean's text (true, True, TRUE,

@@ -117,7 +117,7 @@ func (s Server) LogFormat() string {
 func parseServer(n *yaml.Node) (Server, []formschema.FieldError) {
 	vals, errs := serverSchema.Decode(n)
 	s := &server{}
-	proxies, _ := vals.StringList(keyTrustedProxies)
+	proxies := vals.StringList(keyTrustedProxies)
 	for i, e := range proxies {
 		p, ok := parseProxy(e)
 		if !ok {
@@ -126,15 +126,14 @@ func parseServer(n *yaml.Node) (Server, []formschema.FieldError) {
 		}
 		s.proxies = append(s.proxies, p)
 	}
-	hosts, _ := vals.StringList(keyAllowedHosts)
+	hosts := vals.StringList(keyAllowedHosts)
 	for i, e := range hosts {
 		if webhttp.CanonicalHost(strings.TrimSpace(e)) == "" {
 			errs = append(errs, formschema.FieldError{Path: index(keyAllowedHosts, i), Message: "must be a host name or address, with an optional port, such as nas.lan or nas.lan:8374"})
 		}
 	}
-	level, _ := vals.String(keyLogLevel)
-	s.level = logLevels[level]
-	s.format, _ = vals.String(keyLogFormat)
+	s.level = logLevels[vals.String(keyLogLevel)]
+	s.format = vals.String(keyLogFormat)
 	if len(errs) > 0 {
 		slices.SortStableFunc(errs, func(a, b formschema.FieldError) int {
 			return fieldOrder(a.Path) - fieldOrder(b.Path)
@@ -188,15 +187,15 @@ func denyAllServer() Server {
 // own value when valid, else its default, and a host policy of the entries as
 // written. Each refused element passes its path text, which CanonicalHost
 // refuses, so a list with no valid entry denies every Host; a list it cannot
-// read, an alias or a merge key denies every Host. It follows no alias. It
-// reads a null by its YAML tag, not formschema.IsNull: a failed section can
-// hold a written tag, and IsNull reads !!str ~ as absent, admitting any Host.
+// read, an alias or a merge key denies every Host. It follows no alias. A
+// null is formschema.IsNull's, a tag rule, so a written !!str ~ is a string
+// and denies every Host as any unreadable list does.
 func failClosedServer(nodes []*yaml.Node) Server {
 	if len(nodes) != 1 {
 		return denyAllServer()
 	}
 	n := nodes[0]
-	if n.Kind == yaml.ScalarNode && n.ShortTag() == tagNull {
+	if formschema.IsNull(n) {
 		return Server{}
 	}
 	if n.Kind != yaml.MappingNode {
@@ -246,7 +245,7 @@ func writtenHosts(nodes []*yaml.Node) ([]string, bool) {
 		return nil, false
 	}
 	n := nodes[0]
-	if n.Kind == yaml.ScalarNode && n.ShortTag() == tagNull {
+	if formschema.IsNull(n) {
 		return nil, true
 	}
 	if n.Kind != yaml.SequenceNode {
@@ -255,7 +254,7 @@ func writtenHosts(nodes []*yaml.Node) ([]string, bool) {
 	entries := make([]string, 0, len(n.Content))
 	for i, e := range n.Content {
 		text := strings.TrimSpace(e.Value)
-		if e.Kind != yaml.ScalarNode || e.ShortTag() == tagNull || text == "" {
+		if e.Kind != yaml.ScalarNode || formschema.IsNull(e) || text == "" {
 			text = index("server."+keyAllowedHosts, i)
 		}
 		entries = append(entries, text)

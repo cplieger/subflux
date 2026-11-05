@@ -32,8 +32,10 @@ var variantKeys = map[string]Variant{"standard": Standard, "hi": HI, "forced": F
 // the section is absent), and returns every field error at once, each path
 // absolute from the config root (languages.rules[1].targets[0].tag). On any
 // error the Policy is the zero Policy. Every scalar is read by its text
-// whatever its YAML tag, and afterwards, valid or not, every scalar under n
-// is marked formschema.PlainTag: the section holds no secret.
+// whatever its YAML tag, except that one tagged !!null is absent
+// (formschema.IsNull), so an explicit !!str ~ is a string. Afterwards, valid
+// or not, every scalar under n is marked formschema.PlainTag: the section
+// holds no secret.
 func ParsePolicy(n *yaml.Node) (Policy, []formschema.FieldError) {
 	p, errs := walkPolicy(n)
 	formschema.MarkPlain(n)

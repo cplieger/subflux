@@ -22,6 +22,7 @@ import (
 
 	"github.com/cplieger/runesafe/v3"
 	"github.com/cplieger/subflux/internal/epmarker"
+	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
@@ -180,13 +181,21 @@ var subtitleSignatures = [][]byte{
 	[]byte("WEBVTT"),
 }
 
-// looksLikeSubtitle probes subtitleenc.TextView's decoded form rather than raw
-// bytes, so a UTF-16 subtitle (NUL-interleaved) is judged on its text rather
-// than being read as binary. TextView decodes only positively-identified
-// encodings, so an unidentified payload is probed raw and cannot be talked
-// into looking like text by a fallback decoder.
+// looksLikeSubtitle probes the decoded form rather than raw bytes, so a
+// UTF-16 subtitle (NUL-interleaved) is judged on its text rather than being
+// read as binary, and an unnamed payload is probed raw.
 func looksLikeSubtitle(data []byte) bool {
-	return looksLikeSubtitleRaw(subtitleenc.TextView(data))
+	return looksLikeSubtitleRaw(decodeView(data))
+}
+
+// decodeView returns data unchanged when Detect, with no hint, cannot name
+// and decode it.
+func decodeView(data []byte) []byte {
+	text, err := subtitleenc.Detect(data, language.Tag{}).Decode(data)
+	if err != nil {
+		return data
+	}
+	return text
 }
 
 func looksLikeSubtitleRaw(data []byte) bool {
