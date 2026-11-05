@@ -89,6 +89,16 @@ func mismatches(merged *yaml.Node, path string) ([]mismatch, bool) {
 	return retagged(merged, back, path, nil), true
 }
 
+// readsAnother reports whether back, scalar m reread, reads another type than
+// m's tag, or than null for an untagged empty plain m, which the encoder quotes
+// in flow.
+func readsAnother(m, back *yaml.Node) bool {
+	if m.Tag == "" && m.Style == 0 && m.Value == "" {
+		return back.ShortTag() != tagNull
+	}
+	return m.Tag != "" && m.ShortTag() != back.ShortTag()
+}
+
 // mismatch is a scalar retagged found, with the collections from the
 // outermost flow one holding it down to its parent (none in block context).
 type mismatch struct {
@@ -116,12 +126,7 @@ func retagged(m, back *yaml.Node, path string, flow []*yaml.Node) []mismatch {
 			bad = append(bad, retagged(m.Content[i], back.Content[i], index(path, i), flow)...)
 		}
 	case yaml.ScalarNode:
-		want := m.ShortTag()
-		if m.Tag == "" && m.Style == 0 && m.Value == "" {
-			// An empty plain scalar is a null; the encoder quotes one in flow.
-			want = tagNull
-		}
-		if (m.Tag != "" || want == tagNull) && want != back.ShortTag() {
+		if readsAnother(m, back) {
 			bad = append(bad, mismatch{flow: flow, path: path})
 		}
 	}
