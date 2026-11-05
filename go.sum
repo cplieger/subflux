@@ -22,8 +22,8 @@ github.com/cplieger/go/textsafe v1.0.0-dev.1 h1:NqiLs9uk4eOoXXkTQo0O8lMtYddo3XZu
 github.com/cplieger/go/textsafe v1.0.0-dev.1/go.mod h1:5IH0ZWTC+U864nzWGtcwGkp+PtA5hrlcfY2zLY/TexM=
 github.com/cplieger/go/xmlx v1.0.0-dev.2 h1:5KZgCyZfbB73q0rxXQj/AwByLLmBir3Hi30C2vlp3ns=
 github.com/cplieger/go/xmlx v1.0.0-dev.2/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
-github.com/cplieger/go/yamlenv v1.0.0-dev.1 h1:KA0t52zn3GJRWu4RnUaTx64QzSwsJjRsTnB6floeJCM=
-github.com/cplieger/go/yamlenv v1.0.0-dev.1/go.mod h1:rpijBJ7LqjTnmwWZpxX2O/htMilzJZOnMc6o1z7fOlc=
+github.com/cplieger/go/yamlenv v1.0.0-dev.2 h1:YZriaF+FfG6ulLQx7fAyPZI7QvgsuML7KkB7lFwxEQ8=
+github.com/cplieger/go/yamlenv v1.0.0-dev.2/go.mod h1:bYTrNFzQ0qSpy0u51Bouc9yTNXuj0FfGppio02PiJBw=
 github.com/cplieger/langtag/v3 v3.2.0-dev.1 h1:gXHAaMDLaJQRxiIC9cQMEsEmN9Y6g+8eMUFvkkCoHXc=
 github.com/cplieger/langtag/v3 v3.2.0-dev.1/go.mod h1:l9xswWicp31qquRod3FKzweWF0gJ06XKj/rqsNGESAQ=
 github.com/dlclark/regexp2/v2 v2.12.0 h1:GsCgDZZeHluUDHASr2yqQonZk4Tma5LFmLH9CSsFFEE=
@@ -32,8 +32,8 @@ github.com/nwaples/rardecode/v2 v2.4.6 h1:ddDMXtry2leooYMOXn0F8RzCvt+9tfq6SpleiR
 github.com/nwaples/rardecode/v2 v2.4.6/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
 github.com/ulikunitz/xz v0.5.17 h1:flR0y/x1hgM8EGV1AW3Xll6T413G0glV8UfBwR617V4=
 github.com/ulikunitz/xz v0.5.17/go.mod h1:H9Rt/W6/Qj27PGauhQc6nfCDy7vHpzsOThBSaYDoEhw=
-go.yaml.in/yaml/v3 v3.0.6 h1:zcDfvjXEqTQmpjniUBLc91xYJMB2c4QOFxEF/LCEckM=
-go.yaml.in/yaml/v3 v3.0.6/go.mod h1:HVTZu1O7/Vkt2N+BFy8Zza+lnLsABggaTM2ZpNIGuKg=
+go.yaml.in/yaml/v4 v4.0.0 h1:/LG1pNO84Z4l603j/xMn69CcS5OYhMQ/f7l2LoQUGuw=
+go.yaml.in/yaml/v4 v4.0.0/go.mod h1:aZqd9kCMsGL7AuUv/m/PvWLdg5sjJsZ4oHDEnfPPfY0=
 golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
 golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/text v0.43.0 h1:1QivrlhwAsnMOcqgOdl9my7s9OyZl8O5/UGUTJVXoWc=

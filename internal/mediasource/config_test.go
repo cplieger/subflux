@@ -10,7 +10,7 @@ import (
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // arrKind is an arr-shaped kind: url and api_key required, public_url

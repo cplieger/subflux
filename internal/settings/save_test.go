@@ -16,7 +16,7 @@ import (
 
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var errActivate = errors.New("store update failed")
@@ -581,6 +581,17 @@ func TestSaveRefusesStaleBase(t *testing.T) {
 	}
 	if fileText(t, path) != "server: {log_level: error}\n" || s.Snapshot().p != first.p {
 		t.Error("a stale save wrote the file or replaced the snapshot")
+	}
+}
+
+// TestEncodeKeepsTheFileShape pins the shape a Save writes: two-space
+// indent, block sequences indented under their key, and a long plain value
+// kept on one line, so the file keeps the shape its owner wrote.
+func TestEncodeKeepsTheFileShape(t *testing.T) {
+	const text = "t:\n  a: /media/My TV Shows/" + "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty\n  l:\n    - \"x\"\n    - y\n"
+	got, err := encode(node(t, text))
+	if err != nil || string(got) != text {
+		t.Errorf("encode = %q, %v; want %q", got, err, text)
 	}
 }
 
