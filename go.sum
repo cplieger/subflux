@@ -10,8 +10,8 @@ github.com/cplieger/go/httpserver v1.0.0-dev.3 h1:cxmEdEXhRh591+2/lrhRlxn9cTenL7
 github.com/cplieger/go/httpserver v1.0.0-dev.3/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
 github.com/cplieger/go/jsonx v1.0.0-dev.2 h1:XP5vemRQ+PWJT+kX5aZtHm1U/aLi36sZPwgMSjMxaVI=
 github.com/cplieger/go/jsonx v1.0.0-dev.2/go.mod h1:ank2TTHUDI/GrTBZ/KAwU72ECOdrCCDDYqlRSuR/+BQ=
-github.com/cplieger/go/keyenc v1.2.0-dev.1 h1:n3EFRTPr1LBVvfjPeGxgE4VS009JNGdWtaBT2rAN6y0=
-github.com/cplieger/go/keyenc v1.2.0-dev.1/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
+github.com/cplieger/go/keyenc v1.2.0-dev.2 h1:B6j+A7k9EHrAQrNX5KMo14lPsTwo/x7wQdI2AvS+6p8=
+github.com/cplieger/go/keyenc v1.2.0-dev.2/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
 github.com/cplieger/go/measure v1.0.0-dev.1 h1:xzc1DhLUmKnuG9ExlNn7JnopFKwD/ReP0DgX/jPeIhY=
 github.com/cplieger/go/measure v1.0.0-dev.1/go.mod h1:KY7f8SnaQkwhMKsmKIe+eIyYW7z0Xe6vE9AF02fMubw=
 github.com/cplieger/go/slogx v1.0.0-dev.1 h1:oYkkLGxYkUHebk+OtaWVzD9NwPqTmq13HztG6NaArn4=
