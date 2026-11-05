@@ -56,31 +56,37 @@ func bodyTagged(n *yaml.Node) bool {
 // collection first rewrites that collection block style, which keeps a
 // file's own timestamp a timestamp.
 func settleTags(merged *yaml.Node, path string) []formschema.FieldError {
-	for pass := 0; ; pass++ {
-		back, err := reread(merged)
-		if err != nil {
-			// The caller's own parse of the written file reports it.
-			return nil
-		}
-		bad := retagged(merged, back, path, nil)
-		if len(bad) == 0 {
-			return nil
-		}
-		reflowed := false
-		for _, b := range bad {
-			if pass == 0 && b.flow != nil {
-				unflow(b.flow)
-				reflowed = true
-			}
-		}
-		if !reflowed {
-			errs := make([]formschema.FieldError, 0, len(bad))
-			for _, b := range bad {
-				errs = append(errs, formschema.FieldError{Path: b.path, Message: msgTagged})
-			}
-			return errs
+	bad, ok := mismatches(merged, path)
+	if !ok || len(bad) == 0 {
+		return nil
+	}
+	reflowed := false
+	for _, b := range bad {
+		if b.flow != nil {
+			unflow(b.flow)
+			reflowed = true
 		}
 	}
+	if reflowed {
+		if bad, ok = mismatches(merged, path); !ok {
+			return nil
+		}
+	}
+	errs := make([]formschema.FieldError, 0, len(bad))
+	for _, b := range bad {
+		errs = append(errs, formschema.FieldError{Path: b.path, Message: msgTagged})
+	}
+	return errs
+}
+
+// mismatches is retagged over merged's reread. ok is false when merged does
+// not read back, which the caller's own parse of the written file reports.
+func mismatches(merged *yaml.Node, path string) ([]mismatch, bool) {
+	back, err := reread(merged)
+	if err != nil {
+		return nil, false
+	}
+	return retagged(merged, back, path, nil), true
 }
 
 // mismatch is a scalar retagged found, with the outermost flow collection
