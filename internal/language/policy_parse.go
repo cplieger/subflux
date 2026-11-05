@@ -213,6 +213,10 @@ func targetTagProblem(text string) string {
 	return ""
 }
 
+// msgUnknownVariant names the accepted variants and not the scalar, which can
+// be an expanded ${SUBFLUX_...} value; a field error names a path, never a value.
+const msgUnknownVariant = "unknown variant; use standard, hi or forced"
+
 func (w *policyWalk) variants(n *yaml.Node, path string) ([]Variant, bool) {
 	if n == nil {
 		return []Variant{Standard}, true
@@ -235,7 +239,7 @@ func (w *policyWalk) variants(n *yaml.Node, path string) ([]Variant, bool) {
 		case !ok:
 			valid = false
 		case !known:
-			w.fail(p, "unknown variant "+text)
+			w.fail(p, msgUnknownVariant)
 			valid = false
 		case slices.Contains(out, v):
 			w.fail(p, text+" is listed twice")
