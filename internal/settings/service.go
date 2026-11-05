@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var (

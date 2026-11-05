@@ -14,7 +14,7 @@ import (
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // fakeHarness serves a Library through a Fake, counting the adapter calls

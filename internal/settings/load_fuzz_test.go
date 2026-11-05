@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // FuzzLoad_neverAllowAllWhenListed: for any file bytes, an inactive Hosts()

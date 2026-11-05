@@ -21,7 +21,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // syncBuffer is a log destination safe for the app's goroutines.

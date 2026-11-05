@@ -10,7 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Mode is which of the three states a Snapshot is in.

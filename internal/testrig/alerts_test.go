@@ -12,7 +12,7 @@ import (
 
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/obs"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // promqlWords are the PromQL functions and keywords the shipped rules may

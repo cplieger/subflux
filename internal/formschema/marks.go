@@ -3,7 +3,7 @@ package formschema
 import (
 	"slices"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // MarkPlain retags n, and every scalar beneath it, PlainTag. A section owner

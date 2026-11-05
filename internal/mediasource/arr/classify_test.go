@@ -14,7 +14,7 @@ import (
 	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/arr"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestClassify(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/cplieger/go/yamlenv"
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var subfluxName = regexp.MustCompile(`^SUBFLUX_[A-Z0-9_]+$`)
