@@ -48,31 +48,84 @@ func bodyTagged(n *yaml.Node) bool {
 	return n.Kind != yaml.ScalarNode && n.Tag != "" && n.ShortTag() != (&yaml.Node{Kind: n.Kind}).ShortTag()
 }
 
-// retagged refuses, at its path, each tagged scalar of m that back, m written
-// by encode and parsed again, does not read with the same tag. go-yaml's
-// encoders write such a tag differently: v3 explicit, v4 dropping a
+// settleTags refuses, at its path, each tagged scalar of merged whose reread
+// (merged written by encode and parsed again) has another tag: v4 drops a
 // mismatched !!int or !!float (internal/libyaml/desolver.go), and both
-// quoting text a flow collection cannot hold plain.
-func retagged(m, back *yaml.Node, path string) []formschema.FieldError {
+// majors quote text holding a ':' in a flow collection. v3 writes a mismatch
+// explicit, which the file's own shape walk refuses. A mismatch inside a flow
+// collection first rewrites that collection block style, which keeps a
+// file's own timestamp a timestamp.
+func settleTags(merged *yaml.Node, path string) []formschema.FieldError {
+	for pass := 0; ; pass++ {
+		back, err := reread(merged)
+		if err != nil {
+			// The caller's own parse of the written file reports it.
+			return nil
+		}
+		bad := retagged(merged, back, path, nil)
+		if len(bad) == 0 {
+			return nil
+		}
+		reflowed := false
+		for _, b := range bad {
+			if pass == 0 && b.flow != nil {
+				unflow(b.flow)
+				reflowed = true
+			}
+		}
+		if !reflowed {
+			errs := make([]formschema.FieldError, 0, len(bad))
+			for _, b := range bad {
+				errs = append(errs, formschema.FieldError{Path: b.path, Message: msgTagged})
+			}
+			return errs
+		}
+	}
+}
+
+// mismatch is a scalar retagged found, with the outermost flow collection
+// holding it (nil in block context).
+type mismatch struct {
+	flow *yaml.Node
+	path string
+}
+
+func retagged(m, back *yaml.Node, path string, flow *yaml.Node) []mismatch {
 	if m == nil || back == nil || m.Kind != back.Kind {
 		return nil
 	}
-	var errs []formschema.FieldError
+	if flow == nil && m.Kind != yaml.ScalarNode && m.Style&yaml.FlowStyle != 0 {
+		flow = m
+	}
+	var bad []mismatch
 	switch m.Kind {
 	case yaml.MappingNode:
 		for i := 0; i+1 < len(m.Content) && i+1 < len(back.Content); i += 2 {
-			errs = append(errs, retagged(m.Content[i+1], back.Content[i+1], child(path, m.Content[i].Value))...)
+			at := child(path, m.Content[i].Value)
+			bad = append(bad, retagged(m.Content[i], back.Content[i], at, flow)...)
+			bad = append(bad, retagged(m.Content[i+1], back.Content[i+1], at, flow)...)
 		}
 	case yaml.SequenceNode:
 		for i := range min(len(m.Content), len(back.Content)) {
-			errs = append(errs, retagged(m.Content[i], back.Content[i], index(path, i))...)
+			bad = append(bad, retagged(m.Content[i], back.Content[i], index(path, i), flow)...)
 		}
 	case yaml.ScalarNode:
 		if m.Tag != "" && m.ShortTag() != back.ShortTag() {
-			errs = append(errs, formschema.FieldError{Path: path, Message: msgTagged})
+			bad = append(bad, mismatch{flow: flow, path: path})
 		}
 	}
-	return errs
+	return bad
+}
+
+// unflow writes n and every collection beneath it block style: the emitter
+// writes each child of a flow collection in flow.
+func unflow(n *yaml.Node) {
+	if n.Kind != yaml.ScalarNode {
+		n.Style &^= yaml.FlowStyle
+	}
+	for _, c := range n.Content {
+		unflow(c)
+	}
 }
 
 // mergeDocument is body, a whole document, with each unchanged scalar taken
@@ -89,11 +142,8 @@ func mergeDocument(stored, body *yaml.Node) (*yaml.Node, []formschema.FieldError
 	if len(errs) > 0 {
 		return nil, errs
 	}
-	// A merged document that does not read back is refused by Save's own parse.
-	if back, err := reread(merged); err == nil {
-		if errs := retagged(merged, back, ""); len(errs) > 0 {
-			return nil, errs
-		}
+	if errs := settleTags(merged, ""); len(errs) > 0 {
+		return nil, errs
 	}
 	return merged, nil
 }

@@ -102,7 +102,7 @@ func fileShape(n *yaml.Node, path string) []formschema.FieldError {
 	if n.Kind == yaml.AliasNode || n.Anchor != "" {
 		errs = append(errs, formschema.FieldError{Path: path, Message: msgShared})
 	}
-	if n.Style&yaml.TaggedStyle != 0 {
+	if n.Style&yaml.TaggedStyle != 0 || n.Tag == "!" {
 		errs = append(errs, formschema.FieldError{Path: path, Message: msgTagged})
 	}
 	return errs

@@ -614,7 +614,8 @@ func TestSaveBodyShapes(t *testing.T) {
 	tagged = append(tagged, bodyCase{"the non-specific tag set in code", bang, []string{"server.log_format"}, msgTagged})
 	stamp := node(t, "server: {log_format: x}\n"+validLanguages)
 	stamp.Content[1].Content[1].Tag, stamp.Content[1].Content[1].Value = "!!timestamp", "2001-12-14 12:00:00"
-	tagged = append(tagged, bodyCase{"a timestamp a flow mapping cannot hold plain", stamp, []string{"server.log_format"}, msgTagged})
+	// Written block style, it reaches the section as a timestamp, which an enum refuses.
+	tagged = append(tagged, bodyCase{"a timestamp in a flow mapping keeps its type", stamp, []string{"server.log_format"}, ""})
 	cases := append(tagged, []bodyCase{
 		{"a written mark", node(t, "server: {log_level: !plain debug}\n"+validLanguages), []string{"server.log_level"}, ""},
 		{"a written core tag", node(t, "server: {log_level: !!str debug}\n"+validLanguages), []string{"server.log_level"}, msgTagged},
@@ -719,5 +720,25 @@ func TestMergeKeepsAFlowNullNull(t *testing.T) {
 		if n.ShortTag() != tagNull {
 			t.Errorf("reread %q as %s, want %s", n.Value, n.ShortTag(), tagNull)
 		}
+	}
+}
+
+// TestSaveKeepsAFlowTimestampATimestamp pins settleTags' block rewrite: the
+// encoder quotes a ':' inside a flow collection, so a file's own timestamp
+// there would read back a string.
+func TestSaveKeepsAFlowTimestampATimestamp(t *testing.T) {
+	testSection(t)
+	path := fixture(t, "t: {a: shown, b: 2024-01-02T03:04:05Z}\n"+validLanguages)
+	s := serve(path, nil, nil)
+	if m := s.Snapshot().Mode(); m != ModeActive {
+		failure, _ := s.Snapshot().Failure()
+		t.Fatalf("fixture mode %v (%v), want active", m, failure)
+	}
+	if _, errs, err := s.Save(t.Context(), s.Snapshot().Document(), s.Snapshot().Revision()); err != nil || errs != nil {
+		t.Fatalf("Save(Document()) = %v, %v", errs, err)
+	}
+	b := Load(path, Registries{}).p.doc.Content[1].Content[3]
+	if b.ShortTag() != "!!timestamp" || b.Value != "2024-01-02T03:04:05Z" {
+		t.Errorf("t.b reads back %s %q, want the timestamp kept", b.ShortTag(), b.Value)
 	}
 }
