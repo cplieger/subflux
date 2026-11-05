@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/runesafe/v3"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
+	"github.com/cplieger/go/textsafe"
 )
 
 const (
@@ -63,7 +63,7 @@ func (p *source) login(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("login: %w", err)
 	}
-	defer func() { httpx.DrainClose(body) }()
+	defer func() { httpclient.DrainClose(body) }()
 
 	var resp loginResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
@@ -77,7 +77,7 @@ func (p *source) login(ctx context.Context) error {
 	if resp.BaseURL.Raw() != "" && !isValidServerHost(resp.BaseURL.Raw()) {
 		slog.Warn("opensubtitles: rejecting suspicious server redirect",
 			"base_url", resp.BaseURL)
-		resp.BaseURL = runesafe.Untrusted{}
+		resp.BaseURL = textsafe.Untrusted{}
 	}
 
 	p.tokenMu.Lock()

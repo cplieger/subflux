@@ -50,7 +50,7 @@ func TestLoadRefusesShapes(t *testing.T) {
 		if paths := failurePaths(t, s); !slices.Equal(paths, []string{"x", "x"}) {
 			t.Errorf("paths %v, want [x x] (shape, unknown section)", paths)
 		}
-		if a, _ := got.String("a"); *calls != 1 || a != "kept" {
+		if a := got.String("a"); *calls != 1 || a != "kept" {
 			t.Errorf("section t: %d parses, a = %q", *calls, a)
 		}
 	})

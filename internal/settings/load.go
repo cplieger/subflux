@@ -6,10 +6,10 @@ import (
 	"errors"
 	"io/fs"
 
-	"github.com/cplieger/atomicfile/v4"
-	"github.com/cplieger/envx/yamlenv/v2"
+	"github.com/cplieger/go/filesafe"
+	"github.com/cplieger/go/yamlenv"
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // maxFileBytes bounds the file Load reads and Save writes.
@@ -18,11 +18,11 @@ const maxFileBytes = 1 << 20
 // Load reads the file at path, an absolute path: absent is Unconfigured, and
 // a file that does not parse is Failed. It never writes.
 func Load(path string, r Registries) Snapshot {
-	data, err := atomicfile.ReadBounded(context.Background(), path, maxFileBytes)
+	data, err := filesafe.ReadBounded(context.Background(), path, maxFileBytes)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return parse(nil, r, fileState{known: true})
-	case errors.Is(err, atomicfile.ErrFileTooLarge):
+	case errors.Is(err, filesafe.ErrFileTooLarge):
 		return rootFailure("config.yaml is larger than 1 MiB", fileState{})
 	case err != nil:
 		return rootFailure("config.yaml cannot be read: "+err.Error(), fileState{})

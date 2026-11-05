@@ -17,8 +17,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/ssrf"
 )
 
 // fakeSkyHook answers in turn from answers, the last repeating, and records
@@ -82,7 +82,7 @@ func TestShowRedirectToOtherHostRefused(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &fakeSkyHook{answers: []answer{{code: http.StatusFound, header: http.Header{"Location": {target}}}}}
 			_, _, err := fakeClient(f).Show(t.Context(), 78874, "eng", "official")
-			if _, refused := errors.AsType[*httpx.RedirectRefusedError](err); !refused {
+			if _, refused := errors.AsType[*httpclient.RedirectRefusedError](err); !refused {
 				t.Errorf("Show error = %v, want a refused redirect", err)
 			}
 			if got := f.requests(); !slices.Equal(got, []string{fireflyURL}) {
@@ -221,7 +221,7 @@ func TestShowTransientRetried(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				f := &fakeSkyHook{answers: []answer{{code: code}}}
 				_, _, err := fakeClient(f).Show(t.Context(), 78874, "eng", "official")
-				if !httpx.IsTransient(err) {
+				if !httpclient.IsTransient(err) {
 					t.Errorf("Show error = %v, want transient", err)
 				}
 				if n := len(f.requests()); n != maxAttempts {
@@ -252,7 +252,7 @@ func TestShowOtherStatusNotRetried(t *testing.T) {
 		t.Run(strconv.Itoa(code), func(t *testing.T) {
 			f := &fakeSkyHook{answers: []answer{{code: code, body: recorded(t, "78874-eng-official.json")}}}
 			_, found, err := fakeClient(f).Show(t.Context(), 78874, "eng", "official")
-			if found || err == nil || httpx.IsTransient(err) {
+			if found || err == nil || httpclient.IsTransient(err) {
 				t.Errorf("Show = %v, %v; want a permanent error", found, err)
 			}
 			if err != nil && !strings.HasSuffix(err.Error(), "HTTP "+strconv.Itoa(code)) {
@@ -275,7 +275,7 @@ func TestShowOverCapRefused(t *testing.T) {
 	t.Run("17 MiB", func(t *testing.T) {
 		f := &fakeSkyHook{answers: []answer{ok(showOfSize(17 << 20))}}
 		_, found, err := fakeClient(f).Show(t.Context(), 78874, "eng", "official")
-		if _, over := errors.AsType[*httpx.ResponseTooLargeError](err); !over || found || httpx.IsTransient(err) {
+		if _, over := errors.AsType[*httpclient.ResponseTooLargeError](err); !over || found || httpclient.IsTransient(err) {
 			t.Errorf("Show = %v, %v; want a permanent over-cap error", found, err)
 		}
 		if n := len(f.requests()); n != 1 {
@@ -316,7 +316,7 @@ func TestShowOutOfRangeRefused(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &fakeSkyHook{answers: []answer{ok([]byte(body))}}
 			_, found, err := fakeClient(f).Show(t.Context(), 78874, "eng", "dvd")
-			if found || err == nil || httpx.IsTransient(err) {
+			if found || err == nil || httpclient.IsTransient(err) {
 				t.Errorf("Show = %v, %v; want a permanent error", found, err)
 			}
 			if n := len(f.requests()); n != 1 {

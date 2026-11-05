@@ -11,7 +11,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // validLanguages is the smallest languages section that parses, for a file
@@ -194,8 +194,7 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 		if s.Mode() != ModeActive {
 			t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 		}
-		a, _ := got.String("a")
-		b, _ := got.String("b")
+		a, b := got.String("a"), got.String("b")
 		if a != "a${b" || b != "x-${SUBFLUX_PASS}" {
 			t.Errorf("a = %q, b = %q; want a${b and x-${SUBFLUX_PASS}", a, b)
 		}
@@ -219,6 +218,37 @@ func TestExpansionKeepsDollarBraceInResolvedValue(t *testing.T) {
 	})
 }
 
+// TestPolicyErrorsNeverEchoExpandedValues pins that a languages field error
+// names its path and never the scalar an environment reference expanded to.
+func TestPolicyErrorsNeverEchoExpandedValues(t *testing.T) {
+	t.Setenv("SUBFLUX_S", "hunter2SECRET")
+	errs, ok := loadText(t, "languages: {default: [{tag: en, variants: [\"${SUBFLUX_S}\"]}]}\n").Failure()
+	if !ok || len(errs) == 0 {
+		t.Fatalf("Failure() = %v, %v; want the bad variant refused", errs, ok)
+	}
+	for _, e := range errs {
+		if strings.Contains(e.Path+e.Message, "hunter2SECRET") {
+			t.Errorf("field error %q: %q echoes the expanded value", e.Path, e.Message)
+		}
+	}
+	if errs[0].Path != "languages.default[0].variants[0]" {
+		t.Errorf("Failure()[0].Path = %q, want languages.default[0].variants[0]", errs[0].Path)
+	}
+}
+
+// TestLoadSyntaxErrorWithholdsValue pins the root error a syntax error
+// gives: a location, never the text around it.
+func TestLoadSyntaxErrorWithholdsValue(t *testing.T) {
+	errs, ok := loadText(t, "server:\n  log_level: \"hunter2-SECRET\n").Failure()
+	if !ok || len(errs) != 1 || errs[0].Path != "" {
+		t.Fatalf("Failure() = %v, %v; want one root error", errs, ok)
+	}
+	m := errs[0].Message
+	if !strings.HasPrefix(m, "config.yaml is not valid YAML: line ") || !strings.Contains(m, "details withheld") || strings.Contains(m, "hunter2") {
+		t.Errorf("message %q, want a line number and the details withheld", m)
+	}
+}
+
 func TestExpandedDigitsStayStrings(t *testing.T) {
 	got, _ := testSection(t)
 	t.Setenv("SUBFLUX_KEY", "0123")
@@ -227,10 +257,8 @@ func TestExpandedDigitsStayStrings(t *testing.T) {
 	if s.Mode() != ModeActive {
 		t.Fatalf("mode %v, failure %v", s.Mode(), failurePaths(t, s))
 	}
-	a, _ := got.String("a")
-	sec, _ := got.Secret("s")
-	n, ok := got.Int("n")
-	if a != "0123" || sec != "0123" || !ok || n != 42 {
-		t.Errorf("a = %q, s = %q, n = %d %v; want 0123, 0123, 42", a, sec, n, ok)
+	a, sec, n := got.String("a"), got.Secret("s"), got.Int("n")
+	if a != "0123" || sec != "0123" || n != 42 {
+		t.Errorf("a = %q, s = %q, n = %d; want 0123, 0123, 42", a, sec, n)
 	}
 }

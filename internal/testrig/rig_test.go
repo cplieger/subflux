@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/app"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func get(t *testing.T, r *Rig, path string) (int, string) {

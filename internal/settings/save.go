@@ -10,9 +10,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cplieger/atomicfile/v4"
+	"github.com/cplieger/go/filesafe"
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const (
@@ -35,7 +35,7 @@ func (f fileState) same(g fileState) bool {
 
 // writeFile is the one write seam: Save's persist and its restore both call it.
 var writeFile = func(ctx context.Context, path string, data []byte) error {
-	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600), atomicfile.WithMaxBytes(maxFileBytes))
+	_, err := filesafe.WriteFile(ctx, path, data, filesafe.WithMode(0o600), filesafe.WithMaxBytes(maxFileBytes))
 	return err
 }
 
@@ -143,7 +143,7 @@ func removeFile(path string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	if rerr := atomicfile.RemoveFileInRoot(root, filepath.Base(path)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+	if rerr := filesafe.RemoveFileInRoot(root, filepath.Base(path)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
 		return rerr
 	}
 	dir, err := root.Open(".")
@@ -156,7 +156,7 @@ func removeFile(path string) error {
 
 // readFile reads the file as Save's baseline.
 func readFile(path string) fileState {
-	data, err := atomicfile.ReadBounded(context.Background(), path, maxFileBytes)
+	data, err := filesafe.ReadBounded(context.Background(), path, maxFileBytes)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return fileState{known: true}
@@ -170,15 +170,20 @@ func rootError(msg string) []formschema.FieldError {
 	return []formschema.FieldError{{Message: msg}}
 }
 
-// encode is n as file text, two-space indented.
+// encode is n as file text, two-space indented and never line-wrapped.
+// WithV3Defaults keeps v3's sequence indent and quoting; its 80-column wrap
+// would fold a long value on every Save. It dumps a copy: v4's Dump clears the
+// inferable tags of the tree it is given (internal/libyaml/desolver.go).
 func encode(n *yaml.Node) ([]byte, error) {
 	var b bytes.Buffer
-	e := yaml.NewEncoder(&b)
-	e.SetIndent(2)
-	if err := e.Encode(n); err != nil {
+	d, err := yaml.NewDumper(&b, yaml.WithV3Defaults(), yaml.WithIndent(2), yaml.WithLineWidth(-1))
+	if err != nil {
 		return nil, fmt.Errorf("settings: encode the document: %w", err)
 	}
-	if err := e.Close(); err != nil {
+	if err := d.Dump(deepCopy(n)); err != nil {
+		return nil, fmt.Errorf("settings: encode the document: %w", err)
+	}
+	if err := d.Close(); err != nil {
 		return nil, fmt.Errorf("settings: encode the document: %w", err)
 	}
 	return b.Bytes(), nil

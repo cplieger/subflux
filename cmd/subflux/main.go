@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/cplieger/health"
+	"github.com/cplieger/go/health"
 )
 
 func main() {

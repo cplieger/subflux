@@ -5,15 +5,13 @@
 //   - Framerate correction (known ratios + golden-section search)
 //   - Split-aware DP alignment (handles commercial breaks, different cuts)
 //   - Audio-based sync (energy VAD + FFT cross-correlation, no reference needed)
-//   - Encoding normalization (UTF-16, Windows-1252 → UTF-8)
+//   - Encoding normalization (UTF-16 and the other forms subtitleenc names with no hint → UTF-8)
 //
 // The entry point is SyncWithOptions, which takes already-parsed cues and
-// returns the winning SyncResult. Callers own file I/O: read the subtitle,
-// decode it with subtitleenc.Normalize, ParseSRT it, sync, then WriteSRT the
-// corrected cues.
-//
-// Audio-only sync (no reference subtitle) is the same call with a nil
-// reference, EnableAudio, and SyncOptions.VideoPath set.
+// returns the winning SyncResult; audio-only sync is the same call with a nil
+// reference, EnableAudio and SyncOptions.VideoPath set. Callers own file I/O:
+// read the subtitle, decode it (subtitleenc.Detect, then Decode), ParseSRT
+// it, sync, then WriteSRT the corrected cues.
 package subsync
 
 import (

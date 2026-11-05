@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/mediasource"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func scalar(s string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s} }

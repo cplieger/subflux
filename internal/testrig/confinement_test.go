@@ -29,7 +29,16 @@ type importRule struct {
 
 // importRules is the architecture's confinement table; each row lands with
 // the landing that turns it on.
-var importRules []importRule
+var importRules = []importRule{releaseRule(modulePath)}
+
+// releaseRule keeps release.Parsed inside search's packages: rank, the
+// provider adapters and the engine.
+func releaseRule(module string) importRule {
+	return importRule{
+		imported: module + "/internal/release",
+		allowed:  []string{module + "/internal/rank", module + "/internal/provider/...", module + "/internal/search"},
+	}
+}
 
 // providerHTTPRoots are trees whose subpackages may not build a raw net/http
 // client or transport; the provider boundary owns the one client.
@@ -114,6 +123,14 @@ func TestConfinementChecker(t *testing.T) {
 			t.Errorf("every-package rule: violations = %q, want the one planted import", got)
 		}
 	})
+	t.Run("release row", func(t *testing.T) {
+		rule := releaseRule(fixture)
+		got := importViolations(pkgs, fixture, []importRule{rule})
+		want := []string{fmt.Sprintf("%s/internal/other imports %s/internal/release, allowed only in %v", fixture, fixture, rule.allowed)}
+		if !slices.Equal(got, want) {
+			t.Errorf("violations = %q, want %q", got, want)
+		}
+	})
 	t.Run("raw client", func(t *testing.T) {
 		got, err := rawHTTPViolations(pkgs, fixture, []string{""})
 		if err != nil {
@@ -131,7 +148,8 @@ func TestConfinementChecker(t *testing.T) {
 }
 
 // importViolations reports each direct import a rule forbids, once per
-// importer and imported path, test variants folded into their package.
+// importer and imported path, test variants folded into their package, so a
+// package's own tests may import it.
 func importViolations(pkgs []listedPackage, module string, rules []importRule) []string {
 	var out []string
 	for _, p := range pkgs {
@@ -145,7 +163,7 @@ func importViolations(pkgs []listedPackage, module string, rules []importRule) [
 			}
 			for _, imp := range p.Imports {
 				imp = basePackage(imp)
-				if !matchPath(r.imported, imp) {
+				if imp == importer || !matchPath(r.imported, imp) {
 					continue
 				}
 				v := r.violation(importer, imp)
@@ -236,10 +254,11 @@ func rawHTTPInFile(path, shown string) ([]string, error) {
 	return out, nil
 }
 
-// basePackage folds a test variant ("p [p.test]", "p_test [p.test]") into p.
+// basePackage folds a test variant ("p [p.test]", "p_test [p.test]") and
+// the generated test main ("p.test") into p.
 func basePackage(importPath string) string {
 	path, _, _ := strings.Cut(importPath, " ")
-	return strings.TrimSuffix(path, "_test")
+	return strings.TrimSuffix(strings.TrimSuffix(path, ".test"), "_test")
 }
 
 func matchPath(pattern, path string) bool {

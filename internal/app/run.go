@@ -11,10 +11,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/health"
+	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
-	"github.com/cplieger/webhttp/v3"
 )
 
 // Paths are the files the process reads and writes.
@@ -91,12 +91,12 @@ func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam
 			return fmt.Errorf("app: listen on %s: %w", listenAddr, err)
 		}
 	}
-	srv := webhttp.NewServer(handler(m, marker, cfg.Routes),
-		webhttp.WithReadTimeout(readTimeout),
-		webhttp.WithReadHeaderTimeout(readHeaderTimeout),
-		webhttp.WithWriteTimeout(writeTimeout),
-		webhttp.WithMaxHeaderBytes(maxHeaderBytes),
-		webhttp.WithSlogErrorLog(slog.LevelWarn),
+	srv := httpserver.New(handler(m, marker, cfg.Routes),
+		httpserver.WithReadTimeout(readTimeout),
+		httpserver.WithReadHeaderTimeout(readHeaderTimeout),
+		httpserver.WithWriteTimeout(writeTimeout),
+		httpserver.WithMaxHeaderBytes(maxHeaderBytes),
+		httpserver.WithSlogErrorLog(slog.LevelWarn),
 	)
 	producers := []component{
 		httpComponent(srv, ln),

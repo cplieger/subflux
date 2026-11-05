@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
@@ -70,7 +71,7 @@ func Validate(data []byte) error {
 		}
 	}
 
-	if isText(subtitleenc.TextView(data)) {
+	if isText(decodeView(data)) {
 		return nil
 	}
 
@@ -109,4 +110,14 @@ func CountNonText(data []byte) int {
 		}
 	}
 	return n
+}
+
+// decodeView returns data unchanged when Detect, with no hint, cannot name
+// and decode it.
+func decodeView(data []byte) []byte {
+	text, err := subtitleenc.Detect(data, language.Tag{}).Decode(data)
+	if err != nil {
+		return data
+	}
+	return text
 }

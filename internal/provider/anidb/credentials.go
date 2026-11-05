@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/xmlx"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/xmlx"
 )
 
 // errClientRejected is the AniDB error code for a client string the API does
@@ -49,7 +49,7 @@ func (m *Mapper) CheckClientKey(ctx context.Context) error {
 	}
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return httpx.RedactTransportError(err, "anidb credential check", httpx.Secret(m.clientKey))
+		return httpclient.RedactTransportError(err, "anidb credential check", httpclient.Secret(m.clientKey))
 	}
 	defer resp.Body.Close()
 	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {

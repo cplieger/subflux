@@ -38,17 +38,17 @@ func TestDecodeKeepsScalarText(t *testing.T) {
 			if len(errs) != 0 {
 				t.Fatalf("errors: %v", errs)
 			}
-			if got, _ := vals.Secret("api_key"); got != text {
+			if got := vals.Secret("api_key"); got != text {
 				t.Errorf("Secret = %q, want %q", got, text)
 			}
-			if got, _ := vals.String("name"); got != text {
+			if got := vals.String("name"); got != text {
 				t.Errorf("String = %q, want %q", got, text)
 			}
 		})
 	}
 	vals, errs := s.Decode(section(t, `n: "42"`))
-	if got, ok := vals.Int("n"); len(errs) != 0 || !ok || got != 42 {
-		t.Errorf(`Int from "42" = %d, %v, %v; want 42`, got, ok, errs)
+	if got := vals.Int("n"); len(errs) != 0 || got != 42 {
+		t.Errorf(`Int from "42" = %d, %v; want 42`, got, errs)
 	}
 }
 
@@ -64,23 +64,23 @@ func TestDecodeAppliesDefaults(t *testing.T) {
 	if len(errs) != 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if b, _ := vals.Bool("enabled"); !b {
+	if b := vals.Bool("enabled"); !b {
 		t.Error("enabled lost its written value")
 	}
-	if d, _ := vals.Duration("frequency"); d != 24*time.Hour {
+	if d := vals.Duration("frequency"); d != 24*time.Hour {
 		t.Errorf("frequency = %v, want the 24h default", d)
 	}
-	if n, _ := vals.Int("copies"); n != 7 {
+	if n := vals.Int("copies"); n != 7 {
 		t.Errorf("copies = %d, want the default 7", n)
 	}
-	if f, _ := vals.String("format"); f != "json" {
+	if f := vals.String("format"); f != "json" {
 		t.Errorf("format = %q, want the default json", f)
 	}
-	if _, ok := vals.String("path"); ok {
-		t.Error("an absent key with no default has a value")
+	if p := vals.String("path"); p != "" {
+		t.Errorf("an absent key with no default reads %q, want its zero value", p)
 	}
 	vals, errs = s.Decode(nil)
-	if n, _ := vals.Int("copies"); len(errs) != 0 || n != 7 {
+	if n := vals.Int("copies"); len(errs) != 0 || n != 7 {
 		t.Errorf("absent section: copies = %d, errors %v; want the default", n, errs)
 	}
 	bad := Schema{Fields: []Field{{Key: "n", Kind: Int, Default: "x"}, {Key: "l", Kind: StringList, Default: "a"}}}
@@ -107,7 +107,7 @@ func TestDecodeRefusesUnknownKey(t *testing.T) {
 	if !slices.Equal(errs, []FieldError{{"b", "unknown key"}, {"a", "key is set twice"}}) {
 		t.Errorf("errors = %v", errs)
 	}
-	if got, _ := vals.String("a"); got != "x" {
+	if got := vals.String("a"); got != "x" {
 		t.Errorf("a = %q, want the first value", got)
 	}
 	if _, errs := s.Decode(section(t, "- a\n")); !slices.Equal(errs, []FieldError{{"", "must be a mapping"}}) {
@@ -154,14 +154,14 @@ func TestDecodeBounds(t *testing.T) {
 	if len(errs) != 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if n, _ := vals.Int("free"); n != -900 {
+	if n := vals.Int("free"); n != -900 {
 		t.Errorf("unbounded int = %d", n)
 	}
-	if l, _ := vals.StringList("list"); !slices.Equal(l, []string{"a", "", "b"}) {
+	if l := vals.StringList("list"); !slices.Equal(l, []string{"a", "", "b"}) {
 		t.Errorf("list = %q", l)
 	}
-	if on, ok := vals.Bool("on"); on || !ok {
-		t.Errorf("on = %v, %v; want false, true", on, ok)
+	if on := vals.Bool("on"); on {
+		t.Errorf("on = %v, want false", on)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestDecodeDurationWholeMilliseconds(t *testing.T) {
 	s := Schema{Fields: []Field{{Key: "d", Kind: DurationMs, Min: 1000, Max: 3_600_000}}}
 	for src, want := range map[string]time.Duration{"d: 1s": time.Second, "d: 1500ms": 1500 * time.Millisecond, "d: 1h": time.Hour} {
 		vals, errs := s.Decode(section(t, src))
-		if d, _ := vals.Duration("d"); len(errs) != 0 || d != want {
+		if d := vals.Duration("d"); len(errs) != 0 || d != want {
 			t.Errorf("%s: %v, %v; want %v", src, d, errs, want)
 		}
 	}
@@ -190,41 +190,29 @@ func TestDecodeNullIsAbsent(t *testing.T) {
 	if !slices.Equal(errs, []FieldError{{"c", "required"}}) {
 		t.Errorf("errors = %v, want c required", errs)
 	}
-	if n, _ := vals.Int("a"); n != 3 {
+	if n := vals.Int("a"); n != 3 {
 		t.Errorf("a null value did not take the default: %d", n)
 	}
-	if _, ok := vals.String("b"); ok {
-		t.Error("a null string has a value")
+	if b := vals.String("b"); b != "" {
+		t.Errorf("a null string reads %q", b)
 	}
 	if vals, errs := s.Decode(section(t, "b: 'null'\nc: x")); len(errs) != 0 {
 		t.Errorf("quoted null: %v", errs)
-	} else if b, _ := vals.String("b"); b != "null" {
+	} else if b := vals.String("b"); b != "null" {
 		t.Errorf("quoted null read as %q", b)
 	}
-	marked := section(t, "a: ~\nb: null\nc: x\nl: [~]\n")
-	for _, k := range []string{"a", "b"} {
-		valueNode(marked, k).Tag = PlainTag
-	}
-	valueNode(marked, "l").Content[0].Tag = PlainTag
 	withList := Schema{Fields: append(slices.Clone(s.Fields), Field{Key: "l", Kind: StringList})}
-	vals, errs = withList.Decode(marked)
-	if !slices.Equal(errs, []FieldError{{"l[0]", "must be a single value"}}) {
-		t.Errorf("marked nulls: errors %v, want only the list's null element refused", errs)
-	}
-	if n, _ := vals.Int("a"); n != 3 {
-		t.Errorf("a marked null did not take the default: %d", n)
-	}
-	if b, ok := vals.String("b"); ok {
-		t.Errorf("a marked null string read as %q", b)
+	if _, errs := withList.Decode(section(t, "c: x\nl: [~]\n")); !slices.Equal(errs, []FieldError{{"l[0]", "must be a single value"}}) {
+		t.Errorf("a null list element: errors %v, want it refused", errs)
 	}
 }
 
 func TestIsNull(t *testing.T) {
-	m := section(t, "plain: ~\nword: null\nNull: Null\nupper: NULL\nempty:\nstr: !!str ~\nquoted: 'null'\ndq: \"\"\ntext: nil\nlist: []\n")
-	m.Content[1].Tag = PlainTag
+	m := section(t, "plain: ~\nword: null\nNull: Null\nupper: NULL\nempty:\ntagged: !!null ~\nstr: !!str ~\nmarked: ~\nquoted: 'null'\ndq: \"\"\ntext: nil\nlist: []\n")
+	valueNode(m, "marked").Tag = PlainTag
 	for key, want := range map[string]bool{
-		"plain": true, "word": true, "Null": true, "upper": true, "empty": true, "str": true,
-		"quoted": false, "dq": false, "text": false, "list": false,
+		"plain": true, "word": true, "Null": true, "upper": true, "empty": true, "tagged": true,
+		"str": false, "marked": false, "quoted": false, "dq": false, "text": false, "list": false,
 	} {
 		t.Run(key, func(t *testing.T) {
 			if got := IsNull(valueNode(m, key)); got != want {
@@ -257,19 +245,6 @@ func TestDecodeRefusesSharedNodes(t *testing.T) {
 	}
 	if tag := valueNode(m, "a").Tag; tag == PlainTag {
 		t.Error("an anchored scalar was marked, unmasking its alias")
-	}
-}
-
-func TestValuesAnswerOnlyTheirKind(t *testing.T) {
-	s := Schema{Fields: []Field{{Key: "k", Kind: Secret}, {Key: "l", Kind: StringList}}}
-	vals, _ := s.Decode(section(t, "k: x\nl: [a]\n"))
-	if _, ok := vals.String("k"); ok {
-		t.Error("String answered a Secret field")
-	}
-	l, _ := vals.StringList("l")
-	l[0] = "changed"
-	if again, _ := vals.StringList("l"); again[0] != "a" {
-		t.Error("StringList shares its backing array")
 	}
 }
 

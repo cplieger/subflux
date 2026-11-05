@@ -15,7 +15,7 @@ internal/cache/testdata/rapid/
 .kiro/
 
 # Local Go workspace for building against unreleased sibling library checkouts
-# (e.g. ../webhttp with ParseCIDRs). Local-only; go.mod keeps the released pin.
+# (e.g. a ../go checkout). Local-only; go.mod keeps the released pin.
 go.work
 go.work.sum
 

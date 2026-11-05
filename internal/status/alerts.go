@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
 )
 
 // maxAlertText bounds an alert's text and a provider's reason, in bytes.
@@ -87,6 +87,6 @@ func (s *Store) RetainAlerts(kind string, live []AlertSource) {
 }
 
 func cutText(text string) string {
-	out, _ := runesafe.SanitizeSingleLineCapped(text, maxAlertText, "…")
+	out, _ := textsafe.SanitizeSingleLineCapped(text, maxAlertText, "…")
 	return out
 }

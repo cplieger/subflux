@@ -21,7 +21,8 @@ type Harness interface {
 	Kind() mediasource.AdapterKind
 	// Serve starts a fake upstream over lib for the test's lifetime,
 	// answering from lib's state at each request, and returns an entry
-	// pointing at it.
+	// pointing at it. Serve and Refuse return Values decoded by Kind's
+	// Schema, as ParseConfigs would.
 	Serve(t testing.TB, lib *Library) mediasource.Config
 	// Refuse returns an entry whose upstream refuses the credential.
 	Refuse(t testing.TB) mediasource.Config

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var (
@@ -110,6 +110,9 @@ func (s *Service) Merge(section string, entry *yaml.Node, parse func(expanded *y
 	}
 	merged, errs := mergeNode(entry, se, section)
 	if len(errs) > 0 {
+		return errs
+	}
+	if errs := settleTags(merged, section); len(errs) > 0 {
 		return errs
 	}
 	out, err := reread(merged)

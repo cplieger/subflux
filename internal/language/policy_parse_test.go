@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // section parses doc, a YAML document holding a languages key, and returns
@@ -64,12 +64,6 @@ func TestPreMarkedNodeParsesSame(t *testing.T) {
 		t.Fatalf("pre-marked: %v", errs)
 	}
 	quoted := mustPolicy(t, strings.Replace(validSection, "close_varieties: true", `close_varieties: "true"`, 1))
-	nulls := section(t, validSection+"    - audio: fr\n      targets:\n        - tag: fr\n          variants:\n")
-	retag(nulls)
-	withNull, errs := ParsePolicy(nulls)
-	if len(errs) > 0 {
-		t.Fatalf("pre-marked null: %v", errs)
-	}
 	for name, p := range map[string]Policy{"pre-marked": premarked, "quoted true": quoted} {
 		t.Run(name, func(t *testing.T) {
 			if p.Digest() != loaded.Digest() || !p.CloseVarieties() {
@@ -77,14 +71,25 @@ func TestPreMarkedNodeParsesSame(t *testing.T) {
 			}
 		})
 	}
-	t.Run("pre-marked null reads as absent", func(t *testing.T) {
-		if got := withNull.TargetsFor(mustParse(t, "fr"), nil); len(got) != 1 || !slices.Equal(got[0].Variants, []Variant{Standard}) {
+}
+
+func TestNullFieldIsAbsent(t *testing.T) {
+	fr := "    - audio: fr\n      targets:\n        - tag: fr\n          variants: "
+	t.Run("a null reads as absent", func(t *testing.T) {
+		p := mustPolicy(t, validSection+fr+"~\n")
+		if got := p.TargetsFor(mustParse(t, "fr"), nil); len(got) != 1 || !slices.Equal(got[0].Variants, []Variant{Standard}) {
 			t.Errorf("TargetsFor(fr) = %v; want fr with the default variant", got)
+		}
+	})
+	t.Run("a !!str ~ is a string", func(t *testing.T) {
+		_, errs := ParsePolicy(section(t, validSection+fr+"!!str ~\n"))
+		if len(errs) != 1 || errs[0].Path != "languages.rules[2].targets[0].variants" {
+			t.Errorf("errors = %v, want the variants refused", errs)
 		}
 	})
 }
 
-// retag marks every scalar under n PlainTag, as a Document round trip does.
+// retag marks every scalar under n PlainTag, as a section parse leaves it.
 func retag(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
 		n.Tag = formschema.PlainTag
@@ -172,7 +177,7 @@ func TestParsePolicyRows(t *testing.T) {
 		{"not a tag", target("klingon"), "languages.default[0].tag", "not a language tag"},
 		{"variants empty", "languages:\n  default:\n    - tag: en\n      variants: []\n", "languages.default[0].variants", "list at least one of standard, hi, forced"},
 		{"variants not a list", "languages:\n  default:\n    - tag: en\n      variants: hi\n", "languages.default[0].variants", "must be a list"},
-		{"unknown variant", "languages:\n  default:\n    - tag: en\n      variants: [sdh]\n", "languages.default[0].variants[0]", "unknown variant sdh"},
+		{"unknown variant", "languages:\n  default:\n    - tag: en\n      variants: [sdh]\n", "languages.default[0].variants[0]", msgUnknownVariant},
 		{"variant listed twice", "languages:\n  default:\n    - tag: en\n      variants: [hi, hi]\n", "languages.default[0].variants[1]", "hi is listed twice"},
 		{"rules not a list", pre + "  rules: {audio: ja}\n", "languages.rules", "must be a list"},
 		{"too many rules", pre + "  rules: [" + rulesN(65) + "]\n", "languages.rules", "at most 64 rules"},
@@ -220,11 +225,11 @@ func TestParsePolicySectionChecksBesideFieldErrors(t *testing.T) {
 			{Path: "languages", Message: "configure at least one subtitle target"},
 		}},
 		{"a duplicate after a row with bad variants", "languages:\n  default:\n    - tag: en\n      variants: [loud]\n    - tag: en\n", []formschema.FieldError{
-			{Path: "languages.default[0].variants[0]", Message: "unknown variant loud"},
+			{Path: "languages.default[0].variants[0]", Message: msgUnknownVariant},
 			{Path: "languages.default[1].tag", Message: "en is listed twice"},
 		}},
 		{"33 distinct beside bad variants", "languages:\n  default: [" + targetsN(16, 0) + "]\n  rules:\n    - audio: ja\n      targets: [" + targetsN(16, 16) + "]\n    - audio: de\n      targets:\n        - tag: " + targetTags[32] + "\n          variants: [loud]\n", []formschema.FieldError{
-			{Path: "languages.rules[1].targets[0].variants[0]", Message: "unknown variant loud"},
+			{Path: "languages.rules[1].targets[0].variants[0]", Message: msgUnknownVariant},
 			{Path: "languages", Message: "at most 32 distinct subtitle languages"},
 		}},
 		{"a refused target still counts as written", "languages:\n  default:\n    - tag: klingon\n", []formschema.FieldError{
@@ -232,7 +237,7 @@ func TestParsePolicySectionChecksBesideFieldErrors(t *testing.T) {
 		}},
 		{"an over-long list still walks its rows", "languages:\n  default: [" + targetsN(16, 0) + ", {tag: " + targetTags[16] + ", variants: [loud]}]\n", []formschema.FieldError{
 			{Path: "languages.default", Message: "at most 16 targets"},
-			{Path: "languages.default[16].variants[0]", Message: "unknown variant loud"},
+			{Path: "languages.default[16].variants[0]", Message: msgUnknownVariant},
 		}},
 		{"an over-long rules list still walks its targets", "languages:\n  rules: [" + rulesUnique(65, "[{tag: fr}]") + "]\n", []formschema.FieldError{
 			{Path: "languages.rules", Message: "at most 64 rules"},

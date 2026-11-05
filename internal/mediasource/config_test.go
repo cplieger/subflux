@@ -10,7 +10,7 @@ import (
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // arrKind is an arr-shaped kind: url and api_key required, public_url
@@ -30,7 +30,7 @@ var arrSchema = formschema.Schema{Fields: []formschema.Field{
 func (k *arrKind) kind(typ string) mediasource.AdapterKind {
 	return mediasource.AdapterKind{Type: typ, Schema: arrSchema, New: func(cfg mediasource.Config, deps mediasource.Deps) (mediasource.Adapter, error) {
 		k.news = append(k.news, deps)
-		raw, _ := cfg.Values.String("url")
+		raw := cfg.Values.String("url")
 		if u, err := url.Parse(raw); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 			return nil, errors.New("baseURL must be an absolute http or https URL")
 		}
@@ -143,7 +143,7 @@ func TestParseConfigsAccepts(t *testing.T) {
 	if cfgs[1].ID != "nested" || cfgs[1].Type != "radarr" || cfgs[1].Index != 1 || len(cfgs[1].PathMappings) != 2 {
 		t.Errorf("second config %+v, want nested radarr at index 1 with two mappings", cfgs[1])
 	}
-	if key, _ := cfgs[0].Values.Secret("api_key"); key != "k" {
+	if key := cfgs[0].Values.Secret("api_key"); key != "k" {
 		t.Errorf("api_key %q, want the adapter's decoded value", key)
 	}
 	for _, n := range []string{"", "~", "sources: null"} {
@@ -169,9 +169,16 @@ func TestExcludeTagsDefaults(t *testing.T) {
 	}
 	for tail, want := range cases {
 		cfgs, errs := mediasource.ParseConfigs(parseYAML(t, "- {id: s, type: sonarr, url: 'http://a', api_key: k"+tail+"}"), arrKinds(&arrKind{}))
-		if len(errs) > 0 || !slices.Equal(cfgs[0].ExcludeTags, want) {
-			t.Errorf("exclude_tags%q = %q %v, want %q", tail, cfgs[0].ExcludeTags, errs, want)
+		if len(errs) > 0 || len(cfgs) != 1 || !slices.Equal(cfgs[0].ExcludeTags, want) {
+			t.Errorf("exclude_tags%q = %+v %v, want one entry excluding %q", tail, cfgs, errs, want)
 		}
+	}
+}
+
+func TestEnvelopeNullsAreAbsent(t *testing.T) {
+	cfgs, errs := mediasource.ParseConfigs(parseYAML(t, "- {id: s, type: sonarr, url: 'http://a', api_key: k, enabled: ~, path_mappings: null, exclude_tags: null}"), arrKinds(&arrKind{}))
+	if len(errs) > 0 || len(cfgs) != 1 || cfgs[0].PathMappings != nil || !slices.Equal(cfgs[0].ExcludeTags, []string{"no-subflux"}) {
+		t.Errorf("ParseConfigs = %+v %v, want one enabled entry with no mappings and the default tag", cfgs, errs)
 	}
 }
 

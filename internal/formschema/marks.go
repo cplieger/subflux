@@ -3,12 +3,12 @@ package formschema
 import (
 	"slices"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // MarkPlain retags n, and every scalar beneath it, PlainTag. A section owner
 // calls it for each non-Secret scalar it accepts without Decode, after reading
-// the values: yaml.v3's node.Decode refuses a !plain scalar as a bool or int.
+// the values: go-yaml's node.Decode refuses a !plain scalar as a bool or int.
 // It never follows an alias. A sequence element holding a Secret field must
 // carry an id key, so a Save can match it to its stored secret.
 func MarkPlain(n *yaml.Node) {

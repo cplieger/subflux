@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -69,11 +69,11 @@ func (p *source) CheckCredentials(ctx context.Context) error {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return httpx.RedactTransportError(err, "hdbits credential check", httpx.Secret(p.passkey))
+		return httpclient.RedactTransportError(err, "hdbits credential check", httpclient.Secret(p.passkey))
 	}
 	defer resp.Body.Close()
 	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
-		return httpx.RedactSecret(statusErr, p.passkey)
+		return httpclient.RedactSecret(statusErr, p.passkey)
 	}
 
 	var result struct {
@@ -81,7 +81,7 @@ func (p *source) CheckCredentials(ctx context.Context) error {
 		Status  int    `json:"status"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxErrorBodyBytes)).Decode(&result); err != nil {
-		return httpx.RedactSecret(fmt.Errorf("decode credential check: %w", err), p.passkey)
+		return httpclient.RedactSecret(fmt.Errorf("decode credential check: %w", err), p.passkey)
 	}
 	return apiStatusError(result.Status, p.redact(result.Message))
 }

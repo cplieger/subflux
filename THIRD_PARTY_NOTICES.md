@@ -1,6 +1,6 @@
 # Third-party notices
 
-subflux ports two upstream projects into its own source. Each section names what was ported, the file and line that holds it, and reproduces the upstream license text.
+subflux ports three upstream projects into its own source and imports the release-name patterns of three more. Each section names what was taken, the file that holds it, and reproduces the upstream license text.
 
 ## alass
 
@@ -734,4 +734,139 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## ICU charset detection
+
+<https://github.com/unicode-org/icu> at commit `560e6db559a4a836a016b762051eee00d56e3d76` (ICU 69.1)
+
+### Code included
+
+`internal/subtitleenc/icu` ports ICU4C's charset detector from C++ to Go, without its EBCDIC, UTF, ISO-2022-KR and ISO-2022-CN recognizers. Every upstream file named below lives in `icu4c/source/i18n/`:
+
+- `internal/subtitleenc/icu/ngram.go` (`ngramConfidence`) ports `NGramParser` from `csrsbcs.cpp`, and `internal/subtitleenc/icu/sbcs.go` its `CharsetRecog_8859_*`, `windows_1251`, `windows_1256` and `KOI8_R` recognizers.
+- `internal/subtitleenc/icu/mbcs.go` (`Multibyte.Confidence` and the four `nextChar` readers) ports `CharsetRecog_mbcs::match_mbcs` and the Shift-JIS, EUC, Big5 and GB18030 recognizers from `csrmbcs.cpp`.
+- `internal/subtitleenc/icu/iso2022.go` (`ISO2022JPConfidence`) ports `CharsetRecog_2022::match_2022` and the ISO-2022-JP escapes from `csr2022.cpp`.
+- `internal/subtitleenc/icu/reference_test.go` (`detectAll`, with the C1 signal) ports `CharsetDetector::detectAll` from `csdetect.cpp`, so the test compares the port with ICU's own answers.
+- `internal/subtitleenc/icu/tables_gen.go` carries the byte maps, trigram tables and common-character lists of `csrsbcs.cpp` and `csrmbcs.cpp` verbatim, written by `internal/subtitleenc/icu/gen.go`.
+
+The ported sources carry `© 2016 and later: Unicode, Inc. and others.` and `Copyright (C) 2005-2016, International Business Machines Corporation and others.` ICU is governed by the Unicode License V3; the IBM-era code also carries the ICU License that covered ICU 1.8.1 to 57.1. Both texts, from the `LICENSE` file at the commit above, follow.
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+
+SPDX-License-Identifier: Unicode-3.0
+```
+
+```text
+ICU License - ICU 1.8.1 to ICU 57.1
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright (c) 1995-2016 International Business Machines Corporation and others
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, and/or sell copies of the Software, and to permit persons
+to whom the Software is furnished to do so, provided that the above
+copyright notice(s) and this permission notice appear in all copies of
+the Software and that both the above copyright notice(s) and this
+permission notice appear in supporting documentation.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY
+SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER
+RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder
+shall not be used in advertising or otherwise to promote the sale, use
+or other dealings in this Software without prior written authorization
+of the copyright holder.
+
+All trademarks and registered trademarks mentioned herein are the
+property of their respective owners.
+```
+
+## Release-name patterns
+
+<https://github.com/Sonarr/Sonarr>, <https://github.com/Radarr/Radarr> and <https://github.com/TRaSH-Guides/Guides>, at the commits `internal/release/patterns_source.go` pins
+
+### Code included
+
+`internal/release/patterns_gen.go` carries the patterns `cmd/release-patterns` imports from these projects, as published, and `internal/release/overrides.go` a hand port of the release-group patterns, whose backreference the executor does not run. `internal/release/patterns.manifest.json` lists every imported entry; `internal/release/testdata/upstream.json` holds each pattern as published.
+
+- From Sonarr and Radarr: the source, remux and raw-HD regexes of `src/NzbDrone.Core/Parser/QualityParser.cs`, the release-group regexes of `Parser/ReleaseGroupParser.cs`, the website and torrent clean-up regexes of `Parser/ParserCommon.cs`, the extension regex and lists of `MediaFiles/FileExtensions.cs` and `MediaFiles/MediaFileExtensions.cs`, the `QualitySource` enum, and Radarr's `EditionRegex` from `Parser/Parser.cs`.
+- From TRaSH-Guides: the specifications of 72 streaming-service custom formats under `docs/json/sonarr/cf/` and `docs/json/radarr/cf/`.
+- From Sonarr's and Radarr's parser tests: the test cases of `src/NzbDrone.Core.Test/ParserTests/QualityParserFixture.cs` and `ReleaseGroupParserFixture.cs`, and of Radarr's `EditionParserFixture.cs`, in `internal/release/testdata/golden/fixtures.json`, which the parser's tests check it against.
+
+Sonarr and Radarr are licensed under the GNU General Public License version 3, whose text is reproduced in the alass section above; section 13 of the GPLv3 lets an AGPL-3.0 program contain them. TRaSH-Guides is licensed under the MIT License, from its `LICENSE` file:
+
+```text
+MIT License
+
+Copyright (c) 2021 TRaSH
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

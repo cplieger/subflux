@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -95,14 +95,14 @@ func (r *retryProvider) Download(ctx context.Context, sub *subflux.Subtitle) ([]
 		if attempt == r.maxAttempts-1 {
 			break
 		}
-		delay := httpx.JitteredBackoff(backoff)
+		delay := httpclient.JitteredBackoff(backoff)
 		slog.Warn("download failed with transient error, retrying",
 			"provider", r.inner.Name(), "attempt", attempt+1,
 			"backoff_ms", delay.Milliseconds(), "error", err)
-		if err := httpx.SleepCtx(ctx, delay); err != nil {
+		if err := httpclient.SleepCtx(ctx, delay); err != nil {
 			return nil, err
 		}
-		backoff = httpx.SafeDouble(backoff)
+		backoff = httpclient.SafeDouble(backoff)
 		backoff = min(backoff, maxRetryBackoff)
 	}
 	// The report belongs to the caller: downloadBestCandidate logs this and

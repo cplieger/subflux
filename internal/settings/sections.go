@@ -3,7 +3,7 @@ package settings
 import (
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // section is one row of the ordered section table: parse reads the section's

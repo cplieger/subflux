@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // FuzzLoad_neverAllowAllWhenListed: for any file bytes, an inactive Hosts()
 // implies the bytes hold no document or one mapping whose
 // server.allowed_hosts is absent, null or an empty sequence, read here by
-// yaml.v3 alone; Load never panics.
+// go-yaml alone; Load never panics.
 func FuzzLoad_neverAllowAllWhenListed(f *testing.F) {
 	for _, seed := range []string{
 		"", "# c\n", "server: {}\n", "server: {allowed_hosts: []}\n", "server: {allowed_hosts: ~}\n",

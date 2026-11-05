@@ -11,10 +11,10 @@ import (
 
 	"github.com/cplieger/arrapi/v3"
 	"github.com/cplieger/arrapi/v3/sonarr"
-	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/arr"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestClassify(t *testing.T) {
@@ -38,7 +38,7 @@ func TestClassify(t *testing.T) {
 		"too large":         {&arrapi.ResponseTooLargeError{Path: "/api/v5/series", Limit: 64 << 20}, mediasource.Protocol},
 		"refused dial":      {fmt.Errorf("arrapi: request /api: %w", errors.New("dial tcp: connection refused")), mediasource.Unreachable},
 		"passed deadline":   {fmt.Errorf("arrapi: request /api: %w", context.DeadlineExceeded), mediasource.Unreachable},
-		"a wrapped refusal": {fmt.Errorf("arrapi: request /api: %w", &httpx.RedirectRefusedError{Origin: "http://other:8989", Reason: httpx.RedirectOtherOrigin}), mediasource.Protocol},
+		"a wrapped refusal": {fmt.Errorf("arrapi: request /api: %w", &httpclient.RedirectRefusedError{Origin: "http://other:8989", Reason: httpclient.RedirectOtherOrigin}), mediasource.Protocol},
 	}
 	for name, r := range rows {
 		if got := arr.Classify(r.err); got.Cause != r.want || !errors.Is(got, r.err) {
@@ -46,7 +46,7 @@ func TestClassify(t *testing.T) {
 		}
 	}
 	t.Run("the hop cap names the loop", func(t *testing.T) {
-		got := arr.Classify(&httpx.RedirectRefusedError{Origin: "http://sonarr:8989", Reason: httpx.RedirectTooMany})
+		got := arr.Classify(&httpclient.RedirectRefusedError{Origin: "http://sonarr:8989", Reason: httpclient.RedirectTooMany})
 		if got.Cause != mediasource.Protocol || !strings.Contains(got.Err.Error(), "redirect loop") {
 			t.Errorf("hop cap: %v %q, want protocol naming the loop", got.Cause, got.Err)
 		}

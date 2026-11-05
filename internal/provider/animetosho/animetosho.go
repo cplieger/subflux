@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -429,8 +429,7 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subt
 }
 
 // matchFiles returns all files for a single-file entry; for a season pack
-// (multiple files) it returns only files whose filename contains the
-// matching S##E## pattern.
+// (multiple files) it returns only the files fileMatchesEpisode keeps.
 func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile {
 	if len(files) <= 1 {
 		return files
@@ -455,43 +454,16 @@ func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile 
 	return nil
 }
 
-// fileMatchesEpisode also matches standalone episode numbers for anime
-// (e.g. " - 01 " or " E01"). Only falls back to standalone patterns when no
-// S##E## pattern exists in the filename, probing the AIRED number first and
-// then the ABSOLUTE number (batch entries dominantly name files by absolute
-// number, e.g. "[Group] Show - 26.mkv" for S02E01).
+// fileMatchesEpisode reports whether filename claims the episode: a marker
+// naming it, else the number epmarker.Absolute reads, as the aired episode or
+// the absolute one (batch entries name files by absolute number, "[Group]
+// Show - 26.mkv" for S02E01).
 func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
-	if filename == "" {
-		return false
-	}
 	for _, m := range epmarker.Find(filename) {
 		if m.Season == season && m.Episode == episode {
 			return true
 		}
 	}
-	// Presence is checked at the marker-shape level, not the parsed markers
-	// above: a name with an unreadable marker still numbers its episodes
-	// explicitly, so it must not fall through to absolute numbering.
-	if epmarker.Present(filename) {
-		return false
-	}
-	if standaloneNumberMatch(filename, episode) {
-		return true
-	}
-	return absEpisode > 0 && absEpisode != episode &&
-		standaloneNumberMatch(filename, absEpisode)
-}
-
-// standaloneNumberMatch matches "e##" (word boundary before it, so
-// "Release01" never matches), " ## ", and " - ##".
-func standaloneNumberMatch(filename string, number int) bool {
-	lower := strings.ToLower(filename)
-	epStr := fmt.Sprintf("e%02d", number)
-	padded := fmt.Sprintf(" %02d ", number)
-	dashPad := fmt.Sprintf(" - %02d", number)
-	idx := strings.Index(lower, epStr)
-	if idx >= 0 && (idx == 0 || lower[idx-1] < 'a' || lower[idx-1] > 'z') {
-		return true
-	}
-	return strings.Contains(lower, padded) || strings.Contains(lower, dashPad)
+	n, ok := epmarker.Absolute(filename)
+	return ok && (n == episode || absEpisode > 0 && n == absEpisode)
 }

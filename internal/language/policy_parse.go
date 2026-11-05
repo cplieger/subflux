@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/subflux/internal/formschema"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // The section's limits bound the planner's loops, far above any real
@@ -32,8 +32,10 @@ var variantKeys = map[string]Variant{"standard": Standard, "hi": HI, "forced": F
 // the section is absent), and returns every field error at once, each path
 // absolute from the config root (languages.rules[1].targets[0].tag). On any
 // error the Policy is the zero Policy. Every scalar is read by its text
-// whatever its YAML tag, and afterwards, valid or not, every scalar under n
-// is marked formschema.PlainTag: the section holds no secret.
+// whatever its YAML tag, except that one tagged !!null is absent
+// (formschema.IsNull), so an explicit !!str ~ is a string. Afterwards, valid
+// or not, every scalar under n is marked formschema.PlainTag: the section
+// holds no secret.
 func ParsePolicy(n *yaml.Node) (Policy, []formschema.FieldError) {
 	p, errs := walkPolicy(n)
 	formschema.MarkPlain(n)
@@ -213,6 +215,10 @@ func targetTagProblem(text string) string {
 	return ""
 }
 
+// msgUnknownVariant names the accepted variants and not the scalar, which can
+// be an expanded ${SUBFLUX_...} value; a field error names a path, never a value.
+const msgUnknownVariant = "unknown variant; use standard, hi or forced"
+
 func (w *policyWalk) variants(n *yaml.Node, path string) ([]Variant, bool) {
 	if n == nil {
 		return []Variant{Standard}, true
@@ -235,7 +241,7 @@ func (w *policyWalk) variants(n *yaml.Node, path string) ([]Variant, bool) {
 		case !ok:
 			valid = false
 		case !known:
-			w.fail(p, "unknown variant "+text)
+			w.fail(p, msgUnknownVariant)
 			valid = false
 		case slices.Contains(out, v):
 			w.fail(p, text+" is listed twice")

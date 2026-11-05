@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/xmlx"
+	"github.com/cplieger/go/xmlx"
 )
 
 // decompressIfGzipped returns data unchanged if it is not gzip-compressed.
