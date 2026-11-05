@@ -30,7 +30,7 @@ type fakeHarness struct {
 func (h *fakeHarness) Kind() mediasource.AdapterKind {
 	return mediasource.AdapterKind{Type: "fake", Schema: sourcetest.FakeSchema, New: func(cfg mediasource.Config, _ mediasource.Deps) (mediasource.Adapter, error) {
 		f := sourcetest.NewFake(h.lib, h.caps)
-		if token, _ := cfg.Values.Secret("token"); token == "refused" {
+		if cfg.Values.Secret("token") == "refused" {
 			for _, op := range []string{"Items", "Root", "Changes", "Tags", "RootFolders", "Ping", "Rescan", "Poster"} {
 				f.Fail(op, &mediasource.SourceError{Cause: mediasource.Unauthorized})
 			}
@@ -39,9 +39,9 @@ func (h *fakeHarness) Kind() mediasource.AdapterKind {
 	}}
 }
 
-func (h *fakeHarness) Serve(_ testing.TB, lib *sourcetest.Library) mediasource.Config {
+func (h *fakeHarness) Serve(t testing.TB, lib *sourcetest.Library) mediasource.Config {
 	h.lib = lib
-	return mediasource.Config{}
+	return mediasource.Config{Values: fakeValues(t, "")}
 }
 
 func (*fakeHarness) Refuse(t testing.TB) mediasource.Config {

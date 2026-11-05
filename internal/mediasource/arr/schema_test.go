@@ -32,8 +32,17 @@ func TestReadValues(t *testing.T) {
 			t.Errorf("public_url %q accepted", bad)
 		}
 	}
-	if _, err := arr.ReadValues(formschema.Values{}); err == nil {
-		t.Error("ReadValues of nothing accepted")
+}
+
+func TestSchemaRequiresURLAndKey(t *testing.T) {
+	for _, doc := range []string{"api_key: k", "url: ''\napi_key: k", "url: http://s", "url: http://s\napi_key: ''"} {
+		var n yaml.Node
+		if err := yaml.Unmarshal([]byte(doc), &n); err != nil {
+			t.Fatal(err)
+		}
+		if _, errs := arr.Schema("Sonarr").Decode(n.Content[0]); len(errs) != 1 || errs[0].Message != "required" {
+			t.Errorf("Decode(%q) errors = %v, want one required", doc, errs)
+		}
 	}
 }
 

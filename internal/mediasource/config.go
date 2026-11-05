@@ -65,18 +65,7 @@ func parseEntry(e *yaml.Node, kinds []AdapterKind) (Config, bool, []formschema.F
 	}
 	var cfg Config
 	enabled := true
-	envelope := map[string]*yaml.Node{}
-	adapter := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-	for i := 0; i+1 < len(e.Content); i += 2 {
-		k, v := e.Content[i], e.Content[i+1]
-		switch k.Value {
-		case keyID, keyType, keyEnabled, keyPathMappings, keyExcludeTags:
-			envelope[k.Value] = v
-			formschema.MarkPlain(v)
-		default:
-			adapter.Content = append(adapter.Content, k, v)
-		}
-	}
+	envelope, adapter := splitEntry(e)
 	var errs []formschema.FieldError
 	var err *formschema.FieldError
 	if cfg.ID, err = parseID(envelope[keyID]); err != nil {
@@ -97,6 +86,9 @@ func parseEntry(e *yaml.Node, kinds []AdapterKind) (Config, bool, []formschema.F
 	cfg.PathMappings, merrs = parseMappings(envelope[keyPathMappings])
 	cfg.ExcludeTags, terrs = parseExcludeTags(envelope[keyExcludeTags])
 	errs = append(append(errs, merrs...), terrs...)
+	for _, v := range envelope {
+		formschema.MarkPlain(v)
+	}
 	if kind == nil {
 		return cfg, enabled, errs
 	}
@@ -110,6 +102,23 @@ func parseEntry(e *yaml.Node, kinds []AdapterKind) (Config, bool, []formschema.F
 		}
 	}
 	return cfg, enabled, errs
+}
+
+// splitEntry parts a mapping entry into its envelope values, by key, and
+// the adapter's own keys, as a mapping for its schema's Decode.
+func splitEntry(e *yaml.Node) (envelope map[string]*yaml.Node, adapter *yaml.Node) {
+	envelope = map[string]*yaml.Node{}
+	adapter = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for i := 0; i+1 < len(e.Content); i += 2 {
+		k, v := e.Content[i], e.Content[i+1]
+		switch k.Value {
+		case keyID, keyType, keyEnabled, keyPathMappings, keyExcludeTags:
+			envelope[k.Value] = v
+		default:
+			adapter.Content = append(adapter.Content, k, v)
+		}
+	}
+	return envelope, adapter
 }
 
 const (

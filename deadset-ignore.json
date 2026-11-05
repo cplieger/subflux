@@ -1328,6 +1328,18 @@
       "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first callers outside the package, land there."
     },
     {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.APIKey",
+      "path": "internal/mediasource/arr/schema.go",
+      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.URL",
+      "path": "internal/mediasource/arr/schema.go",
+      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
+    },
+    {
       "code": "DS1101",
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Event",
       "path": "internal/mediasource/sourcetest/library.go",
