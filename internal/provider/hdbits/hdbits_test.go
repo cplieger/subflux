@@ -273,16 +273,19 @@ func TestFilterSubtitleData(t *testing.T) {
 	}
 
 	// Subtitle extensions sub-table.
-	t.Run("subtitle extensions accepted", func(t *testing.T) {
+	t.Run("subtitle extensions", func(t *testing.T) {
 		t.Parallel()
-		for _, ext := range []string{".srt", ".ass", ".ssa", ".sub", ".vtt", ".zip", ".rar"} {
+		for ext, want := range map[string]int{
+			".srt": 1, ".ass": 1, ".ssa": 1, ".vtt": 1, ".zip": 1, ".rar": 1,
+			".sub": 0, ".idx": 0,
+		} {
 			t.Run(ext, func(t *testing.T) {
 				t.Parallel()
 				data := []hdbSubtitleItem{{Title: "Sub", Filename: "sub" + ext, Language: "en", ID: 1}}
 				req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 				got := filterSubtitleData(data, req)
-				if len(got) != 1 {
-					t.Errorf("filterSubtitleData(filename=%q) = %d results, want 1", "sub"+ext, len(got))
+				if len(got) != want {
+					t.Errorf("filterSubtitleData(filename=%q) = %d results, want %d", "sub"+ext, len(got), want)
 				}
 			})
 		}

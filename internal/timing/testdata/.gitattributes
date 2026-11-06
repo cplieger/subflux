@@ -1,0 +1,2 @@
+# Subtitle fixtures are byte-exact: CRLF and legacy encodings are the cases under test.
+* -text

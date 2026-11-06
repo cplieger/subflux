@@ -57,7 +57,6 @@ func TestZipExtract(t *testing.T) {
 		{"extracts srt", makeZip(t, zipEntry{"subtitle.srt", srt}), srt},
 		{"extracts ass", makeZip(t, zipEntry{"subtitle.ass", ass}), ass},
 		{"extracts ssa", makeZip(t, zipEntry{"subtitle.ssa", ssa}), ssa},
-		{"extracts sub", makeZip(t, zipEntry{"subtitle.sub", sub}), sub},
 		{"case insensitive extension", makeZip(t, zipEntry{"subtitle.SRT", srt}), srt},
 
 		// Subtitle in subdirectory.
@@ -70,6 +69,10 @@ func TestZipExtract(t *testing.T) {
 		), srt},
 
 		// Filtering behavior.
+		{"skips VobSub and MicroDVD sub files", makeZip(t,
+			zipEntry{"subtitle.sub", sub},
+			zipEntry{"subtitle.srt", srt},
+		), srt},
 		{"skips non-subtitle files", makeZip(t,
 			zipEntry{"readme.txt", []byte("not a subtitle")},
 			zipEntry{"subtitle.srt", srt},

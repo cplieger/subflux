@@ -54,7 +54,7 @@ func gate(m member) bool {
 	if m.isDir {
 		return false
 	}
-	if !subtitleext.ArchiveInput(filepath.Ext(m.name)) {
+	if !subtitleext.ArchiveInput(m.name) {
 		return false
 	}
 	// Skips the __MACOSX/._name.srt noise a macOS-made archive carries.

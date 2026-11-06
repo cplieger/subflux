@@ -693,6 +693,24 @@
     },
     {
       "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ExtSRT",
+      "path": "internal/subtitlefile/path.go",
+      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ManualPath",
+      "path": "internal/subtitlefile/path.go",
+      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#Path",
+      "path": "internal/subtitlefile/path.go",
+      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#VariantFromFlags",
       "path": "internal/subtitlefile/path.go",
       "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
@@ -1551,12 +1569,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.ASCIITransparent",
-      "path": "internal/subtitleenc/codec.go",
-      "reason": "Retained until TS-1 (internal/subtitleenc#Encoding.ASCIITransparent): timing-sync's Writer, its first caller outside the package, lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#ErrUndecodable",
       "path": "internal/subtitleenc/subtitleenc.go",
       "reason": "Decode's and Encode's sentinel, for errors.Is at a caller; timing-sync's Writer, the first caller that handles it, lands in TS-1."
@@ -1572,6 +1584,36 @@
       "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#SiblingMargin",
       "path": "internal/subtitleenc/detect.go",
       "reason": "Detect's documented tie rule: two legacy pages scoring within this margin that decode differently answer Unknown."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#Event.Text",
+      "path": "internal/timing/cues.go",
+      "reason": "Retained until TS-2 (internal/timing#Event.*): the dialogue filter and the reference pipeline, its first readers, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#Event.Style",
+      "path": "internal/timing/cues.go",
+      "reason": "Retained until TS-2 (internal/timing#Event.*): the dialogue filter and the reference pipeline, its first readers, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#Event.StartMs",
+      "path": "internal/timing/cues.go",
+      "reason": "Retained until TS-2 (internal/timing#Event.*): the dialogue filter and the reference pipeline, its first readers, land there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#Event.EndMs",
+      "path": "internal/timing/cues.go",
+      "reason": "Retained until TS-2 (internal/timing#Event.*): the dialogue filter and the reference pipeline, its first readers, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#Decision",
+      "path": "internal/timing/outcome.go",
+      "reason": "Retained until ST-1 (internal/timing#Decision): statedb.Provenance, which stores a timing pass's outcome, is its first reader there."
     }
   ]
 }
