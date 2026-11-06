@@ -64,6 +64,8 @@ func runWatch(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	return 0
 }
 
+// watch writes the plan to out as a JSON array, [] when nothing changed,
+// since scripts/apply-issues.sh iterates it and fails on null.
 func watch(ctx context.Context, dir, existing, out string, up *upstream, stdout io.Writer) error {
 	issues, err := readIssues(existing)
 	if err != nil {
@@ -76,6 +78,9 @@ func watch(ctx context.Context, dir, existing, out string, up *upstream, stdout 
 	actions, err := w.plan(ctx, issues)
 	if err != nil {
 		return err
+	}
+	if actions == nil {
+		actions = []action{}
 	}
 	b, err := json.MarshalIndent(actions, "", "  ")
 	if err != nil {
