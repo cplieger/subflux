@@ -1,5 +1,5 @@
-github.com/cplieger/arrapi/v3 v3.2.0-dev.7 h1:QbKKUTnE9uHk9bNRazNETNSJvEffuFpDl7g/DWvQy7M=
-github.com/cplieger/arrapi/v3 v3.2.0-dev.7/go.mod h1:MDXY20G1msHHkSLTEHSoAgTswUZVRW7XA3MBVpwFCfo=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.8 h1:+yjD4wt4GobWqonJMoy6p45Cj1T9Soxqdp0NguG42JQ=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.8/go.mod h1:MDXY20G1msHHkSLTEHSoAgTswUZVRW7XA3MBVpwFCfo=
 github.com/cplieger/go/filesafe v1.0.0-dev.2 h1:Y9CEthiQH/VkzjNXgt1kyr0UzPL+PNc2klUj2npdkYg=
 github.com/cplieger/go/filesafe v1.0.0-dev.2/go.mod h1:Pu9t7x6mRQwXm09EdWaQvVK++fpjgGP7+58XiMxGYks=
 github.com/cplieger/go/health v1.0.0-dev.3 h1:cTbUZ38yLP8Je8aup6f+WNezkf0rJbtUbHWTLPJfJrQ=
