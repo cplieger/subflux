@@ -12,8 +12,8 @@ github.com/cplieger/go/jsonx v1.0.0-dev.2 h1:XP5vemRQ+PWJT+kX5aZtHm1U/aLi36sZPwg
 github.com/cplieger/go/jsonx v1.0.0-dev.2/go.mod h1:ank2TTHUDI/GrTBZ/KAwU72ECOdrCCDDYqlRSuR/+BQ=
 github.com/cplieger/go/keyenc v1.2.0-dev.2 h1:B6j+A7k9EHrAQrNX5KMo14lPsTwo/x7wQdI2AvS+6p8=
 github.com/cplieger/go/keyenc v1.2.0-dev.2/go.mod h1:YxYV/OxXxOyQetArMEAUl2IzU/AsH6vlgXvA0UUYASo=
-github.com/cplieger/go/measure v1.0.0-dev.3 h1:BxcWofAcSibuM3WZFY/y9HKiiIwZE7gJD67dkm0HBeA=
-github.com/cplieger/go/measure v1.0.0-dev.3/go.mod h1:KY7f8SnaQkwhMKsmKIe+eIyYW7z0Xe6vE9AF02fMubw=
+github.com/cplieger/go/measure v1.0.0-dev.4 h1:1uAbRO+jVZP+0wA6SE7Bhax0pzdKICs7aQqw7pmNcUE=
+github.com/cplieger/go/measure v1.0.0-dev.4/go.mod h1:KY7f8SnaQkwhMKsmKIe+eIyYW7z0Xe6vE9AF02fMubw=
 github.com/cplieger/go/slogx v1.0.0-dev.1 h1:oYkkLGxYkUHebk+OtaWVzD9NwPqTmq13HztG6NaArn4=
 github.com/cplieger/go/slogx v1.0.0-dev.1/go.mod h1:4v0aqEGWQ4ubxjIiddoMocANHMKB6SdYTgOWYaIUX6A=
 github.com/cplieger/go/ssrf v1.0.0-dev.1 h1:2wxKGOKp5sFwwJneaxOEOvFqlA7077nOWmaKm+9q5MU=
