@@ -141,7 +141,7 @@ func TestPlaceholderHasNoScript(t *testing.T) {
 
 func TestPublicHealthAndMetrics(t *testing.T) {
 	r := Start(t, Options{Config: []byte("server:\n  allowed_hosts: [nas.lan]\n")})
-	if code, body := get(t, r, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"OK"`) {
+	if code, body := get(t, r, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"ok"`) {
 		t.Errorf("/api/health = %d %q", code, body)
 	}
 	if code, body := get(t, r, "/metrics"); code != http.StatusOK || !strings.Contains(body, "subflux_build_info{") {
