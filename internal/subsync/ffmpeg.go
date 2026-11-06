@@ -9,7 +9,9 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // LangMapper is a type alias for ffmpeg.LangMapper, preserving backward
@@ -76,4 +78,14 @@ func extractEmbeddedSRT(ctx context.Context, videoPath string, streamIndex int) 
 		return nil, err
 	}
 	return cues, nil
+}
+
+// decodeView returns data unchanged when Detect, with no hint, cannot name
+// and decode it.
+func decodeView(data []byte) []byte {
+	text, err := subtitleenc.Detect(data, language.Tag{}).Decode(data)
+	if err != nil {
+		return data
+	}
+	return text
 }

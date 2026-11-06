@@ -24,7 +24,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/subtitlefile"
+	"github.com/cplieger/subflux/internal/timing"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -185,7 +185,7 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 		"id", sub.ID, "bytes", len(data))
 
 	result := archive.Decompress(data)
-	if err := subtitlefile.Validate(result); err != nil {
+	if _, err := timing.ParseCues(result); err != nil {
 		return nil, fmt.Errorf("animetosho: %w", err)
 	}
 	return result, nil

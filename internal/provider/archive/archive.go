@@ -40,7 +40,7 @@ const (
 
 // ErrNotArchive reports that data is not a container this package can open. It
 // is the one refusal a caller branches on: the raw bytes are still the whole
-// story and subtitlefile.Validate is what names them. Every other refusal
+// story and timing.ParseCues is what names them. Every other refusal
 // describes an archive that DID open.
 var ErrNotArchive = errors.New("not a readable zip or rar archive")
 
@@ -210,7 +210,7 @@ func looksLikeSubtitleRaw(data []byte) bool {
 		probe = probe[:4096]
 	}
 
-	if subtitlefile.CountNonText(probe)*10 > len(probe) {
+	if !subtitlefile.LooksLikeText(probe) {
 		return false
 	}
 

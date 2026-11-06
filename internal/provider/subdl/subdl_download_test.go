@@ -204,8 +204,7 @@ func TestHandleDownloadResponse_500_boundary_content_length(t *testing.T) {
 
 func TestHandleDownloadResponse_rejects_binary_raw_data(t *testing.T) {
 	t.Parallel()
-	// Binary data that isn't a recognized archive format but fails
-	// ValidateSubtitleData's non-text byte threshold.
+	// Control bytes in no container format: timing.ParseCues names them.
 	binaryData := make([]byte, 200)
 	for i := range binaryData {
 		binaryData[i] = 0x01 // non-text control byte
@@ -218,8 +217,8 @@ func TestHandleDownloadResponse_rejects_binary_raw_data(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleDownloadResponse(binary raw) expected error")
 	}
-	if !strings.Contains(err.Error(), "subdl:") {
-		t.Errorf("handleDownloadResponse(binary raw) error = %q, want containing 'subdl:'", err)
+	if !strings.Contains(err.Error(), "subdl:") || !strings.Contains(err.Error(), "binary data") {
+		t.Errorf("handleDownloadResponse(binary raw) error = %q, want 'subdl:' and 'binary data'", err)
 	}
 }
 

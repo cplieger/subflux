@@ -55,7 +55,7 @@ Downloads matched by file hash or from the same release skip timing, because the
 
 ## Clean-up
 
-Every saved file has HTML tags and extra whitespace removed and gets standard line endings. A file in UTF-16 or ISO-2022-JP is converted to UTF-8, and a UTF-8 byte order mark is dropped. A file in any other encoding keeps its bytes unchanged, because subflux cannot name that encoding with certainty from the text alone. Hearing-impaired annotations are removed only when `post_processing.strip_hi` is on. The `post_processing` section in [Configuration](configuration.md) turns each step on or off.
+Every saved file has HTML tags and extra whitespace removed and gets standard line endings. A file is converted to UTF-8 from the encoding subflux detects, with the subtitle's language as a hint, and a byte order mark is dropped. A file in an encoding subflux cannot name keeps its bytes unchanged. Hearing-impaired annotations are removed only when `post_processing.strip_hi` is on. The `post_processing` section in [Configuration](configuration.md) turns each step on or off.
 
 ## The web page
 

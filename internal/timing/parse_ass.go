@@ -150,11 +150,11 @@ func assDialogue(v view, l line, fields assFields) (cue, span, bool) {
 		}
 		at += comma + 1
 	}
-	startMs, ok := assTime(v, startF)
+	start, startMs, ok := assTime(v, startF)
 	if !ok {
 		return cue{}, span{}, false
 	}
-	endMs, ok := assTime(v, endF)
+	end, endMs, ok := assTime(v, endF)
 	if !ok {
 		return cue{}, span{}, false
 	}
@@ -165,21 +165,24 @@ func assDialogue(v view, l line, fields assFields) (cue, span, bool) {
 	}
 	return cue{
 		startMs: startMs, endMs: endMs,
-		text: v.span(at, l.end),
+		start: start, end: end,
+		text:  v.span(at, l.end),
+		block: v.span(l.start, l.next),
 	}, style, true
 }
 
 // assTime reads one H:MM:SS.cc field, blanks around it allowed; the fraction
-// counts centiseconds, as libass reads it.
-func assTime(v view, field span) (int64, bool) {
+// counts centiseconds, as libass reads it. It returns the stamp's document
+// span.
+func assTime(v view, field span) (span, int64, bool) {
 	b := v.b[field.from:field.to]
 	lo, hi := trimmedBounds(b)
 	if !isASCII(b[lo:hi]) {
-		return 0, false
+		return span{}, 0, false
 	}
 	ms, next, ok := clock(b[:hi], lo, ".", 2, 10)
 	if !ok || next != hi {
-		return 0, false
+		return span{}, 0, false
 	}
-	return ms, true
+	return v.span(field.from+lo, field.from+hi), ms, true
 }

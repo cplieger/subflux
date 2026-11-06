@@ -6,6 +6,8 @@ package subsync
 import (
 	"regexp"
 	"strings"
+
+	"github.com/cplieger/subflux/internal/timing"
 )
 
 // reSubTags matches HTML tags and ASS override tags in subtitle text.
@@ -59,7 +61,7 @@ func cleanTextLen(text string) int {
 	}
 	text = reSubTags.ReplaceAllString(text, "")
 	text = reMusicLine.ReplaceAllString(text, "")
-	text = stripHI(text)
+	text = timing.StripHI(text)
 	// Strip any remaining music notes (handles multi-line ♪...♪ cues).
 	text = strings.ReplaceAll(text, "♪", "")
 	text = strings.ReplaceAll(text, "♫", "")

@@ -88,8 +88,6 @@ func TestEffectiveVariant_returns_set_variant(t *testing.T) {
 	}
 }
 
-// --- VariantFromFlags ---
-
 func TestMediaLabel(t *testing.T) {
 	t.Parallel()
 
