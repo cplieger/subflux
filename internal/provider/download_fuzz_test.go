@@ -4,12 +4,11 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/epmarker"
-	"github.com/cplieger/subflux/internal/subtitlefile"
+	"github.com/cplieger/subflux/internal/timing"
 )
 
-// FuzzExtractAndValidate exercises ExtractAndValidate with arbitrary data,
-// verifying that it never panics and that successful results pass subtitle
-// validation invariants.
+// FuzzExtractAndValidate: no panic, and a result is non-nil, error-free and
+// accepted by timing.ParseCues.
 func FuzzExtractAndValidate(f *testing.F) {
 	f.Add([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"), 1, 5)
 	f.Add([]byte{}, 0, 0)
@@ -21,25 +20,18 @@ func FuzzExtractAndValidate(f *testing.F) {
 	f.Add(make([]byte, 128), 1, 1)                            // all zeros
 
 	f.Fuzz(func(t *testing.T, data []byte, season, episode int) {
-		// The season/episode pair is fuzzed as two ints because that is what a
-		// provider reads off the wire; epmarker.For is what turns it into a
-		// target, collapsing an absent half to "any episode".
 		result, err := ExtractAndValidate(data,
 			epmarker.For(epmarker.Marker{Season: season, Episode: episode}))
 
-		// Invariant 1: never panics (implicit).
-
-		// Invariant 2: if no error, result is non-nil and passes ValidateSubtitleData.
 		if err == nil {
 			if result == nil {
 				t.Fatal("ExtractAndValidate returned nil data with nil error")
 			}
-			if valErr := subtitlefile.Validate(result); valErr != nil {
-				t.Fatalf("ExtractAndValidate returned data that fails ValidateSubtitleData: %v", valErr)
+			if _, perr := timing.ParseCues(result); perr != nil {
+				t.Fatalf("ExtractAndValidate returned data ParseCues refuses: %v", perr)
 			}
 		}
 
-		// Invariant 3: if error, result must be nil.
 		if err != nil && result != nil {
 			t.Fatal("ExtractAndValidate returned non-nil data with non-nil error")
 		}

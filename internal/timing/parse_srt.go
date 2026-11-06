@@ -25,7 +25,7 @@ func parseSRT(doc []byte, v view, enc subtitleenc.Encoding) (Cues, error) {
 			p.textLine(l, content)
 		}
 	}
-	p.closeOpen()
+	p.closeOpen(len(v.b))
 	return p.c, nil
 }
 
@@ -41,13 +41,22 @@ func (p *srtParser) timing(l line, t srtStamps) error {
 	if err := countEvent(len(p.c.events)); err != nil {
 		return err
 	}
-	// A lone number before the timing line is this event's index, not the
-	// open event's text.
-	p.hasIndex = false
-	p.closeOpen()
+	blockStart := l.start
+	var idx span
+	if p.hasIndex {
+		blockStart = p.index.start
+		lo, hi := trimmedBounds(p.v.content(p.index))
+		idx = p.v.span(p.index.start+lo, p.index.start+hi)
+		p.hasIndex = false
+	}
+	p.closeOpen(blockStart)
 	p.c.events = append(p.c.events, cue{
 		startMs: t.startMs, endMs: t.endMs,
-		text: span{from: p.v.off(l.next)},
+		start: p.v.span(l.start+t.start.from, l.start+t.start.to),
+		end:   p.v.span(l.start+t.end.from, l.start+t.end.to),
+		text:  span{from: p.v.off(l.next)},
+		block: span{from: p.v.off(blockStart)},
+		index: idx,
 	})
 	p.textEnd = l.next
 	return nil
@@ -68,19 +77,24 @@ func (p *srtParser) textLine(l line, content []byte) {
 	}
 }
 
-// closeOpen ends the open event's text, if any. A pending lone number here is
-// the last text line: timing clears it first.
-func (p *srtParser) closeOpen() {
+// closeOpen ends the open event, if any, at the block starting at next. A
+// pending lone number here is the last text line: timing clears it first.
+func (p *srtParser) closeOpen(next int) {
 	if len(p.c.events) == 0 {
 		return
 	}
 	if p.hasIndex {
 		p.textEnd = p.index.end
 	}
-	p.c.events[len(p.c.events)-1].text.to = p.v.off(p.textEnd)
+	e := &p.c.events[len(p.c.events)-1]
+	e.text.to = p.v.off(p.textEnd)
+	e.block.to = p.v.off(next)
 }
 
-type srtStamps struct{ startMs, endMs int64 }
+type srtStamps struct {
+	start, end     span // offsets within the line
+	startMs, endMs int64
+}
 
 // srtTiming reads an ASCII timing line, H:MM:SS,mmm --> H:MM:SS,mmm with
 // '.' or ',' and 1 to 3 fraction digits, followed by anything that does not
@@ -93,18 +107,22 @@ func srtTiming(b []byte) (srtStamps, bool) {
 	}
 	i := skipBlank(b, 0)
 	var ok bool
+	t.start.from = i
 	if t.startMs, i, ok = clock(b, i, ",.", 3, 1); !ok {
 		return t, false
 	}
+	t.start.to = i
 	i = skipBlank(b, i)
 	rest, ok := bytes.CutPrefix(b[i:], []byte("-->"))
 	if !ok {
 		return t, false
 	}
 	i = skipBlank(b, len(b)-len(rest))
-	if t.endMs, _, ok = clock(b, i, ",.", 3, 1); !ok {
+	t.end.from = i
+	if t.endMs, i, ok = clock(b, i, ",.", 3, 1); !ok {
 		return t, false
 	}
+	t.end.to = i
 	return t, true
 }
 

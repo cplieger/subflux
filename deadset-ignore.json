@@ -339,6 +339,30 @@
     },
     {
       "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#Variant",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#DefaultVariant",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#VariantHI",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/subflux#VariantForced",
+      "path": "internal/subflux/types.go",
+      "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
+    },
+    {
+      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subflux#SubtitleSource",
       "path": "internal/subflux/types_coverage.go",
       "reason": "Retained until SE-2 (internal/subflux#*): its importers went with the old tree."
@@ -633,24 +657,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcess",
-      "path": "internal/subsync/postprocess.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcessBytes",
-      "path": "internal/subsync/postprocess.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#PostProcessOptions",
-      "path": "internal/subsync/postprocess.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subsync#Cue",
       "path": "internal/subsync/srt.go",
       "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
@@ -684,36 +690,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/subsync#SyncWithOptions",
       "path": "internal/subsync/sync.go",
       "reason": "Retained until TS-2 (internal/subsync#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ErrEmpty",
-      "path": "internal/subtitlefile/content.go",
-      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ExtSRT",
-      "path": "internal/subtitlefile/path.go",
-      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#ManualPath",
-      "path": "internal/subtitlefile/path.go",
-      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#Path",
-      "path": "internal/subtitlefile/path.go",
-      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subtitlefile#VariantFromFlags",
-      "path": "internal/subtitlefile/path.go",
-      "reason": "Retained until TS-1 (internal/subtitlefile#*): its importers went with the old tree."
     },
     {
       "code": "DS1501",
@@ -975,18 +951,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#FilenameTag",
-      "path": "internal/language/filename.go",
-      "reason": "Retained until TS-2 (internal/language#FilenameTag): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#ReadFilename",
-      "path": "internal/language/filename.go",
-      "reason": "Retained until TS-2 (internal/language#ReadFilename): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#FormatVersion",
       "path": "internal/language/format.go",
       "reason": "Retained until ST-1 (internal/language#FormatVersion): its first caller outside the package lands there."
@@ -1091,7 +1055,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Variant.Flags",
       "path": "internal/language/variant.go",
-      "reason": "Retained until TS-1 (internal/language#Variant.Flags): its first caller outside the package lands there."
+      "reason": "Retained until SE-2 (internal/language#Variant.Flags): search's rank key, its first caller outside the package, lands there."
     },
     {
       "code": "DS1501",
@@ -1139,7 +1103,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Variant",
       "path": "internal/language/variant.go",
-      "reason": "A target's variant: Variant.Flags' first caller outside the package, in TS-1, names it."
+      "reason": "A target's variant: Variant.Flags' first caller outside the package, in SE-2, names it."
     },
     {
       "code": "DS1301",
@@ -1169,7 +1133,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Flags.Serves",
       "path": "internal/language/variant.go",
-      "reason": "Retained until TS-1 (internal/language#Flags.Serves): its first caller outside the package lands there."
+      "reason": "Retained until TS-2 (internal/language#Flags.Serves): mediawrite's Deliver, its first caller outside the package, lands there."
     },
     {
       "code": "DS1501",
@@ -1565,7 +1529,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.Encode",
       "path": "internal/subtitleenc/codec.go",
-      "reason": "Retained until TS-1 (internal/subtitleenc#Encoding.Encode): timing-sync's Writer, its first caller outside the package, lands there."
+      "reason": "Retained until TS-2 (internal/subtitleenc#Encoding.Encode): timing-sync's Writer, its first caller outside the package, lands there."
     },
     {
       "code": "DS1501",
@@ -1614,6 +1578,18 @@
       "symbol": "go://github.com/cplieger/subflux/internal/timing#Decision",
       "path": "internal/timing/outcome.go",
       "reason": "Retained until ST-1 (internal/timing#Decision): statedb.Provenance, which stores a timing pass's outcome, is its first reader there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#PreviewSpan",
+      "path": "internal/timing/rendervtt.go",
+      "reason": "Retained until TS-2 (internal/timing#PreviewSpan): the ffmpeg runner's Preview, its first reader outside the package, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/timing#lineScan.work",
+      "path": "internal/timing/striphi.go",
+      "reason": "The bytes-examined counter TestCleanStackedLabelsLinear holds to 4 times a line's length: the scan's linear bound is asserted through it."
     }
   ]
 }

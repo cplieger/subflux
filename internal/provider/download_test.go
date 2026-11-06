@@ -65,11 +65,9 @@ func TestExtractAndValidate_fallsBackToTheRawBody(t *testing.T) {
 	}
 }
 
-// TestExtractAndValidate_reportsTheArchivesOwnRefusal asserts a zip that opened
-// and had nothing for this episode is reported as such. subtitlefile.Validate
-// can only answer "detected zip archive" for those bytes, which reads as "this
-// build cannot open archives" for a payload the extractor unpacked and walked
-// member by member, and that misreading is what the message has to avoid.
+// TestExtractAndValidate_reportsTheArchivesOwnRefusal: a zip that opened and
+// held nothing for this episode reports the extractor's refusal, since
+// "zip archive" would read as "archives are unsupported".
 func TestExtractAndValidate_reportsTheArchivesOwnRefusal(t *testing.T) {
 	t.Parallel()
 	archived := srtInZip(t, "Show.S03E02.srt", []byte("1\n00:00:01,000 --> 00:00:02,000\nHi\n"))
@@ -87,19 +85,17 @@ func TestExtractAndValidate_reportsTheArchivesOwnRefusal(t *testing.T) {
 	if !strings.Contains(err.Error(), "S03E02.srt") {
 		t.Errorf("err = %q, want the member it did hold named", err)
 	}
-	if strings.Contains(err.Error(), "binary archive data") {
-		t.Errorf("err = %q, want the extractor's refusal rather than Validate's "+
+	if strings.Contains(err.Error(), "zip archive") {
+		t.Errorf("err = %q, want the extractor's refusal rather than ParseCues' "+
 			"container verdict", err)
 	}
 }
 
-// TestExtractAndValidate_unreadableContainerStillDescribesTheBytes asserts the
-// ErrNotArchive fallback survives: when nothing here can open the payload, the
-// raw bytes are the whole story and Validate is what names them.
+// TestExtractAndValidate_unreadableContainerStillDescribesTheBytes: when no
+// extractor opens the payload, ParseCues names the container it found.
 func TestExtractAndValidate_unreadableContainerStillDescribesTheBytes(t *testing.T) {
 	t.Parallel()
-	// 7z magic: a real container, and one this package deliberately does not
-	// unpack, so Validate's format name is the most useful thing anyone can say.
+	// 7z: a container no extractor here unpacks.
 	sevenZip := append([]byte{'7', 'z', 0xBC, 0xAF, 0x27, 0x1C}, bytes.Repeat([]byte{0x00, 0x81}, 300)...)
 
 	got, err := ExtractAndValidate(sevenZip, epmarker.For(epmarker.Marker{Season: 1, Episode: 1}))
@@ -109,7 +105,7 @@ func TestExtractAndValidate_unreadableContainerStillDescribesTheBytes(t *testing
 	if err == nil {
 		t.Fatal("ExtractAndValidate(7z) err = nil, want a refusal")
 	}
-	if !strings.Contains(err.Error(), "7z") {
+	if !strings.HasSuffix(err.Error(), ": 7z archive") {
 		t.Errorf("err = %q, want the detected container format named", err)
 	}
 }

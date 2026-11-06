@@ -330,7 +330,7 @@ func TestValid_acceptedCodesAreSafeFilenameSegments(t *testing.T) {
 // arbitrary input, which the exhaustive walk above cannot reach: multi-byte
 // runes, longer subtags and BCP 47 shapes. It replaces the manual path's own
 // character blocklist — a code Valid accepts is the only kind that reaches
-// subtitlefile.ManualPath, so an accepted ':' would open an NTFS alternate data
+// a subtitle file name, so an accepted ':' would open an NTFS alternate data
 // stream on the share and an accepted trailing dot would collapse two codes onto
 // one file.
 func FuzzValid_acceptedCodesAreFilenameSafe(f *testing.F) {

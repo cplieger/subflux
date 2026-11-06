@@ -21,7 +21,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/subtitlefile"
+	"github.com/cplieger/subflux/internal/timing"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
@@ -303,7 +303,7 @@ func (p *source) fetchSubtitleFile(ctx context.Context, fileID int, link string)
 		return nil, fmt.Errorf("read subtitle: %w", err)
 	}
 
-	if err := subtitlefile.Validate(data); err != nil {
+	if _, err := timing.ParseCues(data); err != nil {
 		return nil, fmt.Errorf("opensubtitles: %w", err)
 	}
 

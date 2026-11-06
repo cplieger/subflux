@@ -43,6 +43,21 @@ func failureArms(t testing.TB) []failureArm {
 			return err
 		}})
 	}
+	for _, tc := range renderFailures(t) {
+		arms = append(arms, failureArm{"Render " + tc.name, func() error {
+			_, err := timing.Render(tc.c, tc.t)
+			return err
+		}})
+	}
+	for _, tc := range renderVTTFailures(t) {
+		arms = append(arms, failureArm{"RenderVTT " + tc.name, tc.call})
+	}
+	for _, tc := range cleanFailures(t) {
+		arms = append(arms, failureArm{"Clean " + tc.name, func() error {
+			_, err := timing.Clean(tc.c, tc.opts, tc.tag)
+			return err
+		}})
+	}
 	for _, tc := range undecodableCues(t) {
 		arms = append(arms, failureArm{"DecodeCues " + tc.name, func() error {
 			_, err := timing.DecodeCues(tc.b)

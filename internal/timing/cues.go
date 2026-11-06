@@ -32,8 +32,8 @@ const (
 )
 
 // Cues is a parsed subtitle document: its bytes, Format and encoding, and
-// per event its times and the byte span of its text. The zero Cues holds no
-// document.
+// per event its times and the byte spans of its timestamps, text and block.
+// The zero Cues holds no document.
 type Cues struct {
 	doc    []byte
 	events []cue
@@ -47,7 +47,14 @@ type span struct{ from, to int }
 type cue struct {
 	style          string
 	startMs, endMs int64
+	start, end     span
 	text           span
+	// block is what removing the event removes: an SRT block from its index
+	// line (or timing line) to the next block, an ASS line with its
+	// terminator.
+	block span
+	// index is an SRT block's index digits; empty when it has none.
+	index span
 }
 
 // Event is one cue as the dialogue filter reads it: an SRT cue or an ASS or
@@ -126,7 +133,7 @@ func checkSize(b []byte, limit int) error {
 	return nil
 }
 
-// parse checks no size: its callers bound the bytes (ParseCues and
+// parse checks no size: its callers bound the bytes (ParseCues, Clean and
 // decodeCues check them, and parseVTT's conversion at most doubles them,
 // see maxParsedBytes).
 func parse(b []byte, enc subtitleenc.Encoding) (Cues, error) {

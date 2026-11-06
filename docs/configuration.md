@@ -62,9 +62,9 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `post_processing.sync_subtitles` | `true` | Re-time automatic downloads against a subtitle track inside the video |
 | `post_processing.audio_sync_fallback` | `false` | Re-time against the audio when the video has no subtitle track to compare with |
 | `post_processing.sync_min_confidence` | `0.6` | The confidence, from 0 to 1, a timing change needs before it is applied |
-| `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` |
-| `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>` and `<font>` tags |
-| `post_processing.normalize_utf8` | `true` | Convert UTF-16 and ISO-2022-JP text to UTF-8 and drop a UTF-8 byte order mark; text in another encoding is written as it arrived |
+| `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
+| `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |
+| `post_processing.normalize_utf8` | `true` | Convert the text to UTF-8 from the encoding subflux detects, with the subtitle's language as a hint, and drop a byte order mark; text in an encoding subflux cannot name is written as it arrived |
 | `post_processing.normalize_endings` | `true` | Convert line endings to CRLF, the SRT standard |
 | `post_processing.clean_whitespace` | `true` | Trim lines and remove empty lines |
 | `post_processing.remove_empty` | `true` | Drop subtitle lines left with no text |

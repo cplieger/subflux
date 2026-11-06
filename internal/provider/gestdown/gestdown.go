@@ -23,7 +23,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/subtitlefile"
+	"github.com/cplieger/subflux/internal/timing"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -204,7 +204,7 @@ func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	if err := subtitlefile.Validate(data); err != nil {
+	if _, err := timing.ParseCues(data); err != nil {
 		return nil, fmt.Errorf("gestdown: %w", err)
 	}
 	slog.Debug("gestdown download complete", "id", sub.ID, "bytes", len(data))
