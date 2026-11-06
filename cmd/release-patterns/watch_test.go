@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 )
 
@@ -226,6 +228,23 @@ func runWatchPlan(t *testing.T, u *watchUpstream, issues []watchIssue) []action 
 
 func tryWatch(t *testing.T, u *watchUpstream, manifest map[string]any, issues []watchIssue, token string) ([]action, error) {
 	t.Helper()
+	out, err := watchPlanFile(t, u, manifest, issues, token)
+	if err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actions []action
+	if err := json.Unmarshal(b, &actions); err != nil {
+		t.Fatal(err)
+	}
+	return actions, nil
+}
+
+func watchPlanFile(t *testing.T, u *watchUpstream, manifest map[string]any, issues []watchIssue, token string) (string, error) {
+	t.Helper()
 	dir := watchDir(t, manifest)
 	var lines bytes.Buffer
 	for _, is := range issues {
@@ -239,17 +258,37 @@ func tryWatch(t *testing.T, u *watchUpstream, manifest map[string]any, issues []
 	srv := u.serve(t)
 	up := newUpstream(srv.URL+"/raw", srv.URL+"/api", token)
 	if err := watch(t.Context(), dir, existing, out, up, &bytes.Buffer{}); err != nil {
-		return nil, err
+		return "", err
 	}
-	b, err := os.ReadFile(out)
+	return out, nil
+}
+
+// applyIssues runs scripts/apply-issues.sh on plan with a gh that records
+// its argv to the returned log and fails.
+func applyIssues(t *testing.T, plan string) (output []byte, ghLog string, err error) {
+	t.Helper()
+	for _, tool := range []string{"bash", "jq"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("apply-issues.sh needs %s: %v", tool, err)
+		}
+	}
+	bin := t.TempDir()
+	ghLog = filepath.Join(bin, "gh.log")
+	stub := fmt.Sprintf("#!/usr/bin/env bash\nprintf '%%s\\n' \"$*\" >>%q\nexit 1\n", ghLog)
+	syscall.ForkLock.RLock() // golang/go#22315: a concurrent fork holds the fd and exec fails with ETXTBSY
+	err = os.WriteFile(filepath.Join(bin, "gh"), []byte(stub), 0o700)
+	syscall.ForkLock.RUnlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var actions []action
-	if err := json.Unmarshal(b, &actions); err != nil {
+	script, err := filepath.Abs("../../scripts/apply-issues.sh")
+	if err != nil {
 		t.Fatal(err)
 	}
-	return actions, nil
+	cmd := exec.CommandContext(t.Context(), "bash", script, plan)
+	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "GITHUB_REPOSITORY=owner/repo")
+	output, err = cmd.CombinedOutput()
+	return output, ghLog, err
 }
 
 func keyOfAction(a *action) string {
@@ -282,6 +321,29 @@ func TestWatchPlansNothingWithoutAChange(t *testing.T) {
 	t.Run("heads moved, files the same", func(t *testing.T) {
 		if got := runWatchPlan(t, newWatchUpstream(), nil); len(got) != 0 {
 			t.Errorf("got %v", summary(got))
+		}
+	})
+	t.Run("the plan is an empty array apply-issues.sh accepts", func(t *testing.T) {
+		plan, err := watchPlanFile(t, newWatchUpstream(), watchManifest(), nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(b) != "[]\n" {
+			t.Errorf("plan file %q, want %q", b, "[]\n")
+		}
+		out, ghLog, err := applyIssues(t, plan)
+		if err != nil {
+			t.Errorf("apply-issues.sh: %v\n%s", err, out)
+		}
+		if !strings.Contains(string(out), "applied 0 action(s)") {
+			t.Errorf("apply-issues.sh output:\n%s", out)
+		}
+		if calls, err := os.ReadFile(ghLog); err == nil {
+			t.Errorf("apply-issues.sh ran gh:\n%s", calls)
 		}
 	})
 }
