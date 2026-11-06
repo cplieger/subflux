@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitleext"
 	"pgregory.net/rapid"
 )
 
@@ -192,6 +193,18 @@ func TestManualPath_variants(t *testing.T) {
 }
 
 // --- Path PBT ---
+
+func TestExtSRTIsWriterOutput(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{
+		Path("/media/movie.mkv", Tags{Lang: "fr"}),
+		ManualPath("/media/movie.mkv", 2, Tags{Lang: "fr", Forced: true}),
+	} {
+		if !subtitleext.WriterOutput(p) {
+			t.Errorf("subtitleext.WriterOutput(%q) = false for a path subflux writes", p)
+		}
+	}
+}
 
 func TestPath_always_ends_with_srt(t *testing.T) {
 	t.Parallel()

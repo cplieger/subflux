@@ -4,8 +4,7 @@
 // The names land on SMB and NFS shares Windows clients read, so the segment
 // layout, the ordinal position and the extension are compatibility contract,
 // and ManualOrdinal must stay the exact inverse of ManualPath's numbering.
-// internal/subtitleext separately decides which extensions COUNT as subtitles;
-// its coverage test pins ExtSRT to the writerOutput view.
+// internal/subtitleext separately decides which extensions count as subtitles.
 package subtitlefile
 
 import (
@@ -17,9 +16,8 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// ExtSRT is the extension every subflux writer emits. The capability-scoped
-// extension authority lives in internal/subtitleext; its coverage test pins this
-// constant to the writerOutput view so the two cannot drift.
+// ExtSRT is the extension every subflux writer emits; it must stay in
+// subtitleext's writer-output view (TestExtSRTIsWriterOutput).
 const ExtSRT = ".srt"
 
 // Tags are the variant tags a subtitle filename carries next to its

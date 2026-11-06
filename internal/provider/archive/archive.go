@@ -27,11 +27,6 @@ import (
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// Archive-member extension acceptance comes from subtitleext's archiveInput
-// capability view, which includes .vtt: VTT files are only encountered inside
-// archives, not as standalone files on disk from Sonarr/Radarr media
-// libraries.
-
 // maxExtractSize is the maximum size of a single extracted subtitle file (5 MB).
 const maxExtractSize = 5 << 20
 

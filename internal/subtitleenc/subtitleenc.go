@@ -57,6 +57,10 @@ var encodingNames = [...]string{
 	ShiftJIS: "ShiftJIS", EUCJP: "EUCJP", GB18030: "GB18030", Big5: "Big5", EUCKR: "EUCKR",
 }
 
+// Valid reports whether e is a declared Encoding, Unknown included: a byte
+// read back from storage may not be.
+func (e Encoding) Valid() bool { return int(e) < len(encodingNames) }
+
 // String is the value's Go name, such as "Windows1250".
 func (e Encoding) String() string {
 	if int(e) < len(encodingNames) {

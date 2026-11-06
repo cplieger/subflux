@@ -69,6 +69,20 @@ func TestEncodingValuesAppendOnly(t *testing.T) {
 	}
 }
 
+func TestValid(t *testing.T) {
+	t.Parallel()
+	for e := Unknown; e <= EUCKR; e++ {
+		if !e.Valid() {
+			t.Errorf("%s.Valid() = false", e)
+		}
+	}
+	for _, e := range []Encoding{EUCKR + 1, Encoding(255)} {
+		if e.Valid() {
+			t.Errorf("%s.Valid() = true", e)
+		}
+	}
+}
+
 func TestUnknownNeverDecoded(t *testing.T) {
 	t.Parallel()
 	for _, e := range []Encoding{Unknown, Encoding(24), Encoding(255)} {
