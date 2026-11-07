@@ -1,0 +1,884 @@
+{
+ "id": 494892,
+ "title": "[DB] Sousou no Frieren | Frieren: Beyond Journey's End [Dual Audio 10bit BD1080p][HEVC-x265]",
+ "status": "unknown",
+ "num_files": 44,
+ "anidb_aid": 17617,
+ "anidb_eid": null,
+ "files": [
+  {
+   "id": 1225284,
+   "filename": "Extras/[DB]Sousou no Frieren_-_NCED01_(10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2349566,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e21.xz?filename=Extras_%5BDB%5DSousou+no+Frieren_-_NCED01_%2810bit_BD1080p_x265%29_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "9volt",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225285,
+   "filename": "Extras/[DB]Sousou no Frieren_-_NCED02_(10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2433945,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e26.xz?filename=Extras_%5BDB%5DSousou+no+Frieren_-_NCED02_%2810bit_BD1080p_x265%29_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "9volt",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225286,
+   "filename": "Extras/[DB]Sousou no Frieren_-_NCOP01_(10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2210072,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e28.xz?filename=Extras_%5BDB%5DSousou+no+Frieren_-_NCOP01_%2810bit_BD1080p_x265%29_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "9volt",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225287,
+   "filename": "Extras/[DB]Sousou no Frieren_-_NCOP02_(10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2433944,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e24.xz?filename=Extras_%5BDB%5DSousou+no+Frieren_-_NCOP02_%2810bit_BD1080p_x265%29_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "9volt",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225288,
+   "filename": "Extras/[DB]Sousou no Frieren_-_SPNCED_(10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2349565,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e1f.xz?filename=Extras_%5BDB%5DSousou+no+Frieren_-_SPNCED_%2810bit_BD1080p_x265%29_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "9volt",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225289,
+   "filename": "[DB] Sousou no Frieren | Frieren: Beyond Journey's End [Dual Audio 10bit BD1080p][HEVC-x265].7z",
+   "attachments": []
+  },
+  {
+   "id": 1225290,
+   "filename": "[DB]Sousou no Frieren_-_01_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2182257,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/df9.xz?filename=%5BDB%5DSousou+no+Frieren_-_01_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545608,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/dfc.xz?filename=%5BDB%5DSousou+no+Frieren_-_01_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225291,
+   "filename": "[DB]Sousou no Frieren_-_02_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265917,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e3b.xz?filename=%5BDB%5DSousou+no+Frieren_-_02_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2293461,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e3c.xz?filename=%5BDB%5DSousou+no+Frieren_-_02_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225292,
+   "filename": "[DB]Sousou no Frieren_-_03_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2405825,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2cf.xz?filename=%5BDB%5DSousou+no+Frieren_-_03_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2517791,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e10.xz?filename=%5BDB%5DSousou+no+Frieren_-_03_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225293,
+   "filename": "[DB]Sousou no Frieren_-_04_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2126703,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/dfe.xz?filename=%5BDB%5DSousou+no+Frieren_-_04_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2210071,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/dfd.xz?filename=%5BDB%5DSousou+no+Frieren_-_04_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225294,
+   "filename": "[DB]Sousou no Frieren_-_05_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2126706,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e52.xz?filename=%5BDB%5DSousou+no+Frieren_-_05_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2265919,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2ce.xz?filename=%5BDB%5DSousou+no+Frieren_-_05_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225295,
+   "filename": "[DB]Sousou no Frieren_-_06_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265914,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e0a.xz?filename=%5BDB%5DSousou+no+Frieren_-_06_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2405824,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2bc.xz?filename=%5BDB%5DSousou+no+Frieren_-_06_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225296,
+   "filename": "[DB]Sousou no Frieren_-_07_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2321633,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2dc.xz?filename=%5BDB%5DSousou+no+Frieren_-_07_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2377743,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e07.xz?filename=%5BDB%5DSousou+no+Frieren_-_07_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225297,
+   "filename": "[DB]Sousou no Frieren_-_08_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2405830,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2e4.xz?filename=%5BDB%5DSousou+no+Frieren_-_08_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2517793,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e4f.xz?filename=%5BDB%5DSousou+no+Frieren_-_08_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225298,
+   "filename": "[DB]Sousou no Frieren_-_09_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2154295,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e3a.xz?filename=%5BDB%5DSousou+no+Frieren_-_09_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545613,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2d3.xz?filename=%5BDB%5DSousou+no+Frieren_-_09_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225299,
+   "filename": "[DB]Sousou no Frieren_-_10_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265915,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2c5.xz?filename=%5BDB%5DSousou+no+Frieren_-_10_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2433942,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e0d.xz?filename=%5BDB%5DSousou+no+Frieren_-_10_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225300,
+   "filename": "[DB]Sousou no Frieren_-_11_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2182258,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e33.xz?filename=%5BDB%5DSousou+no+Frieren_-_11_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2293460,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2b9.xz?filename=%5BDB%5DSousou+no+Frieren_-_11_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225301,
+   "filename": "[DB]Sousou no Frieren_-_12_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265913,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/dea.xz?filename=%5BDB%5DSousou+no+Frieren_-_12_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2293458,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/ded.xz?filename=%5BDB%5DSousou+no+Frieren_-_12_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225302,
+   "filename": "[DB]Sousou no Frieren_-_13_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2321634,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e55.xz?filename=%5BDB%5DSousou+no+Frieren_-_13_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545614,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2c0.xz?filename=%5BDB%5DSousou+no+Frieren_-_13_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225303,
+   "filename": "[DB]Sousou no Frieren_-_14_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2433943,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e1a.xz?filename=%5BDB%5DSousou+no+Frieren_-_14_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545610,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2d5.xz?filename=%5BDB%5DSousou+no+Frieren_-_14_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225304,
+   "filename": "[DB]Sousou no Frieren_-_15_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265912,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001e2/2da.xz?filename=%5BDB%5DSousou+no+Frieren_-_15_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2517789,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/de8.xz?filename=%5BDB%5DSousou+no+Frieren_-_15_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225305,
+   "filename": "[DB]Sousou no Frieren_-_16_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2377741,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/df2.xz?filename=%5BDB%5DSousou+no+Frieren_-_16_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545607,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001cf/09a.xz?filename=%5BDB%5DSousou+no+Frieren_-_16_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225306,
+   "filename": "[DB]Sousou no Frieren_-_17_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265918,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e4c.xz?filename=%5BDB%5DSousou+no+Frieren_-_17_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2433946,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e4b.xz?filename=%5BDB%5DSousou+no+Frieren_-_17_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225307,
+   "filename": "[DB]Sousou no Frieren_-_18_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2489997,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e03.xz?filename=%5BDB%5DSousou+no+Frieren_-_18_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2545609,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e02.xz?filename=%5BDB%5DSousou+no+Frieren_-_18_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225308,
+   "filename": "[DB]Sousou no Frieren_-_19_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2405826,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e1e.xz?filename=%5BDB%5DSousou+no+Frieren_-_19_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2517792,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e1b.xz?filename=%5BDB%5DSousou+no+Frieren_-_19_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225309,
+   "filename": "[DB]Sousou no Frieren_-_20_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2182260,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e41.xz?filename=%5BDB%5DSousou+no+Frieren_-_20_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2405828,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e43.xz?filename=%5BDB%5DSousou+no+Frieren_-_20_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225310,
+   "filename": "[DB]Sousou no Frieren_-_21_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2182259,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e34.xz?filename=%5BDB%5DSousou+no+Frieren_-_21_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545612,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e35.xz?filename=%5BDB%5DSousou+no+Frieren_-_21_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225311,
+   "filename": "[DB]Sousou no Frieren_-_22_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2433941,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/def.xz?filename=%5BDB%5DSousou+no+Frieren_-_22_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2517790,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001d7/cc7.xz?filename=%5BDB%5DSousou+no+Frieren_-_22_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225312,
+   "filename": "[DB]Sousou no Frieren_-_23_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2293459,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001d8/d94.xz?filename=%5BDB%5DSousou+no+Frieren_-_23_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2377742,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/df7.xz?filename=%5BDB%5DSousou+no+Frieren_-_23_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225313,
+   "filename": "[DB]Sousou no Frieren_-_24_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2126705,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e42.xz?filename=%5BDB%5DSousou+no+Frieren_-_24_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2182261,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e44.xz?filename=%5BDB%5DSousou+no+Frieren_-_24_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225314,
+   "filename": "[DB]Sousou no Frieren_-_25_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2154294,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e2b.xz?filename=%5BDB%5DSousou+no+Frieren_-_25_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2545611,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e2e.xz?filename=%5BDB%5DSousou+no+Frieren_-_25_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225315,
+   "filename": "[DB]Sousou no Frieren_-_26_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2126704,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e2c.xz?filename=%5BDB%5DSousou+no+Frieren_-_26_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2405827,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e2d.xz?filename=%5BDB%5DSousou+no+Frieren_-_26_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225316,
+   "filename": "[DB]Sousou no Frieren_-_27_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2293462,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001df/76c.xz?filename=%5BDB%5DSousou+no+Frieren_-_27_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2405829,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e4a.xz?filename=%5BDB%5DSousou+no+Frieren_-_27_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1225317,
+   "filename": "[DB]Sousou no Frieren_-_28_(Dual Audio_10bit_BD1080p_x265).mkv",
+   "attachments": [
+    {
+     "id": 2265916,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e14.xz?filename=%5BDB%5DSousou+no+Frieren_-_28_%28Dual+Audio_10bit_BD1080p_x265%29_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs/Songs [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2349564,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001fe/e15.xz?filename=%5BDB%5DSousou+no+Frieren_-_28_%28Dual+Audio_10bit_BD1080p_x265%29_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  }
+ ]
+}

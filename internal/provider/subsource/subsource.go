@@ -1,574 +1,377 @@
-// Package subsource implements the SubSource subtitle provider.
-// SubSource has a REST API at api.subsource.net. Requires an API key.
-// Supports both movies and TV episodes via IMDB ID search.
-// Rate limits: 60/min, 1800/hour, 7200/day.
+// Package subsource is the SubSource provider: its REST API at
+// api.subsource.net, which finds a title by IMDb id (falling back to its
+// text search) and lists that title's subtitles per language. It needs an
+// API key; its limits are 60 calls a minute, 1,800 an hour and 7,200 a day.
 package subsource
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/jsonx"
 	"github.com/cplieger/go/keyenc"
-	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
-	"golang.org/x/sync/errgroup"
+	"github.com/cplieger/subflux/internal/rank"
 )
+
+// ID is SubSource's provider id.
+const ID provider.ProviderID = "subsource"
 
 const (
-	providerName    = subflux.ProviderNameSubSource
-	baseURL         = "https://api.subsource.net/api/v1"
-	matchedByIMDB   = subflux.MatchByIMDB
-	paramAPIKey     = "api_key"
+	apiHost = "api.subsource.net"
+	apiURL  = "https://" + apiHost + "/api/v1"
+
+	keyAPIKey = "api_key"
+
+	// paramSearchType names a search's kind; byIMDb is the kind, and its
+	// parameter, of an IMDb id search.
 	paramSearchType = "searchType"
+	byIMDb          = "imdb"
+
+	// unmatchedIMDb is an id no title has, so the key test touches nothing.
+	unmatchedIMDb = "tt0000000"
+
+	maxSearchBody   = 1 << 20
+	maxListBody     = 2 << 20
+	maxDownloadBody = 10 << 20
 )
 
-// Factory creates a SubSource provider from settings.
-func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
-	ps := provider.FromMap(settings)
-	if ps.APIKey == "" {
-		return nil, errors.New("subsource: api_key is required")
+// languages are SubSource's language labels as its API reads and answers
+// them (testdata/languages-probe.json): lower case, words joined by "_", a
+// variety in parentheses appended ("chinese_traditional"), its own spellings
+// kept. A label filters exactly, so "french" never answers "french_france".
+var languages = language.MustProviderMap(provider.WirePairs(
+	"abkhazian", "ab", "afrikaans", "af", "albanian", "sq", "amharic", "am",
+	"arabic", "ar", "aragonese", "an", "armenian", "hy", "assamese", "as",
+	"azerbaijani", "az", "basque", "eu", "belarusian", "be", "bengali", "bn",
+	"bosnian", "bs", "brazilian_portuguese", "pt-BR", "breton", "br",
+	"bulgarian", "bg", "burmese", "my", "catalan", "ca",
+	"chinese_bg_code", "zh", "chinese_traditional", "zh-Hant", "chinese_cantonese", "yue",
+	"croatian", "hr", "czech", "cs", "danish", "da", "dutch", "nl",
+	"english", "en", "espranto", "eo", "estonian", "et", "farsi_persian", "fa",
+	"finnish", "fi", "french", "fr", "french_france", "fr-FR", "french_canada", "fr-CA",
+	"gaelic", "gd", "georgian", "ka", "german", "de", "greek", "el",
+	"hebrew", "he", "hindi", "hi", "hungarian", "hu", "icelandic", "is",
+	"igbo", "ig", "indonesian", "id", "interlingua", "ia", "irish", "ga",
+	"italian", "it", "japanese", "ja", "kannada", "kn", "kazakh", "kk",
+	"khmer", "km", "korean", "ko", "kurdish", "ku", "latvian", "lv",
+	"lithuanian", "lt", "luxembourgish", "lb", "macedonian", "mk", "malay", "ms",
+	"malayalam", "ml", "marathi", "mr", "mongolian", "mn", "navajo", "nv",
+	"nepali", "ne", "northen_sami", "se", "norwegian", "no", "occitan", "oc", //nolint:misspell // SubSource's own label
+	"polish", "pl", "portuguese", "pt", "pushto", "ps", "romanian", "ro",
+	"russian", "ru", "serbian", "sr", "sindhi", "sd", "sinhala", "si",
+	"slovak", "sk", "slovenian", "sl", "somali", "so", "spanish", "es",
+	"spanish_latin_america", "es-419", "spanish_spain", "es-ES", "swahili", "sw",
+	"swedish", "sv", "tagalog", "tl", "tamil", "ta", "tatar", "tt",
+	"telugu", "te", "thai", "th", "turkish", "tr", "turkmen", "tk",
+	"ukrainian", "uk", "urdu", "ur", "uzbek", "uz", "vietnamese", "vi",
+	"welsh", "cy",
+))
+
+// NewEntry is SubSource's row of the provider table.
+func NewEntry() provider.Entry {
+	return provider.Entry{
+		ID:      ID,
+		Summary: "Movie and TV subtitles from SubSource by IMDb id; needs an API key.",
+		Hosts:   []string{apiHost},
+		Schema: formschema.Schema{Fields: []formschema.Field{
+			{Key: keyAPIKey, Label: "API key", Help: "From subsource.net API registration", Kind: formschema.Secret, Required: true},
+		}},
+		Languages: languages,
+		New: func(c provider.Client, v formschema.Values) (provider.Adapter, error) {
+			return &adapter{c: c, key: v.Secret(keyAPIKey), titles: cache.New(func(id int) bool { return id > 0 })}, nil
+		},
 	}
-	return &source{
-		apiKey:     ps.APIKey,
-		client:     provider.NewHTTPClient(provider.HTTPTimeoutExtended),
-		titleCache: cache.New[int](cache.DefaultTTL),
-	}, nil
 }
 
-// source implements the SubSource API client.
-type source struct {
-	client     *http.Client
-	titleCache *cache.Cache[int]
-	apiKey     string
+type adapter struct {
+	titles *cache.Cache[int]
+	c      provider.Client
+	key    string
 }
 
-// Name returns the provider identifier for SubSource.
-func (*source) Name() subflux.ProviderID { return providerName }
-
-// langEntry pairs a requested ISO language code with its SubSource language name.
-type langEntry struct {
-	iso string
-	ss  string
-}
-
-// langResult holds one language goroutine's outcome: the subtitles found for
-// that language or the error its query returned.
-type langResult struct {
-	err  error
-	subs []subflux.Subtitle
-}
-
-// Search finds subtitles matching the request via IMDB ID lookup.
-// Tries alternative titles if the primary title is not found.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if req.ImdbID == "" {
-		slog.Debug("subsource: no IMDB ID, skipping")
-		return nil, nil
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	if q.External.IMDb == 0 {
+		return nil, &provider.Skipped{Cause: "no IMDb id"}
 	}
-
-	titleID, err := p.searchTitleWithAlternatives(ctx, req)
-	if err != nil {
+	movieID, err := a.title(ctx, &q)
+	if err != nil || movieID == 0 {
 		return nil, err
 	}
-	if titleID == 0 {
-		slog.Debug("subsource: title not found", "imdb_id", req.ImdbID)
-		return nil, nil
-	}
-
-	langs := collectLangs(req.Languages)
-	if len(langs) == 0 {
-		return nil, nil
-	}
-
-	// Search languages concurrently with bounded concurrency.
-	perLang := make([]langResult, len(langs))
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(len(langs))
-	for i, le := range langs {
-		g.Go(func() error {
-			subs, queryErr := p.querySubtitles(gctx, titleID, le.ss, le.iso, req)
-			if queryErr != nil {
-				slog.Warn("subsource query failed", "lang", le.iso, "error", httpclient.RedactSecret(queryErr, p.apiKey))
-				perLang[i] = langResult{err: queryErr}
-			} else {
-				perLang[i] = langResult{subs: subs}
-			}
-			return nil
-		})
-	}
-	_ = g.Wait()
-
-	results, err := aggregateLangResults(perLang)
-	if err != nil {
-		return nil, err
-	}
-	slog.Info("subsource search complete", "results", len(results),
-		"media", logsafe.Field(req.MediaLabel()))
-	return results, nil
-}
-
-// collectLangs maps each requested ISO language to its SubSource language name,
-// dropping languages SubSource does not support.
-func collectLangs(languages []string) []langEntry {
-	var langs []langEntry
-	for _, lang := range languages {
-		ssLang := iso2ToSubSource(lang)
-		if ssLang != "" {
-			langs = append(langs, langEntry{iso: lang, ss: ssLang})
-		}
-	}
-	return langs
-}
-
-// aggregateLangResults flattens the per-language results. If every language
-// query failed, the last error is propagated so the caller can distinguish a
-// provider failure from a genuine no-results.
-func aggregateLangResults(perLang []langResult) ([]subflux.Subtitle, error) {
-	var results []subflux.Subtitle
-	var lastErr error
-	var anySuccess bool
-	for _, lr := range perLang {
-		if lr.err != nil {
-			lastErr = lr.err
+	var out []provider.Candidate
+	for _, tag := range q.Langs {
+		wire, ok := languages.Wire(tag)
+		if !ok {
 			continue
 		}
-		anySuccess = true
-		results = append(results, lr.subs...)
+		items, err := a.subtitles(ctx, movieID, wire, &q)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, candidates(items, tag)...)
 	}
-
-	if !anySuccess && lastErr != nil {
-		return nil, fmt.Errorf("subsource: all language queries failed: %w", lastErr)
-	}
-	return results, nil
+	return out, nil
 }
 
-// Download fetches the subtitle content for the given search result.
-// SubSource returns archives; the subtitle file is extracted automatically.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
-		return nil, fmt.Errorf("subsource: %w", err)
+// Test searches an IMDb id no title has; an answer of any kind but a
+// refusal proves the key.
+func (a *adapter) Test(ctx context.Context) error {
+	_, err := a.search(ctx, url.Values{paramSearchType: {byIMDb}, byIMDb: {unmatchedIMDb}})
+	if f, ok := errors.AsType[*provider.Failure](err); ok && f.Kind == provider.NotFound {
+		return nil
 	}
+	return err
+}
 
-	u, err := url.Parse(sub.DownloadURL)
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	id, err := strconv.ParseUint(ref.Token(), 10, 63)
 	if err != nil {
-		return nil, fmt.Errorf("subsource: invalid download URL: %w", err)
+		return provider.Payload{}, provider.Fail(provider.Permanent, "the subtitle id is not a number")
 	}
-	q := u.Query()
-	q.Set(paramAPIKey, p.apiKey)
-	u.RawQuery = q.Encode()
-	dlURL := u.String()
-
-	slog.Debug("subsource downloading subtitle", "id", sub.ID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, http.NoBody)
+	resp, err := a.get(ctx, fmt.Sprintf("/subtitles/%d/download", id), url.Values{})
 	if err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, httpclient.RedactTransportError(err, "subsource download", httpclient.Secret(p.apiKey))
+		return provider.Payload{}, err
 	}
 	defer resp.Body.Close()
-
-	// Use CheckHTTPStatus for unified typed error dispatch. This honors the
-	// Retry-After header on 429 (via httpwire.ParseRetryAfter) and returns
-	// *subflux.AuthError for 401/403 just like the search path.
-	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
-		return nil, httpclient.RedactSecret(statusErr, p.apiKey)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
+	b, err := provider.ReadAll(resp, maxDownloadBody)
 	if err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
+		return provider.Payload{}, err
 	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("subsource: empty response body for subtitle %s", sub.ID)
+	if len(b) == 0 {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "SubSource answered an empty download")
 	}
-
-	// SubSource returns archives; extract the subtitle file.
-	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
-	if err != nil {
-		return nil, fmt.Errorf("subsource: %w", err)
-	}
-	slog.Debug("subsource download complete", "id", sub.ID, "bytes", len(result), "archive", len(result) != len(data))
-	return result, nil
+	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
 }
 
-// searchTitleWithAlternatives tries the primary title, then alternative titles.
-// Rate-limit and auth errors short-circuit the loop since they won't resolve
-// by trying a different title.
-func (p *source) searchTitleWithAlternatives(ctx context.Context, req *subflux.SearchRequest) (int, error) {
-	titleID, err := p.searchTitle(ctx, req)
+// get GETs path under the API with params and the key.
+func (a *adapter) get(ctx context.Context, path string, params url.Values) (*http.Response, error) {
+	params.Set(keyAPIKey, a.key)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+path+"?"+params.Encode(), http.NoBody)
 	if err != nil {
-		return 0, fmt.Errorf("subsource search title: %w", err)
+		return nil, err
 	}
-	if titleID > 0 {
-		return titleID, nil
-	}
-
-	// Track the first real error separately from the loop cursor so a
-	// transient failure followed by a clean "not found" doesn't mask it.
-	var firstErr error
-	for _, alt := range req.AlternativeTitles {
-		altReq := *req
-		altReq.Title = alt
-		id, altErr := p.searchTitle(ctx, &altReq)
-		if altErr != nil {
-			if firstErr == nil {
-				firstErr = altErr
-			}
-			// Rate-limit/auth errors won't resolve with another title.
-			if isFatalSearchError(altErr) {
-				return 0, fmt.Errorf("subsource search alt title: %w", altErr)
-			}
-			continue
-		}
-		if id > 0 {
-			return id, nil
-		}
-	}
-	if firstErr != nil {
-		return 0, fmt.Errorf("subsource search alt title: %w", firstErr)
-	}
-	return 0, nil
+	return a.c.Do(req)
 }
 
-// isFatalSearchError reports whether err should abort the alternative-title
-// loop: rate-limit and auth errors won't resolve by trying another title.
-func isFatalSearchError(err error) bool {
-	if _, isRL := errors.AsType[*subflux.RateLimitError](err); isRL {
-		return true
+func (a *adapter) getJSON(ctx context.Context, path string, params url.Values, limit int64, v any) error {
+	resp, err := a.get(ctx, path, params)
+	if err != nil {
+		return err
 	}
-	if _, isAuth := errors.AsType[*subflux.AuthError](err); isAuth {
-		return true
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, limit)
+	if err != nil {
+		return err
 	}
-	return false
+	if err := json.Unmarshal(b, v); err != nil {
+		return provider.Fail(provider.Permanent, "decode SubSource answer: "+err.Error())
+	}
+	return nil
 }
 
-// --- API types ---
-
-type searchResult struct {
+type titleHit struct {
 	Title       string  `json:"title"`
 	ReleaseYear flexInt `json:"releaseYear"`
 	MovieID     int     `json:"movieId"`
 }
 
-type searchResponse struct {
-	Success *bool          `json:"success"`
-	Error   string         `json:"error,omitempty"`
-	Data    []searchResult `json:"data"`
+func (a *adapter) search(ctx context.Context, params url.Values) ([]titleHit, error) {
+	var r struct {
+		Success *bool      `json:"success"`
+		Error   string     `json:"error"`
+		Data    []titleHit `json:"data"`
+	}
+	if err := a.getJSON(ctx, "/movies/search", params, maxSearchBody, &r); err != nil {
+		return nil, err
+	}
+	if r.Success != nil && !*r.Success {
+		return nil, refusal(r.Error)
+	}
+	return r.Data, nil
 }
 
-type subtitleItem struct {
-	Commentary   string   `json:"commentary"`
-	ReleaseInfo  []string `json:"releaseInfo"`
-	SubtitleID   int      `json:"subtitleId"`
-	HearingImp   bool     `json:"hearingImpaired"`
-	ForeignParts bool     `json:"foreignParts"`
-}
-
-type subtitleResponse struct {
-	Error   string         `json:"error,omitempty"`
-	Data    []subtitleItem `json:"data"`
-	Success bool           `json:"success"`
-}
-
-// --- API calls ---
-
-// searchTitle resolves the SubSource numeric title id for the request,
-// memoized per titleCacheKey.
-func (p *source) searchTitle(ctx context.Context, req *subflux.SearchRequest) (int, error) {
-	cacheKey := titleCacheKey(req)
-	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
-		return p.searchTitleUncached(ctx, req)
+// title is SubSource's id for q's media (per season for an episode),
+// cached by IMDb id and season: the IMDb search's first hit, taken without a
+// title match, else the text search's first hit matching one of q's titles.
+func (a *adapter) title(ctx context.Context, q *provider.Query) (int, error) {
+	imdb := fmt.Sprintf("tt%07d", q.External.IMDb)
+	season := 0
+	if q.Kind == media.Episode {
+		season = q.Numbering.Season
+	}
+	return a.titles.GetOrFetch(ctx, titleKey(imdb, season), func(ctx context.Context) (int, error) {
+		params := url.Values{paramSearchType: {byIMDb}, byIMDb: {imdb}}
+		if season > 0 {
+			params.Set("season", strconv.Itoa(season))
+		}
+		hits, err := a.search(ctx, params)
+		if err != nil {
+			return 0, err
+		}
+		for _, h := range hits {
+			if h.MovieID > 0 {
+				return h.MovieID, nil
+			}
+		}
+		return a.textTitle(ctx, q.Titles, season, q.Year)
 	})
 }
 
-// titleCacheKey builds the titleCache key for a request. Must carry every
-// input that changes the query — title (alternative-title retries) and
-// season (SubSource has per-season title pages). Built with keyenc because
-// ImdbID and Title are adjacent free-form arr text that can carry ':';
-// a collision here hands querySubtitles the wrong title id.
-func titleCacheKey(req *subflux.SearchRequest) string {
-	season := 0
-	if req.MediaType == subflux.MediaTypeEpisode {
-		season = req.Season
-	}
-	return keyenc.Join("title", req.ImdbID, strings.ToLower(req.Title), strconv.Itoa(season))
+// titleKey is the title cache's key: SubSource answers per-season title ids.
+func titleKey(imdb string, season int) string {
+	return keyenc.Join("title", imdb, strconv.Itoa(season))
 }
 
-func (p *source) searchTitleUncached(ctx context.Context, req *subflux.SearchRequest) (int, error) {
-	params := url.Values{
-		paramAPIKey:     {p.apiKey},
-		paramSearchType: {string(matchedByIMDB)},
-		"imdb":          {req.ImdbID},
-	}
-	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
-		params.Set("season", strconv.Itoa(req.Season))
-	}
-
-	data, err := p.doSearch(ctx, params)
-	if err != nil {
-		return 0, err
-	}
-
-	// If IMDB search returned nothing, try text search.
-	if len(data) == 0 && req.Title != "" {
-		slog.Debug("subsource: IMDB search returned no results, falling back to text search",
-			"imdb_id", req.ImdbID, "title", req.Title)
-		return p.searchTitleByText(ctx, req)
-	}
-
-	return matchTitle(data, req.Title, req.Year), nil
-}
-
-func (p *source) searchTitleByText(ctx context.Context, req *subflux.SearchRequest) (int, error) {
-	params := url.Values{
-		paramAPIKey:     {p.apiKey},
-		paramSearchType: {"text"},
-		"q":             {strings.ToLower(req.Title)},
-	}
-	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
-		params.Set("season", strconv.Itoa(req.Season))
-	}
-
-	data, err := p.doSearch(ctx, params)
-	if err != nil {
-		return 0, err
-	}
-
-	return matchTitle(data, req.Title, req.Year), nil
-}
-
-// doSearch executes a title search request and returns the decoded results.
-// Transport errors are redacted to prevent api_key leakage via *url.Error.
-func (p *source) doSearch(ctx context.Context, params url.Values) ([]searchResult, error) {
-	u := baseURL + "/movies/search?" + params.Encode()
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("subsource title search: %w", err), p.apiKey)
-	}
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, httpclient.RedactTransportError(err, "subsource title search", httpclient.Secret(p.apiKey))
-	}
-	defer resp.Body.Close()
-
-	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-
-	var result searchResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
-	}
-	if result.Success != nil && !*result.Success {
-		return nil, p.apiFailure(result.Error)
-	}
-	return result.Data, nil
-}
-
-// API failure vocabularies for a success:false answer arriving as HTTP 200,
-// matched case-insensitively.
-var (
-	keyRefusalPatterns = []string{"api key", "api_key", "unauthorized", "not authorized"}
-	notFoundPatterns   = []string{"not found", "no subtitles", "no results"}
-)
-
-// apiFailure classifies a success:false answer: a refused key is
-// *subflux.AuthError, a not-found answer is no error (no results), anything
-// else a plain error. The text is redacted of the API key and bounded.
-func (p *source) apiFailure(msg string) error {
-	text := logsafe.RedactedField(msg, httpclient.Secret(p.apiKey))
-	lower := strings.ToLower(text)
-	switch {
-	case containsAny(lower, keyRefusalPatterns):
-		return &subflux.AuthError{Msg: "SubSource refused the API key: " + text}
-	case containsAny(lower, notFoundPatterns):
-		return nil
-	default:
-		return fmt.Errorf("subsource API: %q", text)
-	}
-}
-
-func containsAny(s string, patterns []string) bool {
-	for _, p := range patterns {
-		if strings.Contains(s, p) {
-			return true
+// textTitle tries each title's text search in turn; a refused key or a rate
+// limit ends the turn, and another failure is returned when no title matched.
+func (a *adapter) textTitle(ctx context.Context, titles []string, season, year int) (int, error) {
+	var firstErr error
+	for _, title := range titles {
+		if title == "" {
+			continue
+		}
+		params := url.Values{paramSearchType: {"text"}, "q": {strings.ToLower(title)}}
+		if season > 0 {
+			params.Set("season", strconv.Itoa(season))
+		}
+		hits, err := a.search(ctx, params)
+		switch f, _ := errors.AsType[*provider.Failure](err); {
+		case f != nil && (f.Kind == provider.Auth || f.Kind == provider.RateLimited):
+			return 0, err
+		case err != nil:
+			firstErr = cmp.Or(firstErr, err)
+		default:
+			if id := matchTitle(hits, title, year); id > 0 {
+				return id, nil
+			}
 		}
 	}
-	return false
+	return 0, firstErr
 }
 
-// matchTitle finds the first search result whose title contains the query
-// and whose year matches (if specified). Returns 0 if no match.
-func matchTitle(data []searchResult, title string, year int) int {
+// matchTitle is the first hit whose title contains title, in that year when
+// year is known; 0 for none.
+func matchTitle(hits []titleHit, title string, year int) int {
 	lower := strings.ToLower(title)
-	for _, r := range data {
-		if strings.Contains(strings.ToLower(r.Title), lower) {
-			if year == 0 || int(r.ReleaseYear) == year {
-				return r.MovieID
-			}
+	for _, h := range hits {
+		if strings.Contains(strings.ToLower(h.Title), lower) && (year == 0 || int(h.ReleaseYear) == year) {
+			return h.MovieID
 		}
 	}
 	return 0
 }
 
-func (p *source) querySubtitles(ctx context.Context, titleID int, ssLang, isoLang string, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	params := url.Values{
-		paramAPIKey: {p.apiKey},
-		"language":  {strings.ToLower(ssLang)},
-		"limit":     {"100"},
-		"movieId":   {strconv.Itoa(titleID)},
-	}
-	if req.MediaType == subflux.MediaTypeEpisode {
-		params.Set("seasonNumber", strconv.Itoa(req.Season))
-		params.Set("episodeNumber", strconv.Itoa(req.Episode))
-	}
-
-	u := baseURL + "/subtitles?" + params.Encode()
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("subsource subtitles: %w", err), p.apiKey)
-	}
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, httpclient.RedactTransportError(err, "subsource subtitles", httpclient.Secret(p.apiKey))
-	}
-	defer resp.Body.Close()
-
-	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-
-	var result subtitleResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
-	}
-
-	if !result.Success {
-		return nil, p.apiFailure(result.Error)
-	}
-
-	return buildSubtitles(result.Data, isoLang, req.Season, req.Episode), nil
+type item struct {
+	Commentary      string   `json:"commentary"`
+	ReleaseInfo     []string `json:"releaseInfo"`
+	SubtitleID      int      `json:"subtitleId"`
+	HearingImpaired bool     `json:"hearingImpaired"`
+	ForeignParts    bool     `json:"foreignParts"`
 }
 
-// buildSubtitles converts raw API subtitle items into subflux.Subtitle values.
-// Filters out forced/foreign-parts subtitles, detects HI, and expands
-// multi-release entries into individual results. Pure function.
-func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) []subflux.Subtitle {
-	var subs []subflux.Subtitle
-	for _, item := range items {
-		// Skip forced subs unless explicitly requested.
-		if item.ForeignParts || classify.IsForced(item.Commentary) {
+func (a *adapter) subtitles(ctx context.Context, movieID int, wire string, q *provider.Query) ([]item, error) {
+	params := url.Values{"language": {wire}, "limit": {"100"}, "movieId": {strconv.Itoa(movieID)}}
+	if q.Kind == media.Episode {
+		params.Set("seasonNumber", strconv.Itoa(q.Numbering.Season))
+		params.Set("episodeNumber", strconv.Itoa(q.Numbering.Episode))
+	}
+	var r struct {
+		Error   string `json:"error"`
+		Data    []item `json:"data"`
+		Success bool   `json:"success"`
+	}
+	if err := a.getJSON(ctx, "/subtitles", params, maxListBody, &r); err != nil {
+		return nil, err
+	}
+	if !r.Success {
+		return nil, refusal(r.Error)
+	}
+	return r.Data, nil
+}
+
+// The success:false texts that refuse the key, and those that mean no
+// results, matched case-insensitively.
+var (
+	keyRefusals = []string{"api key", "api_key", "unauthorized", "not authorized"}
+	noResults   = []string{"not found", "no subtitles", "no results"}
+)
+
+// refusal is a 200 answer's success:false error: Auth for a refused key, nil
+// for no results, else Permanent.
+func refusal(msg string) error {
+	lower := strings.ToLower(msg)
+	has := func(ps []string) bool {
+		for _, p := range ps {
+			if strings.Contains(lower, p) {
+				return true
+			}
+		}
+		return false
+	}
+	switch {
+	case has(keyRefusals):
+		return provider.Fail(provider.Auth, "SubSource refused the API key: "+msg)
+	case has(noResults):
+		return nil
+	}
+	return provider.Fail(provider.Permanent, "SubSource: "+msg)
+}
+
+// candidates are one per release name of each file.
+func candidates(items []item, tag language.Tag) []provider.Candidate {
+	var out []provider.Candidate
+	for _, it := range items {
+		if it.SubtitleID <= 0 {
 			continue
 		}
-
-		hi := item.HearingImp || classify.IsHearingImpaired(item.Commentary, "")
-
-		// One entry per release name so the scorer evaluates each
-		// independently against the same subtitle file.
-		releases := item.ReleaseInfo
+		releases := it.ReleaseInfo
 		if len(releases) == 0 {
 			releases = []string{""}
 		}
 		for _, rel := range releases {
-			subs = append(subs, subflux.Subtitle{
-				Provider:    providerName,
-				ID:          strconv.Itoa(item.SubtitleID),
-				Language:    isoLang,
-				ReleaseName: rel,
-				DownloadURL: baseURL + "/subtitles/" + strconv.Itoa(item.SubtitleID) + "/download",
-				HearingImp:  hi,
-				MatchedBy:   matchedByIMDB,
-				Season:      season,
-				Episode:     episode,
+			out = append(out, provider.Candidate{
+				Ref:     provider.NewRef(strconv.Itoa(it.SubtitleID)),
+				Lang:    tag,
+				Release: rel,
+				Flags: language.Flags{
+					HI:     provider.HearingImpaired(it.HearingImpaired, it.Commentary, rel),
+					Forced: provider.Forced(it.ForeignParts, it.Commentary, rel),
+				},
+				MatchedBy: rank.ID,
 			})
 		}
 	}
-	return subs
+	return out
 }
 
-// flexInt unmarshals both string and number JSON representations to an int.
-// SubSource's releaseYear field returns either shape; errors default to
-// zero (unknown year).
+// flexInt reads SubSource's releaseYear, which comes as a number or a
+// string; any other shape is 0, an unknown year.
 type flexInt int
 
-// yearPolicy is the lenient decode policy for releaseYear: every gate is
-// jsonx.Zero over the full int64 range, so any odd shape or invalid value
-// decodes to 0 instead of failing the record.
 var yearPolicy = jsonx.Policy{
-	MinValue:         math.MinInt64,
-	MaxValue:         math.MaxInt64,
-	Null:             jsonx.Zero,
-	EmptyInput:       jsonx.Zero,
-	EmptyString:      jsonx.Zero,
-	MalformedString:  jsonx.Zero,
-	NonNumericString: jsonx.Zero,
-	OtherShape:       jsonx.Zero,
-	PaddedString:     jsonx.Zero,
-	FloatForm:        jsonx.Zero,
-	Fractional:       jsonx.Zero,
-	OutOfRange:       jsonx.Zero,
+	MinValue: math.MinInt64, MaxValue: math.MaxInt64,
+	Null: jsonx.Zero, EmptyInput: jsonx.Zero, EmptyString: jsonx.Zero, MalformedString: jsonx.Zero,
+	NonNumericString: jsonx.Zero, OtherShape: jsonx.Zero, PaddedString: jsonx.Zero,
+	FloatForm: jsonx.Zero, Fractional: jsonx.Zero, OutOfRange: jsonx.Zero,
 }
 
-// UnmarshalJSON implements json.Unmarshaler for flexInt.
 func (f *flexInt) UnmarshalJSON(data []byte) error {
 	n, err := jsonx.ParseInt64(data, yearPolicy)
 	if err != nil {
-		// Unreachable under the all-Zero policy; default anyway.
-		*f = 0
-		return nil
+		n = 0
 	}
 	*f = flexInt(n)
 	return nil
-}
-
-// --- Language mapping ---
-// SubSource uses capitalized English language names.
-
-var iso2ToSubSourceMap = map[string]string{
-	"en": "English", "fr": "French", "es": "Spanish", "de": "German",
-	"it": "Italian", "pt": "Portuguese", "pb": "Brazillian Portuguese",
-	"nl": "Dutch", "ru": "Russian",
-	"ar": "Arabic", "ja": "Japanese", "zh": "Chinese BG code", "ko": "Korean",
-	"sv": "Swedish", "no": "Norwegian", "da": "Danish", "fi": "Finnish",
-	"pl": "Polish", "cs": "Czech", "hu": "Hungarian", "ro": "Romanian",
-	"tr": "Turkish", "el": "Greek", "he": "Hebrew", "th": "Thai",
-	"vi": "Vietnamese", "id": "Indonesian", "bg": "Bulgarian",
-	"hr": "Croatian", "sr": "Serbian", "sl": "Slovenian",
-	"sk": "Slovak", "uk": "Ukrainian", "ca": "Catalan",
-	"eu": "Basque", "fa": "Farsi_persian", "ms": "Malay",
-	"sq": "Albanian", "bs": "Bosnian", "hy": "Armenian",
-	"az": "Azerbaijani", "bn": "Bengali", "mk": "Macedonian",
-	"hi": "Hindi", "ta": "Tamil", "te": "Telugu",
-	"ur": "Urdu", "is": "Icelandic", "lt": "Lithuanian",
-	"lv": "Latvian", "et": "Estonian", "sw": "Swahili",
-}
-
-func iso2ToSubSource(code string) string {
-	code = classify.Alpha2FromAlpha3(code)
-	if v, ok := iso2ToSubSourceMap[code]; ok {
-		return v
-	}
-	return ""
 }

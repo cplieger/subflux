@@ -1,0 +1,121 @@
+{
+ "captured": "2026-11-07T03:50Z, read-only GETs of api.subsource.net/api/v1 with the API key (redacted)",
+ "answered_labels": {
+  "albanian": 2,
+  "arabic": 184,
+  "bengali": 20,
+  "big_5_code": 4,
+  "bosnian": 2,
+  "brazilian_portuguese": 20,
+  "bulgarian": 5,
+  "burmese": 10,
+  "chinese_bg_code": 31,
+  "chinese_cantonese": 2,
+  "chinese_traditional": 1,
+  "croatian": 7,
+  "czech": 14,
+  "danish": 62,
+  "dutch": 48,
+  "english": 490,
+  "espranto": 2,
+  "estonian": 8,
+  "farsi_persian": 132,
+  "finnish": 16,
+  "french": 88,
+  "french_france": 1,
+  "german": 26,
+  "greek": 8,
+  "hebrew": 19,
+  "hindi": 2,
+  "hungarian": 10,
+  "icelandic": 6,
+  "indonesian": 126,
+  "italian": 14,
+  "japanese": 15,
+  "khmer": 1,
+  "korean": 47,
+  "kurdish": 1,
+  "latvian": 4,
+  "lithuanian": 6,
+  "macedonian": 2,
+  "malay": 57,
+  "malayalam": 11,
+  "mongolian": 3,
+  "norwegian": 35,
+  "polish": 12,
+  "portuguese": 20,
+  "romanian": 19,
+  "russian": 12,
+  "serbian": 9,
+  "sinhala": 5,
+  "slovak": 4,
+  "slovenian": 11,
+  "somali": 1,
+  "spanish": 41,
+  "spanish_latin_america": 2,
+  "spanish_spain": 1,
+  "swedish": 41,
+  "tamil": 3,
+  "thai": 26,
+  "turkish": 42,
+  "ukrainian": 12,
+  "urdu": 11,
+  "vietnamese": 150
+ },
+ "filter_by_movie": {
+  "English": {
+   "148433": 0
+  },
+  "big 5 code": {
+   "148433": 0,
+   "97779": 0
+  },
+  "brazilian portuguese": {
+   "148433": 0
+  },
+  "brazilian_portuguese": {
+   "148433": 3
+  },
+  "brazillian portuguese": {
+   "148433": 0
+  },
+  "chinese (traditional)": {
+   "148433": 0,
+   "97779": 0
+  },
+  "chinese bg code": {
+   "148433": 0,
+   "97779": 0
+  },
+  "chinese traditional": {
+   "148433": 0,
+   "97779": 0
+  },
+  "chinese_bg_code": {
+   "97779": 1
+  },
+  "chinese_cantonese": {
+   "148433": 1
+  },
+  "chinese_traditional": {
+   "148433": 1,
+   "97779": 0
+  },
+  "french": {
+   "148433": 0
+  },
+  "french_france": {
+   "148433": 1
+  },
+  "spanish": {
+   "148433": 0
+  },
+  "spanish_latin_america": {
+   "148433": 1
+  }
+ },
+ "movies": {
+  "97779": "Tokyo Raiders (2000)",
+  "148433": "The Wedding Banquet (2025)"
+ }
+}

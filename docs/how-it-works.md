@@ -73,7 +73,7 @@ Until a valid configuration is saved, the settings dialog opens on its own and t
 
 When a site rejects its credentials, such as a wrong password, passkey or API key, subflux stops calling it instead of retrying until the site locks the account. The first rejection pauses the site for 5 minutes and the second for 30 minutes. Each pause ends with one test request, and the third rejection disables the site.
 
-A disabled site raises an alert on the web page that stays until it is cleared, logs one ERROR line and sets `subflux_provider_disabled{provider}` to 1. The disable survives a restart, and nothing turns the site back on by itself. Three things do:
+A disabled site raises an alert on the web page that stays until it is cleared, logs one ERROR line and sets `subflux_provider_health{provider,health="disabled"}` to 1. The disable survives a restart, and nothing turns the site back on by itself. Three things do:
 
 - Save the site with different credentials.
 - Press the site's **Test** button in the settings dialog. A pass with the recorded credentials turns the site back on. A pass with edited credentials asks you to save them.
@@ -81,14 +81,7 @@ A disabled site raises an alert on the web page that stays until it is cleared, 
 
 Switching the site off clears its alert, and switching it back on with the same credentials disables it again. A rate-limit answer is not a rejection. It pauses only the operation that hit it, a search or a download, for as long as the site's `Retry-After` header says, or 10 minutes.
 
-AnimeTosho's optional AniDB client key is judged on its own. If AniDB rejects the key, AnimeTosho stops looking up episodes by AniDB ID and keeps searching by title. An alert names the key, and `subflux_provider_setting_rejected{provider,setting}` reads 1. This lasts until one of these happens:
-
-- You change or clear the key.
-- A Test of the saved key passes.
-- You reset site state with `subflux timeouts-reset`.
-- AniDB accepts the key on a later lookup.
-
-A restart forgets the refusal. The alert and the metric return after the first episode lookup AniDB refuses again. Saving any settings, a passing Test and a reset each make AnimeTosho ask AniDB again on its next episode lookup.
+AnimeTosho finds an anime episode by its AniDB episode, read from [animap](https://github.com/cplieger/animap)'s anime map. subflux downloads the map from GitHub on the first AnimeTosho search, and checks for a newer release when a search finds the copy it holds 6 hours old. A failed download keeps that copy, waits 30 minutes before the next try and never counts against AnimeTosho itself. When the map cannot be downloaded at all, or has not refreshed for 24 hours, an alert says so. With no map, AnimeTosho searches by title.
 
 A scan that is already running when you save keeps the settings it started with. It does stop calling any site whose settings you changed. The next scan uses the new settings.
 

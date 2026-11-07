@@ -3,6 +3,7 @@ module github.com/cplieger/subflux
 go 1.27.3
 
 require (
+	github.com/cplieger/animap/mapread v0.3.1
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.8
 	github.com/cplieger/bolttable v1.0.0-dev.6
 	github.com/cplieger/go/filesafe v1.0.0-dev.2
@@ -15,7 +16,6 @@ require (
 	github.com/cplieger/go/slogx v1.0.0-dev.1
 	github.com/cplieger/go/ssrf v1.0.0-dev.1
 	github.com/cplieger/go/textsafe v1.0.0-dev.1
-	github.com/cplieger/go/xmlx v1.0.0-dev.2
 	github.com/cplieger/go/yamlenv v1.0.0-dev.2
 	github.com/cplieger/langtag/v3 v3.2.0-dev.1
 	github.com/dlclark/regexp2/v2 v2.12.0
@@ -24,6 +24,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
+	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
 )
 

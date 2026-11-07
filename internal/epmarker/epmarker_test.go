@@ -842,7 +842,7 @@ func TestStatesEpisode(t *testing.T) {
 }
 
 // TestAbsolute pins the absolute-number form: the last " - NN", else the first
-// E##, EP## or Episode N, else the first " NN "; never a bare number in
+// E##, EP## or Episode N, else the last spaced NN; never a bare number in
 // brackets, never a range and never for a name a marker shapes.
 func TestAbsolute(t *testing.T) {
 	t.Parallel()
@@ -861,7 +861,18 @@ func TestAbsolute(t *testing.T) {
 		{"dash after a season word", "[Grp] Show 2nd Season - 05 [1080p]", 5, true},
 		{"spaced number", "Show 08 [720p].mkv", 8, true},
 		{"dash before spaced", "Show 03 - 08 [720p].mkv", 8, true},
-		{"the first spaced number", "[Miaou] Series Title 02 VOSTFR FHD 10 bits", 2, true},
+		{"a bit depth after the spaced number", "[Miaou] Series Title 02 VOSTFR FHD 10 bits", 2, true},
+		{"the last spaced number", "Mob Psycho 100 05 [1080p].mkv", 5, true},
+		{"the last spaced number at the end", "Mob Psycho 100 05", 5, true},
+		{"the last spaced number before an extension", "Mob Psycho 100 05.mkv", 5, true},
+		{"the last spaced number before a language suffix", "Mob Psycho 100 05.eng.forced.srt", 5, true},
+		{"a bit depth after the last word", "Title 02 VOSTFR 10 bits", 2, true},
+		{"a bit depth before an extension", "Show 02 10 bits.mkv", 2, true},
+		{"a dotted year after a spaced number", "Show 05.2010", 0, false},
+		{"a dotted title after a spaced number", "Show 05.The.Big.Bad.mkv", 0, false},
+		{"a dotted word too long for a suffix", "Show 05.Goodbye.mkv", 0, false},
+		{"a trailing dot", "Show 05.", 0, false},
+		{"a spaced bit depth alone", "Show 10 bit x265.mkv", 0, false},
 		{"eNN", "Show e08.mkv", 8, true},
 		{"eNN at the start", "e08 - Show Title.mkv", 8, true},
 		{"eNN after a multibyte character", "日e08.mkv", 8, true},
@@ -900,7 +911,7 @@ func TestAbsolute(t *testing.T) {
 		{"e after z", "Blaze08.mkv", 0, false},
 		{"e after a digit", "Show2e08.mkv", 0, false},
 		{"eNN glued to a letter", "Show e08x.mkv", 0, false},
-		{"spaced number needs both spaces", "Show 08.mkv", 0, false},
+		{"a spaced number glued to an underscore", "Show 08_x.mkv", 0, false},
 		{"marker shape", "Show S01E01 - 26.mkv", 0, false},
 		{"unreadable marker shape", "Show S99999999999999999999E01 - 26.mkv", 0, false},
 		{"cross marker", "Show 01x08 - 26.mkv", 0, false},

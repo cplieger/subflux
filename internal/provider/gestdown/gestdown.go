@@ -1,410 +1,247 @@
-// Package gestdown implements the Gestdown subtitle provider.
-// Gestdown is an Addic7ed proxy with a clean REST API. TV shows only.
-// API docs: https://gestdown.readme.io/reference
+// Package gestdown is the Gestdown provider: Addic7ed's TV subtitles through
+// Gestdown's REST API (https://gestdown.readme.io/reference), found by the
+// series' TVDB id, one season and language per request.
 package gestdown
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/keyenc"
-	"github.com/cplieger/go/ssrf"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/timing"
-	"golang.org/x/sync/errgroup"
+	"github.com/cplieger/subflux/internal/rank"
 )
+
+// ID is Gestdown's provider id.
+const ID provider.ProviderID = "gestdown"
 
 const (
-	providerName = subflux.ProviderNameGestdown
-	baseURL      = "https://api.gestdown.info"
+	apiHost = "api.gestdown.info"
+	baseURL = "https://" + apiHost
+
+	maxListBody     = 1 << 20
+	maxSeasonBody   = 5 << 20
+	maxSubtitleBody = 5 << 20
 )
 
-// source implements the Gestdown API client.
-type source struct {
-	client    *http.Client
-	showCache *cache.Cache[[]showResult]
-	subCache  *cache.Cache[[]subflux.Subtitle]
-}
+// languages are the codes Gestdown's language path segment accepts, each
+// its own wire label: it answers 400 to an Addic7ed name such as "Brazilian
+// Portuguese" and to a code it does not know (testdata/languages-probe.json).
+var languages = language.MustProviderMap(provider.WirePairs(codePairs(
+	"en", "fr", "es", "es-419", "es-ES", "de", "it", "pt", "pt-BR", "nl",
+	"ru", "ar", "ja", "zh-Hans", "zh-Hant", "ko", "sv", "no", "da", "fi",
+	"pl", "cs", "hu", "ro", "tr", "el", "he", "th", "vi", "id", "bg", "hr",
+	"sr", "sl", "sk", "uk", "ca", "eu", "gl", "fa", "ms", "sq", "bs", "hy",
+	"az", "bn", "mk", "hi", "ta", "te", "ml", "kn", "mr", "ur", "ne", "si",
+	"af", "sw", "lt", "lv", "et", "is", "ga", "cy", "ka", "mn", "km", "lo",
+	"my",
+)...))
 
-// Factory creates a Gestdown provider. No configuration is required.
-func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
-	return &source{
-		client:    provider.NewHTTPClient(provider.HTTPTimeoutStandard),
-		showCache: cache.New[[]showResult](cache.DefaultTTL),
-		subCache:  cache.New[[]subflux.Subtitle](cache.DefaultTTL),
-	}, nil
-}
-
-// Name returns the provider identifier for Gestdown.
-func (*source) Name() subflux.ProviderID { return providerName }
-
-// checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
-// gestdown's rate-limit signal (Addic7ed throttle) with Retry-After parsed
-// into RateLimitError.RetryAfter; everything else defers to
-// httpwire.CheckHTTPStatus.
-func checkStatus(resp *http.Response) error {
-	if resp.StatusCode == http.StatusLocked {
-		return &subflux.RateLimitError{
-			Msg:        "HTTP 423: rate limited",
-			RetryAfter: httpwire.ParseRetryAfter(resp),
-		}
+func codePairs(codes ...string) []string {
+	out := make([]string, 0, 2*len(codes))
+	for _, c := range codes {
+		out = append(out, c, c)
 	}
-	return httpwire.CheckHTTPStatus(resp)
+	return out
 }
 
-// langEntry pairs a requested ISO language code with its Gestdown-specific
-// (Addic7ed-style) language name.
-type langEntry struct {
-	iso  string
-	gest string
-}
-
-// langResult holds one language goroutine's outcome: either the subtitles
-// found for that language or the error that ended its show loop.
-type langResult struct {
-	err  error
-	subs []subflux.Subtitle
-}
-
-// Search finds subtitles for TV episodes via TVDB ID lookup.
-// Gestdown only supports TV shows; movies are skipped.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if req.MediaType != subflux.MediaTypeEpisode || req.TvdbID == 0 {
-		slog.Debug("gestdown: not an episode or no TVDB ID, skipping")
-		return nil, nil
+// NewEntry is Gestdown's row of the provider table.
+func NewEntry() provider.Entry {
+	return provider.Entry{
+		ID:        ID,
+		Summary:   "TV subtitles from Addic7ed through the Gestdown API; needs no account.",
+		Hosts:     []string{apiHost},
+		Languages: languages,
+		Quirk:     quirk,
+		New: func(c provider.Client, _ formschema.Values) (provider.Adapter, error) {
+			return &adapter{
+				c:       c,
+				shows:   cache.New(cache.NonEmpty[string]),
+				seasons: cache.New(cache.NonEmpty[seasonEpisode]),
+			}, nil
+		},
 	}
+}
 
-	shows, err := p.findShow(ctx, req.TvdbID)
+// quirk reads 423, Gestdown's answer while Addic7ed throttles it, as a rate
+// limit.
+func quirk(resp *http.Response, _ []byte) error {
+	if resp.StatusCode != http.StatusLocked {
+		return nil
+	}
+	return &provider.Failure{
+		Kind: provider.RateLimited, Msg: "Addic7ed is throttling Gestdown",
+		RetryAfter: max(httpclient.ParseRetryAfterResponse(resp), 0),
+	}
+}
+
+type adapter struct {
+	shows   *cache.Cache[[]string]
+	seasons *cache.Cache[[]seasonEpisode]
+	c       provider.Client
+}
+
+// Search asks each of q's languages in turn for the episode's season; a
+// failed language returns what the earlier ones found with its failure.
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	switch {
+	case q.Kind != media.Episode:
+		return nil, &provider.Skipped{Cause: "Gestdown has TV episodes only"}
+	case q.External.TVDB == 0:
+		return nil, &provider.Skipped{Cause: "no TVDB id"}
+	case q.Numbering.Scheme != media.TVDB:
+		return nil, &provider.Skipped{Cause: "the episode is not numbered in TVDB's order"}
+	}
+	shows, err := a.shows.GetOrFetch(ctx, keyenc.Join("show", strconv.FormatUint(q.External.TVDB, 10)), func(ctx context.Context) ([]string, error) {
+		return a.findShows(ctx, q.External.TVDB)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("gestdown find show: %w", err)
+		return nil, err
 	}
-	if len(shows) == 0 {
-		slog.Debug("gestdown: show not found", "tvdb_id", req.TvdbID)
-		return nil, nil
-	}
-
-	langs := collectLangs(req.Languages)
-	if len(langs) == 0 {
-		return nil, nil
-	}
-
-	// Bounded concurrency per language; each language's show loop stays
-	// sequential (break-on-first-success).
-	perLang := make([]langResult, len(langs))
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(3)
-	for i, le := range langs {
-		g.Go(func() error {
-			perLang[i] = p.searchShowsForLang(gctx, shows, req, le.gest, le.iso)
-			return nil
-		})
-	}
-	_ = g.Wait()
-
-	return aggregateResults(perLang, req)
-}
-
-// collectLangs maps each requested ISO language to its Gestdown language name,
-// dropping languages Gestdown does not support.
-func collectLangs(languages []string) []langEntry {
-	var langs []langEntry
-	for _, lang := range languages {
-		gestLang := iso2ToGestdown(lang)
-		if gestLang != "" {
-			langs = append(langs, langEntry{iso: lang, gest: gestLang})
-		}
-	}
-	return langs
-}
-
-// searchShowsForLang searches one language across the candidate shows,
-// stopping at the first show that yields subtitles (or the first error).
-func (p *source) searchShowsForLang(ctx context.Context, shows []showResult, req *subflux.SearchRequest, gestLang, isoLang string) langResult {
-	var lr langResult
-	for _, show := range shows {
-		if show.ID == "" {
+	var out []provider.Candidate
+	for _, tag := range q.Langs {
+		wire, ok := languages.Wire(tag)
+		if !ok {
 			continue
 		}
-		subs, searchErr := p.searchSeasonCached(ctx, show.ID, req.Season, req.Episode, gestLang, isoLang)
-		if searchErr != nil {
-			slog.Warn("gestdown search failed",
-				"show", show.ID, "lang", isoLang, "error", searchErr)
-			return langResult{err: searchErr}
-		}
-		lr = langResult{subs: subs}
-		if len(subs) > 0 {
-			break
-		}
-	}
-	return lr
-}
-
-// aggregateResults flattens the per-language results. If every attempted
-// language failed, the combined error is returned so the caller can
-// distinguish a provider outage from a genuine no-results.
-func aggregateResults(perLang []langResult, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	var results []subflux.Subtitle
-	attempted, failed := 0, 0
-	for _, lr := range perLang {
-		attempted++
-		if lr.err != nil {
-			failed++
-			continue
-		}
-		results = append(results, lr.subs...)
-	}
-
-	if attempted > 0 && failed == attempted {
-		slog.Warn("gestdown search complete (all calls failed)",
-			"attempts", attempted, "media", logsafe.Field(req.MediaLabel()))
-		return nil, fmt.Errorf("gestdown: all %d attempts failed", attempted)
-	}
-
-	slog.Info("gestdown search complete", "results", len(results),
-		"media", logsafe.Field(req.MediaLabel()))
-	return results, nil
-}
-
-// Download fetches the subtitle content for the given search result.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
-		return nil, fmt.Errorf("gestdown: %w", err)
-	}
-
-	slog.Debug("gestdown downloading subtitle", "url", sub.DownloadURL)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sub.DownloadURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if sErr := checkStatus(resp); sErr != nil {
-		return nil, sErr
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxSingleSubtitleBytes))
-	if err != nil {
-		return nil, err
-	}
-	if _, err := timing.ParseCues(data); err != nil {
-		return nil, fmt.Errorf("gestdown: %w", err)
-	}
-	slog.Debug("gestdown download complete", "id", sub.ID, "bytes", len(data))
-	return data, nil
-}
-
-// --- API types ---
-
-type showResult struct {
-	ID string `json:"id"`
-}
-
-type showsResponse struct {
-	Shows []showResult `json:"shows"`
-}
-
-type subtitleResult struct {
-	SubtitleID  string `json:"subtitleId"`
-	Version     string `json:"version"`
-	DownloadURI string `json:"downloadUri"`
-	Completed   bool   `json:"completed"`
-	HearingImp  bool   `json:"hearingImpaired"`
-}
-
-type seasonResponse struct {
-	Episodes []seasonEpisode `json:"episodes"`
-}
-
-type seasonEpisode struct {
-	Subtitles []subtitleResult `json:"subtitles"`
-	Number    int              `json:"number"`
-}
-
-// --- API calls ---
-
-// findShow resolves gestdown's show ids for a TVDB id, memoized per showCacheKey.
-func (p *source) findShow(ctx context.Context, tvdbID int) ([]showResult, error) {
-	cacheKey := showCacheKey(tvdbID)
-	return p.showCache.GetOrFetch(cacheKey, func() ([]showResult, error) {
-		shows, err := p.findShowUncached(ctx, tvdbID)
-		if err != nil || len(shows) == 0 {
-			return nil, err
-		}
-		return shows, nil
-	})
-}
-
-// showCacheKey builds the showCache key for a TVDB id. Uses keyenc so this
-// package has one key grammar (see seasonCacheKey, whose showID can carry
-// a ':'); a forgeable key here would return another series' show-id list.
-func showCacheKey(tvdbID int) string {
-	return keyenc.Join("show", strconv.Itoa(tvdbID))
-}
-
-func (p *source) findShowUncached(ctx context.Context, tvdbID int) ([]showResult, error) {
-	u := fmt.Sprintf("%s/shows/external/tvdb/%d", baseURL, tvdbID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
-	}
-	if err := checkStatus(resp); err != nil {
-		return nil, err
-	}
-
-	var result showsResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode shows: %w", err)
-	}
-	return result.Shows, nil
-}
-
-// searchSeasonCached fetches one season's subtitles for one language, memoized
-// per seasonCacheKey, then narrows the result to the requested episode.
-func (p *source) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
-	cacheKey := seasonCacheKey(showID, season, gestLang)
-
-	allSubs, err := p.subCache.GetOrFetch(cacheKey, func() ([]subflux.Subtitle, error) {
-		return p.searchSeasonRetry(ctx, showID, season, gestLang, isoLang)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return filterByEpisode(allSubs, episode), nil
-}
-
-// seasonCacheKey builds the subCache key for one season of one language.
-// showID is gestdown's own free-form id and can carry the ':' separator;
-// keyenc escapes element-wise so a collision can't hand an episode another
-// show's or language's cached season list.
-func seasonCacheKey(showID string, season int, gestLang string) string {
-	return keyenc.Join("season", showID, strconv.Itoa(season), gestLang)
-}
-
-// filterByEpisode returns only subtitles matching the given episode number.
-func filterByEpisode(subs []subflux.Subtitle, episode int) []subflux.Subtitle {
-	var results []subflux.Subtitle
-	for i := range subs {
-		if subs[i].Episode == episode {
-			results = append(results, subs[i])
-		}
-	}
-	return results
-}
-
-func (p *source) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
-	var subs []subflux.Subtitle
-	err := httpwire.RetryOnRateLimit(ctx, 3, 5*time.Minute, func() error {
-		var searchErr error
-		subs, searchErr = p.searchSeason(ctx, showID, season, gestLang, isoLang)
-		return searchErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return subs, nil
-}
-
-func (p *source) searchSeason(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
-	u := fmt.Sprintf("%s/shows/%s/%d/%s", baseURL, url.PathEscape(showID), season, gestLang)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
-	}
-	if err := checkStatus(resp); err != nil {
-		return nil, err
-	}
-
-	var result seasonResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // season data limit
-		return nil, fmt.Errorf("decode season: %w", err)
-	}
-
-	return buildSubtitles(result.Episodes, season, isoLang), nil
-}
-
-// convertSubtitle converts a raw subtitleResult into an subflux.Subtitle.
-// Returns ok=false if the subtitle should be skipped (incomplete or invalid URI).
-func convertSubtitle(s subtitleResult, episode, season int, isoLang string) (subflux.Subtitle, bool) {
-	if !s.Completed {
-		return subflux.Subtitle{}, false
-	}
-	if !strings.HasPrefix(s.DownloadURI, "/") {
-		slog.Warn("gestdown: unexpected download URI",
-			"uri", s.DownloadURI, "subtitle_id", s.SubtitleID)
-		return subflux.Subtitle{}, false
-	}
-	releases := strings.Split(s.Version, ",")
-	for i := range releases {
-		releases[i] = strings.TrimSpace(releases[i])
-	}
-	return subflux.Subtitle{
-		Provider:    providerName,
-		ID:          s.SubtitleID,
-		Language:    isoLang,
-		ReleaseName: strings.Join(releases, " "),
-		DownloadURL: baseURL + s.DownloadURI,
-		HearingImp:  s.HearingImp,
-		MatchedBy:   subflux.MatchByTVDB,
-		Episode:     episode,
-		Season:      season,
-	}, true
-}
-
-// buildSubtitles converts raw season API response into subflux.Subtitle slice.
-// Filters incomplete subtitles and validates download URI prefix.
-func buildSubtitles(episodes []seasonEpisode, season int, isoLang string) []subflux.Subtitle {
-	var subs []subflux.Subtitle
-	for _, ep := range episodes {
-		for _, s := range ep.Subtitles {
-			if sub, ok := convertSubtitle(s, ep.Number, season, isoLang); ok {
-				subs = append(subs, sub)
+		for _, show := range shows {
+			eps, err := a.seasons.GetOrFetch(ctx, keyenc.Join("season", show, strconv.Itoa(q.Numbering.Season), wire), func(ctx context.Context) ([]seasonEpisode, error) {
+				return a.season(ctx, show, q.Numbering.Season, wire)
+			})
+			if err != nil {
+				return out, err
+			}
+			found := candidates(eps, q.Numbering.Episode, tag)
+			out = append(out, found...)
+			if len(found) > 0 {
+				break
 			}
 		}
 	}
-	return subs
+	return out, nil
 }
 
-// --- Language mapping ---
-// Gestdown uses Addic7ed-style language names.
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/subtitles/download/"+url.PathEscape(ref.Token()), http.NoBody)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, maxSubtitleBody)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+}
 
-func iso2ToGestdown(code string) string {
-	return classify.LookupLangName(code, nil)
+// getJSON decodes a GET's answer into v; a 404 leaves v untouched.
+func (a *adapter) getJSON(ctx context.Context, u string, limit int64, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
+	if err != nil {
+		return err
+	}
+	resp, err := a.c.Do(req)
+	if f, ok := errors.AsType[*provider.Failure](err); ok && f.Kind == provider.NotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, limit)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return provider.Fail(provider.Permanent, fmt.Sprintf("decode %s answer: %v", resp.Request.URL.Path, err))
+	}
+	return nil
+}
+
+// findShows is Gestdown's show ids for a TVDB series; one series can map to
+// several Addic7ed shows.
+func (a *adapter) findShows(ctx context.Context, tvdb uint64) ([]string, error) {
+	var r struct {
+		Shows []struct {
+			ID string `json:"id"`
+		} `json:"shows"`
+	}
+	if err := a.getJSON(ctx, fmt.Sprintf("%s/shows/external/tvdb/%d", baseURL, tvdb), maxListBody, &r); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(r.Shows))
+	for _, s := range r.Shows {
+		if s.ID != "" {
+			ids = append(ids, s.ID)
+		}
+	}
+	return ids, nil
+}
+
+type subtitle struct {
+	SubtitleID      string `json:"subtitleId"`
+	Version         string `json:"version"`
+	DownloadURI     string `json:"downloadUri"`
+	Completed       bool   `json:"completed"`
+	HearingImpaired bool   `json:"hearingImpaired"`
+}
+
+type seasonEpisode struct {
+	Subtitles []subtitle `json:"subtitles"`
+	Number    int        `json:"number"`
+}
+
+func (a *adapter) season(ctx context.Context, show string, season int, wire string) ([]seasonEpisode, error) {
+	var r struct {
+		Episodes []seasonEpisode `json:"episodes"`
+	}
+	u := fmt.Sprintf("%s/shows/%s/%d/%s", baseURL, url.PathEscape(show), season, url.PathEscape(wire))
+	if err := a.getJSON(ctx, u, maxSeasonBody, &r); err != nil {
+		return nil, err
+	}
+	return r.Episodes, nil
+}
+
+// candidates are episode's completed subtitles whose download path is the
+// one Fetch rebuilds from the subtitle id.
+func candidates(eps []seasonEpisode, episode int, tag language.Tag) []provider.Candidate {
+	var out []provider.Candidate
+	for _, ep := range eps {
+		if ep.Number != episode {
+			continue
+		}
+		for _, s := range ep.Subtitles {
+			if !s.Completed || s.SubtitleID == "" || s.DownloadURI != "/subtitles/download/"+s.SubtitleID {
+				continue
+			}
+			versions := strings.Split(s.Version, ",")
+			for i := range versions {
+				versions[i] = strings.TrimSpace(versions[i])
+			}
+			release := strings.Join(versions, " ")
+			out = append(out, provider.Candidate{
+				Ref:       provider.NewRef(s.SubtitleID),
+				Lang:      tag,
+				Release:   release,
+				Flags:     language.Flags{HI: provider.HearingImpaired(s.HearingImpaired, release)},
+				MatchedBy: rank.ID,
+			})
+		}
+	}
+	return out
 }

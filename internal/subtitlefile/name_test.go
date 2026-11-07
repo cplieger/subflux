@@ -195,7 +195,7 @@ func TestExtOfFormat(t *testing.T) {
 		t.Error("subtitleext.WriterOutput(.sub) = true, but no writer produces it")
 	}
 	var parsed []string
-	for _, e := range subtitleext.Extensions() {
+	for _, e := range []string{".ass", ".srt", ".ssa", ".sub", ".vtt"} { // subtitleext's table
 		if n, ok := subtitlefile.Parse("m", "m"+e); ok {
 			parsed = append(parsed, n.Ext.String())
 		} else if subtitleext.OnDisk("m" + e) {

@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/ulikunitz/xz"
 )
 
@@ -42,7 +41,7 @@ func decompressXZ(data []byte) []byte {
 		return data
 	}
 	decompressed, err := io.ReadAll(
-		io.LimitReader(r, httpwire.MaxJSONResponseBytes),
+		io.LimitReader(r, maxExtractSize),
 	)
 	if err != nil {
 		slog.Debug("archive: xz decompression failed, "+
@@ -61,7 +60,7 @@ func decompressGzip(data []byte) []byte {
 	}
 	defer gr.Close()
 	decompressed, err := io.ReadAll(
-		io.LimitReader(gr, httpwire.MaxJSONResponseBytes),
+		io.LimitReader(gr, maxExtractSize),
 	)
 	if err != nil {
 		slog.Debug("archive: gzip decompression failed, "+

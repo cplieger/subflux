@@ -4,10 +4,17 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/language"
 )
 
-var testLangMapper LangMapper = classify.Alpha2FromAlpha3
+// testLangMapper maps a tag onto language.Parse's canonical form.
+func testLangMapper(s string) string {
+	t, ok := language.Parse(s)
+	if !ok {
+		return ""
+	}
+	return t.String()
+}
 
 func TestNormalizeFFprobeLang(t *testing.T) {
 	t.Parallel()
@@ -19,16 +26,14 @@ func TestNormalizeFFprobeLang(t *testing.T) {
 		{input: "fra", want: "fr"},
 		{input: "en", want: "en"},
 		{input: "fr", want: "fr"},
-		{input: "en-US", want: "en"},
-		{input: "fr-FR", want: "fr"},
-		// Brazilian Portuguese: the region decides the target, so it must not be
-		// discarded before it is read. Truncating at the hyphen used to answer
-		// "pt" here and route a Brazilian audio track to European Portuguese.
-		{input: "pt-BR", want: "pb"},
+		{input: "en-US", want: "en-US"},
+		{input: "fr-FR", want: "fr-FR"},
+		// The region reaches the mapper: Brazilian Portuguese is its own target.
+		{input: "pt-BR", want: "pt-BR"},
 		{input: "und", want: ""},
 		{input: "undetermined", want: ""},
 		{input: "", want: ""},
-		{input: "pob", want: "pb"},
+		{input: "pob", want: ""},
 		{input: "ger", want: "de"},
 		{input: "deu", want: "de"},
 		{input: "jpn", want: "ja"},
@@ -215,36 +220,10 @@ func TestNormalizeFFprobeLang_three_letter_unknown(t *testing.T) {
 
 func TestNormalizeFFprobeLang_bcp47_with_region(t *testing.T) {
 	t.Parallel()
-	// por-BR canonicalizes to pt-BR, which is Brazilian Portuguese.
-	got := NormalizeFFprobeLang("por-BR", testLangMapper)
-	if got != "pb" {
-		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "por-BR", got, "pb")
-	}
-	// A region that names no separate target is discarded after being read.
-	if got := NormalizeFFprobeLang("por-PT", testLangMapper); got != "pt" {
-		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "por-PT", got, "pt")
-	}
-}
-
-func TestAlpha2FromAlpha3(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		input, want string
-	}{
-		{input: "eng", want: "en"},
-		{input: "fre", want: "fr"},
-		{input: "fra", want: "fr"},
-		{input: "unknown", want: ""},
-		{input: "", want: ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			t.Parallel()
-			if got := classify.Alpha2FromAlpha3(tt.input); got != tt.want {
-				t.Errorf("Alpha2FromAlpha3(%q) = %q, want %q",
-					tt.input, got, tt.want)
-			}
-		})
+	for in, want := range map[string]string{"por-BR": "pt-BR", "por-PT": "pt-PT"} {
+		if got := NormalizeFFprobeLang(in, testLangMapper); got != want {
+			t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
@@ -290,7 +269,7 @@ func TestNormalizeFFprobeLang_case_insensitive(t *testing.T) {
 		{input: "EN", want: "en"},
 		{input: "UND", want: ""},
 		{input: "Undetermined", want: ""},
-		{input: "EN-US", want: "en"},
+		{input: "EN-US", want: "en-US"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -339,9 +318,8 @@ func TestNormalizeFFprobeLang_malformedTagRejected(t *testing.T) {
 	if got := NormalizeFFprobeLang("-en", testLangMapper); got != "" {
 		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "-en", got, "")
 	}
-	// A well-formed BCP 47 tag still resolves to its primary language.
-	if got := NormalizeFFprobeLang("en-US", testLangMapper); got != "en" {
-		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "en-US", got, "en")
+	if got := NormalizeFFprobeLang("en-US", testLangMapper); got != "en-US" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "en-US", got, "en-US")
 	}
 }
 

@@ -1,469 +1,267 @@
-// Package animetosho implements the AnimeTosho subtitle provider.
-// Anime episodes only, uses AniDB episode IDs.
+// Package animetosho is the AnimeTosho provider: the subtitle attachments of
+// the anime releases AnimeTosho's feed indexes, searched by AniDB episode or
+// anime through the anime map, else by title.
 package animetosho
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
-	"slices"
+	"path"
 	"strconv"
 	"strings"
+	"sync"
 
-	"github.com/cplieger/go/ssrf"
-	"github.com/cplieger/subflux/internal/epmarker"
-	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/animap/mapread"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/anidb"
+	"github.com/cplieger/subflux/internal/provider/animemap"
 	"github.com/cplieger/subflux/internal/provider/archive"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/timing"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	providerName     = subflux.ProviderNameAnimeTosho
-	feedURL          = "https://feed.animetosho.org/json"
-	storageURL       = "https://animetosho.org/storage/attach/"
-	maxSearchEntries = 6
+	feedHost    = "feed.animetosho.net"
+	storageHost = "storage.animetosho.net"
+	feedURL     = "https://" + feedHost + "/json"
 
-	statusComplete     = "complete"
-	attachTypeSubtitle = "subtitle"
+	// A query reads its first six entries AnimeTosho did not skip, all at
+	// once.
+	maxEntries = 6
 )
 
-// Factory creates an AnimeTosho provider from settings.
-func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
-	ps := provider.FromMap(settings)
-	anidbKey, _ := ps.Custom[string(provider.KeyAniDBClientKey)].(string)
-	if anidbKey == "" {
-		slog.Debug("animetosho: no anidb_client_key, episode ID resolution disabled")
-	}
-	return &source{
-		client:      provider.NewHTTPClient(provider.HTTPTimeoutStandard),
-		anidbMapper: anidb.NewMapper(anidbKey),
-	}, nil
+type adapter struct {
+	m *animemap.Map
+	c provider.Client
 }
 
-// source implements the AnimeTosho subtitle API.
-type source struct {
-	client      *http.Client
-	anidbMapper episodeMapper
-}
-
-// episodeMapper is the AniDB lookup a search resolves its episode id through;
-// *anidb.Mapper.
-type episodeMapper interface {
-	Resolve(ctx context.Context, tvdbID, season, episode int) *anidb.EpisodeResult
-	CheckClientKey(ctx context.Context) error
-	ClientKeyVerdict() (answered bool, refusal error)
-	ForgetClientKeyVerdict()
-}
-
-var _ provider.SettingReporter = (*source)(nil)
-
-// SettingVerdict names the AniDB client key once AniDB refused it or answered
-// a request carrying it with data, with the refusal or nil for an acceptance.
-// After a refusal searches run by title only.
-func (p *source) SettingVerdict() (setting string, refusal error) {
-	answered, refusal := p.anidbMapper.ClientKeyVerdict()
-	if !answered {
-		return "", nil
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	if q.Kind != media.Episode && q.Kind != media.Movie {
+		return nil, &provider.Skipped{Cause: "not an episode or a movie"}
 	}
-	return string(provider.KeyAniDBClientKey), refusal
-}
-
-// ForgetSettingVerdict drops AniDB's answer about the client key, so the next
-// episode lookup asks AniDB again.
-func (p *source) ForgetSettingVerdict() { p.anidbMapper.ForgetClientKeyVerdict() }
-
-// Name returns the provider identifier for AnimeTosho.
-func (*source) Name() subflux.ProviderID { return providerName }
-
-// Search tries AniDB episode ID lookup first (more precise for anime), then
-// falls back to title+season search.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if req.MediaType != subflux.MediaTypeEpisode {
-		slog.Debug("animetosho: not an episode, skipping",
-			"media_type", req.MediaType)
-		return nil, nil
-	}
-	if req.Title == "" {
-		slog.Debug("animetosho: no title, skipping")
-		return nil, nil
-	}
-
-	if req.TvdbID > 0 {
-		if subs, done, err := p.searchByAniDB(ctx, req); done {
-			return subs, err
+	if animemap.Keyed(&q) {
+		if x := a.m.Index(ctx, a.c); x != nil {
+			if ls := animemap.Landings(x, &q); len(ls) > 0 {
+				return a.searchLandings(ctx, &placer{x: x, q: &q, landings: ls})
+			}
 		}
 	}
-
-	results, err := p.searchByTitle(ctx, req)
-	if err != nil {
-		// The provider-sweep boundary logs this with the provider name; the
-		// media label and which leg failed are what it cannot reconstruct.
-		return nil, fmt.Errorf("title search for %s: %w", logsafe.Field(req.MediaLabel()), err)
+	if len(q.Titles) == 0 {
+		return nil, &provider.Skipped{Cause: "no title and no AniDB episode"}
 	}
-	slog.Info("animetosho search complete",
-		"results", len(results), "media", logsafe.Field(req.MediaLabel()))
-	return results, nil
+	query := q.Titles[0]
+	if q.Kind == media.Episode {
+		query = fmt.Sprintf("%s S%02d", query, q.Numbering.Season)
+	}
+	answers, err := a.read(ctx, url.Values{"q": {query}})
+	var out []provider.Candidate
+	for _, an := range answers {
+		out = append(out, titleCandidates(an, &q)...)
+	}
+	return dedupe(out), err
 }
 
-// searchByAniDB searches by the AniDB episode id when one resolves. done
-// reports an answer the title search must not replace: results, or a rate
-// limit that would refuse the title search too.
-func (p *source) searchByAniDB(ctx context.Context, req *subflux.SearchRequest) (subs []subflux.Subtitle, done bool, err error) {
-	result := p.anidbMapper.Resolve(ctx, req.TvdbID, req.Season, req.Episode)
-	if result == nil || result.AniDBEpisodeID <= 0 {
-		return nil, false, nil
-	}
-	slog.Debug("animetosho: using AniDB episode ID",
-		"tvdb_id", req.TvdbID, "anidb_ep_id", result.AniDBEpisodeID)
-	subs, err = p.searchByEpisodeID(ctx, result.AniDBEpisodeID, req)
-	if err == nil && len(subs) > 0 {
-		slog.Info("animetosho search complete (anidb)",
-			"results", len(subs), "media", logsafe.Field(req.MediaLabel()))
-		return subs, true, nil
-	}
-	if _, limited := errors.AsType[*subflux.RateLimitError](err); limited {
-		return nil, true, err
-	}
-	if err != nil {
-		slog.Warn("animetosho: AniDB search failed, falling back to title",
-			"error", err)
-	} else {
-		slog.Debug("animetosho: AniDB search returned no results, falling back to title",
-			"anidb_ep_id", result.AniDBEpisodeID)
-	}
-	return nil, false, nil
+// feedQuery is one id query: a Listed landing's ?eid=, or one anime's ?aid=
+// for all of its other landings.
+type feedQuery struct {
+	eid   *mapread.Landing // the ?eid= query's landing, nil for ?aid=
+	param string
+	id    int
+	anime int
 }
 
-// Download fetches the subtitle content for the given search result.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// Validate download URL to prevent SSRF via malicious API responses.
-	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
-		return nil, fmt.Errorf("animetosho: %w", err)
-	}
-
-	slog.Debug("animetosho downloading", "url", sub.DownloadURL)
-
-	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, sub.DownloadURL, http.NoBody,
+// searchLandings runs every landing's query in turn. A rate limit ends the
+// search with what was read; any other failure is returned, after the other
+// queries ran, beside what they gave.
+func (a *adapter) searchLandings(ctx context.Context, p *placer) ([]provider.Candidate, error) {
+	var (
+		out   []provider.Candidate
+		first error
 	)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, err
-	}
-
-	// cap+1 detect-and-error idiom: a payload at the cap is far more likely
-	// truncated than exactly-cap-sized, and a silently truncated archive
-	// would fail extraction with a confusing error.
-	data, readErr := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes+1))
-	if readErr != nil {
-		return nil, readErr
-	}
-	if int64(len(data)) > httpwire.MaxDownloadBytes {
-		return nil, fmt.Errorf("animetosho: download exceeded %d bytes", httpwire.MaxDownloadBytes)
-	}
-
-	slog.Debug("animetosho download complete",
-		"id", sub.ID, "bytes", len(data))
-
-	result := archive.Decompress(data)
-	if _, err := timing.ParseCues(result); err != nil {
-		return nil, fmt.Errorf("animetosho: %w", err)
-	}
-	return result, nil
-}
-
-func (p *source) searchByEpisodeID(ctx context.Context, anidbEpID int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	entries, err := p.searchEntriesByEID(ctx, anidbEpID)
-	if err != nil {
-		return nil, err
-	}
-	return p.collectSubtitles(ctx, entries, req)
-}
-
-func (p *source) searchByTitle(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	entries, err := p.searchEntries(ctx, req.Title, req.Season)
-	if err != nil {
-		return nil, fmt.Errorf("search entries: %w", err)
-	}
-	return p.collectSubtitles(ctx, entries, req)
-}
-
-// collectSubtitles fetches entries concurrently, bounded at maxSearchEntries.
-// A failed entry is skipped, except a rate limit: it stops the remaining
-// fetches and is returned without the partial results, because every later
-// call would be refused too.
-func (p *source) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	results := make([]entryResult, len(entries))
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(maxSearchEntries)
-
-	for idx, entry := range entries {
-		if entry.ID <= 0 {
-			slog.Debug("animetosho: skipping entry with invalid ID",
-				"entry_id", entry.ID, "title", entry.Title)
-			continue
+	for _, fq := range queries(p.x, p.landings) {
+		answers, err := a.read(ctx, url.Values{fq.param: {strconv.Itoa(fq.id)}})
+		for _, an := range answers {
+			out = append(out, p.candidates(an, &fq)...)
 		}
-		g.Go(func() error {
-			subs, err := p.fetchSubtitlesForEntry(
-				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode,
-			)
-			if _, limited := errors.AsType[*subflux.RateLimitError](err); limited {
-				return err
-			}
-			if err != nil {
-				if gctx.Err() == nil {
-					slog.Warn("animetosho: failed to get subs for entry",
-						"entry_id", entry.ID, "error", err)
-				}
-				return nil
-			}
-			results[idx] = entryResult{subs: subs, title: entry.Title}
-			return nil
-		})
+		if f, ok := errors.AsType[*provider.Failure](err); ok && f.Kind == provider.RateLimited {
+			return dedupe(out), err
+		}
+		first = cmp.Or(first, err)
 	}
-	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("entry subtitles: %w", err)
-	}
-
-	out := mergeEntryResults(results, req)
-	slog.Debug("animetosho: collected subtitles from entries",
-		"entries_checked", len(entries), "results", len(out))
-	return out, nil
+	return dedupe(out), first
 }
 
-type entryResult struct {
-	title string
-	subs  []subflux.Subtitle
-}
-
-// mergeEntryResults names each subtitle after its entry's release, numbers
-// it for the requested episode and drops an id an earlier entry returned.
-func mergeEntryResults(results []entryResult, req *subflux.SearchRequest) []subflux.Subtitle {
-	var out []subflux.Subtitle
-	seen := make(map[string]bool)
-	for _, r := range results {
-		for i := range r.subs {
-			r.subs[i].ReleaseName = r.title
-			r.subs[i].Season = req.Season
-			r.subs[i].Episode = req.Episode
-			if !seen[r.subs[i].ID] {
-				seen[r.subs[i].ID] = true
-				out = append(out, r.subs[i])
-			}
+// queries are the landings' feed queries: one ?eid= per Listed landing, since
+// animap publishes AniDB's episode ids, and one ?aid= per anime for its
+// NotListed and ListingUnknown landings, whatever their kind.
+func queries(x *mapread.Index, ls []mapread.Landing) []feedQuery {
+	var out []feedQuery
+	aids := map[int]bool{}
+	for i := range ls {
+		l := &ls[i]
+		ep, ok := x.Episode(l.Ref)
+		switch {
+		case !ok:
+		case ep.Listing == mapread.Listed:
+			out = append(out, feedQuery{param: "eid", id: ep.ID, anime: l.AniDB, eid: l})
+		case !aids[l.AniDB]:
+			aids[l.AniDB] = true
+			out = append(out, feedQuery{param: "aid", id: l.AniDB, anime: l.AniDB})
 		}
 	}
 	return out
 }
 
-func (p *source) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry, error) {
-	slog.Debug("animetosho searching by anidb eid", "eid", eid)
-
-	var entries []feedEntry
-	if err := p.fetchJSON(ctx, fmt.Sprintf("%s?eid=%d", feedURL, eid), &entries); err != nil {
-		return nil, err
+// dedupe keeps each attachment once, as first offered.
+func dedupe(cs []provider.Candidate) []provider.Candidate {
+	seen := map[string]bool{}
+	out := cs[:0]
+	for i := range cs {
+		if tok := cs[i].Ref.Token(); !seen[tok] {
+			seen[tok] = true
+			out = append(out, cs[i])
+		}
 	}
-
-	filtered := filterCompleteEntries(entries)
-	slog.Debug("animetosho eid entries found",
-		"eid", eid, "total", len(entries), "complete", len(filtered))
-	return filtered, nil
+	return out
 }
 
-// fetchJSON returns typed provider errors from CheckHTTPStatus so callers
-// preserve Retry-After hints for 429 responses.
-func (p *source) fetchJSON(ctx context.Context, reqURL string, v any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
-	if err != nil {
-		return err
-	}
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return err
-	}
-	return json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(v)
-}
-
-type feedEntry struct {
+type entry struct {
 	Title  string `json:"title"`
 	Status string `json:"status"`
 	ID     int    `json:"id"`
 }
 
-// searchEntries uses a season-level query to catch both per-episode entries
-// and season packs.
-func (p *source) searchEntries(ctx context.Context,
-	title string, season int,
-) ([]feedEntry, error) {
-	query := fmt.Sprintf("%s S%02d", title, season)
-	slog.Debug("animetosho searching entries", "query", logsafe.Field(query))
+// answer is one entry of a feed answer with its files.
+type answer struct {
+	title string
+	files []file
+}
 
-	var entries []feedEntry
-	if err := p.fetchJSON(ctx,
-		fmt.Sprintf("%s?q=%s", feedURL, url.QueryEscape(query)), &entries); err != nil {
+type detail struct {
+	Files []file `json:"files"`
+}
+
+type file struct {
+	Filename    string       `json:"filename"`
+	Attachments []attachment `json:"attachments"`
+}
+
+type attachment struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
+	Info struct {
+		Lang   string `json:"language_code"`
+		Name   string `json:"name"`
+		Forced bool   `json:"forced"`
+	} `json:"info"`
+}
+
+// read runs one feed query and reads its first maxEntries entries' files at
+// once. A rate limit ends it with what was read; any other failed entry is
+// returned, after the rest are read, beside what they gave.
+func (a *adapter) read(ctx context.Context, v url.Values) ([]answer, error) {
+	var feed []entry
+	if err := a.getJSON(ctx, feedURL+"?"+v.Encode(), &feed); err != nil {
 		return nil, err
 	}
-
-	filtered := filterCompleteEntries(entries)
-	slog.Debug("animetosho entries found",
-		"total", len(entries), "complete", len(filtered))
-	return filtered, nil
-}
-
-func (p *source) fetchSubtitlesForEntry(ctx context.Context,
-	entryID int, languages []string,
-	season, episode, absEpisode int,
-) ([]subflux.Subtitle, error) {
-	slog.Debug("animetosho fetching entry subtitles", "entry_id", entryID)
-
-	var result entryDetail
-	if err := p.fetchJSON(ctx,
-		fmt.Sprintf("%s?show=torrent&id=%d", feedURL, entryID), &result); err != nil {
-		return nil, err
-	}
-
-	return filterAttachments(result, languages, season, episode, absEpisode), nil
-}
-
-type entryDetail struct {
-	Files []entryFile `json:"files"`
-}
-
-type entryFile struct {
-	Filename    string            `json:"filename"`
-	Attachments []entryAttachment `json:"attachments"`
-}
-
-type entryAttachment struct {
-	Info attachmentInfo `json:"info"`
-	Type string         `json:"type"`
-	ID   int            `json:"id"`
-}
-
-type attachmentInfo struct {
-	Lang string `json:"lang"`
-	Name string `json:"name"`
-}
-
-func filterCompleteEntries(entries []feedEntry) []feedEntry {
-	var filtered []feedEntry
-	for _, e := range entries {
-		if e.Status == statusComplete {
-			filtered = append(filtered, e)
-			if len(filtered) >= maxSearchEntries {
+	var es []entry
+	for _, e := range feed {
+		if e.ID > 0 && e.Status != "skipped" {
+			es = append(es, e)
+			if len(es) == maxEntries {
 				break
 			}
 		}
 	}
-	return filtered
+	return a.details(ctx, es)
 }
 
-func filterAttachments(result entryDetail, languages []string,
-	season, episode, absEpisode int,
-) []subflux.Subtitle {
-	files := matchFiles(result.Files, season, episode, absEpisode)
-
-	var subs []subflux.Subtitle
-	for _, file := range files {
-		for _, att := range file.Attachments {
-			if sub, ok := attachmentToSubtitle(att, languages); ok {
-				subs = append(subs, sub)
+// details reads each entry's files at once, as read says.
+func (a *adapter) details(ctx context.Context, es []entry) ([]answer, error) {
+	per := make([]answer, len(es))
+	var (
+		mu    sync.Mutex
+		first error
+	)
+	g, gctx := errgroup.WithContext(ctx)
+	for i, e := range es {
+		g.Go(func() error {
+			var d detail
+			err := a.getJSON(gctx, feedURL+"?"+url.Values{"show": {"torrent"}, "id": {strconv.Itoa(e.ID)}}.Encode(), &d)
+			if f, ok := errors.AsType[*provider.Failure](err); ok && f.Kind == provider.RateLimited {
+				return err
 			}
-		}
+			if err != nil {
+				mu.Lock()
+				first = cmp.Or(first, err)
+				mu.Unlock()
+				return nil
+			}
+			per[i] = answer{title: e.Title, files: d.Files}
+			return nil
+		})
 	}
-	return subs
+	err := g.Wait()
+	return per, cmp.Or(err, first)
 }
 
-func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subtitle, bool) {
-	if att.Type != attachTypeSubtitle {
-		return subflux.Subtitle{}, false
+// Fetch downloads an attachment, xz-compressed, from AnimeTosho's storage
+// and answers it decompressed, named as the link names it.
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	u, ok := storageURL(ref.Token())
+	if !ok {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "not an AnimeTosho storage link")
 	}
-	if att.ID <= 0 {
-		return subflux.Subtitle{}, false
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return provider.Payload{}, err
 	}
-	lang := classify.Alpha2FromAlpha3(att.Info.Lang)
-	if lang == "" {
-		lang = "en" // AnimeTosho defaults to English.
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return provider.Payload{}, err
 	}
-	if lang == "pt" && strings.Contains(
-		strings.ToLower(att.Info.Name), "brazil",
-	) {
-		lang = "pb"
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, provider.MaxBody)
+	if err != nil {
+		return provider.Payload{}, err
 	}
-	if !slices.Contains(languages, lang) {
-		return subflux.Subtitle{}, false
+	if len(b) == 0 {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "AnimeTosho answered an empty attachment")
 	}
-
-	hexID := fmt.Sprintf("%08x", att.ID)
-	dlURL := fmt.Sprintf("%s%s/%d.xz", storageURL, hexID, att.ID)
-
-	return subflux.Subtitle{
-		Provider:    providerName,
-		ID:          strconv.Itoa(att.ID),
-		Language:    lang,
-		DownloadURL: dlURL,
-		MatchedBy:   subflux.MatchByTitle,
-	}, true
+	n := cmp.Or(u.Query().Get("filename"), path.Base(u.Path))
+	return provider.Payload{Name: strings.TrimSuffix(n, ".xz"), Bytes: archive.Decompress(b)}, nil
 }
 
-// matchFiles returns all files for a single-file entry; for a season pack
-// (multiple files) it returns only the files fileMatchesEpisode keeps.
-func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile {
-	if len(files) <= 1 {
-		return files
+// storageURL is an attachment link on AnimeTosho's storage host, which is
+// the only host a download may reach (S-AT1).
+func storageURL(s string) (*url.URL, bool) {
+	u, err := url.Parse(s)
+	if err != nil || u.Scheme != "https" || u.Host != storageHost || u.User != nil {
+		return nil, false
 	}
+	return u, true
+}
 
-	var matched []entryFile
-	for _, f := range files {
-		if fileMatchesEpisode(f.Filename, season, episode, absEpisode) {
-			matched = append(matched, f)
-		}
+func (a *adapter) getJSON(ctx context.Context, u string, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
+	if err != nil {
+		return err
 	}
-
-	if len(matched) > 0 {
-		return matched
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return err
 	}
-
-	// No filename matched the episode pattern (non-standard naming). Skip
-	// rather than returning all files.
-	slog.Debug("animetosho: no file matched target episode in pack",
-		"season", season, "episode", episode,
-		"files", len(files))
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, provider.MaxBody)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return provider.Fail(provider.Permanent, "decode AnimeTosho answer: "+err.Error())
+	}
 	return nil
-}
-
-// fileMatchesEpisode reports whether filename claims the episode: a marker
-// naming it, else the number epmarker.Absolute reads, as the aired episode or
-// the absolute one (batch entries name files by absolute number, "[Group]
-// Show - 26.mkv" for S02E01).
-func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
-	for _, m := range epmarker.Find(filename) {
-		if m.Season == season && m.Episode == episode {
-			return true
-		}
-	}
-	n, ok := epmarker.Absolute(filename)
-	return ok && (n == episode || absEpisode > 0 && n == absEpisode)
 }

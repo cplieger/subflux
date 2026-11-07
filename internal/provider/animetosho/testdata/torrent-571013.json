@@ -1,0 +1,872 @@
+{
+ "id": 571013,
+ "title": "[Judas] Sousou no Frieren (Frieren Beyond Journey`s End) (Season 01) [BD 1080p][HEVC x265 10bit][Dual-Audio][Eng-Subs] (Batch)",
+ "status": "complete",
+ "num_files": 44,
+ "anidb_aid": 17617,
+ "anidb_eid": null,
+ "files": [
+  {
+   "id": 1325527,
+   "filename": "Extras/NCs/[Judas] Frieren - NCED01a.mkv",
+   "attachments": [
+    {
+     "id": 3541809,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/ead.xz?filename=Extras_NCs_%5BJudas%5D+Frieren+-+NCED01a_track3.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325528,
+   "filename": "Extras/NCs/[Judas] Frieren - NCED02.mkv",
+   "attachments": []
+  },
+  {
+   "id": 1325529,
+   "filename": "Extras/NCs/[Judas] Frieren - NCED1b.mkv",
+   "attachments": [
+    {
+     "id": 3288786,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/ea7.xz?filename=Extras_NCs_%5BJudas%5D+Frieren+-+NCED1b_track3.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325530,
+   "filename": "Extras/NCs/[Judas] Frieren - NCOP01.mkv",
+   "attachments": [
+    {
+     "id": 3244852,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/eb0.xz?filename=Extras_NCs_%5BJudas%5D+Frieren+-+NCOP01_track3.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325531,
+   "filename": "Extras/NCs/[Judas] Frieren - NCOP02.mkv",
+   "attachments": [
+    {
+     "id": 3496930,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/eac.xz?filename=Extras_NCs_%5BJudas%5D+Frieren+-+NCOP02_track3.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325532,
+   "filename": "Season 01/[Judas] Frieren - S01E01.mkv",
+   "attachments": [
+    {
+     "id": 3349013,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e7d.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E01_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3408193,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e7a.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E01_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325533,
+   "filename": "Season 01/[Judas] Frieren - S01E02.mkv",
+   "attachments": [
+    {
+     "id": 3126223,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e9c.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E02_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3496929,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e9f.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E02_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325534,
+   "filename": "Season 01/[Judas] Frieren - S01E03.mkv",
+   "attachments": [
+    {
+     "id": 3111516,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e60.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E03_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3244850,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e62.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E03_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325535,
+   "filename": "Season 01/[Judas] Frieren - S01E04.mkv",
+   "attachments": [
+    {
+     "id": 3259592,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e5b.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E04_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3526669,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e59.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E04_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325536,
+   "filename": "Season 01/[Judas] Frieren - S01E05.mkv",
+   "attachments": [
+    {
+     "id": 3408195,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e87.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E05_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3541808,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e84.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E05_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325537,
+   "filename": "Season 01/[Judas] Frieren - S01E06.mkv",
+   "attachments": [
+    {
+     "id": 3422970,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e68.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E06_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3482209,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e6a.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E06_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325538,
+   "filename": "Season 01/[Judas] Frieren - S01E07.mkv",
+   "attachments": [
+    {
+     "id": 3378558,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e4d.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E07_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3496926,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e49.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E07_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325539,
+   "filename": "Season 01/[Judas] Frieren - S01E08.mkv",
+   "attachments": [
+    {
+     "id": 3081778,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e48.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E08_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3526668,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e4a.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E08_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325540,
+   "filename": "Season 01/[Judas] Frieren - S01E09.mkv",
+   "attachments": [
+    {
+     "id": 3229897,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e95.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E09_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3229898,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e97.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E09_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325541,
+   "filename": "Season 01/[Judas] Frieren - S01E10.mkv",
+   "attachments": [
+    {
+     "id": 3081777,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e3a.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E10_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3467373,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e38.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E10_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325542,
+   "filename": "Season 01/[Judas] Frieren - S01E11.mkv",
+   "attachments": [
+    {
+     "id": 3170427,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e42.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E11_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3452510,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e40.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E11_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325543,
+   "filename": "Season 01/[Judas] Frieren - S01E12.mkv",
+   "attachments": [
+    {
+     "id": 3185106,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e74.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E12_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3378559,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e71.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E12_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325544,
+   "filename": "Season 01/[Judas] Frieren - S01E13.mkv",
+   "attachments": [
+    {
+     "id": 3155655,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e33.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E13_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3229895,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e30.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E13_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325545,
+   "filename": "Season 01/[Judas] Frieren - S01E14.mkv",
+   "attachments": [
+    {
+     "id": 3334010,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e41.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E14_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3349012,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e45.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E14_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325546,
+   "filename": "Season 01/[Judas] Frieren - S01E15.mkv",
+   "attachments": [
+    {
+     "id": 3185107,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e9d.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E15_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3437750,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e9e.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E15_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325547,
+   "filename": "Season 01/[Judas] Frieren - S01E16.mkv",
+   "attachments": [
+    {
+     "id": 3081776,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e31.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E16_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3229896,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e32.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E16_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325548,
+   "filename": "Season 01/[Judas] Frieren - S01E17.mkv",
+   "attachments": [
+    {
+     "id": 3200211,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e69.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E17_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3259593,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e6d.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E17_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325549,
+   "filename": "Season 01/[Judas] Frieren - S01E18.mkv",
+   "attachments": [
+    {
+     "id": 3200212,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e81.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E18_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3349014,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e80.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E18_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325550,
+   "filename": "Season 01/[Judas] Frieren - S01E19.mkv",
+   "attachments": [
+    {
+     "id": 3200213,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/ea6.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E19_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3526670,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/ea8.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E19_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325551,
+   "filename": "Season 01/[Judas] Frieren - S01E20.mkv",
+   "attachments": [
+    {
+     "id": 3096808,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e5a.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E20_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3318896,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e58.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E20_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325552,
+   "filename": "Season 01/[Judas] Frieren - S01E21.mkv",
+   "attachments": [
+    {
+     "id": 3185105,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e64.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E21_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3200210,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e61.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E21_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325553,
+   "filename": "Season 01/[Judas] Frieren - S01E22.mkv",
+   "attachments": [
+    {
+     "id": 3303792,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e52.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E22_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3511771,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e50.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E22_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325554,
+   "filename": "Season 01/[Judas] Frieren - S01E23.mkv",
+   "attachments": [
+    {
+     "id": 3155656,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e8d.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E23_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3452511,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e8c.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E23_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325555,
+   "filename": "Season 01/[Judas] Frieren - S01E24.mkv",
+   "attachments": [
+    {
+     "id": 3111517,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e78.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E24_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3334011,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e79.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E24_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325556,
+   "filename": "Season 01/[Judas] Frieren - S01E25.mkv",
+   "attachments": [
+    {
+     "id": 3096807,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e3b.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E25_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3259591,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e39.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E25_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325557,
+   "filename": "Season 01/[Judas] Frieren - S01E26.mkv",
+   "attachments": [
+    {
+     "id": 3363616,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e86.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E26_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3408194,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e85.xz?filename=Season+01_%5BJudas%5D+Frieren+-+S01E26_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325558,
+   "filename": "Season 01/[Judas] Frieren -S01E27.mkv",
+   "attachments": [
+    {
+     "id": 3185104,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e54.xz?filename=Season+01_%5BJudas%5D+Frieren+-S01E27_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3408192,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e51.xz?filename=Season+01_%5BJudas%5D+Frieren+-S01E27_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325559,
+   "filename": "Season 01/[Judas] Frieren -S01E28.mkv",
+   "attachments": [
+    {
+     "id": 3081779,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e72.xz?filename=Season+01_%5BJudas%5D+Frieren+-S01E28_track5.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Signs/Songs] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 3288785,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00278/e70.xz?filename=Season+01_%5BJudas%5D+Frieren+-S01E28_track4.eng.sup.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "English [Full] (PGS)",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1325560,
+   "filename": "[Judas] Sousou no Frieren (Frieren Beyond Journey`s End) (Season 01) [BD 1080p][HEVC x265 10bit][Dual-Audio][Eng-Subs] (Batch).7z",
+   "attachments": []
+  }
+ ]
+}

@@ -21,8 +21,8 @@ func TestPut_neverExceedsMaxEntries(t *testing.T) {
 			key := strconv.Itoa(rapid.IntRange(0, 12).Draw(rt, "key"))
 			val := []byte(rapid.String().Draw(rt, "val"))
 			dc.put(key, val, nil)
-			if got := len(dc.cache); got > maxEntries {
-				rt.Fatalf("cache size %d exceeds maxEntries %d", got, maxEntries)
+			if got := len(dc.cache); got > maxEntries || got != len(dc.h) {
+				rt.Fatalf("cache size %d, heap %d, maxEntries %d", got, len(dc.h), maxEntries)
 			}
 		}
 	})

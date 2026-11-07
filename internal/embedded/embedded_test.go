@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/language"
 	"pgregory.net/rapid"
 )
 
@@ -142,29 +143,25 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			wantHI:    true,
 		},
 		{
-			name:      "bcp47_extracts_primary_subtag",
+			name:      "bcp47_keeps_region",
 			codec:     "srt",
 			lang:      "en-US",
 			trackName: "English US",
-			wantLang:  "en",
+			wantLang:  "en-US",
 		},
 		{
-			// Brazilian Portuguese is a separate coverage target from European
-			// Portuguese, so the region has to be read before it is dropped.
-			// Truncating at the hyphen reported this track as "pt".
 			name:      "bcp47_region_selects_brazilian_portuguese",
 			codec:     "srt",
 			lang:      "por-BR",
 			trackName: "Portuguese BR",
-			wantLang:  "pb",
+			wantLang:  "pt-BR",
 		},
 		{
-			// A region that names no separate target is dropped once read.
-			name:      "bcp47_european_region_stays_pt",
+			name:      "bcp47_european_region",
 			codec:     "srt",
 			lang:      "por-PT",
 			trackName: "Portuguese PT",
-			wantLang:  "pt",
+			wantLang:  "pt-PT",
 		},
 	}
 	for _, tt := range tests {
@@ -175,7 +172,7 @@ func TestNormalizeTrack_valid(t *testing.T) {
 				t.Fatalf("normalizeTrack(%q, %q, %q, %v, %v) = nil, want non-nil",
 					tt.codec, tt.lang, tt.trackName, tt.forced, tt.hi)
 			}
-			if got.lang != tt.wantLang {
+			if got.lang.String() != tt.wantLang {
 				t.Errorf("lang = %q, want %q", got.lang, tt.wantLang)
 			}
 			if got.forced != tt.wantForce {
@@ -205,9 +202,7 @@ func TestNormalizeTrack_returns_nil(t *testing.T) {
 		{name: "unknown_alpha3", lang: "xyz"},
 		{name: "malformed_tag_leading_dash", lang: "-en"},
 		{name: "unassigned_two_letter_code", lang: "xx"},
-		// Cantonese is a real language with no ISO 639-1 code, so it has no
-		// spelling in subflux's two-letter space.
-		{name: "language_without_two_letter_code", lang: "yue"},
+		{name: "padded_undefined", lang: " UND "},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -279,8 +274,8 @@ func TestNormalizeTrack_valid_output_invariants(t *testing.T) {
 		// string is not one, and a track tagged with a non-language is now
 		// dropped rather than reported as coverage under a made-up code.
 		lang := rapid.SampledFrom([]string{
-			"eng", "fre", "fra", "ger", "deu", "spa", "por", "pob", "jpn",
-			"chi", "zho", "nob", "nor", "en", "fr", "pb", "pt", "pt-BR",
+			"eng", "fre", "fra", "ger", "deu", "spa", "por", "jpn", "yue",
+			"chi", "zho", "nob", "nor", "en", "fr", "pt", "pt-BR",
 			"por-BR", "en-US", "zh-Hant", "ENG", " eng ",
 		}).Draw(t, "lang")
 		codec := rapid.StringMatching(`[a-z]{2,6}`).Draw(t, "codec")
@@ -294,15 +289,8 @@ func TestNormalizeTrack_valid_output_invariants(t *testing.T) {
 				codec, lang)
 			return
 		}
-		// The language becomes a filename segment and part of the bbolt state
-		// key, so it has to be in the two-letter internal space.
-		if len(got.lang) != 2 {
-			t.Errorf("normalizeTrack(%q, %q, ...).lang = %q (len %d), want len 2",
-				codec, lang, got.lang, len(got.lang))
-		}
-		if got.lang == "und" {
-			t.Errorf("normalizeTrack(%q, %q, ...).lang = %q, want a real language",
-				codec, lang, got.lang)
+		if back, ok := language.Parse(got.lang.String()); !ok || back != got.lang {
+			t.Errorf("normalizeTrack(%q, %q, ...).lang = %q does not read back", codec, lang, got.lang)
 		}
 		if got.codec != codec {
 			t.Errorf("codec = %q, want %q", got.codec, codec)

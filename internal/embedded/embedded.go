@@ -14,8 +14,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
@@ -28,12 +27,20 @@ const (
 // Detector detects embedded subtitle tracks via ffprobe.
 type Detector struct{}
 
+// Track is one embedded subtitle track; Lang is never the zero Tag.
+type Track struct {
+	Codec           string
+	Lang            language.Tag
+	Forced          bool
+	HearingImpaired bool
+}
+
 // DetectTracks returns all embedded subtitle tracks in the given video
-// file, including bitmap formats (PGS, VobSub), normalized to api types.
+// file, including bitmap formats (PGS, VobSub).
 // Errors (ffprobe failure, corrupt file, timeout) are returned to the
 // caller, which owns logging/metrics/fail-open policy; "error" stays
 // distinguishable from "no tracks" (nil, nil).
-func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.EmbeddedTrack, error) {
+func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]Track, error) {
 	tracks, err := allTracks(ctx, videoPath)
 	if err != nil {
 		return nil, err
@@ -41,9 +48,9 @@ func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.E
 	if len(tracks) == 0 {
 		return nil, nil
 	}
-	result := make([]subflux.EmbeddedTrack, len(tracks))
+	result := make([]Track, len(tracks))
 	for i, st := range tracks {
-		result[i] = subflux.EmbeddedTrack{
+		result[i] = Track{
 			Codec:           st.codec,
 			Lang:            st.lang,
 			Forced:          st.forced,
@@ -58,7 +65,7 @@ func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.E
 // subTrack is a normalized subtitle track from any container format.
 type subTrack struct {
 	codec           string
-	lang            string
+	lang            language.Tag
 	forced          bool
 	hearingImpaired bool
 }
@@ -84,15 +91,11 @@ func allTracks(ctx context.Context, path string) ([]subTrack, error) {
 	return tracks, nil
 }
 
-// normalizeTrack converts ffprobe track metadata into a subTrack.
-// Returns nil if the track should be skipped (undefined language).
+// normalizeTrack converts ffprobe track metadata into a subTrack, or nil
+// when its language tag names no language ("und" included).
 func normalizeTrack(codec, lang, name string, forced, hi bool) *subTrack {
-	// Delegate to the canonical ffprobe-tag normalizer (lowercasing,
-	// "und"/"undetermined" → empty, BCP 47 primary subtag, alpha3→alpha2)
-	// rather than comparing "und" before lowercasing, which lets tags like
-	// "UND" leak through as real coverage languages.
-	lang2 := ffmpeg.NormalizeFFprobeLang(lang, classify.Alpha2FromAlpha3)
-	if lang2 == "" {
+	tag, ok := language.Parse(strings.TrimSpace(lang))
+	if !ok || tag == (language.Tag{}) {
 		return nil
 	}
 
@@ -105,7 +108,7 @@ func normalizeTrack(codec, lang, name string, forced, hi bool) *subTrack {
 
 	return &subTrack{
 		codec:           codec,
-		lang:            lang2,
+		lang:            tag,
 		forced:          forced,
 		hearingImpaired: hi,
 	}
@@ -123,7 +126,8 @@ func detectHIFromName(name string) bool {
 
 // detectForcedFromName checks if the track name indicates forced subtitles.
 func detectForcedFromName(name string) bool {
-	return classify.IsForced(name)
+	lower := strings.ToLower(name)
+	return strings.Contains(lower, "forced") || strings.Contains(lower, "foreign")
 }
 
 // --- Codec name normalization ---

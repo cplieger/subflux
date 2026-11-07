@@ -1,417 +1,299 @@
-// Package subdl implements the SubDL subtitle provider.
-// REST API at api.subdl.com/api/v1, requires API key.
-// Supports movies and TV episodes via IMDB/TMDB search.
-// Rate limits: 2000/day, 1,000,000 lifetime.
+// Package subdl is the SubDL provider: its REST API at api.subdl.com, by
+// IMDb or TMDB id or by title, with downloads from dl.subdl.com. It needs an
+// API key; the key's quota is 2,000 calls a day.
 package subdl
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"log/slog"
-	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/go/httpclient"
-	"github.com/cplieger/go/ssrf"
-	"github.com/cplieger/go/textsafe"
-	"github.com/cplieger/subflux/internal/epmarker"
-	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/rank"
 )
+
+// ID is SubDL's provider id.
+const ID provider.ProviderID = "subdl"
 
 const (
-	providerName = subflux.ProviderNameSubDL
-	apiURL       = "https://api.subdl.com/api/v1"
-	dlBaseURL    = "https://dl.subdl.com"
+	apiHost = "api.subdl.com"
+	dlHost  = "dl.subdl.com"
+	apiURL  = "https://" + apiHost + "/api/v1"
+
+	keyAPIKey = "api_key"
+
+	maxListBody     = 2 << 20
+	maxDownloadBody = 10 << 20
+
+	// limitBody is the most a 500 carrying SubDL's download-limit answer
+	// holds.
+	limitBody = 100
 )
 
-// Factory creates a SubDL provider from settings.
-func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
-	ps := provider.FromMap(settings)
-	if ps.APIKey == "" {
-		return nil, errors.New("subdl: api_key is required")
+// languages are SubDL's upper-case language codes.
+var languages = language.MustProviderMap(provider.WirePairs(
+	"EN", "en", "FR", "fr", "ES", "es", "DE", "de",
+	"IT", "it", "PT", "pt", "BR_PT", "pt-BR", "NL", "nl", "RU", "ru",
+	"AR", "ar", "JA", "ja", "ZH", "zh", "KO", "ko",
+	"SV", "sv", "NO", "no", "DA", "da", "FI", "fi",
+	"PL", "pl", "CS", "cs", "HU", "hu", "RO", "ro",
+	"TR", "tr", "EL", "el", "HE", "he", "TH", "th",
+	"VI", "vi", "ID", "id", "BG", "bg",
+	"HR", "hr", "SR", "sr", "SL", "sl",
+	"SK", "sk", "UK", "uk", "FA", "fa",
+	"MS", "ms", "HI", "hi", "BN", "bn",
+	"TA", "ta", "TE", "te", "UR", "ur",
+	"IS", "is", "LT", "lt", "LV", "lv",
+	"ET", "et", "SQ", "sq", "BS", "bs",
+	"MK", "mk", "CA", "ca",
+))
+
+// NewEntry is SubDL's row of the provider table.
+func NewEntry() provider.Entry {
+	return provider.Entry{
+		ID:      ID,
+		Summary: "Movie and TV subtitles from SubDL by IMDb or TMDB id or title; needs an API key.",
+		Hosts:   []string{apiHost, dlHost},
+		Schema: formschema.Schema{Fields: []formschema.Field{
+			{Key: keyAPIKey, Label: "API key", Help: "From subdl.com API registration", Kind: formschema.Secret, Required: true},
+		}},
+		Languages: languages,
+		Quirk:     quirk,
+		New: func(c provider.Client, v formschema.Values) (provider.Adapter, error) {
+			return &adapter{c: c, key: v.Secret(keyAPIKey)}, nil
+		},
 	}
-	return &source{
-		apiKey:    ps.APIKey,
-		dlBaseURL: dlBaseURL,
-		client:    provider.NewHTTPClient(provider.HTTPTimeoutExtended),
-	}, nil
 }
 
-// source implements the SubDL API client.
-type source struct {
-	client    *http.Client
-	apiKey    string
-	dlBaseURL string
+// quirk reads a 500 with a body under 100 bytes, SubDL's answer once the
+// key's download limit is spent, as no such file.
+func quirk(resp *http.Response, body []byte) error {
+	if resp.StatusCode == http.StatusInternalServerError && len(body) < limitBody {
+		return provider.Fail(provider.NotFound, "SubDL's download limit answer")
+	}
+	return nil
 }
 
-// Name returns the provider identifier for SubDL.
-func (*source) Name() subflux.ProviderID { return providerName }
+type adapter struct {
+	c   provider.Client
+	key string
+}
 
-// Search finds subtitles matching the request via IMDB/TMDB ID or title.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if req.ImdbID == "" && req.TmdbID == 0 && req.Title == "" {
-		slog.Debug("subdl: no IMDB ID, TMDB ID, or title, skipping")
-		return nil, nil
-	}
-
-	langs := make([]string, 0, len(req.Languages))
-	for _, lang := range req.Languages {
-		sdlLang := iso2ToSubDL(lang)
-		if sdlLang != "" {
-			langs = append(langs, sdlLang)
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	var wires []string
+	for _, t := range q.Langs {
+		if w, ok := languages.Wire(t); ok {
+			wires = append(wires, w)
 		}
 	}
-	if len(langs) == 0 {
+	if len(wires) == 0 {
 		return nil, nil
 	}
-
-	params := buildSearchParams(p.apiKey, req, langs)
-
-	result, err := p.doAPIRequest(ctx, params)
-	if err != nil {
+	params, by, ok := searchParams(&q, wires)
+	if !ok {
+		return nil, &provider.Skipped{Cause: "no IMDb id, TMDB id or title"}
+	}
+	params.Set(keyAPIKey, a.key)
+	var r answer
+	if err := a.getJSON(ctx, apiURL+"/subtitles?"+params.Encode(), &r); err != nil {
 		return nil, err
 	}
-
-	items, statusErr := p.checkAPIStatus(result, logsafe.Field(req.MediaLabel()))
-	if statusErr != nil {
-		return nil, statusErr
+	if !r.Status {
+		return nil, refusal(r.Error)
 	}
-	if items == nil {
-		return nil, nil
-	}
-
-	subs := filterResults(items, req.MediaType == subflux.MediaTypeEpisode, inferMatchedBy(params))
-
-	slog.Info("subdl search complete", "results", len(subs),
-		"media", logsafe.Field(req.MediaLabel()))
-	return subs, nil
+	return candidates(r.Subtitles, q.Kind == media.Episode, by), nil
 }
 
-// inferMatchedBy returns the label describing which identifier the SubDL
-// request used. Mirrors the priority order in buildSearchParams.
-func inferMatchedBy(params url.Values) subflux.MatchMethod {
-	switch {
-	case params.Get("film_name") != "":
-		return subflux.MatchByTitle
-	case params.Get("tmdb_id") != "":
-		return subflux.MatchByTMDB
-	default:
-		return subflux.MatchByIMDB
+// Test asks SubDL's account endpoint, which proves the key without touching
+// the subtitle index.
+func (a *adapter) Test(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/me?"+url.Values{keyAPIKey: {a.key}}.Encode(), http.NoBody)
+	if err != nil {
+		return err
 	}
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = provider.ReadAll(resp, maxListBody)
+	return err
 }
 
-// buildSearchParams constructs the URL query parameters for a SubDL search.
-// Pure function; all branching logic for episode vs movie and ID fallback
-// is contained here for independent testability.
-func buildSearchParams(apiKey string, req *subflux.SearchRequest, langs []string) url.Values {
-	params := url.Values{
-		"api_key":       {apiKey},
-		"languages":     {strings.Join(langs, ",")},
+// Fetch GETs the download path on dl.subdl.com with the key, as SubDL's
+// answer links it.
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	u := url.URL{Scheme: "https", Host: dlHost, Path: ref.Token(), RawQuery: url.Values{keyAPIKey: {a.key}}.Encode()}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, maxDownloadBody)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+}
+
+func (a *adapter) getJSON(ctx context.Context, u string, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
+	if err != nil {
+		return err
+	}
+	resp, err := a.c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, maxListBody)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return provider.Fail(provider.Permanent, "decode SubDL answer: "+err.Error())
+	}
+	return nil
+}
+
+// searchParams is the search's query, the key aside: an IMDb id first, then
+// a TMDB id (a series' for an episode), then the first title; ok is false
+// with none. hi is left out, since hi=1 answers only hearing-impaired files.
+func searchParams(q *provider.Query, wires []string) (params url.Values, by rank.MatchedBy, ok bool) {
+	params = url.Values{
+		"languages":     {strings.Join(wires, ",")},
 		"subs_per_page": {"30"},
 		"comment":       {"1"},
 		"releases":      {"1"},
-		"hi":            {"1"},
-		"bazarr":        {"1"},
 	}
-
-	if req.MediaType == subflux.MediaTypeEpisode {
+	title := ""
+	if len(q.Titles) > 0 {
+		title = q.Titles[0]
+	}
+	if q.Kind == media.Episode {
 		params.Set("type", "tv")
-		params.Set("season_number", strconv.Itoa(req.Season))
-		params.Set("episode_number", strconv.Itoa(req.Episode))
-		if req.ImdbID != "" {
-			params.Set("imdb_id", req.ImdbID)
-		} else {
-			params.Set("film_name", req.Title)
-		}
+		params.Set("season_number", strconv.Itoa(q.Numbering.Season))
+		params.Set("episode_number", strconv.Itoa(q.Numbering.Episode))
 	} else {
 		params.Set("type", "movie")
-		switch {
-		case req.ImdbID != "":
-			params.Set("imdb_id", req.ImdbID)
-		case req.TmdbID > 0:
-			params.Set("tmdb_id", strconv.Itoa(req.TmdbID))
-		default:
-			params.Set("film_name", req.Title)
-		}
 	}
-	return params
+	switch {
+	case q.External.IMDb != 0:
+		params.Set("imdb_id", fmt.Sprintf("tt%07d", q.External.IMDb))
+		return params, rank.ID, true
+	case q.External.TMDB != 0:
+		params.Set("tmdb_id", strconv.FormatUint(q.External.TMDB, 10))
+		return params, rank.ID, true
+	case title != "":
+		params.Set("film_name", title)
+		return params, rank.Title, true
+	}
+	return nil, 0, false
 }
 
-// notFoundPatterns lists error message substrings that indicate the SubDL API
-// could not find the requested media. Checked case-insensitively.
-var notFoundPatterns = []string{"can't find", "cannot find", "not found"}
+// The status:false texts that refuse the key, and those that mean no such
+// media, matched case-insensitively.
+var (
+	authRefusals = []string{"not authorized", "api key", "invalid key"}
+	notFound     = []string{"can't find", "cannot find", "not found"}
+)
 
-// authRefusalPatterns lists error message substrings with which a status:false
-// answer refuses the API key, checked case-insensitively. Measured on /me: a
-// rejected key answers `{"status":false,"error":"Not Authorized"}`.
-var authRefusalPatterns = []string{"not authorized", "api key", "invalid key"}
-
-// isNotFoundError reports whether msg matches any known not-found pattern.
-func isNotFoundError(msg string) bool { return containsAny(msg, notFoundPatterns) }
-
-func isAuthRefusal(msg string) bool { return containsAny(msg, authRefusalPatterns) }
-
-// containsAny reports whether msg contains any of patterns, case-insensitively.
-func containsAny(msg string, patterns []string) bool {
+// refusal is a 200 answer's status:false error: Auth for a refused key, nil
+// for unknown media, else Permanent.
+func refusal(msg string) error {
 	lower := strings.ToLower(msg)
-	for _, p := range patterns {
-		if strings.Contains(lower, p) {
-			return true
+	contains := func(ps []string) bool {
+		for _, p := range ps {
+			if strings.Contains(lower, p) {
+				return true
+			}
 		}
+		return false
 	}
-	return false
+	switch {
+	case contains(authRefusals):
+		return provider.Fail(provider.Auth, "SubDL refused the key: "+msg)
+	case contains(notFound), msg == "":
+		return nil
+	}
+	return provider.Fail(provider.Permanent, "SubDL: "+msg)
 }
 
-// checkAPIStatus interprets the SubDL API status field. Returns the subtitle
-// items on success, nil on "not found", *subflux.AuthError for a refused key,
-// or an error for other API failures. The upstream text can echo the request,
-// so it is redacted of the API key before it reaches either error.
-func (p *source) checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
-	if result.Status {
-		return result.Subtitles, nil
-	}
-	msg := logsafe.RedactedField(result.Error.Raw(), httpclient.Secret(p.apiKey))
-	if isAuthRefusal(msg) {
-		return nil, &subflux.AuthError{Msg: "subdl API: " + msg}
-	}
-	if isNotFoundError(msg) {
-		slog.Debug("subdl: no results", "media", label)
-		return nil, nil
-	}
-	if msg != "" {
-		return nil, fmt.Errorf("subdl API: %s", msg)
-	}
-	slog.Warn("subdl: API returned status=false with no error message", "media", label)
-	return nil, nil
+type answer struct {
+	Error     string `json:"error"`
+	Subtitles []item `json:"subtitles"`
+	Status    bool   `json:"status"`
 }
 
-// filterResults converts raw API items into Subtitle values, applying
-// language, forced, and season-pack filters. Pure function.
-func filterResults(items []subtitleItem, isEpisode bool, matchedBy subflux.MatchMethod) []subflux.Subtitle {
-	var subs []subflux.Subtitle
-	for i := range items {
-		item := &items[i]
-		// Skip season packs for episode searches.
-		if isEpisode && item.EpisodeFrom != item.EpisodeEnd {
-			continue
-		}
-
-		isoLang := subdlToISO2(item.Language)
-		if isoLang == "" {
-			continue
-		}
-
-		hi := item.HI || classify.IsHearingImpaired(item.Comment, item.Name)
-		if classify.IsForced(item.Comment) {
-			continue
-		}
-
-		releaseName := strings.Join(item.Releases, " ")
-
-		subs = append(subs, subflux.Subtitle{
-			Provider:    providerName,
-			ID:          item.Name,
-			Language:    isoLang,
-			ReleaseName: releaseName,
-			DownloadURL: item.URL,
-			HearingImp:  hi,
-			MatchedBy:   matchedBy,
-			Season:      item.Season,
-			Episode:     item.Episode,
-		})
-	}
-	return subs
-}
-
-// Download fetches the subtitle content for the given search result.
-// SubDL download URLs are relative paths; absolute URLs are rejected.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	// DownloadURL is a relative path (e.g. "/sd/..."); reject absolute
-	// URLs to prevent injection via a crafted API response.
-	if !strings.HasPrefix(sub.DownloadURL, "/") {
-		return nil, fmt.Errorf("subdl: unexpected download path: %q", sub.DownloadURL)
-	}
-	fullURL := p.dlBaseURL + sub.DownloadURL
-	if err := ssrf.ValidateURL(fullURL); err != nil {
-		return nil, fmt.Errorf("subdl: %w", err)
-	}
-
-	slog.Debug("subdl downloading subtitle", "url", fullURL)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, http.NoBody)
-	if err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, httpclient.RedactTransportError(err, "subdl download", httpclient.Secret(p.apiKey))
-	}
-	defer resp.Body.Close()
-
-	data, err := handleDownloadResponse(resp, provider.TargetOf(sub))
-	if err != nil {
-		if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
-			slog.Warn("subdl: download rate limited", "url", fullURL)
-		}
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-	slog.Debug("subdl download complete", "id", sub.ID, "bytes", len(data))
-	return data, nil
-}
-
-// doAPIRequest performs a GET against the SubDL subtitles endpoint and
-// returns the decoded response. Transport errors are wrapped and any
-// api_key embedded in them is redacted. Caller inspects result.Status via
-// checkAPIStatus.
-func (p *source) doAPIRequest(ctx context.Context, params url.Values) (*apiResponse, error) {
-	u := apiURL + "/subtitles?" + params.Encode()
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("subdl search: %w", err), p.apiKey)
-	}
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, httpclient.RedactTransportError(err, "subdl search", httpclient.Secret(p.apiKey))
-	}
-	defer resp.Body.Close()
-
-	if err := httpwire.CheckHTTPStatus(resp); err != nil {
-		return nil, httpclient.RedactSecret(err, p.apiKey)
-	}
-
-	var result apiResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httpclient.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
-	}
-	return &result, nil
-}
-
-// handleDownloadResponse processes the HTTP response from a subtitle download.
-// Detects rate limiting (429, 500 with small body) and extracts subtitles
-// from archive responses. Testable without HTTP infrastructure.
-func handleDownloadResponse(resp *http.Response, want epmarker.Target) ([]byte, error) {
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, &subflux.RateLimitError{
-			Msg:        "download rate limited (429)",
-			RetryAfter: httpwire.ParseRetryAfter(resp),
-		}
-	}
-	// 500 with a tiny body signals the download limit was exceeded.
-	// ContentLength is -1 when unknown; only match when explicitly small.
-	if resp.StatusCode == http.StatusInternalServerError && resp.ContentLength >= 0 && resp.ContentLength < 100 {
-		return nil, &subflux.RateLimitError{
-			Msg:        "download limit exceeded (500)",
-			RetryAfter: httpwire.ParseRetryAfter(resp),
-		}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, &httpwire.HTTPStatusError{Code: resp.StatusCode}
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := provider.ExtractAndValidate(data, want)
-	if err != nil {
-		return nil, fmt.Errorf("subdl: %w", err)
-	}
-	return result, nil
-}
-
-// --- API types ---
-
-type apiResponse struct {
-	// Error is upstream-controlled text, tagged at the decode boundary;
-	// checkAPIStatus redacts and bounds it before any error carries it.
-	Error     textsafe.Untrusted `json:"error"`
-	Subtitles []subtitleItem     `json:"subtitles"`
-	Status    bool               `json:"status"`
-}
-
-type subtitleItem struct {
+type item struct {
 	Name        string   `json:"name"`
+	ReleaseName string   `json:"release_name"`
 	Language    string   `json:"language"`
 	URL         string   `json:"url"`
 	Comment     string   `json:"comment"`
 	Releases    []string `json:"releases"`
-	Season      int      `json:"season"`
-	Episode     int      `json:"episode"`
 	EpisodeFrom int      `json:"episode_from"`
 	EpisodeEnd  int      `json:"episode_end"`
 	HI          bool     `json:"hi"`
+	FullSeason  bool     `json:"full_season"`
 }
 
-// --- Language mapping ---
-// SubDL uses uppercase ISO 639-1 codes (EN, FR, AR, etc.)
-
-// subdlLangCodes lists the ISO 639-1 codes SubDL supports. The SubDL API
-// code is strings.ToUpper(code) for every entry except the overrides below.
-var subdlLangCodes = []string{
-	"en", "fr", "es", "de",
-	"it", "pt", "pb", "nl", "ru",
-	"ar", "ja", "zh", "ko",
-	"sv", "no", "da", "fi",
-	"pl", "cs", "hu", "ro",
-	"tr", "el", "he", "th",
-	"vi", "id", "bg",
-	"hr", "sr", "sl",
-	"sk", "uk", "fa",
-	"ms", "hi", "bn",
-	"ta", "te", "ur",
-	"is", "lt", "lv",
-	"et", "sq", "bs",
-	"mk", "ca",
+// candidates are one per release name (else the file's release_name) of
+// each answered file in a mapped language with a download path on
+// dl.subdl.com, less packs for an episode: a pack answers full_season, or a
+// range of episodes.
+func candidates(items []item, episode bool, by rank.MatchedBy) []provider.Candidate {
+	var out []provider.Candidate
+	for i := range items {
+		it := &items[i]
+		if episode && (it.FullSeason || it.EpisodeFrom != it.EpisodeEnd) {
+			continue
+		}
+		tag, ok := languages.Tag(strings.ToUpper(it.Language))
+		if !ok {
+			continue
+		}
+		path, ok := downloadPath(it.URL)
+		if !ok {
+			continue
+		}
+		releases := it.Releases
+		if len(releases) == 0 {
+			releases = []string{it.ReleaseName}
+		}
+		for _, release := range releases {
+			out = append(out, provider.Candidate{
+				Ref:     provider.NewRef(path),
+				Lang:    tag,
+				Release: release,
+				Flags: language.Flags{
+					HI:     provider.HearingImpaired(it.HI, it.Comment, it.Name, release),
+					Forced: provider.Forced(false, it.Comment, it.Name, release),
+				},
+				MatchedBy: by,
+			})
+		}
+	}
+	return out
 }
 
-// subdlLangOverrides maps ISO codes whose SubDL name is not the plain
-// uppercase of the code (mirrors hdbits' hdbLangOverrides pattern).
-var subdlLangOverrides = map[string]string{
-	"pb": "BR_PT",
-}
-
-var iso2ToSubDLMap = func() map[string]string {
-	m := make(map[string]string, len(subdlLangCodes))
-	for _, c := range subdlLangCodes {
-		m[c] = strings.ToUpper(c)
+// downloadPath is the path of an answer's relative download link, its query
+// (which echoes the key) dropped, since Fetch adds the key itself.
+func downloadPath(link string) (string, bool) {
+	u, err := url.Parse(link)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") {
+		return "", false
 	}
-	maps.Copy(m, subdlLangOverrides)
-	return m
-}()
-
-var subdlToISO2Map = func() map[string]string {
-	m := make(map[string]string, len(iso2ToSubDLMap))
-	for k, v := range iso2ToSubDLMap {
-		m[v] = k
-	}
-	return m
-}()
-
-func iso2ToSubDL(code string) string {
-	code = classify.Alpha2FromAlpha3(code)
-	if v, ok := iso2ToSubDLMap[code]; ok {
-		return v
-	}
-	return ""
-}
-
-func subdlToISO2(name string) string {
-	name = strings.ToUpper(name)
-	if v, ok := subdlToISO2Map[name]; ok {
-		return v
-	}
-	return ""
+	return u.Path, true
 }
