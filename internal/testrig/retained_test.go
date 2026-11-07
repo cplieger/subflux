@@ -110,6 +110,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/settings#Service.Save", "PA-2"},
 	{"internal/settings#Snapshot.Document", "PA-2"},
 	{"internal/skyhook#*", "MS-2"},
+	{"internal/statedb#*", "ST-1"},
 	{"internal/status#*", "PAS-1"},
 	{"internal/status#StartCodes", "SE-2"},
 	{"internal/subflux#*", "SE-2"},

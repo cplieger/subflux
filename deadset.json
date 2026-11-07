@@ -107,6 +107,7 @@
       "go://github.com/cplieger/subflux/internal/settings#Service.Save",
       "go://github.com/cplieger/subflux/internal/settings#Snapshot.Document",
       "go://github.com/cplieger/subflux/internal/skyhook#*",
+      "go://github.com/cplieger/subflux/internal/statedb#*",
       "go://github.com/cplieger/subflux/internal/status#*",
       "go://github.com/cplieger/subflux/internal/status#StartCodes",
       "go://github.com/cplieger/subflux/internal/subflux#*",
