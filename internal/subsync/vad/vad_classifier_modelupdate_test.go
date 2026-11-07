@@ -2,16 +2,11 @@ package vad
 
 import "testing"
 
-// Adaptive model-update reference vectors for gmmProbabilityLLR.
-//
-// Each test pins the complete GMM model state (or the relevant subset) after
-// one classified frame against values captured from the known-correct WebRTC
-// port. They are characterization / oracle tests: the GMM model adaptation has
-// no simple closed form, so the strongest available check is that the exact
-// fixed-point state evolution is preserved. Any change to the adaptation
-// arithmetic, branch structure, or clamps shifts at least one pinned value.
-//
-// The decision-output and overhang tests live in vad_classifier_test.go.
+// Adaptive model-update reference vectors for gmmProbabilityLLR, captured
+// from the WebRTC port: the adaptation has no closed form, so each test pins
+// the exact fixed-point model state after one classified frame, and any change
+// to its arithmetic, branches or clamps shifts a pinned value. The decision
+// and overhang tests live in vad_classifier_test.go.
 
 // TestGMMProbabilityLLR_model_noise_frame pins the full model state after a
 // non-speech frame: the noise-mean long-term correction with its lo/hi clamps,
@@ -19,7 +14,7 @@ import "testing"
 // parameters are left unchanged.
 func TestGMMProbabilityLLR_model_noise_frame(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	flag, llr := v.gmmProbabilityLLR(featNoise, 100)
 	assertGMMState(t, "noise", v, flag, llr,
 		0, -608, 1,
@@ -36,7 +31,7 @@ func TestGMMProbabilityLLR_model_noise_frame(t *testing.T) {
 // correction.
 func TestGMMProbabilityLLR_model_speech_frame(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	flag, llr := v.gmmProbabilityLLR(featSpeech, 100)
 	assertGMMState(t, "speech", v, flag, llr,
 		1, 1470, 1,
@@ -52,7 +47,7 @@ func TestGMMProbabilityLLR_model_speech_frame(t *testing.T) {
 // at a different operating point than the realistic noise vector.
 func TestGMMProbabilityLLR_model_noise_uniform_frame(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	flag, llr := v.gmmProbabilityLLR(featUniformLow, 100)
 	assertGMMState(t, "noiseUniform", v, flag, llr,
 		0, 0, 1,
@@ -68,7 +63,7 @@ func TestGMMProbabilityLLR_model_noise_uniform_frame(t *testing.T) {
 // the lower bound lo = (k+5)<<7, making the lower clamp decisive.
 func TestGMMProbabilityLLR_model_noise_mean_low_clamp(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = -32768 // force vadflag == 1 (sumLLR >= globalThresh always)
 	v.noiseMeans[0] = 0     // nmk2 for channel 0, gaussian 0
 	v.noiseMeans[6] = 16000 // raises nGlobalQ8 so the long-term correction is small
@@ -87,7 +82,7 @@ func TestGMMProbabilityLLR_model_noise_mean_low_clamp(t *testing.T) {
 // mx = maxSpeechMean + 640, making the upper clamp decisive.
 func TestGMMProbabilityLLR_model_speech_mean_high_clamp(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = -32768
 	v.speechMeans[0] = 13000
 	flag, llr := v.gmmProbabilityLLR(featSpeech, 100)
@@ -105,7 +100,7 @@ func TestGMMProbabilityLLR_model_speech_mean_high_clamp(t *testing.T) {
 // term (smk+4)>>3 propagates a one-LSB difference into the stored std.
 func TestGMMProbabilityLLR_model_speech_std_mean_shift(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = -32768
 	v.speechMeans[0] = 500
 	v.speechStds[0] = 800
@@ -127,7 +122,7 @@ func TestGMMProbabilityLLR_model_speech_std_mean_shift(t *testing.T) {
 // both signs of the rounding division in the std update.
 func TestGMMProbabilityLLR_model_noise_std_at_floor(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	v.globalThresh = 32767 // suppress the global-sum trigger -> vadflag 0
 	v.localThresh = 32767  // suppress the per-channel trigger   -> vadflag 0
 	setAllGMM(&v.noiseStds, vadMinStd)
@@ -142,7 +137,7 @@ func TestGMMProbabilityLLR_model_noise_std_at_floor(t *testing.T) {
 // stored std.
 func TestGMMProbabilityLLR_model_noise_std_prob_bias(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	v.globalThresh = 32767
 	v.localThresh = 32767
 	setAllGMM(&v.noiseStds, 400)
@@ -157,7 +152,7 @@ func TestGMMProbabilityLLR_model_noise_std_prob_bias(t *testing.T) {
 // apart) and the global-noise-mean upper clamp, both firing on the same frame.
 func TestGMMProbabilityLLR_model_separation_and_noise_clamp(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	v.globalThresh = 32767 // suppress the global-sum trigger -> vadflag 0
 	v.localThresh = 32767  // suppress the per-channel trigger -> vadflag 0
 	setAllGMM(&v.noiseMeans, 12000)
@@ -175,7 +170,7 @@ func TestGMMProbabilityLLR_model_separation_and_noise_clamp(t *testing.T) {
 // down to exactly its per-channel bound, with the separation block not firing.
 func TestGMMProbabilityLLR_model_speech_mean_clamp(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	v.globalThresh = 32767
 	v.localThresh = 32767
 	setAllGMM(&v.speechMeans, 14000)

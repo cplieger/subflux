@@ -111,9 +111,11 @@ RUN export CC=clang \
 
 # Video decoders: H.264, H.265, AV1, VP9, VP8, MPEG-2, MPEG-4, VC-1, Theora, FLV.
 # Audio decoders: AAC, AC3, EAC3, DCA (DTS), TrueHD, MLP, MP3, FLAC, Vorbis, Opus, ALAC, WMA, PCM variants.
-# Subtitle decoders: SRT, ASS, MOV text, raw text, WebVTT, PGS, DVD, DVB.
-# Video encoder: libx264 only (360p ultrafast preview). Audio encoder: AAC + PCM.
-# Filters: scale (resize), aresample, aformat. Muxer: MP4 (fMP4 streaming).
+# Subtitle decoders: SRT, ASS, SSA, MOV text, raw text, WebVTT; bitmap tracks are
+# only probed, and ffprobe names every codec without its decoder.
+# Encoders and muxers: libx264 and AAC into MP4 (preview), SRT and ASS
+# (extraction), PCM (audio sync). Filters: scale, aresample, aformat, anull.
+# TestFFmpegBuildCoversArgs checks these lists against the runner's features.
 #
 # configure DROPS an --enable-<kind>= name it does not know, without failing and
 # (when a sibling in the same list matched) without warning, so the assertions
@@ -136,22 +138,22 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
         --enable-swscale \
         --extra-ldflags="-static -fuse-ld=lld -s" \
         --enable-filter=aresample,anull,aformat,scale \
-        --enable-demuxer=matroska,mov,mp3,flac,ogg,wav,aac,ac3,eac3,dts,dtshd,srt,ass,avi,mpegts,webvtt,flv \
+        --enable-demuxer=matroska,mov,mp3,flac,ogg,wav,aac,ac3,eac3,dts,dtshd,avi,mpegts,flv \
         --enable-decoder=h264,hevc,av1,vp9,vp8,mpeg2video,mpeg4,vc1,wmv3,theora,flv \
         --enable-decoder=aac,aac_latm,ac3,eac3,dca,mp3,mp3float,flac,vorbis,opus \
         --enable-decoder=pcm_s16le,pcm_s16be,pcm_s24le,pcm_s32le,pcm_f32le \
         --enable-decoder=truehd,mlp,alac,wmav1,wmav2 \
-        --enable-decoder=subrip,srt,ass,ssa,movtext,text,webvtt,pgssub,dvdsub,dvbsub \
-        --enable-encoder=libx264,aac,pcm_s16le,srt,ass,webvtt \
+        --enable-decoder=subrip,srt,ass,ssa,movtext,text,webvtt \
+        --enable-encoder=libx264,aac,pcm_s16le,srt \
         --enable-parser=h264,hevc,av1,vp9,mpeg4video,mpegvideo,aac,aac_latm,ac3,mpegaudio,flac,opus,vorbis,dca \
-        --enable-muxer=mp4,srt,ass,webvtt,pcm_s16le,null \
+        --enable-muxer=mp4,srt,ass,pcm_s16le \
         --enable-protocol=file,pipe \
     && make -j"$(nproc)" \
     && cp ffmpeg_g ffmpeg \
     && cp ffprobe_g ffprobe \
-    && test "$(./ffmpeg -hide_banner -decoders | grep -cE '^ [A-Z.]{6} (subrip|srt|ass|ssa|mov_text|text|webvtt|pgssub|dvdsub|dvbsub) ')" = 10 \
-    && test "$(./ffmpeg -hide_banner -encoders | grep -cE '^ [A-Z.]{6} (libx264|aac|pcm_s16le|srt|ass|webvtt) ')" = 6 \
-    && test "$(./ffmpeg -hide_banner -muxers | grep -cE '^  E  (mp4|srt|ass|webvtt|s16le|null) ')" = 6 \
+    && test "$(./ffmpeg -hide_banner -decoders | grep -cE '^ [A-Z.]{6} (subrip|srt|ass|ssa|mov_text|text|webvtt) ')" = 7 \
+    && test "$(./ffmpeg -hide_banner -encoders | grep -cE '^ [A-Z.]{6} (libx264|aac|pcm_s16le|srt) ')" = 4 \
+    && test "$(./ffmpeg -hide_banner -muxers | grep -cE '^  E  (mp4|srt|ass|s16le) ')" = 4 \
     && test "$(./ffmpeg -hide_banner -filters | grep -cE '^ ..? (aresample|anull|aformat|scale) ')" = 4
 
 # --- Go build ---

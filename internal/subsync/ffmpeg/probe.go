@@ -1,31 +1,62 @@
 package ffmpeg
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log/slog"
-	"os/exec"
-	"time"
+	"math"
+	"os"
+	"strconv"
+	"strings"
 )
 
-// maxProbeOutputBytes is the maximum size for ffprobe JSON output (10 MB).
-const maxProbeOutputBytes = 10 << 20
-
-// Track holds metadata for a single stream from ffprobe output.
-type Track struct {
-	CodecName       string
-	Language        string // extracted from tags
-	Title           string // extracted from tags
-	RFrameRate      string // raw r_frame_rate from ffprobe (e.g. "24000/1001")
+// Stream is one stream of a probed video.
+type Stream struct {
+	Type            string // subtitle, video, audio
+	Codec           string // ffprobe's codec_name
+	Language        string
+	Title           string
+	FrameRate       float64 // video streams; 0 unknown
 	Index           int
-	Forced          bool // from disposition
-	HearingImpaired bool // from disposition
+	Forced          bool
+	HearingImpaired bool
 }
 
-// probeOutput is the JSON structure returned by ffprobe -show_streams.
+// Probe lists video's streams through ffprobe.
+func (r Runner) Probe(ctx context.Context, video *os.File) ([]Stream, error) {
+	c, err := start(ctx, "probe", r.ffprobe(), probeTimeout, video,
+		"-v", "error", "-show_streams", "-print_format", "json", videoArg)
+	if err != nil {
+		return nil, err
+	}
+	out, err := c.readAll(maxProbeBytes)
+	if err != nil {
+		return nil, err
+	}
+	return parseProbeOutput(out)
+}
+
+// ProbeStreams opens path and returns its streams of type kind, every stream
+// when kind is "".
+func ProbeStreams(ctx context.Context, path, kind string) ([]Stream, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	streams, err := Runner{}.Probe(ctx, f)
+	if err != nil || kind == "" {
+		return streams, err
+	}
+	kept := streams[:0]
+	for _, s := range streams {
+		if s.Type == kind {
+			kept = append(kept, s)
+		}
+	}
+	return kept, nil
+}
+
 type probeOutput struct {
 	Streams []probeStream `json:"streams"`
 }
@@ -33,96 +64,67 @@ type probeOutput struct {
 type probeStream struct {
 	Tags        map[string]string `json:"tags"`
 	Disposition map[string]int    `json:"disposition"`
+	CodecType   string            `json:"codec_type"`
 	CodecName   string            `json:"codec_name"`
 	RFrameRate  string            `json:"r_frame_rate"`
 	Index       int               `json:"index"`
 }
 
-// ProbeStreams runs ffprobe and returns parsed stream metadata.
-// Filters by codec_type if filterType is non-empty (e.g. "subtitle", "audio").
-func ProbeStreams(ctx context.Context, path, filterType string) ([]Track, error) {
-	if !probeAvailable() {
-		return nil, errors.New("ffprobe not available")
+// parseProbeOutput reads ffprobe's -show_streams JSON; a frame rate that is
+// not a finite positive number reads as 0.
+func parseProbeOutput(data []byte) ([]Stream, error) {
+	if len(data) > maxProbeBytes {
+		return nil, fmt.Errorf("ffprobe output: %d bytes over %d: %w", len(data), maxProbeBytes, ErrOutputCap)
 	}
-
-	args := []string{
-		"-v", "error",
-		"-show_streams",
-		"-print_format", "json",
-	}
-	if filterType != "" {
-		args = append(args, "-select_streams", shortStreamType(filterType))
-	}
-	args = append(args, "file:"+path)
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "ffprobe", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("ffprobe %s: %w: %s", path, err, stderr.String())
-	}
-
-	return ParseProbeOutput(stdout.Bytes())
-}
-
-// ProbeVideoFPS returns the video stream's frame rate, or 0 if unavailable.
-func ProbeVideoFPS(ctx context.Context, path string) float64 {
-	streams, err := ProbeStreams(ctx, path, "video")
-	if err != nil {
-		slog.Debug("ffprobe video FPS failed", "path", path, "error", err)
-		return 0
-	}
-	if len(streams) == 0 {
-		slog.Debug("ffprobe video FPS: no video streams", "path", path)
-		return 0
-	}
-	return parseFrameRate(streams[0].RFrameRate)
-}
-
-// ParseProbeOutput parses raw ffprobe JSON output into Track structs.
-func ParseProbeOutput(data []byte) ([]Track, error) {
-	if len(data) > maxProbeOutputBytes {
-		return nil, fmt.Errorf("ffprobe output too large: %d bytes", len(data))
-	}
-
 	var out probeOutput
 	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("ffprobe parse: %w", err)
+		return nil, fmt.Errorf("ffprobe output: %w", err)
 	}
-
-	tracks := make([]Track, 0, len(out.Streams))
+	streams := make([]Stream, 0, len(out.Streams))
 	for _, s := range out.Streams {
-		t := Track{
-			Index:      s.Index,
-			CodecName:  s.CodecName,
-			RFrameRate: s.RFrameRate,
+		st := Stream{
+			Index:           s.Index,
+			Type:            s.CodecType,
+			Codec:           s.CodecName,
+			Language:        tag(s.Tags, "language"),
+			Title:           tag(s.Tags, "title"),
+			Forced:          s.Disposition["forced"] == 1,
+			HearingImpaired: s.Disposition["hearing_impaired"] == 1,
 		}
-
-		if lang, ok := s.Tags["language"]; ok {
-			t.Language = lang
-		} else if lang, ok := s.Tags["LANGUAGE"]; ok {
-			t.Language = lang
+		if s.CodecType == "video" {
+			st.FrameRate = parseFrameRate(s.RFrameRate)
 		}
-
-		if title, ok := s.Tags["title"]; ok {
-			t.Title = title
-		} else if title, ok := s.Tags["TITLE"]; ok {
-			t.Title = title
-		}
-
-		if s.Disposition != nil {
-			t.Forced = s.Disposition["forced"] == 1
-			t.HearingImpaired = s.Disposition["hearing_impaired"] == 1
-		}
-
-		tracks = append(tracks, t)
+		streams = append(streams, st)
 	}
+	return streams, nil
+}
 
-	slog.Debug("parsed ffprobe output", "count", len(tracks))
-	return tracks, nil
+// tag reads a stream tag, which Matroska muxers write in either case.
+func tag(tags map[string]string, key string) string {
+	if v, ok := tags[key]; ok {
+		return v
+	}
+	return tags[strings.ToUpper(key)]
+}
+
+// parseFrameRate reads ffprobe's r_frame_rate, a fraction ("24000/1001") or
+// a number; anything else, or a result that is not finite and positive, is 0.
+func parseFrameRate(s string) float64 {
+	num, den, isFraction := strings.Cut(s, "/")
+	n, err := strconv.ParseFloat(num, 64)
+	if err != nil {
+		return 0
+	}
+	r := n
+	if isFraction {
+		d, err := strconv.ParseFloat(den, 64)
+		if err != nil || d == 0 {
+			return 0
+		}
+		r = n / d
+	}
+	if math.IsNaN(r) || math.IsInf(r, 0) || r <= 0 {
+		return 0
+	}
+	return r
 }

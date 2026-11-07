@@ -111,16 +111,11 @@ func TestVadLogEnergy_overflow(t *testing.T) {
 }
 
 // TestVadLogEnergy_accumulator_filled_exactly pins the renormalization guard at
-// its boundary: the accumulator halves itself when the next square would
-// overflow it, not when that square fills it exactly. The first nine squares sum
-// to exactly 0xFFFFFFFF (4×32767² + 511² + 31² + 7² + 2² + 2²), so the ninth
-// sample lands on the boundary, and the tenth is what makes the choice
-// observable — a renormalized accumulator takes later squares at half scale.
-//
-// The expected logE is independently grounded: the function returns roughly
-// 48·log2(energy) + offset, and the true energy of these ten samples is
-// 5368643584, so 48·log2(5368643584) + 368 = 1919.5. Halving one sample early
-// returns 1932 instead, a full 12 above the model.
+// its boundary: the accumulator halves when the next square would overflow it,
+// not when a square fills it exactly. The first nine squares sum to 0xFFFFFFFF
+// (4×32767² + 511² + 31² + 7² + 2² + 2²), so the tenth makes the choice
+// observable. Independent ground: the ten samples' energy is 5368643584, and
+// 48·log2(5368643584) + 368 = 1919.5; halving one sample early returns 1932.
 func TestVadLogEnergy_accumulator_filled_exactly(t *testing.T) {
 	t.Parallel()
 	data := []int16{32767, 32767, 32767, 32767, 511, 31, 7, 2, 2, 32767}
@@ -154,7 +149,7 @@ func TestVadLogEnergy_invariants(t *testing.T) {
 
 func TestExtractFeatures_silence(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	frame := make([]int16, 80)
 	features, totalE := v.extractFeatures(frame)
 	// Silent frame on a fresh instance: features should equal their offset values.

@@ -9,10 +9,10 @@ import (
 )
 
 // parseVTT converts a WebVTT document to SRT once and parses that: Render
-// writes SRT, so the stored baseline is the SRT. Cue identifiers, settings,
-// NOTE, STYLE and REGION blocks and every tag but i, b and u (their classes
-// dropped) go. The conversion copies text bytes and writes only ASCII in the
-// document's units, so the encoding survives as it does for SRT.
+// writes SRT, so the stored baseline is the SRT. It drops cue identifiers,
+// cue settings, NOTE, STYLE and REGION blocks and every tag but i, b and u
+// (their classes dropped). The conversion copies text bytes and writes only
+// ASCII in the document's units, so the encoding survives as it does for SRT.
 func parseVTT(doc []byte, v view, enc subtitleenc.Encoding) (Cues, error) {
 	w := vttWriter{v: v, out: append([]byte(nil), doc[:v.base]...), enc: enc}
 	w.nl = "\n"

@@ -78,7 +78,7 @@ func allTracks(ctx context.Context, path string) ([]subTrack, error) {
 	}
 	var tracks []subTrack
 	for _, t := range ffTracks {
-		codec := normalizeCodecName(t.CodecName)
+		codec := normalizeCodecName(t.Codec)
 		st := normalizeTrack(codec, t.Language, t.Title, t.Forced, t.HearingImpaired)
 		if st == nil {
 			continue

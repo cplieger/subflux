@@ -3,8 +3,8 @@ package subsync
 import (
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/cplieger/subflux/internal/timing"
 	"pgregory.net/rapid"
 )
 
@@ -132,12 +132,12 @@ func TestIsForeignFont(t *testing.T) {
 
 func TestDetectDialogueFont_too_few_cues(t *testing.T) {
 	t.Parallel()
-	cues := make([]Cue, 19)
+	cues := make([]timing.Event, 19)
 	for i := range cues {
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+1) * time.Second,
-			Text:  `<font face="Arial">Hello</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+1) * 1000,
+			Text:    `<font face="Arial">Hello</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -149,12 +149,12 @@ func TestDetectDialogueFont_too_few_cues(t *testing.T) {
 func TestDetectDialogueFont_single_font_returns_empty(t *testing.T) {
 	t.Parallel()
 	// With only one font, there's no contrast to detect dialogue vs typesetting.
-	cues := make([]Cue, 30)
+	cues := make([]timing.Event, 30)
 	for i := range cues {
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+2) * time.Second,
-			Text:  `<font face="Arial">Dialogue line</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+2) * 1000,
+			Text:    `<font face="Arial">Dialogue line</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -166,16 +166,16 @@ func TestDetectDialogueFont_single_font_returns_empty(t *testing.T) {
 func TestDetectDialogueFont_picks_dominant_font(t *testing.T) {
 	t.Parallel()
 	// Build 50 cues: 40 with Arial (dialogue), 10 with Impact (signs).
-	cues := make([]Cue, 50)
+	cues := make([]timing.Event, 50)
 	for i := range cues {
 		font := "Arial"
 		if i%5 == 0 {
 			font = "Impact"
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+3) * time.Second,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+3) * 1000,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -187,21 +187,21 @@ func TestDetectDialogueFont_picks_dominant_font(t *testing.T) {
 func TestDetectDialogueFont_skips_short_duration_cues(t *testing.T) {
 	t.Parallel()
 	// Font with very short cues (< 500ms avg) should be excluded.
-	cues := make([]Cue, 50)
+	cues := make([]timing.Event, 50)
 	for i := range cues {
 		if i < 40 {
 			// Short-duration font (100ms each).
-			cues[i] = Cue{
-				Start: time.Duration(i) * 100 * time.Millisecond,
-				End:   time.Duration(i)*100*time.Millisecond + 100*time.Millisecond,
-				Text:  `<font face="ShortFont">X</font>`,
+			cues[i] = timing.Event{
+				StartMs: int64(i) * 100,
+				EndMs:   int64(i)*100 + 100,
+				Text:    `<font face="ShortFont">X</font>`,
 			}
 		} else {
 			// Normal-duration font (3s each).
-			cues[i] = Cue{
-				Start: time.Duration(i) * time.Second,
-				End:   time.Duration(i+3) * time.Second,
-				Text:  `<font face="NormalFont">Dialogue</font>`,
+			cues[i] = timing.Event{
+				StartMs: int64(i) * 1000,
+				EndMs:   int64(i+3) * 1000,
+				Text:    `<font face="NormalFont">Dialogue</font>`,
 			}
 		}
 	}
@@ -213,12 +213,12 @@ func TestDetectDialogueFont_skips_short_duration_cues(t *testing.T) {
 
 func TestDetectDialogueFont_no_font_tags(t *testing.T) {
 	t.Parallel()
-	cues := make([]Cue, 30)
+	cues := make([]timing.Event, 30)
 	for i := range cues {
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+2) * time.Second,
-			Text:  "Plain dialogue without font tags",
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+2) * 1000,
+			Text:    "Plain dialogue without font tags",
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -231,9 +231,9 @@ func TestDetectDialogueFont_no_font_tags(t *testing.T) {
 
 func TestMarkKaraokePairs_no_non_dialogue(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: "Hello"},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: "World"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: "Hello"},
+		{StartMs: 4000, EndMs: 6000, Text: "World"},
 	}
 	got := markKaraokePairs(cues)
 	if len(got) != 0 {
@@ -243,13 +243,13 @@ func TestMarkKaraokePairs_no_non_dialogue(t *testing.T) {
 
 func TestMarkKaraokePairs_detects_shared_timestamps(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
+	cues := []timing.Event{
 		// Non-dialogue cue (karaoke with ASS tags).
-		{Start: time.Second, End: 3 * time.Second, Text: `{\k50}Romaji lyrics`},
+		{StartMs: 1000, EndMs: 3000, Text: `{\k50}Romaji lyrics`},
 		// Dialogue cue sharing exact same timestamps (English translation).
-		{Start: time.Second, End: 3 * time.Second, Text: "English translation"},
+		{StartMs: 1000, EndMs: 3000, Text: "English translation"},
 		// Unrelated dialogue cue.
-		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Normal dialogue"},
+		{StartMs: 5000, EndMs: 7000, Text: "Normal dialogue"},
 	}
 	got := markKaraokePairs(cues)
 	if !got[1] {
@@ -275,9 +275,9 @@ func TestMarkKaraokePairs_empty_input(t *testing.T) {
 
 func TestFilterDialogueCues_keeps_plain_dialogue(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: "Hello world"},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: "How are you?"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: "Hello world"},
+		{StartMs: 4000, EndMs: 6000, Text: "How are you?"},
 	}
 	got := filterDialogueCues(cues, nil)
 	if len(got) != 2 {
@@ -287,10 +287,10 @@ func TestFilterDialogueCues_keeps_plain_dialogue(t *testing.T) {
 
 func TestFilterDialogueCues_removes_non_dialogue(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: "Hello"},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: `{\an8}Sign text`},
-		{Start: 7 * time.Second, End: 9 * time.Second, Text: "m 0 0 l 100 100 b 50 50"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: "Hello"},
+		{StartMs: 4000, EndMs: 6000, Text: `{\an8}Sign text`},
+		{StartMs: 7000, EndMs: 9000, Text: "m 0 0 l 100 100 b 50 50"},
 	}
 	got := filterDialogueCues(cues, nil)
 	if len(got) != 1 {
@@ -303,10 +303,10 @@ func TestFilterDialogueCues_removes_non_dialogue(t *testing.T) {
 
 func TestFilterDialogueCues_removes_karaoke_pairs(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: `{\k50}Romaji`},
-		{Start: time.Second, End: 3 * time.Second, Text: "English translation"},
-		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Normal dialogue"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: `{\k50}Romaji`},
+		{StartMs: 1000, EndMs: 3000, Text: "English translation"},
+		{StartMs: 5000, EndMs: 7000, Text: "Normal dialogue"},
 	}
 	pairs := markKaraokePairs(cues)
 	got := filterDialogueCues(cues, pairs)
@@ -321,9 +321,9 @@ func TestFilterDialogueCues_removes_karaoke_pairs(t *testing.T) {
 
 func TestFilterDialogueCues_removes_fansub_credits(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: "{Fansub Group v2}"},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: "Real dialogue"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: "{Fansub Group v2}"},
+		{StartMs: 4000, EndMs: 6000, Text: "Real dialogue"},
 	}
 	got := filterDialogueCues(cues, nil)
 	if len(got) != 1 {
@@ -345,9 +345,9 @@ func TestFilterDialogueCues_empty_input(t *testing.T) {
 
 func TestFilterDialogueCues_removes_empty_after_stripping(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: "[gunshot]"},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: "Real dialogue"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: "[gunshot]"},
+		{StartMs: 4000, EndMs: 6000, Text: "Real dialogue"},
 	}
 	got := filterDialogueCues(cues, nil)
 	if len(got) != 1 {
@@ -360,7 +360,7 @@ func TestDetectDialogueFont_skips_rare_font(t *testing.T) {
 	// A font appearing in fewer than 5 cues in the middle 80% should be excluded.
 	// Need 3 fonts: MainFont (dominant), SecondFont (enough to trigger len(stats)>=2),
 	// and RareFont (< 5 cues in middle).
-	cues := make([]Cue, 60)
+	cues := make([]timing.Event, 60)
 	for i := range cues {
 		font := "MainFont"
 		if i >= 20 && i < 30 {
@@ -369,10 +369,10 @@ func TestDetectDialogueFont_skips_rare_font(t *testing.T) {
 		if i >= 30 && i < 33 {
 			font = "RareFont"
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+3) * time.Second,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+3) * 1000,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -386,17 +386,17 @@ func TestDetectDialogueFont_skips_rare_font(t *testing.T) {
 func TestDetectDialogueFont_skips_low_percentage_font(t *testing.T) {
 	t.Parallel()
 	// A font appearing in < 10% of middle cues should be excluded.
-	cues := make([]Cue, 100)
+	cues := make([]timing.Event, 100)
 	for i := range cues {
 		font := "DominantFont"
 		// Put 6 cues with MinorFont (6% of middle 80 = 80 cues).
 		if i >= 45 && i < 51 {
 			font = "MinorFont"
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+3) * time.Second,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+3) * 1000,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -409,21 +409,21 @@ func TestDetectDialogueFont_skips_low_percentage_font(t *testing.T) {
 func TestDetectDialogueFont_skips_long_duration_font(t *testing.T) {
 	t.Parallel()
 	// A font with avg duration > 15s should be excluded (likely typesetting).
-	cues := make([]Cue, 50)
+	cues := make([]timing.Event, 50)
 	for i := range cues {
 		if i < 25 {
 			// Long-duration font (20s each).
-			cues[i] = Cue{
-				Start: time.Duration(i) * 20 * time.Second,
-				End:   time.Duration(i)*20*time.Second + 20*time.Second,
-				Text:  `<font face="LongFont">X</font>`,
+			cues[i] = timing.Event{
+				StartMs: int64(i) * 20_000,
+				EndMs:   int64(i)*20_000 + 20_000,
+				Text:    `<font face="LongFont">X</font>`,
 			}
 		} else {
 			// Normal-duration font (3s each).
-			cues[i] = Cue{
-				Start: time.Duration(i) * time.Second,
-				End:   time.Duration(i+3) * time.Second,
-				Text:  `<font face="NormalFont">Dialogue</font>`,
+			cues[i] = timing.Event{
+				StartMs: int64(i) * 1000,
+				EndMs:   int64(i+3) * 1000,
+				Text:    `<font face="NormalFont">Dialogue</font>`,
 			}
 		}
 	}
@@ -436,28 +436,28 @@ func TestDetectDialogueFont_skips_long_duration_font(t *testing.T) {
 func TestFilterDialogueCues_removes_foreign_font(t *testing.T) {
 	t.Parallel()
 	// Build enough cues to trigger font detection, then add a foreign-font cue.
-	cues := make([]Cue, 52)
+	cues := make([]timing.Event, 52)
 	for i := range 50 {
 		font := "Arial"
 		if i%10 == 0 {
 			font = "Impact"
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+3) * time.Second,
-			Text:  `<font face="` + font + `">Dialogue line</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+3) * 1000,
+			Text:    `<font face="` + font + `">Dialogue line</font>`,
 		}
 	}
 	// Add a foreign-font cue at the end.
-	cues[50] = Cue{
-		Start: 50 * time.Second,
-		End:   53 * time.Second,
-		Text:  `<font face="Impact">Sign text</font>`,
+	cues[50] = timing.Event{
+		StartMs: 50000,
+		EndMs:   53000,
+		Text:    `<font face="Impact">Sign text</font>`,
 	}
-	cues[51] = Cue{
-		Start: 54 * time.Second,
-		End:   57 * time.Second,
-		Text:  `<font face="Arial">Normal dialogue</font>`,
+	cues[51] = timing.Event{
+		StartMs: 54000,
+		EndMs:   57000,
+		Text:    `<font face="Arial">Normal dialogue</font>`,
 	}
 
 	got := filterDialogueCues(cues, nil)
@@ -479,16 +479,16 @@ func TestCleanTextLen_multiline_mixed_music_and_dialogue(t *testing.T) {
 
 func TestDetectDialogueFont_tiebreaker_alphabetical(t *testing.T) {
 	t.Parallel()
-	cues := make([]Cue, 40)
+	cues := make([]timing.Event, 40)
 	for i := range cues {
 		font := "Bravo"
 		if i%2 == 0 {
 			font = "Alpha"
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i+3) * time.Second,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i+3) * 1000,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	// Fonts with identical screen time resolve to the alphabetically first
@@ -507,16 +507,16 @@ func TestDetectDialogueFont_tiebreaker_alphabetical(t *testing.T) {
 func TestDetectDialogueFont_accepts_exactly_twenty_cues(t *testing.T) {
 	t.Parallel()
 	// Twenty cues is the smallest sample font detection will analyze.
-	cues := make([]Cue, 20)
+	cues := make([]timing.Event, 20)
 	for i := range cues {
-		font, dur := "Arial", 3*time.Second
+		font, dur := "Arial", int64(3000)
 		if i%2 == 1 {
-			font, dur = "Impact", time.Second
+			font, dur = "Impact", 1000
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i)*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i)*1000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -528,16 +528,16 @@ func TestDetectDialogueFont_accepts_exactly_twenty_cues(t *testing.T) {
 func TestDetectDialogueFont_accepts_half_second_average_cue(t *testing.T) {
 	t.Parallel()
 	// A 500ms average is the shortest cue length still counted as dialogue.
-	cues := make([]Cue, 30)
+	cues := make([]timing.Event, 30)
 	for i := range cues {
-		font, dur := "Alpha", 500*time.Millisecond
+		font, dur := "Alpha", int64(500)
 		if i%2 == 1 {
-			font, dur = "Bravo", 400*time.Millisecond
+			font, dur = "Bravo", 400
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i)*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i)*1000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -549,16 +549,16 @@ func TestDetectDialogueFont_accepts_half_second_average_cue(t *testing.T) {
 func TestDetectDialogueFont_accepts_fifteen_second_average_cue(t *testing.T) {
 	t.Parallel()
 	// A 15s average is the longest cue length still counted as dialogue.
-	cues := make([]Cue, 30)
+	cues := make([]timing.Event, 30)
 	for i := range cues {
-		font, dur := "Alpha", 15*time.Second
+		font, dur := "Alpha", int64(15_000)
 		if i%2 == 1 {
-			font, dur = "Bravo", 16*time.Second
+			font, dur = "Bravo", 16_000
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * 20 * time.Second,
-			End:   time.Duration(i)*20*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 20_000,
+			EndMs:   int64(i)*20_000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -572,16 +572,16 @@ func TestDetectDialogueFont_skips_rare_font_with_the_most_screen_time(t *testing
 	// A font carrying the most total screen time is still rejected when it
 	// appears in under 10% of the sample: long cues are how typesetting and
 	// sign work show up, not dialogue.
-	cues := make([]Cue, 100)
+	cues := make([]timing.Event, 100)
 	for i := range cues {
-		font, dur := "DominantFont", time.Second
+		font, dur := "DominantFont", int64(1000)
 		if i >= 40 && i < 46 {
-			font, dur = "MinorFont", 14*time.Second
+			font, dur = "MinorFont", 14_000
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * 20 * time.Second,
-			End:   time.Duration(i)*20*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 20_000,
+			EndMs:   int64(i)*20_000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -595,16 +595,16 @@ func TestDetectDialogueFont_accepts_font_at_exactly_ten_percent(t *testing.T) {
 	t.Parallel()
 	// A font in exactly 10% of the sample clears the frequency filter, so it
 	// wins on screen time: 5 of the 50 analyzed cues, 60s against 45s.
-	cues := make([]Cue, 62)
+	cues := make([]timing.Event, 62)
 	for i := range cues {
-		font, dur := "Bravo", time.Second
+		font, dur := "Bravo", int64(1000)
 		if i >= 10 && i < 15 {
-			font, dur = "Alpha", 12*time.Second
+			font, dur = "Alpha", 12_000
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * 20 * time.Second,
-			End:   time.Duration(i)*20*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 20_000,
+			EndMs:   int64(i)*20_000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -615,18 +615,18 @@ func TestDetectDialogueFont_accepts_font_at_exactly_ten_percent(t *testing.T) {
 
 func TestDetectDialogueFont_ignores_zero_duration_cues(t *testing.T) {
 	t.Parallel()
-	cues := make([]Cue, 50)
+	cues := make([]timing.Event, 50)
 	for i := range cues {
 		font := "MainFont"
-		dur := 3 * time.Second
+		dur := int64(3000)
 		if i%5 == 0 {
 			font = "ZeroFont"
 			dur = 0
 		}
-		cues[i] = Cue{
-			Start: time.Duration(i) * time.Second,
-			End:   time.Duration(i)*time.Second + dur,
-			Text:  `<font face="` + font + `">Text</font>`,
+		cues[i] = timing.Event{
+			StartMs: int64(i) * 1000,
+			EndMs:   int64(i)*1000 + dur,
+			Text:    `<font face="` + font + `">Text</font>`,
 		}
 	}
 	got := detectDialogueFont(cues)
@@ -637,11 +637,11 @@ func TestDetectDialogueFont_ignores_zero_duration_cues(t *testing.T) {
 
 func TestMarkKaraokePairs_multiple_dialogue_at_same_timestamp(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: `{\k50}Karaoke`},
-		{Start: time.Second, End: 3 * time.Second, Text: "Romaji text"},
-		{Start: time.Second, End: 3 * time.Second, Text: "English text"},
-		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Normal"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: `{\k50}Karaoke`},
+		{StartMs: 1000, EndMs: 3000, Text: "Romaji text"},
+		{StartMs: 1000, EndMs: 3000, Text: "English text"},
+		{StartMs: 5000, EndMs: 7000, Text: "Normal"},
 	}
 	got := markKaraokePairs(cues)
 	if !got[1] || !got[2] {
@@ -654,10 +654,10 @@ func TestMarkKaraokePairs_multiple_dialogue_at_same_timestamp(t *testing.T) {
 
 func TestFilterDialogueCues_all_filtered_returns_nil(t *testing.T) {
 	t.Parallel()
-	cues := []Cue{
-		{Start: time.Second, End: 3 * time.Second, Text: `{\an8}Sign`},
-		{Start: 4 * time.Second, End: 6 * time.Second, Text: "[gunshot]"},
-		{Start: 7 * time.Second, End: 9 * time.Second, Text: "♪ Music ♪"},
+	cues := []timing.Event{
+		{StartMs: 1000, EndMs: 3000, Text: `{\an8}Sign`},
+		{StartMs: 4000, EndMs: 6000, Text: "[gunshot]"},
+		{StartMs: 7000, EndMs: 9000, Text: "♪ Music ♪"},
 	}
 	got := filterDialogueCues(cues, nil)
 	if len(got) != 0 {

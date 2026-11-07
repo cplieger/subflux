@@ -2,177 +2,109 @@ package subsync
 
 import (
 	"context"
-	"log/slog"
-	"time"
+	"slices"
 )
 
-// syncCues aligns downloaded subtitle cues to reference cues.
-// Returns the shifted cues and the applied offset.
-func syncCues(ctx context.Context, reference, incorrect []Cue) ([]Cue, time.Duration) {
-	refSpans := cuesToSpans(reference)
-	incSpans := cuesToSpans(incorrect)
-
-	offsetMs := alignConstantOffset(ctx, refSpans, incSpans)
-	offset := time.Duration(offsetMs) * time.Millisecond
-
-	slog.Debug("subtitle sync complete",
-		"offset_ms", offsetMs,
-		"ref_cues", len(reference),
-		"inc_cues", len(incorrect))
-
-	if offsetMs == 0 {
-		return incorrect, 0
-	}
-	return shiftCues(incorrect, offset), offset
+// sweeper is alass's align_constant_delta over the offsets [-window, window]
+// ms: each span pair's rating, its score times the pair's overlap at the
+// offset, is a trapezoid written as four slope changes into a dense array
+// that two running sums integrate. One sweeper's array is reused by every
+// sweep of an alignment.
+type sweeper struct {
+	deltas []float64
+	window int64
+	// A pair's slope changes before the window still shape the rating inside
+	// it: they enter as the sweep's starting slope and rating.
+	slope0, rating0 float64
 }
 
-// maxAlignSpans caps the number of spans per input to prevent O(n*m) memory
-// exhaustion in the alignment algorithm. A typical movie has ~1500 cues;
-// 10 000 provides generous headroom. Beyond this, only the first N spans
-// are used (still produces a usable alignment for the covered portion).
-const maxAlignSpans = 10_000
-
-// maxAlignEvents caps the total event allocation in merge sort to ~256 MB
-// (16 bytes per event). This prevents OOM when crafted SRT files with
-// extreme timestamps force the bucket sort → merge sort fallback.
-const maxAlignEvents = 16_000_000
-
-// maxBucketRangeMs caps the bucket-sort delta array at 32M float64 entries
-// (~256 MB — the same memory class as maxAlignEvents). Larger offset ranges
-// only arise from pathological or crafted timestamps (32M ms ≈ 9 hours of
-// offset), where the event-based merge sort computes the same peak without
-// the dense allocation; a single align call must never approach the 1 GiB
-// container envelope on its own.
-const maxBucketRangeMs = 32_000_000
-
-// alignConstantOffset finds the single best constant time shift to align
-// the "incorrect" subtitle spans to the "reference" spans.
-//
-// This is a Go port of alass's align_constant_delta algorithm.
-// It computes a piecewise-linear rating function over all possible offsets
-// using differential computation (delta-of-deltas), then finds the maximum.
-//
-// Returns the optimal offset in milliseconds.
-func alignConstantOffset(ctx context.Context, reference, incorrect []timeSpan) int64 {
-	if len(reference) == 0 || len(incorrect) == 0 {
-		return 0
-	}
-	if len(reference) > maxAlignSpans {
-		slog.Warn("alignment: capping reference spans",
-			"original", len(reference), "cap", maxAlignSpans)
-		reference = reference[:maxAlignSpans]
-	}
-	if len(incorrect) > maxAlignSpans {
-		slog.Warn("alignment: capping incorrect spans",
-			"original", len(incorrect), "cap", maxAlignSpans)
-		incorrect = incorrect[:maxAlignSpans]
-	}
-
-	refStart := reference[0].Start
-	refEnd := reference[len(reference)-1].End
-	inStart := incorrect[0].Start
-	inEnd := incorrect[len(incorrect)-1].End
-
-	minOffset := refStart - inEnd
-	maxOffset := refEnd - inStart
-
-	rangeSize := maxOffset - minOffset + 1
-	if rangeSize <= 0 {
-		return 0
-	}
-
-	numEntries := int64(len(incorrect)) * int64(len(reference)) * 4
-	// Integer division is intentional: for small ranges, bucket sort is
-	// always preferred since the array allocation is trivial.
-	if numEntries > rangeSize/10 {
-		slog.Debug("alignment: chose bucket sort",
-			"ref_spans", len(reference), "inc_spans", len(incorrect),
-			"range_ms", rangeSize, "num_entries", numEntries)
-		return alignBucketSort(ctx, reference, incorrect, minOffset, maxOffset)
-	}
-	slog.Debug("alignment: chose merge sort",
-		"ref_spans", len(reference), "inc_spans", len(incorrect),
-		"range_ms", rangeSize, "num_entries", numEntries)
-	return alignMergeSort(ctx, reference, incorrect, minOffset)
+func newSweeper(window int64) *sweeper {
+	return &sweeper{window: window, deltas: make([]float64, 2*window+1)}
 }
 
-// spanScore returns the overlap quality score for a reference/incorrect span pair.
-// Zero-length or inverted spans return 0 (caller should skip).
-func spanScore(r, s timeSpan) float64 {
-	rLen := float64(r.End - r.Start)
-	sLen := float64(s.End - s.Start)
+// best returns the offset in [-window, window] with the highest rating and
+// that rating; the lowest such offset on a tie, and 0 with rating 0 when no
+// offset rates above 0. ref and inc are sorted by StartMs.
+func (w *sweeper) best(ctx context.Context, ref, inc []Span) (offset int64, rating float64, err error) {
+	clear(w.deltas)
+	w.slope0, w.rating0 = 0, 0
+	maxInc := maxDuration(inc)
+	for i, r := range ref {
+		if i%256 == 0 {
+			if err := ctx.Err(); err != nil {
+				return 0, 0, err
+			}
+		}
+		w.addPairs(r, inc, maxInc)
+	}
+	slope, cur := w.slope0, w.rating0
+	for i, d := range w.deltas {
+		cur += slope
+		slope += d
+		if cur > rating {
+			rating, offset = cur, int64(i)-w.window
+		}
+	}
+	return offset, rating, nil
+}
+
+// addPairs writes the slope changes of r paired with every span of inc
+// whose rating can reach the window; maxInc is inc's longest span.
+func (w *sweeper) addPairs(r Span, inc []Span, maxInc int64) {
+	// A pair rates above 0 only for offsets in (r.StartMs-s.EndMs,
+	// r.EndMs-s.StartMs).
+	lo, _ := slices.BinarySearchFunc(inc, r.StartMs-w.window-maxInc, byStart)
+	for _, s := range inc[lo:] {
+		if s.StartMs > r.EndMs+w.window {
+			return
+		}
+		score := spanScore(r, s)
+		if score == 0 || r.StartMs-s.EndMs > w.window || r.EndMs-s.StartMs < -w.window {
+			continue
+		}
+		w.add(r.StartMs-s.EndMs, score)
+		w.add(r.EndMs-s.EndMs, -score)
+		w.add(r.StartMs-s.StartMs, -score)
+		w.add(r.EndMs-s.StartMs, score)
+	}
+}
+
+// add changes the rating's slope by v from offset at on.
+func (w *sweeper) add(at int64, v float64) {
+	switch i := at + w.window; {
+	case i < 0:
+		w.slope0 += v
+		w.rating0 -= v * float64(i+1)
+	case i < int64(len(w.deltas)):
+		w.deltas[i] += v
+	}
+}
+
+func byStart(s Span, start int64) int {
+	switch {
+	case s.StartMs < start:
+		return -1
+	case s.StartMs > start:
+		return 1
+	}
+	return 0
+}
+
+func maxDuration(spans []Span) int64 {
+	var d int64
+	for _, s := range spans {
+		d = max(d, s.EndMs-s.StartMs)
+	}
+	return d
+}
+
+// spanScore is the overlap quality of a pair: the shorter length over the
+// longer, 0 for an empty or inverted span.
+func spanScore(r, s Span) float64 {
+	rLen := float64(r.EndMs - r.StartMs)
+	sLen := float64(s.EndMs - s.StartMs)
 	if rLen <= 0 || sLen <= 0 {
 		return 0
 	}
 	return min(rLen, sLen) / max(rLen, sLen)
-}
-
-// alignBucketSort uses a dense array indexed by offset to accumulate rating
-// derivative changes. Each span pair contributes 4 delta entries (the
-// breakpoints of the piecewise-linear rating function). A single sweep
-// integrates the deltas twice (derivative -> rating) to find the peak.
-// Efficient when the offset range is small relative to the number of span pairs.
-func alignBucketSort(ctx context.Context, ref, inc []timeSpan, minOffset, maxOffset int64) int64 {
-	size := maxOffset - minOffset + 1
-
-	// Bounded dense allocation (~256 MB max, see maxBucketRangeMs); fall
-	// back to the event-based merge sort beyond it to avoid OOM.
-	if size > maxBucketRangeMs {
-		slog.Warn("alignment range too large, falling back to merge sort",
-			"range_ms", size)
-		return alignMergeSort(ctx, ref, inc, minOffset)
-	}
-
-	deltas := make([]float64, size)
-
-	if !accumulateDeltas(ctx, deltas, ref, inc, minOffset, size) {
-		return 0
-	}
-
-	var derivative, rating, bestRating float64
-	var bestOffset int64
-
-	for i := range size {
-		derivative += deltas[i]
-		rating += derivative
-		if rating > bestRating {
-			bestRating = rating
-			bestOffset = i + minOffset
-		}
-	}
-
-	slog.Debug("alignment complete (bucket)",
-		"offset_ms", bestOffset, "rating", bestRating, "range_ms", size)
-	return bestOffset
-}
-
-// accumulateDeltas fills the bucket-sort delta array with the piecewise-linear
-// rating-derivative breakpoints for every reference/incorrect span pair. It
-// reports false if the context was cancelled mid-accumulation.
-func accumulateDeltas(ctx context.Context, deltas []float64, ref, inc []timeSpan, minOffset, size int64) bool {
-	var iterations int
-	for _, r := range ref {
-		for _, s := range inc {
-			iterations++
-			if iterations%10000 == 0 && ctx.Err() != nil {
-				return false
-			}
-			score := spanScore(r, s)
-			if score == 0 {
-				continue
-			}
-			addDelta(deltas, r.Start-s.End-minOffset, score, size)
-			addDelta(deltas, r.End-s.End-minOffset, -score, size)
-			addDelta(deltas, r.Start-s.Start-minOffset, -score, size)
-			addDelta(deltas, r.End-s.Start-minOffset, score, size)
-		}
-	}
-	return true
-}
-
-// addDelta safely adds val to deltas[idx] if idx is within bounds.
-func addDelta(deltas []float64, idx int64, val float64, size int64) {
-	if idx >= 0 && idx < size {
-		deltas[idx] += val
-	}
 }

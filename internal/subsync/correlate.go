@@ -9,13 +9,8 @@ import (
 	"github.com/cplieger/subflux/internal/subsync/fft"
 )
 
-// frameMs is the analysis frame duration in milliseconds.
-// Used by energy envelope, subtitle envelope, dialogue mask, and correlation.
+// frameMs is the audio path's frame: one LLR, one signal sample.
 const frameMs = 10
-
-// maxCorrelationFrames caps the signal length for FFT correlation to prevent
-// excessive memory usage. At 10ms/frame, 500k frames = ~1.4 hours.
-const maxCorrelationFrames = 500_000
 
 // correlationResult holds the output of cross-correlation.
 type correlationResult struct {
@@ -23,23 +18,15 @@ type correlationResult struct {
 	Peak     float64 // normalized correlation peak (0.0 to 1.0)
 }
 
-// crossCorrelateEdges correlates two float64 signals (typically GMM VAD
-// speech probability or energy envelope values) using FFT-based convolution
-// to find the offset that maximizes alignment. Input signals are expected
-// to already be in bipolar form (centered around zero) so that mismatches
-// produce negative scores.
+// crossCorrelateEdges returns the offset of b against a that maximizes their
+// FFT correlation, and its normalized peak; a and b are bipolar (±1), so a
+// mismatch scores negative. The caller bounds their length.
 func crossCorrelateEdges(ctx context.Context, a, b []float64) correlationResult {
 	if len(a) == 0 || len(b) == 0 {
 		return correlationResult{}
 	}
 	if ctx.Err() != nil {
 		return correlationResult{}
-	}
-	if len(a) > maxCorrelationFrames {
-		a = a[:maxCorrelationFrames]
-	}
-	if len(b) > maxCorrelationFrames {
-		b = b[:maxCorrelationFrames]
 	}
 	return correlateFloat(ctx, a, b)
 }
@@ -159,8 +146,6 @@ func parabolicRefine(corr []complex128, bestIdx, offset, n int, bestVal float64)
 	}
 	return offsetFrac * float64(frameMs)
 }
-
-// --- Signal helpers ---
 
 // floatEnergy returns the sum of squared values (L2 norm squared) of the signal.
 func floatEnergy(signal []float64) float64 {

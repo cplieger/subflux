@@ -2,247 +2,97 @@ package subsync
 
 import (
 	"context"
-	"log/slog"
-	"slices"
-	"time"
+	"fmt"
 
-	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 	"github.com/cplieger/subflux/internal/subsync/vad"
-	"golang.org/x/sync/errgroup"
+	"github.com/cplieger/subflux/internal/timing"
 )
 
-// AudioSyncHints provides content characteristics for adaptive strategy
-// selection. Zero values use the default strategy.
-type AudioSyncHints struct {
-	// DialogueCues are pre-classified ASS dialogue cues from the native
-	// parser. When set, audioSyncFromPCM uses these directly instead of
-	// applying text-based heuristics (karaoke pair detection, SDH filtering)
-	// to the flat cue list. This produces better results for ASS files
-	// because style-based classification is more accurate than text patterns.
-	DialogueCues []Cue
+// Speech is the audio path's input: one vad.Detector LLR per 10 ms frame of
+// the video's first audio stream, at most MaxAudioFrames.
+type Speech struct{ LLR []float64 }
 
-	// IsASS indicates the subtitle was ASS-extracted (clean cues, no tag remnants).
-	IsASS bool
-}
+// The audio fit's bounds: an offset past 10% of the duration, clamped to
+// 30 s to 5 minutes, is no fit; the correlation peak is worth at most 0.9.
+const (
+	audioOffsetPct   = 10
+	minAudioOffsetMs = 30_000
+	maxAudioOffsetMs = 300_000
+	audioPeakWeight  = 0.9
+)
 
-// audioSyncConfig consolidates all audio sync tuning parameters for
-// inspectability and testability. The correlation can produce arbitrarily
-// large offsets, so results are clamped by the MaxOffset/MinOffset limits
-// below.
-// The two vad.Tuning values lead because they carry the pointer fields; the
-// scalars follow (govet fieldalignment).
-type audioSyncConfig struct {
-	VADSafe      vad.Tuning // recall-biased pass
-	VADPrecise   vad.Tuning // precision-biased pass
-	MaxOffsetPct int64      // percentage of audio duration
-	MaxOffsetMs  int64      // hard ceiling in milliseconds
-	MinOffsetMs  int64      // hard floor for short clips
-	AgreementMs  int64      // max disagreement between passes
-}
-
-var defaultAudioSyncConfig = audioSyncConfig{
-	MaxOffsetPct: 10,
-	MaxOffsetMs:  300_000, // 5 minutes
-	MinOffsetMs:  30_000,  // 30 seconds
-	VADSafe:      vad.Tuning{Mode: vad.ModeVeryAggressive, Threshold: 250, OverhangFrames: 35, AdaptScale: 0},
-	VADPrecise:   vad.Tuning{Mode: vad.ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0},
-	AgreementMs:  500,
-}
-
-// audioSync performs audio-based synchronization without a reference subtitle.
-//
-// Adaptive strategy selection based on content characteristics:
-//   - Coverage < 0.3 (very sparse): 10-frame smoothing for faster response
-//   - ASS format or duration > 90 min: no-trim mask (more signal available)
-//   - Default: trimmed mask (best for TV/SRT)
-//
-// All paths use voice-band (300-3000 Hz) energy with SDH-filtered mask
-// (excludes [sound effects], music notes, parenthesized descriptions).
-// Broadband energy+flux runs as a complementary strategy. Onset correlation
-// provides mask-bias fallback.
-func audioSync(ctx context.Context, incorrect []Cue, videoPath string, hints AudioSyncHints) SyncResult {
-	if len(incorrect) < MinCuesForSync {
-		slog.Debug("audio sync: skipped, too few cues", "cues", len(incorrect), "min", MinCuesForSync)
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
+// AlignAudio returns a Shift with Confidence peak × 0.9 from correlating the
+// safe and precise speech decisions with inc's dialogue, the precise one
+// when the two offsets agree within audioAgreementMs. Fewer than minSpans
+// spans, no frames, or an offset past the duration's limit is ModelNone.
+// With a non-empty ref (one that passed AlignReference's guard) it measures
+// the shift's Shape against it, so Settle guards the audio fit as it guards
+// a reference one. durationMs is the video's duration.
+func AlignAudio(ctx context.Context, speech Speech, ref, inc []Span, durationMs int64) (Result, error) {
+	if durationMs <= 0 {
+		return Result{}, fmt.Errorf("subsync: AlignAudio over a %d ms video", durationMs)
 	}
-
-	pcm, err := ffmpeg.ExtractSegmentPCM(ctx, videoPath, 0, 0)
-	if err != nil {
-		slog.Warn("audio sync: extraction failed", "path", videoPath, "error", err)
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-
-	return audioSyncFromPCM(ctx, incorrect, pcm, hints)
-}
-
-// audioSyncFromPCM performs audio-based synchronization on pre-extracted PCM.
-// Uses a 2-step GMM classification with frozen adaptation:
-//   - Safe pass (t250-oh35): high pass rate, catches difficult content
-//   - Precise pass (t125-oh10): tighter residuals for easy content
-//
-// If both agree within 500ms, uses the precise result.
-func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints AudioSyncHints) SyncResult {
-	if len(incorrect) < MinCuesForSync {
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-
-	samplesPerFrame := ffmpeg.PCMSampleRate * frameMs / 1000
-	numFrames := len(pcm) / samplesPerFrame
-	if numFrames == 0 {
-		slog.Debug("audio sync: insufficient PCM samples for one frame",
-			"pcm_samples", len(pcm),
-			"samples_per_frame", samplesPerFrame)
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-	audioDurMs := int64(numFrames) * frameMs
-
-	// Cue classification: use pre-classified ASS dialogue cues when
-	// available. The ASS parser classifies styles as dialogue or
-	// non-dialogue; filterDialogueCues handles text-level filtering
-	// (karaoke pair removal, SDH).
-	analysisCues := classifyDialogue(hints.DialogueCues, incorrect)
-
-	if len(analysisCues) == 0 {
-		slog.Debug("audio sync: no dialogue cues after filtering",
-			"original_cues", len(incorrect),
-			"hints_dialogue", len(hints.DialogueCues))
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-
-	// Build bipolar subtitle signal from cleaned cues.
-	vadSubSignal := buildVADSubSignal(analysisCues, numFrames)
-	if len(vadSubSignal) == 0 {
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-
-	// 2-step GMM: run once, threshold at two levels.
-	// Frozen adaptation (adaptScale=0) works better on movie audio.
-	var safeSig, preciseSig []float64
-	g, gctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		safeSig = vad.FramesBinary(gctx, pcm, defaultAudioSyncConfig.VADSafe)
-		return gctx.Err()
-	})
-	g.Go(func() error {
-		preciseSig = vad.FramesBinary(gctx, pcm, defaultAudioSyncConfig.VADPrecise)
-		return gctx.Err()
-	})
-	if err := g.Wait(); err != nil {
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
-	}
-
-	safeLen := min(len(safeSig), len(vadSubSignal))
-	precLen := min(len(preciseSig), len(vadSubSignal))
-
-	safeCorr := crossCorrelateEdges(ctx, safeSig[:safeLen], vadSubSignal[:safeLen])
 	if err := ctx.Err(); err != nil {
-		return SyncResult{Cues: incorrect, Confidence: confidenceNone, Method: MethodAudio}
+		return Result{}, err
 	}
-	precCorr := crossCorrelateEdges(ctx, preciseSig[:precLen], vadSubSignal[:precLen])
-
-	corr := safeCorr
-	signalType := "gmm-safe"
-
-	if abs64(safeCorr.OffsetMs-precCorr.OffsetMs) <= defaultAudioSyncConfig.AgreementMs {
-		corr = precCorr
-		signalType = "gmm-precise"
-	} else {
-		slog.Debug("audio sync: safe/precise disagree, using safe",
-			"safe_offset_ms", safeCorr.OffsetMs,
-			"prec_offset_ms", precCorr.OffsetMs,
-			"diff_ms", abs64(safeCorr.OffsetMs-precCorr.OffsetMs))
+	none := Result{Timing: timing.Identity{}, Method: timing.Audio}
+	llr := speech.LLR[:min(len(speech.LLR), MaxAudioFrames)]
+	if len(inc) < minSpans || len(llr) == 0 {
+		return none, nil
 	}
-
-	slog.Info("audio sync complete",
-		"offset_ms", corr.OffsetMs,
-		"peak", corr.Peak,
-		"signal", signalType,
-		"is_ass", hints.IsASS,
-		"dialogue_cues", len(analysisCues),
-		"safe_offset", safeCorr.OffsetMs,
-		"safe_peak", safeCorr.Peak,
-		"prec_offset", precCorr.OffsetMs,
-		"prec_peak", precCorr.Peak,
-		"audio_dur_s", audioDurMs/1000)
-
-	conf := Confidence(corr.Peak * float64(defaultConfidenceCaps.forMethod(MethodAudio)))
-	if corr.OffsetMs == 0 {
-		return SyncResult{
-			Cues: incorrect, Offset: 0, Rate: 1.0,
-			Confidence: conf, Method: MethodAudio,
-		}
+	safe, precise := make([]float64, len(llr)), make([]float64, len(llr))
+	ds, dp := vad.NewDecider(safeThreshold, safeOverhang), vad.NewDecider(preciseThreshold, preciseOverhang)
+	for i, v := range llr {
+		safe[i], precise[i] = bipolar(ds.Speech(v)), bipolar(dp.Speech(v))
 	}
-
-	// Reject offsets that are unreasonably large. The threshold is the
-	// smaller of the percentage-based limit and the hard ceiling, but
-	// never below the hard floor (protects short clips from false rejects).
-	absOff := abs64(corr.OffsetMs)
-	pctLimit := max(audioDurMs*defaultAudioSyncConfig.MaxOffsetPct/100, defaultAudioSyncConfig.MinOffsetMs)
-	limit := min(pctLimit, defaultAudioSyncConfig.MaxOffsetMs)
-	if audioDurMs > 0 && absOff > limit {
-		slog.Info("audio sync: discarding excessive offset",
-			"offset_ms", corr.OffsetMs,
-			"audio_dur_ms", audioDurMs,
-			"limit_ms", limit)
-		return SyncResult{
-			Cues: incorrect, Offset: 0, Rate: 1.0,
-			Confidence: confidenceNone, Method: MethodAudio,
-		}
+	sub := dialogueSignal(inc, len(llr))
+	corr := crossCorrelateEdges(ctx, safe, sub)
+	prec := crossCorrelateEdges(ctx, precise, sub)
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
 	}
-
-	offset := time.Duration(corr.OffsetMs) * time.Millisecond
-	return SyncResult{
-		Cues: shiftCues(incorrect, offset), Offset: corr.OffsetMs,
-		Rate: 1.0, Confidence: conf, Method: MethodAudio,
+	if d := corr.OffsetMs - prec.OffsetMs; d >= -audioAgreementMs && d <= audioAgreementMs {
+		corr = prec
 	}
+	limit := min(max(durationMs*audioOffsetPct/100, minAudioOffsetMs), maxAudioOffsetMs)
+	if corr.OffsetMs > limit || corr.OffsetMs < -limit {
+		return none, nil
+	}
+	r := Result{
+		Timing:     timing.Canonical(timing.Shift{Ms: corr.OffsetMs}),
+		Method:     timing.Audio,
+		Confidence: corr.Peak * audioPeakWeight,
+	}
+	if len(ref) > 0 {
+		_, r.Shape = measure(fit{kept: shiftSpans(inc, corr.OffsetMs), displayMs: displayMs(inc)}, newRefIndex(ref))
+		r.Measured = true
+	}
+	return r, nil
 }
 
-// classifyDialogue returns the cues that should drive VAD correlation.
-// If ASS-preclassified dialogue cues are provided, they're used as the
-// source; otherwise the full incoming cue list is used. In both cases,
-// karaoke pairs are detected and filterDialogueCues strips SDH and
-// karaoke-pair noise before returning.
-func classifyDialogue(hintCues, fallbackCues []Cue) []Cue {
-	src := fallbackCues
-	if len(hintCues) > 0 {
-		src = hintCues
+func bipolar(speech bool) float64 {
+	if speech {
+		return 1
 	}
-	karaokePairs := markKaraokePairs(src)
-	return filterDialogueCues(src, karaokePairs)
+	return -1
 }
 
-// buildVADSubSignal creates a bipolar {-1, +1} subtitle presence signal
-// for VAD correlation. Frames with active dialogue cues are +1, others -1.
-func buildVADSubSignal(cues []Cue, numFrames int) []float64 {
-	if numFrames == 0 {
-		return nil
+// dialogueSignal is +1 in each of n frames some span covers, -1 elsewhere:
+// a difference array over the span ends, so its cost is n plus the spans.
+func dialogueSignal(spans []Span, n int) []float64 {
+	edges := make([]int, n+1)
+	for _, s := range spans {
+		from, to := max(s.StartMs/frameMs, 0), min(s.EndMs/frameMs, int64(n))
+		if from < to {
+			edges[from]++
+			edges[to]--
+		}
 	}
-	sig := make([]float64, numFrames)
+	sig := make([]float64, n)
+	covered := 0
 	for i := range sig {
-		sig[i] = -1.0
-	}
-
-	// Sort cues by start time for single-pass fill.
-	sorted := make([]Cue, len(cues))
-	copy(sorted, cues)
-	slices.SortFunc(sorted, func(a, b Cue) int {
-		return int(a.Start - b.Start)
-	})
-
-	// Single-pass: track the rightmost filled frame to skip overlaps.
-	filled := 0
-	for _, c := range sorted {
-		sf := max(int(c.Start.Milliseconds()/frameMs), 0)
-		ef := min(int(c.End.Milliseconds()/frameMs), numFrames)
-		if sf < filled {
-			sf = filled
-		}
-		for f := sf; f < ef; f++ {
-			sig[f] = 1.0
-		}
-		if ef > filled {
-			filled = ef
-		}
+		covered += edges[i]
+		sig[i] = bipolar(covered > 0)
 	}
 	return sig
 }

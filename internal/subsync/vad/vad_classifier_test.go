@@ -157,7 +157,7 @@ func TestVadNormW32_non_positive_zero(t *testing.T) {
 // block is skipped, so there is no decision and the model is untouched.
 func TestGMMProbabilityLLR_energy_gate_closed_at_boundary(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	flag, llr := v.gmmProbabilityLLR(featSpeech, vadMinEnergy)
 	if flag != 0 {
 		t.Errorf("flag = %d, want 0 (energy gate closed at boundary)", flag)
@@ -178,7 +178,7 @@ func TestGMMProbabilityLLR_energy_gate_closed_at_boundary(t *testing.T) {
 // the speech frame's max per-channel llr (25 -> 100) clears localThresh 50.
 func TestGMMProbabilityLLR_per_channel_llr_scaled_by_4(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = 32767 // disable the global-sum trigger
 	v.localThresh = 50
 	flag, _ := v.gmmProbabilityLLR(featSpeech, 100)
@@ -192,7 +192,7 @@ func TestGMMProbabilityLLR_per_channel_llr_scaled_by_4(t *testing.T) {
 // at localThresh -1 every channel clears it.
 func TestGMMProbabilityLLR_per_channel_negative_threshold(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = 32767
 	v.localThresh = -1
 	flag, _ := v.gmmProbabilityLLR(featSpeech, 100)
@@ -206,7 +206,7 @@ func TestGMMProbabilityLLR_per_channel_negative_threshold(t *testing.T) {
 // to the maximum per-channel llr*4 (100), no channel strictly exceeds it.
 func TestGMMProbabilityLLR_per_channel_strict_boundary(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.globalThresh = 32767 // disable the global-sum trigger
 	v.localThresh = 100    // == max per-channel llr*4, so `>` is false for all
 	flag, _ := v.gmmProbabilityLLR(featSpeech, 100)
@@ -220,7 +220,7 @@ func TestGMMProbabilityLLR_per_channel_strict_boundary(t *testing.T) {
 // disabled and globalThresh equal to the frame's sumLLR, the flag fires.
 func TestGMMProbabilityLLR_global_threshold_at_equality(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeQuality)
+	v := newVADInst()
 	v.localThresh = 32767
 	v.globalThresh = 1470 // == sumLLR for featSpeech
 	flag, llr := v.gmmProbabilityLLR(featSpeech, 100)
@@ -238,7 +238,7 @@ func TestGMMProbabilityLLR_global_threshold_at_equality(t *testing.T) {
 // numOfSpeech resets, and the model (frameCounter) is untouched.
 func TestGMMProbabilityLLR_overhang_when_not_speech(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	v.overHang = 5
 	flag, _ := v.gmmProbabilityLLR(featUniform1000, 0)
 	if flag != 7 {
@@ -275,8 +275,8 @@ func TestGMMProbabilityLLR_overhang_speech_count(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			v := newVADInst(ModeVeryAggressive) // overHangMax1=6, overHangMax2=9, vadMaxSpeechFr=6
-			v.globalThresh = -32768             // force vadflag 1 (sumLLR >= globalThresh always)
+			v := newVADInst()       // overHangMax1=6, overHangMax2=9, vadMaxSpeechFr=6
+			v.globalThresh = -32768 // force vadflag 1 (sumLLR >= globalThresh always)
 			v.numOfSpeech = tc.presetSpeech
 			flag, _ := v.gmmProbabilityLLR(featUniform1000, 100)
 			if flag != 1 {
