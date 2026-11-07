@@ -13,9 +13,7 @@ const MaxExtractBytes = 50 * 1024 * 1024
 
 // LangMapper resolves a raw language identifier — an ffprobe stream tag in any
 // published code system, with or without a region — onto the caller's internal
-// code space, returning "" for anything it cannot represent. It is injected
-// rather than imported so this package stays free of provider dependencies;
-// subflux supplies classify.Alpha2FromAlpha3.
+// code space, returning "" for anything it cannot represent.
 type LangMapper func(string) string
 
 // Available checks if ffmpeg is on PATH.

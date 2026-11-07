@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/cplieger/subflux/internal/language"
 )
 
 // FuzzNormalizeCodecName exercises codec name normalization with arbitrary inputs
@@ -98,13 +100,9 @@ func FuzzDetectHIFromName(f *testing.F) {
 	})
 }
 
-// FuzzDetectForcedFromName fuzzes forced-subtitle name classification. Its
-// contract is classify.IsForced: case-insensitive substring match over
-// forcedRules, whose entries are ALL positive ("forced", "foreign") by
-// documented design. The same three property families as the HI target
-// apply; if forcedRules ever gains a negative (denying) pattern, the
-// monotonicity property below encodes exactly the contract that changed and
-// must be revisited alongside it.
+// FuzzDetectForcedFromName fuzzes forced-subtitle name classification: a
+// case-insensitive substring match of "forced" or "foreign", both positive,
+// so the monotonicity property below holds; a denying word would break it.
 func FuzzDetectForcedFromName(f *testing.F) {
 	f.Add("English ", "")
 	f.Add("Signs & Songs", "")
@@ -162,7 +160,7 @@ func FuzzNormalizeTrack(f *testing.F) {
 			// nil is valid for empty/undefined lang.
 			return
 		}
-		if track.lang == "" {
+		if track.lang == (language.Tag{}) {
 			t.Fatal("non-nil track must have non-empty lang")
 		}
 	})

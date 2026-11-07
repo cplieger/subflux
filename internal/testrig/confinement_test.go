@@ -19,17 +19,36 @@ const modulePath = "github.com/cplieger/subflux"
 // alone. imported and each allowed or forbidden entry match a path or,
 // ending in "/...", a path and everything beneath it. everyPackage extends
 // the check from this module's packages to every non-stdlib package in the
-// build.
+// build; production checks only non-test imports, so any _test.go file may
+// import it.
 type importRule struct {
 	imported     string
 	allowed      []string
 	forbidden    []string
 	everyPackage bool
+	production   bool
 }
 
 // importRules is the architecture's confinement table; each row lands with
 // the landing that turns it on.
-var importRules = []importRule{releaseRule(modulePath)}
+var importRules = []importRule{releaseRule(modulePath), dialhookRule(modulePath), providertestRule(modulePath)}
+
+// dialhookRule keeps the test dial seam inside the provider boundary and its
+// test server: no adapter or other production code can carry a dial past
+// the Client's host pin.
+func dialhookRule(module string) importRule {
+	return importRule{
+		imported:   module + "/internal/provider/internal/dialhook",
+		allowed:    []string{module + "/internal/provider", module + "/internal/provider/providertest"},
+		production: true,
+	}
+}
+
+// providertestRule keeps the in-memory provider server out of every
+// production build.
+func providertestRule(module string) importRule {
+	return importRule{imported: module + "/internal/provider/providertest", production: true}
+}
 
 // releaseRule keeps release.Parsed inside search's packages: rank, the
 // provider adapters and the engine.
@@ -42,7 +61,7 @@ func releaseRule(module string) importRule {
 
 // providerHTTPRoots are trees whose subpackages may not build a raw net/http
 // client or transport; the provider boundary owns the one client.
-var providerHTTPRoots []string
+var providerHTTPRoots = []string{"internal/provider"}
 
 // scheduleRule keeps scan out of settings, which holds the scan section's
 // Schedule from mediasource: scan imports status, so settings importing scan
@@ -131,6 +150,30 @@ func TestConfinementChecker(t *testing.T) {
 			t.Errorf("violations = %q, want %q", got, want)
 		}
 	})
+	t.Run("production row", func(t *testing.T) {
+		rule := importRule{imported: fixture + "/d", production: true}
+		want := []string{fmt.Sprintf("%s/f imports %s/d, allowed only in []", fixture, fixture)}
+		if got := importViolations(pkgs, fixture, []importRule{rule}); !slices.Equal(got, want) {
+			t.Errorf("production: violations = %q, want %q", got, want)
+		}
+		rule.production = false
+		if got := importViolations(pkgs, fixture, []importRule{rule}); len(got) != 2 {
+			t.Errorf("every import: violations = %q, want f's and e's test import", got)
+		}
+	})
+	t.Run("dialhook and providertest rows", func(t *testing.T) {
+		for _, rule := range []importRule{dialhookRule(fixture), providertestRule(fixture)} {
+			if !rule.production || rule.imported == "" {
+				t.Errorf("row %+v checks test imports or nothing", rule)
+			}
+		}
+		if dialhookRule(fixture).violation(fixture+"/internal/provider/gestdown", fixture+"/internal/provider/internal/dialhook") == "" {
+			t.Error("an adapter may import dialhook")
+		}
+		if providertestRule(fixture).violation(fixture+"/internal/provider", fixture+"/internal/provider/providertest") == "" {
+			t.Error("the boundary may import providertest")
+		}
+	})
 	t.Run("raw client", func(t *testing.T) {
 		got, err := rawHTTPViolations(pkgs, fixture, []string{""})
 		if err != nil {
@@ -158,7 +201,7 @@ func importViolations(pkgs []listedPackage, module string, rules []importRule) [
 		}
 		importer := basePackage(p.ImportPath)
 		for _, r := range rules {
-			if !r.everyPackage && p.Module.Path != module {
+			if !r.everyPackage && p.Module.Path != module || r.production && importer != p.ImportPath {
 				continue
 			}
 			for _, imp := range p.Imports {

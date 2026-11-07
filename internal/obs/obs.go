@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
 	"slices"
 	"strconv"
 
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
+	"github.com/cplieger/subflux/internal/buildinfo"
 )
 
 // Metric is the metrics library's collector, so a series another package
@@ -21,10 +21,6 @@ import (
 type Metric = measure.Metric
 
 var configModes = []string{"unconfigured", "failed", "active"}
-
-// buildVersion is the release tag the image build stamps with -X; a build
-// without it reports the module version.
-var buildVersion string
 
 // Metrics is the process's one registry; New builds it.
 type Metrics struct {
@@ -48,21 +44,11 @@ func New() *Metrics {
 	}
 	buildInfo := measure.NewLabeledGauge("build_info", "Always 1, labelled with the running version.", []string{"version"})
 	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, buildInfo)
-	buildInfo.Set(1, version())
+	buildInfo.Set(1, buildinfo.Version())
 	for _, mode := range configModes {
 		m.configMode.Set(0, mode)
 	}
 	return m
-}
-
-func version() string {
-	if buildVersion != "" {
-		return buildVersion
-	}
-	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
-		return bi.Main.Version
-	}
-	return "unknown"
 }
 
 // Register adds other owners' collectors in turn, stopping at the first

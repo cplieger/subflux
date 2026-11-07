@@ -1,7 +1,6 @@
 package subtitleext_test
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subtitleext"
@@ -67,13 +66,5 @@ func TestTableRows(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestExtensionsSorted(t *testing.T) {
-	t.Parallel()
-	want := []string{".ass", ".srt", ".ssa", ".sub", ".vtt"}
-	if got := subtitleext.Extensions(); !slices.Equal(got, want) {
-		t.Errorf("Extensions() = %v, want %v", got, want)
 	}
 }

@@ -1,354 +1,223 @@
-package betaseries
+package betaseries_test
 
 import (
+	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/betaseries"
+	"github.com/cplieger/subflux/internal/provider/providertest"
+	"github.com/cplieger/subflux/internal/rank"
 )
 
-func TestBetaLangToISO(t *testing.T) {
-	t.Parallel()
+const (
+	apiHost  = "api.betaseries.com"
+	siteHost = "www.betaseries.com"
+	subHost  = "subtitles.betaseries.com"
+	key      = "beta-key-0123456789"
+	values   = "token: " + key
+)
 
-	tests := []struct {
-		name  string
-		input string
-		want  string
+func tag(t *testing.T, s string) language.Tag {
+	t.Helper()
+	tg, ok := language.Parse(s)
+	if !ok {
+		t.Fatalf("tag %q", s)
+	}
+	return tg
+}
+
+func episode(t *testing.T, langs ...string) provider.Query {
+	q := provider.Query{Kind: media.Episode, External: media.ExternalIDs{TVDB: 81189}, Numbering: media.Numbering{Scheme: media.TVDB, Season: 1, Episode: 1}}
+	for _, l := range langs {
+		q.Langs = append(q.Langs, tag(t, l))
+	}
+	return q
+}
+
+func serveFile(t *testing.T, status int, file string, got *http.Request) http.HandlerFunc {
+	t.Helper()
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		*got = *r
+		w.WriteHeader(status)
+		_, _ = w.Write(b)
+	}
+}
+
+func TestSearchRecorded(t *testing.T) {
+	var req http.Request
+	ctx := providertest.Serve(t, t.Context(), serveFile(t, http.StatusOK, "testdata/episodes-81189-s01e01.json", &req), apiHost)
+	got, err := providertest.Build(t, betaseries.NewEntry(), values).Search(ctx, episode(t, "en"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.URL.Path != "/shows/episodes" || req.URL.RawQuery != "episode=1&season=1&subtitles=1&thetvdb_id=81189&v=3.0" || req.Header.Get("X-BetaSeries-Key") != key {
+		t.Errorf("request %s with key %q", req.URL, req.Header.Get("X-BetaSeries-Key"))
+	}
+	// 15 VO entries, none from the dead seriessub source; VOVF maps to nothing.
+	if len(got) != 15 {
+		t.Fatalf("%d candidates, want 15", len(got))
+	}
+	c := got[0]
+	if c.Ref.Token() != "748977" || c.Release != "breaking.bad.s01.e01.pilot.(2008).eng.1cd.(7580711).zip" || c.Lang != tag(t, "en") || c.MatchedBy != rank.ID {
+		t.Errorf("first candidate %+v", c)
+	}
+	fr, err := providertest.Build(t, betaseries.NewEntry(), values).Search(ctx, episode(t, "fr"))
+	if err != nil || len(fr) != 9 {
+		t.Errorf("French: %d candidates, %v; want 9, the seriessub one dropped", len(fr), err)
+	}
+}
+
+func TestSearchSkips(t *testing.T) {
+	var req http.Request
+	ctx := providertest.Serve(t, t.Context(), serveFile(t, http.StatusOK, "testdata/episodes-81189-s01e01.json", &req), apiHost)
+	a := providertest.Build(t, betaseries.NewEntry(), values)
+	movie := episode(t, "en")
+	movie.Kind = media.Movie
+	noID := episode(t, "en")
+	noID.External.TVDB = 0
+	for _, q := range []provider.Query{movie, noID} {
+		if _, err := a.Search(ctx, q); func() bool { _, ok := errors.AsType[*provider.Skipped](err); return !ok }() {
+			t.Errorf("%+v: err %v, want *Skipped", q, err)
+		}
+	}
+	if req.URL != nil {
+		t.Errorf("sent %s", req.URL)
+	}
+}
+
+func TestErrorAnswers(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		kind   provider.FailureKind
 	}{
-		{name: "vo maps to en", input: "vo", want: "en"},
-		{name: "vf maps to fr", input: "vf", want: "fr"},
-		{name: "en maps to en", input: "en", want: "en"},
-		{name: "fr maps to fr", input: "fr", want: "fr"},
-		{name: "uppercase VO", input: "VO", want: "en"},
-		{name: "uppercase VF", input: "VF", want: "fr"},
-		{name: "mixed case Vo", input: "Vo", want: "en"},
-		{name: "unknown code", input: "de", want: ""},
-		{name: "empty string", input: "", want: ""},
+		{"a refused key", http.StatusBadRequest, "testdata/error-1001.json", provider.Auth},
+		{"an unknown series", http.StatusBadRequest, "", provider.NotFound},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := betaLangToISO(tt.input)
-			if got != tt.want {
-				t.Errorf("betaLangToISO(%q) = %q, want %q",
-					tt.input, got, tt.want)
-			}
-		})
+	bodies := map[string]string{
+		"an unknown series": `{"errors":[{"code":4001,"text":"Série introuvable."}]}`,
 	}
-}
-
-func TestFactory(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		settings map[string]any
-		name     string
-		wantErr  bool
-	}{
-		{name: "nil settings", settings: nil, wantErr: true},
-		{name: "missing token", settings: map[string]any{}, wantErr: true},
-		{name: "empty token", settings: map[string]any{"token": ""}, wantErr: true},
-		{name: "non-string token", settings: map[string]any{"token": 123}, wantErr: true},
-		{name: "valid token", settings: map[string]any{"token": "test-key"}, wantErr: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			p, err := Factory(t.Context(), tt.settings)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("Factory() expected error")
-				}
-				return
+	for _, tc := range cases {
+		file := tc.body
+		if file == "" {
+			file = t.TempDir() + "/body"
+			if err := os.WriteFile(file, []byte(bodies[tc.name]), 0o600); err != nil {
+				t.Fatal(err)
 			}
-			if err != nil {
-				t.Fatalf("Factory() unexpected error: %v", err)
-			}
-			if p.Name() != subflux.ProviderNameBetaSeries {
-				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameBetaSeries)
-			}
-		})
+		}
+		var req http.Request
+		ctx := providertest.Serve(t, t.Context(), serveFile(t, tc.status, file, &req), apiHost)
+		_, err := providertest.Build(t, betaseries.NewEntry(), values).Search(ctx, episode(t, "en"))
+		f, ok := errors.AsType[*provider.Failure](err)
+		if !ok || f.Kind != tc.kind || strings.Contains(f.Error(), key) {
+			t.Errorf("%s: err %v, want %s with the key redacted", tc.name, err, tc.kind)
+		}
 	}
 }
 
-// --- Subtitle Entry Filtering ---
+func TestBetaSeriesErrorsArrayFails(t *testing.T) {
+	var req http.Request
+	ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req = *r
+		_, _ = w.Write([]byte(`{"episodes":[],"errors":[{"code":2001,"text":"Argument manquant: ` + key + `"}]}`))
+	}), apiHost)
+	got, err := providertest.Build(t, betaseries.NewEntry(), values).Search(ctx, episode(t, "en"))
+	f, ok := errors.AsType[*provider.Failure](err)
+	if !ok || f.Kind != provider.Permanent || len(got) != 0 {
+		t.Fatalf("got %d candidates, err %v; want a Permanent failure", len(got), err)
+	}
+	if !strings.Contains(f.Msg, "2001") || strings.Contains(f.Error(), key) {
+		t.Errorf("failure %q, want the error code with the key redacted", f.Error())
+	}
+	if req.URL == nil {
+		t.Error("no request reached BetaSeries")
+	}
+}
 
-func TestFilterSubtitleEntries(t *testing.T) {
-	t.Parallel()
+func TestTester(t *testing.T) {
+	var req http.Request
+	ctx := providertest.Serve(t, t.Context(), serveFile(t, http.StatusBadRequest, "testdata/error-1001.json", &req), apiHost)
+	tester, ok := providertest.Build(t, betaseries.NewEntry(), values).(provider.Tester)
+	if !ok {
+		t.Fatal("BetaSeries' adapter is no Tester")
+	}
+	err := tester.Test(ctx)
+	if f, ok := errors.AsType[*provider.Failure](err); !ok || f.Kind != provider.Auth || req.URL.Path != "/status" {
+		t.Errorf("err %v on %s, want Auth on /status", err, req.URL.Path)
+	}
+}
 
-	t.Run("nil entries returns nil", func(t *testing.T) {
-		t.Parallel()
-		got := filterSubtitleEntries(nil, []string{"en"}, 1, 1)
-		if got != nil {
-			t.Errorf("filterSubtitleEntries(nil) = %v, want nil", got)
+func TestFetchFollowsSrtLink(t *testing.T) {
+	const file = "/opensubtitles/breaking.bad.s01.e01.pilot.(2008).eng.1cd.(7580711).zip"
+	var hops []string
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hops = append(hops, r.Host+r.URL.Path)
+		if r.Header.Get("X-BetaSeries-Key") != "" {
+			t.Error("the key went to a download host")
 		}
+		if r.Host == siteHost {
+			http.Redirect(w, r, "https://"+subHost+file, http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte("PK\x03\x04"))
 	})
-
-	t.Run("empty entries returns nil", func(t *testing.T) {
-		t.Parallel()
-		got := filterSubtitleEntries([]subtitleEntry{}, []string{"en"}, 1, 1)
-		if got != nil {
-			t.Errorf("filterSubtitleEntries([]) = %v, want nil", got)
-		}
-	})
-
-	t.Run("basic entry mapped correctly", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 42, Language: "vo", Source: "addic7ed", File: "Show.S01E01.srt", URL: "https://example.com/42.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"en"}, 1, 1)
-		if len(got) != 1 {
-			t.Fatalf("filterSubtitleEntries() = %d results, want 1", len(got))
-		}
-		if got[0].Provider != "betaseries" {
-			t.Errorf("Provider = %q, want %q", got[0].Provider, "betaseries")
-		}
-		if got[0].ID != "42" {
-			t.Errorf("ID = %q, want %q", got[0].ID, "42")
-		}
-		if got[0].Language != "en" {
-			t.Errorf("Language = %q, want %q", got[0].Language, "en")
-		}
-		if got[0].ReleaseName != "Show.S01E01.srt" {
-			t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Show.S01E01.srt")
-		}
-		if got[0].DownloadURL != "https://example.com/42.srt" {
-			t.Errorf("DownloadURL = %q, want %q", got[0].DownloadURL, "https://example.com/42.srt")
-		}
-		if got[0].MatchedBy != subflux.MatchByTVDB {
-			t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTVDB)
-		}
-		if got[0].Season != 1 {
-			t.Errorf("Season = %d, want 1", got[0].Season)
-		}
-		if got[0].Episode != 1 {
-			t.Errorf("Episode = %d, want 1", got[0].Episode)
-		}
-	})
-
-	t.Run("vf maps to fr", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "vf", Source: "addic7ed", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"fr"}, 2, 3)
-		if len(got) != 1 {
-			t.Fatalf("filterSubtitleEntries() = %d results, want 1", len(got))
-		}
-		if got[0].Language != "fr" {
-			t.Errorf("Language = %q, want %q", got[0].Language, "fr")
-		}
-	})
-
-	t.Run("unknown language skipped", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "de", Source: "addic7ed", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"en"}, 1, 1)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleEntries() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("language not in requested list skipped", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "vo", Source: "addic7ed", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"fr"}, 1, 1)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleEntries() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("seriessub source skipped", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "vo", Source: "seriessub", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"en"}, 1, 1)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleEntries() = %d results, want 0 (seriessub)", len(got))
-		}
-	})
-
-	t.Run("multiple entries mixed filtering", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "vo", Source: "addic7ed", File: "en.srt", URL: "https://example.com/1.srt"},
-			{ID: 2, Language: "vf", Source: "seriessub", File: "fr.srt", URL: "https://example.com/2.srt"},
-			{ID: 3, Language: "de", Source: "addic7ed", File: "de.srt", URL: "https://example.com/3.srt"},
-			{ID: 4, Language: "vf", Source: "addic7ed", File: "fr2.srt", URL: "https://example.com/4.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"en", "fr"}, 1, 5)
-		if len(got) != 2 {
-			t.Fatalf("filterSubtitleEntries() = %d results, want 2", len(got))
-		}
-		if got[0].ID != "1" {
-			t.Errorf("got[0].ID = %q, want %q", got[0].ID, "1")
-		}
-		if got[1].ID != "4" {
-			t.Errorf("got[1].ID = %q, want %q", got[1].ID, "4")
-		}
-	})
-
-	t.Run("empty language in entry skipped", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "", Source: "addic7ed", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, []string{"en", "fr"}, 1, 1)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleEntries() = %d results, want 0 (empty language)", len(got))
-		}
-	})
-
-	t.Run("nil languages returns no results", func(t *testing.T) {
-		t.Parallel()
-		entries := []subtitleEntry{
-			{ID: 1, Language: "vo", Source: "addic7ed", File: "sub.srt", URL: "https://example.com/1.srt"},
-		}
-		got := filterSubtitleEntries(entries, nil, 1, 1)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleEntries() = %d results, want 0", len(got))
+	ctx := providertest.Serve(t, t.Context(), h, siteHost, subHost)
+	p, err := providertest.Build(t, betaseries.NewEntry(), values).Fetch(ctx, provider.NewRef("748977"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hops) != 2 || hops[0] != siteHost+"/srt/748977" || hops[1] != subHost+file || p.Name != "breaking.bad.s01.e01.pilot.(2008).eng.1cd.(7580711).zip" {
+		t.Errorf("hops %q, payload %q", hops, p.Name)
+	}
+	t.Run("a redirect off the recorded hosts is refused", func(t *testing.T) {
+		ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://dl.elsewhere.example/x.zip", http.StatusFound)
+		}), siteHost)
+		_, err := providertest.Build(t, betaseries.NewEntry(), values).Fetch(ctx, provider.NewRef("1"))
+		if f, ok := errors.AsType[*provider.Failure](err); !ok || f.Kind != provider.Permanent || f.Host != "dl.elsewhere.example" {
+			t.Errorf("err %v, want Permanent on dl.elsewhere.example", err)
 		}
 	})
 }
 
-// --- classifyBadRequest ---
-
-func TestClassifyBadRequest(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		body        string
-		wantErrType string
-		wantErrMsg  string
-		wantBody    string
-		wantErr     bool
-	}{
-		{
-			name:     "not found 4001",
-			body:     `{"errors":[{"code":4001,"text":"Show not found"}]}`,
-			wantBody: `{"episodes":[]}`,
-		},
-		{
-			name:        "auth error 1001",
-			body:        `{"errors":[{"code":1001,"text":"Invalid API key"}]}`,
-			wantErr:     true,
-			wantErrType: "auth",
-		},
-		{
-			name:       "unknown code 9999",
-			body:       `{"errors":[{"code":9999,"text":"Unknown"}]}`,
-			wantErr:    true,
-			wantErrMsg: "HTTP 400",
-		},
-		{
-			name:       "empty errors array",
-			body:       `{"errors":[]}`,
-			wantErr:    true,
-			wantErrMsg: "HTTP 400",
-		},
-		{
-			name:       "invalid json",
-			body:       `not json`,
-			wantErr:    true,
-			wantErrMsg: "HTTP 400",
-		},
-		{
-			name:       "empty body",
-			body:       ``,
-			wantErr:    true,
-			wantErrMsg: "HTTP 400",
-		},
-		{
-			name:     "multiple errors uses first",
-			body:     `{"errors":[{"code":4001},{"code":1001}]}`,
-			wantBody: `{"episodes":[]}`,
-		},
-		{
-			name:       "unrecognized code 2001",
-			body:       `{"errors":[{"code":2001}]}`,
-			wantErr:    true,
-			wantErrMsg: "HTTP 400",
-		},
+func TestProviderMaps(t *testing.T) {
+	m := betaseries.NewEntry().Languages
+	b, err := os.ReadFile("testdata/episodes-81189-s01e01.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			rc, err := classifyBadRequest([]byte(tt.body))
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("classifyBadRequest() error = nil, want error")
-				}
-				if tt.wantErrType == "auth" {
-					if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
-						t.Errorf("error type = %T, want *subflux.AuthError", err)
-					}
-				}
-				if tt.wantErrMsg != "" && err.Error() != tt.wantErrMsg {
-					t.Errorf("error = %q, want %q", err.Error(), tt.wantErrMsg)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("classifyBadRequest() unexpected error: %v", err)
-			}
-			defer rc.Close()
-			if tt.wantBody != "" {
-				data, _ := io.ReadAll(rc)
-				if string(data) != tt.wantBody {
-					t.Errorf("body = %q, want %q", string(data), tt.wantBody)
-				}
-			} else {
-				rc.Close()
-			}
-		})
+	var r struct {
+		Episodes []struct {
+			Subtitles []struct {
+				Language string `json:"language"`
+			} `json:"subtitles"`
+		} `json:"episodes"`
 	}
-}
-
-// --- Download ---
-
-// statusRoundTripper answers every request with a fixed status and empty body,
-// standing in for the upstream without a network dial.
-type statusRoundTripper struct{ status int }
-
-func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
-	return &http.Response{
-		StatusCode: rt.status,
-		Body:       io.NopCloser(strings.NewReader("")),
-		Header:     make(http.Header),
-	}, nil
-}
-
-// A 404 on the subtitle URL means the upstream no longer holds the file the
-// search result named. Reporting it as a successful download of zero bytes
-// made a withdrawn upload indistinguishable from a provider serving an empty
-// or corrupt payload, so it must name itself.
-func TestDownloadAbsentUpstream(t *testing.T) {
-	t.Parallel()
-
-	p := &source{
-		client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}},
-		token:  "t",
+	if err := json.Unmarshal(b, &r); err != nil {
+		t.Fatal(err)
 	}
-	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: "https://api.betaseries.com/subtitles/sub-1"}
-
-	data, err := p.Download(t.Context(), &sub)
-	if !errors.Is(err, subflux.ErrSubtitleAbsent) {
-		t.Errorf("Download on 404 error = %v, want one wrapping subflux.ErrSubtitleAbsent", err)
+	for _, s := range r.Episodes[0].Subtitles {
+		// VOVF marks a file holding both languages, which no one tag names.
+		if _, ok := m.Tag(s.Language); !ok && s.Language != "VOVF" {
+			t.Errorf("label %q maps to no tag", s.Language)
+		}
 	}
-	if data != nil {
-		t.Errorf("Download on 404 data = %q, want nil", data)
+	for _, tg := range m.Tags() {
+		w, ok := m.Wire(tg)
+		if back, _ := m.Tag(w); !ok || back != tg {
+			t.Errorf("%v does not round-trip through %q", tg, w)
+		}
 	}
 }

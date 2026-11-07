@@ -1,0 +1,82 @@
+{
+ "id": 496366,
+ "title": "[Beatrice-Raws] Sousou no Frieren [BDRip 1920x1080 HEVC TrueHD]",
+ "status": "unknown",
+ "num_files": 589,
+ "anidb_aid": 17617,
+ "anidb_eid": null,
+ "files": [
+  {
+   "id": 1181315,
+   "filename": "[Beatrice-Raws] Sousou no Frieren 26 [BDRip 1920x1080 HEVC TrueHD]_rev.mkv",
+   "attachments": [
+    {
+     "id": 2127376,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001db/125.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+26+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track4.rus.ass.xz",
+     "info": {
+      "language_code": "rus",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2127377,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00200/90a.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+26+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track5.jpn.sup.xz",
+     "info": {
+      "language_code": "jpn",
+      "forced": false,
+      "default": false
+     }
+    },
+    {
+     "id": 2322297,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001db/118.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+26+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "forced": false,
+      "default": true
+     }
+    }
+   ]
+  },
+  {
+   "id": 1181316,
+   "filename": "[Beatrice-Raws] Sousou no Frieren 27 [BDRip 1920x1080 HEVC TrueHD]_rev.mkv",
+   "attachments": [
+    {
+     "id": 2238617,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001dc/149.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+27+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track3.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2406462,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/00200/913.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+27+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track5.und.sup.xz",
+     "info": {
+      "language_code": "und",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 2490664,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/001dc/151.xz?filename=%5BBeatrice-Raws%5D+Sousou+no+Frieren+27+%5BBDRip+1920x1080+HEVC+TrueHD%5D_rev_track4.rus.ass.xz",
+     "info": {
+      "language_code": "rus",
+      "forced": false,
+      "default": false
+     }
+    }
+   ]
+  }
+ ]
+}

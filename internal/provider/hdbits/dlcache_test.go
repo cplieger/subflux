@@ -1,6 +1,10 @@
 package hdbits
 
-import "testing"
+import (
+	"testing"
+	"testing/synctest"
+	"time"
+)
 
 // TestPut_itemSizeBoundary pins the maxItemSize gate: an item exactly at the
 // limit is stored, one byte over is rejected.
@@ -117,23 +121,46 @@ func TestPut_onSaturatedWhenItemTooBig(t *testing.T) {
 	}
 }
 
-// TestPut_onSaturatedFiresOncePerClearCycle: onSaturated is invoked at most
-// once between Clear calls, then re-armed by Clear.
-func TestPut_onSaturatedFiresOncePerClearCycle(t *testing.T) {
+// TestPut_onSaturatedFiresOnce: the callback warns once per cache, however
+// many bodies are refused.
+func TestPut_onSaturatedFiresOnce(t *testing.T) {
 	t.Parallel()
-	dc := newDownloadCache(0, 1024) // maxEntries 0: every Put saturates (no room)
+	dc := newDownloadCache(0, 1024)
 	calls := 0
-	cb := func() { calls++ }
-
-	dc.put("a", []byte("A"), cb)
-	dc.put("b", []byte("B"), cb)
+	for _, k := range []string{"a", "b", "c"} {
+		dc.put(k, []byte(k), func() { calls++ })
+	}
 	if calls != 1 {
-		t.Errorf("onSaturated fired %d times before Clear, want 1 (once per cycle)", calls)
+		t.Errorf("onSaturated fired %d times, want 1", calls)
 	}
+}
 
-	dc.clear() // re-arms the saturation guard
-	dc.put("c", []byte("C"), cb)
-	if calls != 2 {
-		t.Errorf("onSaturated fired %d times total, want 2 (Clear re-arms the guard)", calls)
-	}
+// TestExpiry: a body is served for downloadTTL after it was stored, however often
+// it is read, and an expired one is dropped before a fresh one is evicted.
+func TestExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		dc := newDownloadCache(2, 1024)
+		dc.put("old", []byte("O"), nil)
+		time.Sleep(40 * time.Minute)
+		dc.put("new", []byte("N"), nil)
+		if _, ok := dc.get("old"); !ok {
+			t.Fatal("old expired at 40 minutes")
+		}
+		time.Sleep(20 * time.Minute)
+		if _, ok := dc.get("old"); ok {
+			t.Error("old served an hour after it was stored")
+		}
+		dc.put("old", []byte("O2"), nil)
+		time.Sleep(45 * time.Minute)
+		dc.put("third", []byte("T"), nil)
+		if _, ok := dc.get("old"); !ok {
+			t.Error("a fresh body was evicted while an expired one was held")
+		}
+		if _, ok := dc.get("new"); ok {
+			t.Error("new served past its hour")
+		}
+		if len(dc.cache) != 2 || len(dc.h) != 2 {
+			t.Errorf("%d entries, %d in the heap; want 2", len(dc.cache), len(dc.h))
+		}
+	})
 }

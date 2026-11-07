@@ -1,337 +1,371 @@
 package cache
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"runtime"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
-
-	"pgregory.net/rapid"
 )
 
-func TestCache_Set_and_Get(t *testing.T) {
-	t.Parallel()
-	c := New[string](time.Hour)
-
-	c.Set("key1", "value1")
-
-	got, ok := c.Get("key1")
-	if !ok {
-		t.Fatal("Get(\"key1\") returned ok=false, want true")
+// fetch is GetOrFetch of v for key, reporting whether fn ran.
+func fetch(t *testing.T, c *Cache[[]int], key string, v []int) (got []int, called bool) {
+	t.Helper()
+	got, err := c.GetOrFetch(t.Context(), key, func(context.Context) ([]int, error) { called = true; return v, nil })
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got != "value1" {
-		t.Errorf("Get(\"key1\") = %v, want %q", got, "value1")
+	return got, called
+}
+
+func TestCacheTTLs(t *testing.T) {
+	cases := []struct {
+		name  string
+		value []int
+		ttl   time.Duration
+	}{
+		{name: "hit", value: []int{7}, ttl: 6 * time.Hour},
+		{name: "empty", value: nil, ttl: 15 * time.Minute},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				c := New(NonEmpty[int])
+				fetch(t, c, "k", tc.value)
+				time.Sleep(tc.ttl - time.Second)
+				if _, called := fetch(t, c, "k", tc.value); called {
+					t.Errorf("fetched again before %v", tc.ttl)
+				}
+				time.Sleep(time.Second)
+				if _, called := fetch(t, c, "k", tc.value); !called {
+					t.Errorf("still kept at %v", tc.ttl)
+				}
+			})
+		})
 	}
 }
 
-func TestCache_Get_missing_key(t *testing.T) {
-	t.Parallel()
-	c := New[string](time.Hour)
-
-	got, ok := c.Get("nonexistent")
-	if ok {
-		t.Errorf("Get(\"nonexistent\") returned ok=true, want false")
-	}
-	if got != "" {
-		t.Errorf("Get(\"nonexistent\") = %v, want zero value", got)
-	}
+func TestCacheBound(t *testing.T) {
+	t.Run("expired_first", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			c := New(NonEmpty[int])
+			for i := range maxEntries {
+				v := []int{i}
+				if i%2 == 0 {
+					v = nil
+				}
+				fetch(t, c, strconv.Itoa(i), v)
+			}
+			time.Sleep(emptyTTL)
+			fetch(t, c, "new", []int{1})
+			if got, want := len(c.entries), maxEntries/2+1; got != want {
+				t.Errorf("entries = %d, want %d (the expired half dropped, no hit)", got, want)
+			}
+			if _, called := fetch(t, c, "1", []int{1}); called {
+				t.Error("a live hit went with the expired entries")
+			}
+		})
+	})
+	t.Run("least_recently_used", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			c := New(NonEmpty[int])
+			for i := range maxEntries {
+				fetch(t, c, strconv.Itoa(i), []int{i})
+			}
+			fetch(t, c, "0", nil)
+			fetch(t, c, "new", []int{1})
+			if got := len(c.entries); got != maxEntries {
+				t.Errorf("entries = %d, want %d", got, maxEntries)
+			}
+			if _, called := fetch(t, c, "0", []int{0}); called {
+				t.Error("the just-used oldest key was dropped")
+			}
+			if _, called := fetch(t, c, "1", []int{1}); !called {
+				t.Error("the least recently used key was kept")
+			}
+			if got := len(c.entries); got > maxEntries {
+				t.Errorf("entries = %d, over %d", got, maxEntries)
+			}
+		})
+	})
 }
 
-func TestCache_Get_expired_entry(t *testing.T) {
-	t.Parallel()
-	// Fake clock: a realistic TTL and an exact advance past it, replacing a
-	// nanosecond TTL plus a millisecond sleep chosen to be "surely enough".
-	synctest.Test(t, func(t *testing.T) {
-		c := New[string](time.Hour)
-
-		c.Set("key1", "value1")
-		time.Sleep(time.Hour + time.Second)
-
-		got, ok := c.Get("key1")
-		if ok {
-			t.Errorf("Get(\"key1\") returned ok=true after expiry, want false")
+// TestGetOrFetchNilInterface: an interface-typed cache answers a nil value
+// as the zero value, kept as an empty answer.
+func TestGetOrFetchNilInterface(t *testing.T) {
+	c := New(func(v error) bool { return v != nil })
+	for range 2 {
+		got, err := c.GetOrFetch(t.Context(), "k", func(context.Context) (error, error) { return nil, nil })
+		if got != nil || err != nil {
+			t.Errorf("GetOrFetch = %v, %v; want nil, nil", got, err)
 		}
-		if got != "" {
-			t.Errorf("Get(\"key1\") = %v after expiry, want zero value", got)
+	}
+}
+
+func TestGetOrFetchCoalesces(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := New(NonEmpty[int])
+		var calls atomic.Int32
+		release := make(chan struct{})
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				_, _ = c.GetOrFetch(t.Context(), "k", func(context.Context) ([]int, error) {
+					calls.Add(1)
+					<-release
+					return []int{1}, nil
+				})
+			})
+		}
+		synctest.Wait()
+		close(release)
+		wg.Wait()
+		if n := calls.Load(); n != 1 {
+			t.Errorf("fn ran %d times, want 1", n)
 		}
 	})
 }
 
-// TestCache_Get_is_read_only verifies Get does not remove expired entries: it
-// reports the miss but leaves the map untouched. Cache memory reclamation is
-// the caller's responsibility via Clear.
-func TestCache_Get_is_read_only(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		c := New[string](time.Hour)
+// outcome is what one GetOrFetch caller observed; panicked and stack come
+// from the panic it re-raised.
+type outcome struct {
+	panicked any
+	err      error
+	got      []int
+	stack    []byte
+}
 
-		c.Set("key1", "value1")
-		time.Sleep(time.Hour + time.Second) // let key1 expire
-
-		_, ok := c.Get("key1") // Should return false (expired) but not mutate.
-		if ok {
-			t.Error("Get() returned ok=true for expired entry")
+func callRecovering(ctx context.Context, c *Cache[[]int], fn func(context.Context) ([]int, error)) (o outcome) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
 		}
+		o.panicked = r
+		if p, ok := r.(*panicError); ok {
+			o.panicked, o.stack = p.value, p.stack
+		}
+	}()
+	o.got, o.err = c.GetOrFetch(ctx, "k", fn)
+	return o
+}
 
-		c.mu.RLock()
-		_, present := c.entries["key1"]
-		c.mu.RUnlock()
-		if !present {
-			t.Error("Get() evicted the expired entry; it must be read-only")
+func (o outcome) String() string {
+	return fmt.Sprintf("{panicked %v (stack %d bytes), err %v, got %v}", o.panicked, len(o.stack), o.err, o.got)
+}
+
+func (o outcome) matches(want outcome) bool {
+	if want.panicked != nil {
+		return o.panicked == want.panicked && bytes.Contains(o.stack, []byte("TestFlightLifecycle")) && o.err == nil
+	}
+	return o.panicked == nil && errors.Is(o.err, want.err) && slices.Equal(o.got, want.got)
+}
+
+// lockedBuffer is a log sink the fetch goroutine writes while the test reads.
+type lockedBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// TestFlightLifecycle: two callers share one fetch, the first optionally
+// leaving before it ends, or both leaving before an fn that ignores its
+// context panics. Each caller sees the fetch's end its own way, a panic no
+// caller saw is logged, no flight stays listed, and a later call fetches
+// again unless a value was kept.
+func TestFlightLifecycle(t *testing.T) {
+	boom := errors.New("boom")
+	const panicValue = "fetch failed"
+	succeed := func(context.Context) ([]int, error) { return []int{1}, nil }
+	panics := func(context.Context) ([]int, error) { panic(panicValue) }
+	cases := []struct {
+		name          string
+		fn            func(context.Context) ([]int, error)
+		first, second outcome
+		cancelFirst   bool
+		allLeave      bool
+		kept          bool
+	}{
+		{name: "success", fn: succeed, first: outcome{got: []int{1}}, second: outcome{got: []int{1}}, kept: true},
+		{
+			name:  "error",
+			fn:    func(context.Context) ([]int, error) { return nil, boom },
+			first: outcome{err: boom}, second: outcome{err: boom},
+		},
+		{name: "panic", fn: panics, first: outcome{panicked: panicValue}, second: outcome{panicked: panicValue}},
+		{
+			name:  "goexit",
+			fn:    func(context.Context) ([]int, error) { runtime.Goexit(); return nil, nil },
+			first: outcome{err: errFetchExited}, second: outcome{err: errFetchExited},
+		},
+		{
+			name: "cancel_while_another_waits", fn: succeed, cancelFirst: true,
+			first: outcome{err: context.Canceled}, second: outcome{got: []int{1}}, kept: true,
+		},
+		{
+			name: "cancel_before_a_panic", fn: panics, cancelFirst: true,
+			first: outcome{err: context.Canceled}, second: outcome{panicked: panicValue},
+		},
+		{
+			name: "every_caller_left_before_a_panic", fn: panics, allLeave: true,
+			first: outcome{err: context.Canceled}, second: outcome{err: context.Canceled},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := &lockedBuffer{}
+			prev := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(prev) })
+			synctest.Test(t, func(t *testing.T) {
+				c := New(NonEmpty[int])
+				release := make(chan struct{})
+				var runs atomic.Int32
+				fn := func(ctx context.Context) ([]int, error) {
+					runs.Add(1)
+					if tc.allLeave {
+						<-release
+						return tc.fn(ctx)
+					}
+					select {
+					case <-release:
+						return tc.fn(ctx)
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+				}
+				firstCtx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				secondCtx, cancelSecond := context.WithCancel(t.Context())
+				defer cancelSecond()
+				var first, second outcome
+				var wg sync.WaitGroup
+				wg.Go(func() { first = callRecovering(firstCtx, c, fn) })
+				synctest.Wait()
+				wg.Go(func() { second = callRecovering(secondCtx, c, fn) })
+				synctest.Wait()
+				if tc.allLeave {
+					cancel()
+					cancelSecond()
+					wg.Wait()
+				}
+				if tc.cancelFirst {
+					cancel()
+					synctest.Wait()
+					if !first.matches(tc.first) {
+						t.Errorf("first caller before the fetch ended = %v; want %v", first, tc.first)
+					}
+				}
+				close(release)
+				wg.Wait()
+				synctest.Wait()
+				logged := logs.String()
+				if got := strings.Contains(logged, "cache: a fetch panicked after every caller left"); got != tc.allLeave {
+					t.Errorf("unseen-panic log line written = %v; want %v (log %q)", got, tc.allLeave, logged)
+				}
+				if tc.allLeave && (!strings.Contains(logged, "panic=\"fetch failed\"") || !strings.Contains(logged, "TestFlightLifecycle")) {
+					t.Errorf("unseen-panic log = %q; want the panic value and the fetch's stack", logged)
+				}
+				if !first.matches(tc.first) {
+					t.Errorf("first caller = %v; want %v", first, tc.first)
+				}
+				if !second.matches(tc.second) {
+					t.Errorf("second caller = %v; want %v", second, tc.second)
+				}
+				if n := runs.Load(); n != 1 {
+					t.Errorf("fn ran %d times, want 1", n)
+				}
+				if n := len(c.flights); n != 0 {
+					t.Errorf("%d flights still listed after the fetch ended", n)
+				}
+				if _, called := fetch(t, c, "k", []int{2}); called == tc.kept {
+					t.Errorf("a later call fetched again = %v; want %v", called, !tc.kept)
+				}
+			})
+		})
+	}
+}
+
+// TestCallerTakesEndedFetch: a caller whose ctx ends as the fetch finishes
+// takes the fetch's result, since finish counted it as still waiting. Both
+// select arms are ready, so the rounds cover the ctx arm.
+func TestCallerTakesEndedFetch(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for range 64 {
+		c := New(NonEmpty[int])
+		f := &flight[[]int]{done: make(chan struct{}), cancel: func() {}, value: []int{3}}
+		close(f.done)
+		c.flights["k"] = f
+		got, err := c.GetOrFetch(ctx, "k", func(context.Context) ([]int, error) { return nil, nil })
+		if err != nil || !slices.Equal(got, []int{3}) {
+			t.Fatalf("GetOrFetch on an ended fetch = %v, %v; want [3], nil", got, err)
+		}
+	}
+}
+
+// TestGetOrFetchLastCallerEndsFetch: the fetch's context ends once its only
+// caller has left, and a call after that starts a fetch of its own rather
+// than joining the ending one.
+func TestGetOrFetchLastCallerEndsFetch(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := New(NonEmpty[int])
+		release := make(chan struct{})
+		var sawEnd atomic.Bool
+		ctx, cancel := context.WithCancel(t.Context())
+		var first error
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			_, first = c.GetOrFetch(ctx, "k", func(ctx context.Context) ([]int, error) {
+				<-ctx.Done()
+				sawEnd.Store(true)
+				<-release
+				return nil, ctx.Err()
+			})
+		})
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		if !errors.Is(first, context.Canceled) || !sawEnd.Load() {
+			t.Errorf("caller err = %v, fetch saw its end %v; want context.Canceled, true", first, sawEnd.Load())
+		}
+		got, called := fetch(t, c, "k", []int{2})
+		close(release)
+		wg.Wait()
+		if !called || len(got) != 1 || got[0] != 2 {
+			t.Errorf("call after the last caller left: %v, fetched %v; want its own [2]", got, called)
 		}
 	})
 }
 
-func TestCache_Set_overwrites_existing(t *testing.T) {
-	t.Parallel()
-	c := New[string](time.Hour)
-
-	c.Set("key1", "first")
-	c.Set("key1", "second")
-
-	got, ok := c.Get("key1")
-	if !ok {
-		t.Fatal("Get(\"key1\") returned ok=false, want true")
-	}
-	if got != "second" {
-		t.Errorf("Get(\"key1\") = %v, want %q", got, "second")
-	}
-}
-
-func TestCache_Clear_removes_all_entries(t *testing.T) {
-	t.Parallel()
-	c := New[int](time.Hour)
-
-	c.Set("a", 1)
-	c.Set("b", 2)
-	c.Clear()
-
-	if _, ok := c.Get("a"); ok {
-		t.Error("Get(\"a\") returned ok=true after Clear, want false")
-	}
-	if _, ok := c.Get("b"); ok {
-		t.Error("Get(\"b\") returned ok=true after Clear, want false")
-	}
-}
-
-func TestCache_concurrent_access(t *testing.T) {
-	t.Parallel()
-	c := New[int](time.Hour)
-
-	var wg sync.WaitGroup
-	for i := range 100 {
-		wg.Go(func() {
-			key := "key"
-			c.Set(key, i)
-			c.Get(key)
-		})
-	}
-	wg.Wait()
-	// No race detector panic = pass.
-}
-
-func TestCache_GetOrFetch_caches_result(t *testing.T) {
-	t.Parallel()
-	c := New[string](time.Hour)
-	calls := 0
-
-	fetch := func() (string, error) {
-		calls++
-		return "fetched", nil
-	}
-
-	got, err := c.GetOrFetch("key", fetch)
-	if err != nil {
-		t.Fatalf("GetOrFetch returned error: %v", err)
-	}
-	if got != "fetched" {
-		t.Errorf("GetOrFetch = %q, want %q", got, "fetched")
-	}
-
-	// Second call should hit cache.
-	got, err = c.GetOrFetch("key", fetch)
-	if err != nil {
-		t.Fatalf("GetOrFetch (cached) returned error: %v", err)
-	}
-	if got != "fetched" {
-		t.Errorf("GetOrFetch (cached) = %q, want %q", got, "fetched")
-	}
-	if calls != 1 {
-		t.Errorf("fetch called %d times, want 1", calls)
-	}
-}
-
-func TestCache_GetOrFetch_coalesces_concurrent(t *testing.T) {
-	t.Parallel()
-	c := New[string](time.Hour)
-	var mu sync.Mutex
-	calls := 0
-
-	fetch := func() (string, error) {
-		mu.Lock()
-		calls++
-		mu.Unlock()
-		time.Sleep(10 * time.Millisecond)
-		return "result", nil
-	}
-
-	var wg sync.WaitGroup
-	for range 10 {
-		wg.Go(func() {
-			got, err := c.GetOrFetch("key", fetch)
-			if err != nil {
-				t.Errorf("GetOrFetch error: %v", err)
-			}
-			if got != "result" {
-				t.Errorf("GetOrFetch = %q, want %q", got, "result")
-			}
-		})
-	}
-	wg.Wait()
-
-	if calls != 1 {
-		t.Errorf("fetch called %d times, want 1 (singleflight coalescing)", calls)
-	}
-}
-
-func BenchmarkCache_concurrent(b *testing.B) {
-	c := New[int](time.Hour)
-	for i := range 100 {
-		c.Set(fmt.Sprintf("key-%d", i), i)
-	}
-
-	b.ResetTimer()
+func BenchmarkGetOrFetch(b *testing.B) {
+	c := New(NonEmpty[int])
+	fn := func(context.Context) ([]int, error) { return []int{1}, nil }
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		for pb.Next() {
-			key := fmt.Sprintf("key-%d", i%100)
-			c.Get(key)
+			_, _ = c.GetOrFetch(b.Context(), strconv.Itoa(i%64), fn)
 			i++
 		}
-	})
-}
-
-func TestCache_property_set_then_get_value_correctness(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(rt *rapid.T) {
-		// Invariant 2 (data-flow): Set followed by immediate Get returns the
-		// value, for any (key, value) pair. The original version of this test
-		// drew a random TTL >= 1ms, but on loaded CI runners the wall-clock
-		// gap between Set and Get can exceed 1ms (GC pauses, scheduler
-		// jitter), causing spurious "expired" Get results that rapid
-		// reported as un-reproducible flakes. TTL handling is exercised
-		// deterministically by TestCache_Get_expired_entry (which uses
-		// time.Sleep with margins well above scheduling jitter); this test
-		// is now purely about the
-		// data-flow invariant — TTL is fixed at time.Hour to remove the
-		// time dependency.
-		c := New[int](time.Hour)
-		key := rapid.String().Draw(rt, "key")
-		val := rapid.Int().Draw(rt, "val")
-
-		c.Set(key, val)
-		got, ok := c.Get(key)
-		if !ok {
-			rt.Fatalf("Get(%q) returned ok=false immediately after Set", key)
-		}
-		if got != val {
-			rt.Fatalf("Get(%q) = %v, want %v", key, got, val)
-		}
-	})
-}
-
-// TestCache_property_set_get_sequence drives a small log of Set / Get
-// operations against the cache and an in-memory reference map, then asserts
-// the two agree at each Get. Strictly more coverage than the original
-// "single Set + single Get" property: catches overwrite-on-repeat-Set, key
-// isolation across many keys, and value preservation across interleaved
-// operations. No time dependency — TTL is time.Hour.
-func TestCache_property_set_get_sequence(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(rt *rapid.T) {
-		c := New[int](time.Hour)
-		ref := make(map[string]int)
-		// 1-30 ops of either Set(key,val) or Get(key); keys drawn from a
-		// small alphabet so the same key is reused often (exercising
-		// overwrite + repeated-read paths).
-		ops := rapid.IntRange(1, 30).Draw(rt, "ops")
-		for i := range ops {
-			key := rapid.SampledFrom([]string{"a", "b", "c", "d", "e"}).Draw(rt, fmt.Sprintf("key-%d", i))
-			switch rapid.IntRange(0, 1).Draw(rt, fmt.Sprintf("op-%d", i)) {
-			case 0: // Set
-				val := rapid.Int().Draw(rt, fmt.Sprintf("val-%d", i))
-				c.Set(key, val)
-				ref[key] = val
-			case 1: // Get
-				got, ok := c.Get(key)
-				want, wantOK := ref[key]
-				if ok != wantOK {
-					rt.Fatalf("Get(%q): ok=%v, want %v (op %d)", key, ok, wantOK, i)
-				}
-				if ok && got != want {
-					rt.Fatalf("Get(%q) = %v, want %v (op %d)", key, got, want, i)
-				}
-			}
-		}
-	})
-}
-
-func TestCache_property_clear_invalidates_all(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(rt *rapid.T) {
-		// Invariant 3: Clear makes all subsequent Gets return (zero, false).
-		c := New[int](time.Hour)
-		n := rapid.IntRange(1, 20).Draw(rt, "n")
-		keys := make([]string, n)
-		for i := range n {
-			keys[i] = rapid.String().Draw(rt, "key")
-			c.Set(keys[i], i)
-		}
-		c.Clear()
-		for _, k := range keys {
-			if _, ok := c.Get(k); ok {
-				rt.Fatalf("Get(%q) returned ok=true after Clear", k)
-			}
-		}
-	})
-}
-
-func BenchmarkCache_GetOrFetch(b *testing.B) {
-	b.Run("hit", func(b *testing.B) {
-		c := New[string](time.Hour)
-		c.Set("key", "value")
-		b.ReportAllocs()
-		b.ResetTimer()
-		for b.Loop() {
-			_, _ = c.GetOrFetch("key", func() (string, error) {
-				return "value", nil
-			})
-		}
-	})
-
-	b.Run("miss", func(b *testing.B) {
-		b.ReportAllocs()
-		b.ResetTimer()
-		for b.Loop() {
-			c := New[string](time.Hour)
-			_, _ = c.GetOrFetch("key", func() (string, error) {
-				return "fetched", nil
-			})
-		}
-	})
-
-	b.Run("concurrent_miss", func(b *testing.B) {
-		b.ReportAllocs()
-		b.ResetTimer()
-		b.RunParallel(func(pb *testing.PB) {
-			c := New[string](time.Hour)
-			for pb.Next() {
-				_, _ = c.GetOrFetch("shared", func() (string, error) {
-					time.Sleep(time.Microsecond)
-					return "coalesced", nil
-				})
-			}
-		})
 	})
 }

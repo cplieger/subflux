@@ -1,476 +1,152 @@
-package yifysubtitles
+package yifysubtitles_test
 
 import (
 	"errors"
-	"io"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/providertest"
+	"github.com/cplieger/subflux/internal/provider/yifysubtitles"
+	"github.com/cplieger/subflux/internal/rank"
 )
 
-// --- Factory ---
+const host = "yifysubtitles.ch"
 
-func TestFactory(t *testing.T) {
-	t.Parallel()
+func tag(t *testing.T, s string) language.Tag {
+	t.Helper()
+	tg, ok := language.Parse(s)
+	if !ok {
+		t.Fatalf("tag %q", s)
+	}
+	return tg
+}
 
-	p, err := Factory(t.Context(), nil)
+func file(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		b, err := os.ReadFile(name)
+		if err != nil {
+			panic(err)
+		}
+		_, _ = w.Write(b)
+	}
+}
+
+func movie(t *testing.T, langs ...string) provider.Query {
+	q := provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1375666}}
+	for _, l := range langs {
+		q.Langs = append(q.Langs, tag(t, l))
+	}
+	return q
+}
+
+func TestSearchRecorded(t *testing.T) {
+	var path, ua string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", file("testdata/robots.txt"))
+	mux.HandleFunc("/movie-imdb/tt1375666", func(w http.ResponseWriter, r *http.Request) {
+		path, ua = r.URL.Path, r.UserAgent()
+		file("testdata/movie-imdb-tt1375666.html")(w, r)
+	})
+	ctx := providertest.Serve(t, t.Context(), mux, host)
+	got, err := providertest.Build(t, yifysubtitles.NewEntry(), "").Search(ctx, movie(t, "en", "pt-BR"))
 	if err != nil {
-		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	if p.Name() != subflux.ProviderNameYifySubtitles {
-		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameYifySubtitles)
+	if path == "" || !strings.HasPrefix(ua, "Mozilla/5.0") {
+		t.Errorf("asked %q with agent %q, want the movie page with the browser agent", path, ua)
 	}
-}
-
-// --- Language Mapping ---
-
-func TestYifyLangToISO(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{"English", "English", "en"},
-		{"French", "French", "fr"},
-		{"Spanish", "Spanish", "es"},
-		{"German", "German", "de"},
-		{"Italian", "Italian", "it"},
-		{"Portuguese", "Portuguese", "pt"},
-		{"Brazilian Portuguese", "Brazilian Portuguese", "pb"},
-		{"Dutch", "Dutch", "nl"},
-		{"Russian", "Russian", "ru"},
-		{"Arabic", "Arabic", "ar"},
-		{"Japanese", "Japanese", "ja"},
-		{"Chinese", "Chinese", "zh"},
-		{"Korean", "Korean", "ko"},
-		{"Swedish", "Swedish", "sv"},
-		{"Norwegian", "Norwegian", "no"},
-		{"Danish", "Danish", "da"},
-		{"Finnish", "Finnish", "fi"},
-		{"Polish", "Polish", "pl"},
-		{"Czech", "Czech", "cs"},
-		{"Hungarian", "Hungarian", "hu"},
-		{"Romanian", "Romanian", "ro"},
-		{"Turkish", "Turkish", "tr"},
-		{"Greek", "Greek", "el"},
-		{"Hebrew", "Hebrew", "he"},
-		{"Thai", "Thai", "th"},
-		{"Vietnamese", "Vietnamese", "vi"},
-		{"Indonesian", "Indonesian", "id"},
-		{"Bulgarian", "Bulgarian", "bg"},
-		{"Croatian", "Croatian", "hr"},
-		{"Serbian", "Serbian", "sr"},
-		{"Slovenian", "Slovenian", "sl"},
-		{"unknown language", "Klingon", ""},
-		{"empty string", "", ""},
-		{"case sensitive", "english", ""},
-		{"whitespace not trimmed", " English ", ""},
+	var en, br int
+	for _, c := range got {
+		switch c.Lang {
+		case tag(t, "en"):
+			en++
+		case tag(t, "pt-BR"):
+			br++
+		default:
+			t.Errorf("a candidate in %v, which was not asked", c.Lang)
+		}
+		if c.MatchedBy != rank.ID || c.Ref.Token() == "" || c.Ref.Token()[0] != '/' {
+			t.Errorf("candidate %+v", c)
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := yifyLangToISO(tt.input)
-			if got != tt.want {
-				t.Errorf("yifyLangToISO(%q) = %q, want %q",
-					tt.input, got, tt.want)
-			}
-		})
+	// Three English rows, and three Brazilian Portuguese ones with two more
+	// under its misspelt label.
+	if en != 3 || br != 5 {
+		t.Errorf("%d English and %d Brazilian candidates, want 3 and 5", en, br)
 	}
 }
 
-// --- IMDB ID Validation ---
-
-func TestIsValidImdbID(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-		want  bool
-	}{
-		{"standard ID", "tt1234567", true},
-		{"short ID", "tt1", true},
-		{"long ID", "tt1234567890", true},
-		{"missing prefix", "1234567", false},
-		{"empty string", "", false},
-		{"only prefix", "tt", false},
-		{"letters after tt", "ttabcdef", false},
-		{"path traversal attempt", "tt1234/../etc/passwd", false},
-		{"URL encoded", "tt1234%2F", false},
-		{"too many digits", "tt12345678901", false},
-		{"uppercase prefix", "TT1234567", false},
-		{"whitespace padding", " tt1234567 ", false},
-		{"newline injection", "tt1234567\n", false},
-		{"mixed prefix", "Tt1234567", false},
+func TestSearchSkipsAndMisses(t *testing.T) {
+	ctx := providertest.Serve(t, t.Context(), http.NotFoundHandler(), host)
+	a := providertest.Build(t, yifysubtitles.NewEntry(), "")
+	ep := movie(t, "en")
+	ep.Kind = media.Episode
+	noID := movie(t, "en")
+	noID.External.IMDb = 0
+	for _, q := range []provider.Query{ep, noID} {
+		if _, err := a.Search(ctx, q); func() bool { _, ok := errors.AsType[*provider.Skipped](err); return !ok }() {
+			t.Errorf("%+v: err %v, want *Skipped", q, err)
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := isValidImdbID(tt.input)
-			if got != tt.want {
-				t.Errorf("isValidImdbID(%q) = %v, want %v",
-					tt.input, got, tt.want)
-			}
-		})
+	got, err := a.Search(ctx, movie(t, "en"))
+	if err != nil || len(got) != 0 {
+		t.Errorf("a missing movie page: %v, %v; want no answer and no error", got, err)
 	}
 }
 
-// --- Download Link Extraction ---
-
-func TestExtractDownloadLink(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		html string
-		want string
-	}{
-		{
-			"valid download link",
-			`<a class="download-subtitle" href="/subtitle/12345.zip">Download</a>`,
-			"/subtitle/12345.zip",
-		},
-		{
-			"multi-class download link",
-			`<a class="btn-icon download-subtitle" href="/subtitle/99.zip"><span>DL</span></a>`,
-			"/subtitle/99.zip",
-		},
-		{
-			"extra attributes between class and href",
-			`<a class="download-subtitle" data-id="1" href="/subtitle/99.zip">DL</a>`,
-			"/subtitle/99.zip",
-		},
-		{
-			"link with query params",
-			`<a class="download-subtitle" href="/subtitle/12345.zip?v=2">Download</a>`,
-			"/subtitle/12345.zip?v=2",
-		},
-		{
-			"class present but no href",
-			`<a class="download-subtitle">Download</a>`,
-			"",
-		},
-		{
-			"no download link",
-			`<a href="/other">Other</a>`,
-			"",
-		},
-		{"empty html", "", ""},
-		{
-			"multiple links returns first",
-			`<a class="download-subtitle" href="/first.zip">A</a>` +
-				`<a class="download-subtitle" href="/second.zip">B</a>`,
-			"/first.zip",
-		},
+func TestFetchReadsTheDownloadButton(t *testing.T) {
+	var referer, ua string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/robots.txt", file("testdata/robots.txt"))
+	mux.HandleFunc("/subtitles/inception-2010-english-yify-244676", file("testdata/subtitle-page.html"))
+	mux.HandleFunc("/subtitle/inception-2010-english-yify-244676.zip", func(w http.ResponseWriter, r *http.Request) {
+		referer, ua = r.Referer(), r.UserAgent()
+		_, _ = w.Write([]byte("PK\x03\x04"))
+	})
+	ctx := providertest.Serve(t, t.Context(), mux, host)
+	a := providertest.Build(t, yifysubtitles.NewEntry(), "")
+	p, err := a.Fetch(ctx, provider.NewRef("/subtitles/inception-2010-english-yify-244676"))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := extractDownloadLink(tt.html)
-			if got != tt.want {
-				t.Errorf("extractDownloadLink(%q) = %q, want %q",
-					tt.html, got, tt.want)
-			}
-		})
+	if p.Name != "inception-2010-english-yify-244676.zip" || string(p.Bytes) != "PK\x03\x04" ||
+		referer != "https://"+host+"/subtitles/inception-2010-english-yify-244676" || !strings.HasPrefix(ua, "Mozilla/5.0") {
+		t.Errorf("payload %q, referer %q, agent %q", p.Name, referer, ua)
+	}
+	_, err = a.Fetch(ctx, provider.NewRef("/subtitles/gone"))
+	if f, ok := errors.AsType[*provider.Failure](err); !ok || f.Kind != provider.NotFound {
+		t.Errorf("a missing subtitle page: %v, want NotFound", err)
 	}
 }
 
-// --- HTML Parsing ---
-
-func TestParseResults(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty html returns nil", func(t *testing.T) {
-		t.Parallel()
-		got := parseResults("", []string{"en"})
-		if got != nil {
-			t.Errorf("parseResults(\"\") = %v, want nil", got)
-		}
-	})
-
-	t.Run("nil languages returns no results", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "English", `/subtitle/tt1`, "release", false)
-		got := parseResults(html, nil)
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("empty languages slice returns no results", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "English", `/subtitle/tt1`, "release", false)
-		got := parseResults(html, []string{})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("html without table rows returns no results", func(t *testing.T) {
-		t.Parallel()
-		got := parseResults("<div>no rows here</div>", []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("row with fewer than 5 tds skipped", func(t *testing.T) {
-		t.Parallel()
-		html := `<tr><td>1</td><td>English</td><td>release</td></tr>`
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("unknown language skipped", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "Klingon", `/sub/1`, "release-name", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("language not in requested list skipped", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "French", `/sub/1`, "release-name", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("valid row parsed correctly", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("8", "English", `/subtitle/tt123`, "Test.Release", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		sub := got[0]
-		if sub.Provider != "yifysubtitles" {
-			t.Errorf("Provider = %q, want %q", sub.Provider, "yifysubtitles")
-		}
-		wantURL := "https://yifysubtitles.ch/subtitle/tt123"
-		if sub.ID != wantURL {
-			t.Errorf("ID = %q, want %q", sub.ID, wantURL)
-		}
-		if sub.Language != "en" {
-			t.Errorf("Language = %q, want %q", sub.Language, "en")
-		}
-		if sub.ReleaseName != "Test.Release" {
-			t.Errorf("ReleaseName = %q, want %q", sub.ReleaseName, "Test.Release")
-		}
-		if sub.DownloadURL != wantURL {
-			t.Errorf("DownloadURL = %q, want %q", sub.DownloadURL, wantURL)
-		}
-		if sub.MatchedBy != "imdb" {
-			t.Errorf("MatchedBy = %q, want %q", sub.MatchedBy, "imdb")
-		}
-		if sub.HearingImp {
-			t.Error("HearingImp = true, want false")
-		}
-		if sub.Forced {
-			t.Error("Forced = true, want false")
-		}
-	})
-
-	t.Run("hearing impaired detected", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("3", "English", `/subtitle/tt456`, "release", true)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		if !got[0].HearingImp {
-			t.Error("HearingImp = false, want true")
-		}
-	})
-
-	t.Run("non-numeric rating cell tolerated", func(t *testing.T) {
-		t.Parallel()
-		// The rating column is ignored (the scorer never consumed provider
-		// scores); a non-numeric cell must not break row parsing.
-		html := makeRow("bad", "English", `/subtitle/tt789`, "release", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-	})
-
-	t.Run("html tags stripped from language", func(t *testing.T) {
-		t.Parallel()
-		// Language wrapped in a flag span.
-		html := `<tr>` +
-			`<td><span class="rating">7</span></td>` +
-			`<td><span class="flag-en"></span>English</td>` +
-			`<td><a href="/subtitle/tt500">subtitle Tagged.Release</a></td>` +
-			`<td></td>` +
-			`<td>uploader</td>` +
-			`</tr>`
-		got := parseResults(html, []string{"en"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		if got[0].ReleaseName != "Tagged.Release" {
-			t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Tagged.Release")
-		}
-	})
-
-	t.Run("no href in release td skipped", func(t *testing.T) {
-		t.Parallel()
-		// Row with 5 tds but no <a> tag in the release column.
-		html := `<tr>` +
-			`<td>5</td>` +
-			`<td>English</td>` +
-			`<td>subtitle plain-text</td>` +
-			`<td></td>` +
-			`<td>uploader</td>` +
-			`</tr>`
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("empty href skipped", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "English", ``, "release", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("href without leading slash skipped", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "English", `relative/path`, "release", false)
-		got := parseResults(html, []string{"en"})
-		if len(got) != 0 {
-			t.Errorf("parseResults() = %d results, want 0", len(got))
-		}
-	})
-
-	t.Run("multiple languages matched", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "English", `/subtitle/tt1`, "rel-en", false) +
-			makeRow("7", "French", `/subtitle/tt2`, "rel-fr", false)
-		got := parseResults(html, []string{"en", "fr"})
-		if len(got) != 2 {
-			t.Fatalf("parseResults() = %d results, want 2", len(got))
-		}
-		if got[0].Language != "en" {
-			t.Errorf("got[0].Language = %q, want %q", got[0].Language, "en")
-		}
-		if got[1].Language != "fr" {
-			t.Errorf("got[1].Language = %q, want %q", got[1].Language, "fr")
-		}
-	})
-
-	t.Run("Brazilian Portuguese maps to pb", func(t *testing.T) {
-		t.Parallel()
-		html := makeRow("5", "Brazilian Portuguese", `/subtitle/tt900`, "release", false)
-		got := parseResults(html, []string{"pb"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		if got[0].Language != "pb" {
-			t.Errorf("Language = %q, want %q", got[0].Language, "pb")
-		}
-	})
-}
-
-// makeRow builds a minimal YIFY HTML table row for testing parseResults.
-// The release td includes an href link and the "subtitle " prefix that
-// parseResults strips. The hi parameter controls the hearing-impaired marker.
-func makeRow(rating, lang, href, release string, hi bool) string {
-	hiClass := ""
-	if hi {
-		hiClass = `<span class="hi-subtitle"></span>`
+func TestProviderMaps(t *testing.T) {
+	m := yifysubtitles.NewEntry().Languages
+	b, err := os.ReadFile("testdata/movie-imdb-tt1375666.html")
+	if err != nil {
+		t.Fatal(err)
 	}
-	return `<tr>` +
-		`<td>` + rating + `</td>` +
-		`<td>` + lang + `</td>` +
-		`<td><a href="` + href + `">subtitle ` + release + `</a></td>` +
-		`<td>` + hiClass + `</td>` +
-		`<td>uploader</td>` +
-		`</tr>`
-}
-
-// --- Download ---
-
-// statusRoundTripper answers every request with a fixed status and body,
-// standing in for the upstream without a network dial.
-type statusRoundTripper struct {
-	body   string
-	status int
-}
-
-func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
-	return &http.Response{
-		StatusCode: rt.status,
-		Body:       io.NopCloser(strings.NewReader(rt.body)),
-		Header:     make(http.Header),
-	}, nil
-}
-
-// TestFetchPage_bodyAndMissingPage asserts a served page comes back verbatim
-// while a 404 is reported as an empty page with no error — the two callers read
-// that differently, so the distinction is the whole contract.
-func TestFetchPage_bodyAndMissingPage(t *testing.T) {
-	t.Parallel()
-
-	t.Run("served page returned verbatim", func(t *testing.T) {
-		t.Parallel()
-		const page = "<html><body>yify results</body></html>"
-		p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusOK, body: page}}}
-
-		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
-		if err != nil {
-			t.Fatalf("fetchPage(200) unexpected error: %v", err)
-		}
-		if got != page {
-			t.Errorf("fetchPage(200) = %q, want %q", got, page)
-		}
-	})
-
-	t.Run("missing page is empty with no error", func(t *testing.T) {
-		t.Parallel()
-		p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound, body: "nope"}}}
-
-		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
-		if err != nil {
-			t.Fatalf("fetchPage(404) unexpected error: %v", err)
-		}
-		if got != "" {
-			t.Errorf("fetchPage(404) = %q, want an empty page", got)
-		}
-	})
-}
-
-// A 404 on the subtitle detail page means the upstream no longer holds the
-// file the search result named. fetchPage reports that as an empty body
-// because the search path reads it as "no results"; the download path must
-// turn it into a named absence instead of a zero-byte success.
-func TestDownloadAbsentUpstream(t *testing.T) {
-	t.Parallel()
-
-	p := &source{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}}}
-	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: serverURL + "/subtitles/sub-1"}
-
-	data, err := p.Download(t.Context(), &sub)
-	if !errors.Is(err, subflux.ErrSubtitleAbsent) {
-		t.Errorf("Download on 404 error = %v, want one wrapping subflux.ErrSubtitleAbsent", err)
+	labels := regexp.MustCompile(`<span class="sub-lang">([^<]+)</span>`).FindAllStringSubmatch(string(b), -1)
+	if len(labels) == 0 {
+		t.Fatal("the recording holds no language labels")
 	}
-	if data != nil {
-		t.Errorf("Download on 404 data = %q, want nil", data)
+	for _, l := range labels {
+		if _, ok := m.Tag(l[1]); !ok && l[1] != "Brazillian Portuguese" {
+			t.Errorf("label %q maps to no tag", l[1])
+		}
+	}
+	for _, tg := range m.Tags() {
+		w, ok := m.Wire(tg)
+		if back, _ := m.Tag(w); !ok || back != tg {
+			t.Errorf("%v does not round-trip through %q", tg, w)
+		}
+	}
+	if w, _ := m.Wire(tag(t, "zh-Hant")); w != "Big 5 code" {
+		t.Errorf("zh-Hant asks %q", w)
 	}
 }

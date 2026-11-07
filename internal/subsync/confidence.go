@@ -27,8 +27,7 @@ var _ fmt.Stringer = SyncMethod("")
 // confidenceNone means no sync was performed or the result is unusable.
 // It is the only named point on the 0.0-1.0 Confidence scale: every other
 // threshold that production reads is a purpose-specific constant
-// (ShouldApplyThreshold here, subflux.DefaultSyncMinConfidence at the API layer)
-// or a per-strategy ceiling in defaultConfidenceCaps.
+// (ShouldApplyThreshold) or a per-strategy ceiling in defaultConfidenceCaps.
 const confidenceNone Confidence = 0
 
 // confidenceCaps holds per-strategy confidence ceilings. Each strategy has a
@@ -83,9 +82,7 @@ func (c confidenceCaps) forMethod(m SyncMethod) Confidence {
 // to be considered applicable. Consumers comparing Result.Confidence against
 // a threshold should use this constant instead of a magic 0.5 literal.
 // It is also the sync engine's own default when no explicit threshold is
-// provided (see DefaultSyncOptions and SyncWithOptions). The API layer's
-// DefaultSyncMinConfidence (0.6) is intentionally stricter for user-facing
-// auto-apply decisions.
+// provided (see DefaultSyncOptions and SyncWithOptions).
 const ShouldApplyThreshold Confidence = 0.5
 
 // MinCuesForSync is the minimum number of subtitle cues required for any

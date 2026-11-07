@@ -1,8 +1,13 @@
-// Package opensubtitles implements the OpenSubtitles.com REST API provider.
+// Package opensubtitles is the OpenSubtitles.com provider. Its REST API needs
+// an account and an API key: a login answers a token and, for a VIP account,
+// a faster search host; a search asks by TMDB or IMDb id, then by title when
+// the id finds nothing; a download POST spends one unit of the account's
+// daily quota and answers a one-time link on www.opensubtitles.com.
 package opensubtitles
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,304 +16,434 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cplieger/go/httpclient"
-	"github.com/cplieger/go/ssrf"
-	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/subflux/internal/timing"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/singleflight"
+	"github.com/cplieger/subflux/internal/rank"
+	"golang.org/x/time/rate"
 )
+
+// ID is OpenSubtitles' provider id.
+const ID provider.ProviderID = "opensubtitles"
 
 const (
-	providerName = subflux.ProviderNameOpenSubtitles
-	baseURL      = "https://api.opensubtitles.com/api/v1"
-	tokenExpiry  = 12 * time.Hour
+	apiHost  = "api.opensubtitles.com"
+	vipHost  = "vip-api.opensubtitles.com"
+	linkHost = "www.opensubtitles.com"
+	apiPath  = "/api/v1"
 
-	// VIP (paid): 5 req/s. Free (default): 1 req/s. Request-rate limits
-	// only; the daily download quota is enforced separately by the API.
-	vipRateLimit    = 200 * time.Millisecond // 5 req/s
-	freeRateLimit   = time.Second            // 1 req/s
-	schemeAired     = "aired"
-	matchByTitle    = subflux.MatchByTitle
-	matchByImdb     = subflux.MatchByIMDB
-	settingPassword = provider.KeyPassword
+	keyUsername  = "username"
+	keyPassword  = "password"
+	keyAPIKey    = "api_key"
+	keyUseHash   = "use_hash"
+	keyIncludeAI = "include_ai_translated"
+	keyIncludeMT = "include_machine_translated"
+
+	// A search stops after three pages or once 60 candidates are read.
+	maxPages      = 3
+	enoughResults = 60
+
+	maxListBody   = 2 << 20
+	maxAnswerBody = 64 << 10
 )
 
-// --- Factory and Provider ---
+// The account's request rates: a free account is allowed one request a
+// second, a VIP five.
+var (
+	freeRate = rate.Every(time.Second)
+	vipRate  = rate.Every(200 * time.Millisecond)
+)
 
-// Factory creates an OpenSubtitles provider from settings.
-func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
-	ps := provider.FromMap(settings)
-	if ps.Username == "" || ps.Password == "" {
-		return nil, errors.New("opensubtitles: username and password required")
+// languages are the codes of OpenSubtitles' /infos/languages, lower case as
+// it lists them; a search answer's label is lower-cased before the lookup.
+// Codes language.Parse reads as another language (zh-ca, Cantonese) or not
+// at all are left out, so their files are dropped.
+var languages = language.MustProviderMap(provider.WirePairs(
+	"ab", "ab", "af", "af", "sq", "sq", "am", "am", "ar", "ar", "an", "an",
+	"hy", "hy", "as", "as", "az-az", "az", "eu", "eu", "be", "be", "bn", "bn",
+	"bs", "bs", "br", "br", "bg", "bg", "my", "my", "ca", "ca",
+	"zh-cn", "zh-Hans", "zh-tw", "zh-Hant", "hr", "hr", "cs", "cs", "da", "da",
+	"nl", "nl", "en", "en", "eo", "eo", "et", "et", "fi", "fi", "fr", "fr",
+	"gd", "gd", "gl", "gl", "ka", "ka", "de", "de", "el", "el", "he", "he",
+	"hi", "hi", "hu", "hu", "is", "is", "ig", "ig", "id", "id", "ia", "ia",
+	"ga", "ga", "it", "it", "ja", "ja", "kn", "kn", "kk", "kk", "km", "km",
+	"ko", "ko", "ku", "ku", "lv", "lv", "lt", "lt", "lb", "lb", "mk", "mk",
+	"ms", "ms", "ml", "ml", "mr", "mr", "mn", "mn", "nv", "nv", "ne", "ne",
+	"se", "se", "no", "no", "oc", "oc", "or", "or", "fa", "fa", "pl", "pl",
+	"pt-pt", "pt-PT", "pt-br", "pt-BR", "ps", "ps", "ro", "ro", "ru", "ru",
+	"sr", "sr", "sd", "sd", "si", "si", "sk", "sk", "sl", "sl", "so", "so",
+	"es", "es", "ea", "es-419", "sw", "sw", "sv", "sv", "tl", "tl", "ta", "ta",
+	"tt", "tt", "te", "te", "th", "th", "tr", "tr", "tk", "tk", "uk", "uk",
+	"ur", "ur", "uz", "uz", "vi", "vi", "cy", "cy",
+))
+
+// NewEntry is OpenSubtitles' row of the provider table.
+func NewEntry() provider.Entry {
+	return provider.Entry{
+		ID:      ID,
+		Summary: "Movie and TV subtitles from OpenSubtitles.com; needs an account and an API key.",
+		Hosts:   []string{apiHost, vipHost, linkHost},
+		Schema: formschema.Schema{Fields: []formschema.Field{
+			{Key: keyUsername, Label: "Username", Help: "Your opensubtitles.com account", Kind: formschema.String, Required: true},
+			{Key: keyPassword, Label: "Password", Help: "Your opensubtitles.com password", Kind: formschema.Secret, Required: true},
+			{Key: keyAPIKey, Label: "API key", Help: "From opensubtitles.com/consumers", Kind: formschema.Secret, Required: true},
+			{Key: keyUseHash, Label: "Match by file hash", Help: "Fast and exact when OpenSubtitles knows the file", Kind: formschema.Bool, Default: "true"},
+			{Key: keyIncludeAI, Label: "Include AI translations", Help: "Subtitles from OpenSubtitles' own AI translation pipeline", Kind: formschema.Bool, Default: "false"},
+			{Key: keyIncludeMT, Label: "Include machine translations", Help: "Older machine-translated uploads", Kind: formschema.Bool, Default: "false"},
+		}},
+		Languages: languages,
+		Quirk:     quirk,
+		New: func(c provider.Client, v formschema.Values) (provider.Adapter, error) {
+			return &adapter{
+				c: c, pace: rate.NewLimiter(freeRate, 1),
+				user: v.String(keyUsername), password: v.Secret(keyPassword), key: v.Secret(keyAPIKey),
+				useHash: v.Bool(keyUseHash), includeAI: v.Bool(keyIncludeAI), includeMT: v.Bool(keyIncludeMT),
+			}, nil
+		},
 	}
-	if ps.APIKey == "" {
-		return nil, errors.New("opensubtitles: api_key required")
-	}
-	// use_hash's default (true) comes from the providerEntries schema entry
-	// (P14); a bare settings map (unit tests) reads false, the typed zero.
-	useHash := ps.UseHash
-	includeAI := provider.SettingBool(settings, provider.KeyIncludeAI, false)
-	includeMT := provider.SettingBool(settings, provider.KeyIncludeMT, false)
-
-	// Channel token bucket, capacity 1, pre-filled; a background ticker
-	// refills at the rate-limit interval.
-	rateCh := make(chan struct{}, 1)
-	rateCh <- struct{}{}
-
-	return &source{
-		username:  ps.Username,
-		password:  ps.Password,
-		apiKey:    ps.APIKey,
-		useHash:   useHash,
-		includeAI: includeAI,
-		includeMT: includeMT,
-		rateCh:    rateCh,
-		client:    provider.NewHTTPClient(provider.HTTPTimeoutExtended),
-	}, nil
 }
 
-// source implements the OpenSubtitles.com API.
-type source struct {
-	tokenTime  time.Time
-	tokenSfg   singleflight.Group
-	client     *http.Client
-	rateCh     chan struct{} // token-bucket channel; one token per rate-limit interval
-	token      string
-	apiKey     string
-	password   string
-	serverHost string
-	username   string
-	tokenMu    sync.RWMutex
-	vip        bool
-	useHash    bool
-	includeAI  bool
-	includeMT  bool
+// quirk reads a 406, OpenSubtitles' spent daily download quota, as a rate
+// limit until its Retry-After or else the next UTC midnight, when the quota
+// renews.
+func quirk(resp *http.Response, _ []byte) error {
+	if resp.StatusCode != http.StatusNotAcceptable {
+		return nil
+	}
+	wait := httpclient.ParseRetryAfterResponse(resp)
+	if wait <= 0 {
+		wait = untilUTCMidnight(time.Now())
+	}
+	return &provider.Failure{Kind: provider.RateLimited, RetryAfter: wait, Msg: "the daily download quota is spent"}
 }
 
-// Name returns the provider identifier for OpenSubtitles.
-func (*source) Name() subflux.ProviderID { return providerName }
-
-// numberingResult holds the outcome of searching one numbering scheme.
-type numberingResult struct {
-	err     error
-	results []subflux.Subtitle
+func untilUTCMidnight(now time.Time) time.Duration {
+	n := now.UTC()
+	return max(time.Date(n.Year(), n.Month(), n.Day()+1, 0, 0, 0, 0, time.UTC).Sub(n), time.Second)
 }
 
-// Search queries OpenSubtitles for subtitles matching the request. For episodes
-// with alternate numbering (scene, absolute), it searches each scheme and merges
-// deduplicated results.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if err := p.ensureToken(ctx); err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
-	}
-
-	numberings := episodeNumberings(req)
-	if len(numberings) <= 1 {
-		return p.searchNumbering(ctx, req, req.Season, req.Episode)
-	}
-
-	perScheme := p.searchNumberingsConcurrent(ctx, req, numberings)
-	merged, lastErr := mergeNumberingResults(perScheme)
-
-	// Propagate the last error when every scheme failed, so the caller
-	// doesn't penalize the provider with adaptive backoff for a transient
-	// API failure.
-	if len(merged) == 0 && lastErr != nil {
-		return nil, fmt.Errorf("all numbering schemes failed: %w", lastErr)
-	}
-
-	slog.Info("opensubtitles multi-numbering search complete",
-		"results", len(merged), "schemes", len(numberings),
-		"media", req.Title)
-	return merged, nil
+type adapter struct {
+	c         provider.Client
+	pace      *rate.Limiter
+	sess      session
+	user      string
+	password  string
+	key       string
+	mu        sync.Mutex
+	useHash   bool
+	includeAI bool
+	includeMT bool
 }
 
-// searchNumberingsConcurrent searches each numbering scheme concurrently. The
-// rate limiter serializes the actual HTTP calls, but errgroup overlaps response
-// parsing with the next request's rate-limit wait, saving ~30-50% wall-clock
-// time. The returned slice is index-aligned with numberings; a failed scheme
-// carries its error and never aborts the group.
-func (p *source) searchNumberingsConcurrent(ctx context.Context,
-	req *subflux.SearchRequest, numberings []numbering,
-) []numberingResult {
-	perScheme := make([]numberingResult, len(numberings))
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(len(numberings))
-	for i, n := range numberings {
-		g.Go(func() error {
-			slog.Debug("opensubtitles: trying numbering",
-				"season", n.season, "episode", n.episode,
-				"scheme", n.scheme, "media", req.Title)
-			results, err := p.searchNumbering(gctx, req, n.season, n.episode)
-			if err != nil {
-				slog.Warn("opensubtitles: numbering search failed",
-					"scheme", n.scheme, "error", err)
-			}
-			perScheme[i] = numberingResult{results: results, err: err}
-			return nil // never fail the group; collect all results
-		})
-	}
-	_ = g.Wait()
-	return perScheme
-}
-
-// mergeNumberingResults merges per-scheme results into a single slice
-// deduplicated by subtitle ID, returning the last error seen (if any) so the
-// caller can distinguish "no results" from "all schemes errored".
-func mergeNumberingResults(perScheme []numberingResult) ([]subflux.Subtitle, error) {
-	seen := make(map[string]bool)
-	var merged []subflux.Subtitle
-	var lastErr error
-	for _, nr := range perScheme {
-		if nr.err != nil {
-			lastErr = nr.err
-			continue
-		}
-		for i := range nr.results {
-			if !seen[nr.results[i].ID] {
-				seen[nr.results[i].ID] = true
-				merged = append(merged, nr.results[i])
-			}
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	var wires []string
+	for _, t := range q.Langs {
+		if w, ok := languages.Wire(t); ok {
+			wires = append(wires, w)
 		}
 	}
-	return merged, lastErr
-}
-
-// CountShowSubtitles returns the total subtitle count for a show (by IMDB ID)
-// in one language, without season/episode — used for show-level pre-checks
-// that skip an entire series with too few subtitles. It satisfies
-// provider.ShowSubtitleCounter.
-func (p *source) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
-	imdbID, lang := q.ImdbID, q.Language
-	sanitized := classify.SanitizeImdbID(imdbID)
-	if sanitized == "" {
-		// e.g. "tt0"/"tt00000" sanitize to empty; parent_imdb_id= would be
-		// a guaranteed zero-result round trip.
-		slog.Debug("opensubtitles show count skipped — empty imdb",
-			"imdb", imdbID, "lang", lang)
-		return 0, nil
+	if len(wires) == 0 {
+		return nil, nil
 	}
-	if err := p.ensureToken(ctx); err != nil {
-		return 0, fmt.Errorf("auth: %w", err)
-	}
-
-	params := url.Values{}
-	params.Set("parent_imdb_id", sanitized)
-	params.Set("languages", toOSLang(lang))
-	if !p.includeAI {
-		params.Set("ai_translated", "exclude")
-	}
-	if p.includeMT {
-		params.Set("machine_translated", "include")
-	}
-
-	slog.Debug("opensubtitles show count", "imdb", imdbID, "lang", lang)
-
-	body, err := p.doGet(ctx, "/subtitles", params)
-	if err != nil {
-		return 0, fmt.Errorf("show count: %w", err)
-	}
-	defer func() { httpclient.DrainClose(body) }()
-
-	var resp searchResponse
-	if err := json.NewDecoder(body).Decode(&resp); err != nil {
-		return 0, fmt.Errorf("decode show count: %w", err)
-	}
-
-	slog.Debug("opensubtitles show count result",
-		"imdb", imdbID, "lang", lang, "total_count", resp.TotalCount)
-	return resp.TotalCount, nil
-}
-
-// Download requests a download link from OpenSubtitles and fetches the subtitle
-// file. The /download endpoint always uses the default base URL, not the VIP host.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	if err := p.ensureToken(ctx); err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
-	}
-
-	// Validate file ID is numeric to prevent JSON injection.
-	fileID, err := strconv.Atoi(sub.ID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid file ID %q: %w", sub.ID, err)
-	}
-
-	slog.Debug("opensubtitles downloading subtitle", "file_id", fileID)
-
-	// /download must always use the default base URL, not the VIP host
-	// returned by login (VIP host is search-only).
-	reqBody, err := json.Marshal(map[string]any{
-		"file_id":    fileID,
-		"sub_format": "srt",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal download request: %w", err)
-	}
-
-	body, err := p.doPostDownload(ctx, "/download", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("request download (file_id %d): %w", fileID, err)
-	}
-	defer httpclient.DrainClose(body)
-
-	var dlResp downloadResponse
-	if err := json.NewDecoder(body).Decode(&dlResp); err != nil {
-		return nil, fmt.Errorf("decode download response: %w", err)
-	}
-
-	if dlResp.Link == "" {
-		return nil, errors.New("empty download link")
-	}
-
-	slog.Debug("opensubtitles download link received", "file_id", fileID)
-	p.logQuota(&dlResp)
-
-	if err := ssrf.ValidateURL(dlResp.Link); err != nil {
-		return nil, fmt.Errorf("download URL rejected: %w", err)
-	}
-
-	return p.fetchSubtitleFile(ctx, fileID, dlResp.Link)
-}
-
-// fetchSubtitleFile downloads the subtitle content from the given URL.
-func (p *source) fetchSubtitleFile(ctx context.Context, fileID int, link string) ([]byte, error) {
-	if err := p.rateLimit(ctx); err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
+	slices.Sort(wires)
+	s, err := a.session(ctx)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := p.client.Do(req)
+	var out []provider.Candidate
+	seen := map[string]bool{}
+	for _, n := range numberings(&q) {
+		got, err := a.searchNumbering(ctx, s, &q, wires, n)
+		for i := range got {
+			if tok := got[i].Ref.Token(); !seen[tok] {
+				seen[tok] = true
+				out = append(out, got[i])
+			}
+		}
+		if err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+// numbering is one season and episode a search asks.
+type numbering struct{ season, episode int }
+
+// numberings are the aired numbering, then, outside the specials, the
+// absolute number as season 1.
+func numberings(q *provider.Query) []numbering {
+	if q.Kind != media.Episode {
+		return []numbering{{}}
+	}
+	out := []numbering{{q.Numbering.Season, q.Numbering.Episode}}
+	if abs := (numbering{1, q.Absolute}); q.Absolute > 0 && q.Numbering.Season != 0 && abs != out[0] {
+		out = append(out, abs)
+	}
+	return out
+}
+
+// searchNumbering asks by id, then by the first title when the id found
+// nothing or q has no id OpenSubtitles searches by.
+func (a *adapter) searchNumbering(ctx context.Context, s session, q *provider.Query, wires []string, n numbering) ([]provider.Candidate, error) {
+	if params, ok := a.idParams(q, wires, n); ok {
+		got, err := a.pages(ctx, s, params, q.Langs, rank.ID)
+		if err != nil || len(got) > 0 {
+			return got, err
+		}
+	}
+	if len(q.Titles) == 0 {
+		return nil, nil
+	}
+	params := a.commonParams(q, wires, n)
+	params.Set("query", q.Titles[0])
+	return a.pages(ctx, s, params, q.Langs, rank.Title)
+}
+
+// commonParams are the parameters every search sends. The two translation
+// opt-ins send only their non-default direction, since the API's defaults
+// differ (AI translations included, machine translations excluded).
+func (a *adapter) commonParams(q *provider.Query, wires []string, n numbering) url.Values {
+	p := url.Values{"languages": {strings.Join(wires, ",")}}
+	if q.Kind == media.Episode {
+		if n.episode > 0 {
+			p.Set("episode_number", strconv.Itoa(n.episode))
+		}
+		if n.season > 0 {
+			p.Set("season_number", strconv.Itoa(n.season))
+		}
+	}
+	if !a.includeAI {
+		p.Set("ai_translated", "exclude")
+	}
+	if a.includeMT {
+		p.Set("machine_translated", "include")
+	}
+	return p
+}
+
+// idParams are commonParams with the video's hash and the id OpenSubtitles
+// searches q by: a movie's TMDB id, else its IMDb id, an episode's series
+// IMDb id; false when q has none of them.
+func (a *adapter) idParams(q *provider.Query, wires []string, n numbering) (url.Values, bool) {
+	p := a.commonParams(q, wires, n)
+	switch ids := q.External; {
+	case q.Kind == media.Episode && ids.IMDb != 0:
+		p.Set("parent_imdb_id", strconv.FormatUint(ids.IMDb, 10))
+	case q.Kind == media.Movie && ids.TMDB != 0:
+		p.Set("tmdb_id", strconv.FormatUint(ids.TMDB, 10))
+	case q.Kind == media.Movie && ids.IMDb != 0:
+		p.Set("imdb_id", strconv.FormatUint(ids.IMDb, 10))
+	default:
+		return nil, false
+	}
+	if a.useHash && q.Hash.OSHash != 0 {
+		p.Set("moviehash", fmt.Sprintf("%016x", q.Hash.OSHash))
+	}
+	return p, true
+}
+
+type searchAnswer struct {
+	Data []struct {
+		Attributes attributes `json:"attributes"`
+	} `json:"data"`
+	TotalPages int `json:"total_pages"`
+}
+
+type attributes struct {
+	Language       string `json:"language"`
+	Release        string `json:"release"`
+	FeatureDetails struct {
+		Title       string `json:"title"`
+		ParentTitle string `json:"parent_title"`
+		Year        int    `json:"year"`
+	} `json:"feature_details"`
+	Files []struct {
+		FileName string `json:"file_name"`
+		FileID   int    `json:"file_id"`
+	} `json:"files"`
+	FPS               float64 `json:"fps"`
+	HearingImpaired   bool    `json:"hearing_impaired"`
+	ForeignPartsOnly  bool    `json:"foreign_parts_only"`
+	AITranslated      bool    `json:"ai_translated"`
+	MachineTranslated bool    `json:"machine_translated"`
+	MoviehashMatch    bool    `json:"moviehash_match"`
+}
+
+// pages reads up to maxPages of a search, returning the pages read with a
+// later page's failure.
+func (a *adapter) pages(ctx context.Context, s session, params url.Values, want []language.Tag, by rank.MatchedBy) ([]provider.Candidate, error) {
+	var out []provider.Candidate
+	for page := 1; page <= maxPages; page++ {
+		if page > 1 {
+			params.Set("page", strconv.Itoa(page))
+		}
+		var r searchAnswer
+		if err := a.call(ctx, http.MethodGet, s.host, "/subtitles", params, nil, s.token, maxListBody, &r); err != nil {
+			return out, err
+		}
+		for i := range r.Data {
+			if c, ok := a.candidate(&r.Data[i].Attributes, want, by); ok {
+				out = append(out, c)
+			}
+		}
+		if len(out) >= enoughResults || page >= r.TotalPages {
+			break
+		}
+	}
+	return out, nil
+}
+
+// candidate is one answered subtitle's first file, unless its language is
+// not asked or it is a translation the user did not opt into, which is then
+// marked MachineTranslated. A title match carries the feature's title and
+// year, an episode's being its series'.
+func (a *adapter) candidate(at *attributes, want []language.Tag, by rank.MatchedBy) (provider.Candidate, bool) {
+	if len(at.Files) == 0 || at.Files[0].FileID <= 0 ||
+		(at.AITranslated && !a.includeAI) || (at.MachineTranslated && !a.includeMT) {
+		return provider.Candidate{}, false
+	}
+	tag, ok := languages.Tag(strings.ToLower(at.Language))
+	if !ok || !slices.Contains(want, tag) {
+		return provider.Candidate{}, false
+	}
+	hi := provider.HearingImpaired(at.HearingImpaired, at.Release, at.Files[0].FileName)
+	c := provider.Candidate{
+		Ref:               provider.NewRef(strconv.Itoa(at.Files[0].FileID)),
+		Lang:              tag,
+		Release:           at.Release,
+		Flags:             language.Flags{HI: hi, Forced: !hi && provider.Forced(at.ForeignPartsOnly, at.Release)},
+		MatchedBy:         by,
+		MachineTranslated: at.AITranslated || at.MachineTranslated,
+		FPS:               at.FPS,
+	}
+	if by == rank.Title {
+		c.Title, c.Year = cmp.Or(at.FeatureDetails.ParentTitle, at.FeatureDetails.Title), at.FeatureDetails.Year
+	}
+	if at.MoviehashMatch {
+		c.MatchedBy = rank.Hash
+	}
+	return c, true
+}
+
+// Test logs in, which proves the API key (refused with a 403) and the
+// account (a 401) at once.
+func (a *adapter) Test(ctx context.Context) error {
+	_, err := a.login(ctx)
+	return err
+}
+
+type downloadAnswer struct {
+	Link      string `json:"link"`
+	ResetUTC  string `json:"reset_time_utc"`
+	Requests  int    `json:"requests"`
+	Remaining int    `json:"remaining"`
+}
+
+// Fetch asks the API host for the file's link, which spends a quota unit and
+// so is sent once, then GETs the link.
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	id, err := strconv.ParseUint(ref.Token(), 10, 31)
+	if err != nil || id == 0 {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "the file id is not a number")
+	}
+	s, err := a.session(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("download subtitle: %w", err)
+		return provider.Payload{}, err
+	}
+	body, err := json.Marshal(struct {
+		Format string `json:"sub_format"`
+		FileID uint64 `json:"file_id"`
+	}{"srt", id})
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	// /download answers 503 on the VIP search host, so it always goes to
+	// the API host.
+	var r downloadAnswer
+	err = a.call(ctx, http.MethodPost, apiHost, "/download", nil, body, s.token, maxAnswerBody, &r)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	if r.Remaining*10 < (r.Requests+r.Remaining)*3 {
+		slog.Warn("opensubtitles: download quota low", "remaining", r.Remaining, "used", r.Requests)
+	}
+	link, err := url.Parse(r.Link)
+	if err != nil || r.Link == "" {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered a download with no link")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link.String(), http.NoBody)
+	if err != nil {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered an unusable link")
+	}
+	resp, err := a.do(req, "")
+	if err != nil {
+		return provider.Payload{}, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		slog.Warn("opensubtitles subtitle fetch failed", "file_id", fileID, "status", resp.StatusCode)
-		return nil, fmt.Errorf("download subtitle: HTTP %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
+	b, err := provider.ReadAll(resp, provider.MaxBody)
 	if err != nil {
-		return nil, fmt.Errorf("read subtitle: %w", err)
+		return provider.Payload{}, err
 	}
-
-	if _, err := timing.ParseCues(data); err != nil {
-		return nil, fmt.Errorf("opensubtitles: %w", err)
+	if len(b) == 0 {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered an empty file")
 	}
+	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+}
 
-	slog.Info("opensubtitles subtitle downloaded",
-		"file_id", fileID, "bytes", len(data))
+// call sends one API request to host, carrying the key and, when set, the
+// session's token, and decodes its JSON answer into v.
+func (a *adapter) call(ctx context.Context, method, host, path string, params url.Values, body []byte, token string, limit int64, v any) error {
+	u := "https://" + host + apiPath + path
+	if len(params) > 0 {
+		u += "?" + params.Encode()
+	}
+	var r io.Reader = http.NoBody
+	if body != nil {
+		r = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, r)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Api-Key", a.key)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := a.do(req, token)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, limit)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return provider.Fail(provider.Permanent, "decode OpenSubtitles answer: "+err.Error())
+	}
+	return nil
+}
 
-	return data, nil
+// do paces req to the account's rate and sends it; a refusal of token drops
+// the session, so the next call logs in again.
+func (a *adapter) do(req *http.Request, token string) (*http.Response, error) {
+	if err := a.pace.Wait(req.Context()); err != nil {
+		return nil, err
+	}
+	resp, err := a.c.Do(req)
+	if f, ok := errors.AsType[*provider.Failure](err); ok && f.Kind == provider.Auth && token != "" {
+		a.forget(token)
+	}
+	return resp, err
 }

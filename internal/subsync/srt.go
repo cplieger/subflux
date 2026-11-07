@@ -15,9 +15,7 @@ import (
 
 // --- Types ---
 
-// Cue represents a single subtitle cue with timing and text content.
-// This is a local definition that mirrors subflux.SubtitleCue, decoupling
-// the subsync package from the application's domain types.
+// Cue is one subtitle cue with its timing and text.
 type Cue struct {
 	Text  string
 	Start time.Duration

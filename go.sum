@@ -1,3 +1,5 @@
+github.com/cplieger/animap/mapread v0.3.1 h1:ccy63vtNhHcAMoE96joHRD3M0HYVk2fuFU/8EGTF26U=
+github.com/cplieger/animap/mapread v0.3.1/go.mod h1:DHHAN5DLbPP8nKP/y4ODvQFj9U+upyXc9gEtMbP21Wg=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.8 h1:+yjD4wt4GobWqonJMoy6p45Cj1T9Soxqdp0NguG42JQ=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.8/go.mod h1:MDXY20G1msHHkSLTEHSoAgTswUZVRW7XA3MBVpwFCfo=
 github.com/cplieger/bolttable v1.0.0-dev.6 h1:AFXX72TBIB+5kOp78KaMcFiEGY5HvwPG/d38YmdAx+c=
@@ -22,8 +24,6 @@ github.com/cplieger/go/ssrf v1.0.0-dev.1 h1:2wxKGOKp5sFwwJneaxOEOvFqlA7077nOWmaK
 github.com/cplieger/go/ssrf v1.0.0-dev.1/go.mod h1:/YuSCNO/nE8JB4PAw6FEA/A3AsqHLzcZckpLgQCMGnA=
 github.com/cplieger/go/textsafe v1.0.0-dev.1 h1:NqiLs9uk4eOoXXkTQo0O8lMtYddo3XZuCuyx/ruB66w=
 github.com/cplieger/go/textsafe v1.0.0-dev.1/go.mod h1:5IH0ZWTC+U864nzWGtcwGkp+PtA5hrlcfY2zLY/TexM=
-github.com/cplieger/go/xmlx v1.0.0-dev.2 h1:5KZgCyZfbB73q0rxXQj/AwByLLmBir3Hi30C2vlp3ns=
-github.com/cplieger/go/xmlx v1.0.0-dev.2/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
 github.com/cplieger/go/yamlenv v1.0.0-dev.2 h1:YZriaF+FfG6ulLQx7fAyPZI7QvgsuML7KkB7lFwxEQ8=
 github.com/cplieger/go/yamlenv v1.0.0-dev.2/go.mod h1:bYTrNFzQ0qSpy0u51Bouc9yTNXuj0FfGppio02PiJBw=
 github.com/cplieger/langtag/v3 v3.2.0-dev.1 h1:gXHAaMDLaJQRxiIC9cQMEsEmN9Y6g+8eMUFvkkCoHXc=
@@ -50,6 +50,8 @@ golang.org/x/sys v0.49.0 h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=
 golang.org/x/sys v0.49.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=
 golang.org/x/text v0.43.0 h1:1QivrlhwAsnMOcqgOdl9my7s9OyZl8O5/UGUTJVXoWc=
 golang.org/x/text v0.43.0/go.mod h1:hbSIYA/amXcRXTFSZqh8tWHEoqRvvbKPJ2uz/KU+a+s=
+golang.org/x/time v0.16.0 h1:vMb6ptszcQMkcwiRTAuNNU50gom6++Q/6gY2hDM6VDE=
+golang.org/x/time v0.16.0/go.mod h1:rVKOqvZeKvrDKTQiAHJ7wmwP0RzleSphoEA9RcdLA0s=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 pgregory.net/rapid v1.3.0 h1:vBvO0VSqti75J1jjYqpgPNBLKMd1+gxa9fYo7vk/Exc=

@@ -1,268 +1,195 @@
-// Package yifysubtitles implements the YIFY Subtitles provider.
-// Movies only, uses IMDB IDs for lookup, scrapes HTML.
+// Package yifysubtitles is the YIFY Subtitles provider: movie subtitles read
+// from yifysubtitles.ch's pages by IMDb id. It scrapes HTML, as the site
+// publishes no API, so its entry is a named Exception (DECISIONS 41).
 package yifysubtitles
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/cplieger/go/ssrf"
-	"github.com/cplieger/subflux/internal/epmarker"
-	"github.com/cplieger/subflux/internal/httpwire"
-	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/rank"
 )
 
-const langBrazilianPT = "Brazilian Portuguese"
+// ID is YIFY Subtitles' provider id.
+const ID provider.ProviderID = "yifysubtitles"
 
 const (
-	providerName = subflux.ProviderNameYifySubtitles
-	serverURL    = "https://yifysubtitles.ch"
+	siteHost = "yifysubtitles.ch"
+	siteURL  = "https://" + siteHost
 
-	// browserUA is a browser-like User-Agent required by YIFY to avoid anti-bot blocking.
+	// browserUA passes the site's bot check, which refuses other agents;
+	// DECISIONS 41 (D-UA) keeps it for this exception only.
 	browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+	maxPageBody     = 2 << 20
+	maxDownloadBody = 10 << 20
 )
 
-// Factory creates a YIFY Subtitles provider from settings.
-func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
-	return &source{
-		client: provider.NewHTTPClient(provider.HTTPTimeoutStandard),
-	}, nil
+// languages are the site's language names. Its other spelling of Brazilian
+// Portuguese is normalized before the lookup.
+var languages = language.MustProviderMap(provider.WirePairs(
+	"English", "en", "French", "fr", "Spanish", "es", "German", "de",
+	"Italian", "it", "Portuguese", "pt", "Brazilian Portuguese", "pt-BR", "Dutch", "nl",
+	"Russian", "ru", "Arabic", "ar", "Japanese", "ja", "Korean", "ko",
+	"Chinese", "zh", "Chinese BG code", "zh-Hans", "Big 5 code", "zh-Hant",
+	"Swedish", "sv", "Norwegian", "no", "Danish", "da", "Finnish", "fi",
+	"Polish", "pl", "Czech", "cs", "Hungarian", "hu", "Romanian", "ro",
+	"Turkish", "tr", "Greek", "el", "Hebrew", "he", "Thai", "th",
+	"Vietnamese", "vi", "Indonesian", "id", "Bulgarian", "bg",
+	"Croatian", "hr", "Serbian", "sr", "Slovenian", "sl",
+	"Slovak", "sk", "Ukrainian", "uk", "Catalan", "ca",
+	"Farsi/Persian", "fa", "Malay", "ms", "Albanian", "sq", "Bosnian", "bs",
+	"Bengali", "bn", "Macedonian", "mk", "Hindi", "hi", "Tamil", "ta",
+	"Malayalam", "ml", "Urdu", "ur", "Lithuanian", "lt", "Latvian", "lv",
+	"Estonian", "et", "Icelandic", "is", "Mongolian", "mn",
+))
+
+var labelSpellings = map[string]string{"Brazillian Portuguese": "Brazilian Portuguese"}
+
+// NewEntry is YIFY Subtitles' row of the provider table.
+func NewEntry() provider.Entry {
+	return provider.Entry{
+		ID:        ID,
+		Summary:   "Movie subtitles read from the YIFY Subtitles site by IMDb id; needs no account.",
+		Hosts:     []string{siteHost},
+		Languages: languages,
+		Exception: true,
+		UserAgent: browserUA,
+		New: func(c provider.Client, _ formschema.Values) (provider.Adapter, error) {
+			return &adapter{c: c}, nil
+		},
+	}
 }
 
-// source implements the YIFY Subtitles scraper.
-type source struct {
-	client *http.Client
-}
+type adapter struct{ c provider.Client }
 
-// Name returns the provider identifier for YIFY Subtitles.
-func (*source) Name() subflux.ProviderID { return providerName }
-
-// Search finds movie subtitles by scraping the YIFY Subtitles HTML page for the
-// given IMDB ID. Only movie requests are handled; episodes are skipped.
-func (p *source) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
-	if req.MediaType != subflux.MediaTypeMovie || req.ImdbID == "" {
-		slog.Debug("yifysubtitles: not a movie or no IMDB ID, skipping")
+func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
+	switch {
+	case q.Kind != media.Movie:
+		return nil, &provider.Skipped{Cause: "YIFY Subtitles has movies only"}
+	case q.External.IMDb == 0:
+		return nil, &provider.Skipped{Cause: "no IMDb id"}
+	}
+	page, err := a.page(ctx, fmt.Sprintf("%s/movie-imdb/tt%07d", siteURL, q.External.IMDb), siteURL)
+	if notFound(err) {
 		return nil, nil
 	}
-
-	// Validate IMDB ID format to prevent path injection.
-	if !isValidImdbID(req.ImdbID) {
-		slog.Debug("yifysubtitles: invalid IMDB ID format, skipping",
-			"imdb_id", req.ImdbID)
-		return nil, nil
-	}
-
-	searchURL := fmt.Sprintf("%s/movie-imdb/%s", serverURL, req.ImdbID)
-
-	slog.Debug("yifysubtitles searching", "imdb_id", req.ImdbID)
-
-	body, err := p.fetchPage(ctx, searchURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch movie page: %w", err)
-	}
-
-	results := parseResults(body, req.Languages)
-
-	slog.Info("yifysubtitles search complete", "results", len(results), "media", logsafe.Field(req.MediaLabel()))
-	return results, nil
-}
-
-// Download fetches the subtitle archive for the given search result by first
-// loading the subtitle detail page to extract the real download link.
-func (p *source) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
-	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
-		return nil, fmt.Errorf("yifysubtitles: %w", err)
-	}
-
-	body, err := p.fetchPage(ctx, sub.DownloadURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch subtitle page: %w", err)
-	}
-	if body == "" {
-		return nil, fmt.Errorf("yifysubtitles: %w: %s", subflux.ErrSubtitleAbsent, sub.ID)
-	}
-
-	dlLink := extractDownloadLink(body)
-	if dlLink == "" || !strings.HasPrefix(dlLink, "/") {
-		return nil, errors.New("no download link found on page")
-	}
-
-	fullURL := serverURL + dlLink
-	if ssrfErr := ssrf.ValidateURL(fullURL); ssrfErr != nil {
-		return nil, fmt.Errorf("yifysubtitles download URL: %w", ssrfErr)
-	}
-	slog.Debug("yifysubtitles downloading", "url", fullURL)
-
-	data, err := p.fetchDownload(ctx, fullURL, sub.DownloadURL)
 	if err != nil {
 		return nil, err
 	}
-
-	// Extract from archive.
-	result, err := provider.ExtractAndValidate(data, epmarker.Any())
-	if err != nil {
-		return nil, fmt.Errorf("yifysubtitles: %w", err)
-	}
-	slog.Debug("yifysubtitles download complete", "id", sub.ID, "bytes", len(result), "archive", len(result) != len(data))
-	return result, nil
+	return parseResults(page, q.Langs), nil
 }
 
-// fetchDownload retrieves raw bytes from a download URL with browser-like
-// headers. Body is capped at 10 MB.
-func (p *source) fetchDownload(ctx context.Context, dlURL, referer string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, http.NoBody)
+// Fetch reads the subtitle's page for its download link, then GETs the file
+// with the page as Referer, as a browser does.
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+	pageURL := siteURL + ref.Token()
+	page, err := a.page(ctx, pageURL, siteURL)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	link := downloadLink(page)
+	if link == "" {
+		return provider.Payload{}, provider.Fail(provider.Permanent, "the subtitle page has no download link")
+	}
+	resp, err := a.get(ctx, siteURL+link, pageURL)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, maxDownloadBody)
+	if err != nil {
+		return provider.Payload{}, err
+	}
+	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+}
+
+func (a *adapter) get(ctx context.Context, u, referer string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", browserUA)
 	req.Header.Set("Referer", referer)
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, &subflux.RateLimitError{
-			Msg:        "rate limited (429)",
-			RetryAfter: httpwire.ParseRetryAfter(resp),
-		}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	return io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
+	return a.c.Do(req)
 }
 
-// fetchPage retrieves an HTML page from YIFY Subtitles with browser-like
-// headers. A 404 yields an empty string and no error, because the two callers
-// read it differently: a missing search page is no results, while a missing
-// subtitle page is subflux.ErrSubtitleAbsent. Body is capped at 2 MB.
-func (p *source) fetchPage(ctx context.Context, pageURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, http.NoBody)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", browserUA)
-	req.Header.Set("Referer", serverURL)
-
-	resp, err := p.client.Do(req)
+func (a *adapter) page(ctx context.Context, u, referer string) (string, error) {
+	resp, err := a.get(ctx, u, referer)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+	b, err := provider.ReadAll(resp, maxPageBody)
+	return string(b), err
+}
 
-	if resp.StatusCode == http.StatusNotFound {
-		slog.Debug("yifysubtitles: page not found", "url", pageURL)
-		return "", nil
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return "", &subflux.RateLimitError{
-			Msg:        "rate limited (429)",
-			RetryAfter: httpwire.ParseRetryAfter(resp),
-		}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)) // HTML page limit
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+func notFound(err error) bool {
+	f, ok := errors.AsType[*provider.Failure](err)
+	return ok && f.Kind == provider.NotFound
 }
 
 var (
 	rowRe      = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
 	tdRe       = regexp.MustCompile(`(?s)<td[^>]*>(.*?)</td>`)
-	hrefRe     = regexp.MustCompile(`href="([^"]+)"`)
+	hrefRe     = regexp.MustCompile(`href="(/[^"]+)"`)
 	hiRe       = regexp.MustCompile(`class="hi-subtitle"`)
-	dlBtnRe    = regexp.MustCompile(`class="[^"]*download-subtitle[^"]*"[^>]*href="([^"]+)"`)
+	dlBtnRe    = regexp.MustCompile(`class="[^"]*download-subtitle[^"]*"[^>]*href="(/[^"/][^"]*)"`)
 	tagStripRe = regexp.MustCompile(`<[^>]*>`)
+	spaceRe    = regexp.MustCompile(`\s+`)
 )
 
-func parseResults(html string, languages []string) []subflux.Subtitle {
-	if html == "" {
-		return nil
-	}
-	var results []subflux.Subtitle
-	for _, row := range rowRe.FindAllStringSubmatch(html, -1) {
-		if sub, ok := parseRow(row[1], languages); ok {
-			results = append(results, sub)
+// parseResults reads the movie page's table: one candidate per row in an
+// asked language, its Ref the subtitle page's path.
+func parseResults(page string, langs []language.Tag) []provider.Candidate {
+	var out []provider.Candidate
+	for _, row := range rowRe.FindAllStringSubmatch(page, -1) {
+		tds := tdRe.FindAllStringSubmatch(row[1], -1)
+		if len(tds) < 5 {
+			continue
 		}
+		tag, ok := languages.Tag(label(tds[1][1]))
+		if !ok || !slices.Contains(langs, tag) {
+			continue
+		}
+		link := hrefRe.FindStringSubmatch(tds[2][1])
+		if len(link) < 2 || strings.HasPrefix(link[1], "//") {
+			continue
+		}
+		release := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[2][1], ""))
+		release = strings.TrimSpace(strings.TrimPrefix(release, "subtitle"))
+		release = spaceRe.ReplaceAllString(release, " ")
+		out = append(out, provider.Candidate{
+			Ref:       provider.NewRef(link[1]),
+			Lang:      tag,
+			Release:   release,
+			Flags:     language.Flags{HI: provider.HearingImpaired(hiRe.MatchString(tds[3][1]), release)},
+			MatchedBy: rank.ID,
+		})
 	}
-	return results
+	return out
 }
 
-// parseRow extracts a single subtitle result from a table row.
-// Returns false if the row should be skipped (wrong language, missing link, etc.).
-func parseRow(rowHTML string, languages []string) (subflux.Subtitle, bool) {
-	tds := tdRe.FindAllStringSubmatch(rowHTML, -1)
-	if len(tds) < 5 {
-		return subflux.Subtitle{}, false
+func label(cell string) string {
+	l := strings.TrimSpace(tagStripRe.ReplaceAllString(cell, ""))
+	if s, ok := labelSpellings[l]; ok {
+		return s
 	}
-
-	subLang := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[1][1], ""))
-	release := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[2][1], ""))
-	release = strings.TrimPrefix(release, "subtitle ")
-	hi := hiRe.MatchString(tds[3][1])
-
-	lang := yifyLangToISO(subLang)
-	if lang == "" || !slices.Contains(languages, lang) {
-		return subflux.Subtitle{}, false
-	}
-
-	linkMatch := hrefRe.FindStringSubmatch(tds[2][1])
-	if len(linkMatch) < 2 || !strings.HasPrefix(linkMatch[1], "/") {
-		return subflux.Subtitle{}, false
-	}
-	pageLink := serverURL + linkMatch[1]
-
-	return subflux.Subtitle{
-		Provider:    providerName,
-		ID:          pageLink,
-		Language:    lang,
-		ReleaseName: release,
-		DownloadURL: pageLink,
-		HearingImp:  hi,
-		MatchedBy:   subflux.MatchByIMDB,
-	}, true
+	return l
 }
 
-func extractDownloadLink(html string) string {
-	match := dlBtnRe.FindStringSubmatch(html)
-	if match == nil {
+func downloadLink(page string) string {
+	m := dlBtnRe.FindStringSubmatch(page)
+	if m == nil {
 		return ""
 	}
-	return match[1]
-}
-
-// yifyLangOverrides contains provider-specific name→code mappings that
-// differ from the canonical LangRegistry reverse mapping.
-var yifyLangOverrides = map[string]string{
-	langBrazilianPT: "pb",
-}
-
-func yifyLangToISO(name string) string {
-	return classify.LookupLangCode(name, yifyLangOverrides)
-}
-
-// imdbIDRe matches valid IMDB IDs (e.g. "tt1234567").
-var imdbIDRe = regexp.MustCompile(`^tt\d{1,10}$`)
-
-// isValidImdbID checks that the ID matches the expected IMDB format.
-func isValidImdbID(id string) bool {
-	return imdbIDRe.MatchString(id)
+	return m[1]
 }
