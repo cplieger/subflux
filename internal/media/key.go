@@ -113,6 +113,36 @@ func ParseRootKey(s string) (RootKey, error) {
 	return RootKey{}, fmt.Errorf("media: %s is not a series or movie key", strconv.Quote(s))
 }
 
+// RootKeyFromBytes is RootKey.Bytes' inverse, refusing any other length, a
+// kind and scheme no key text spells, and an id ValidExternalID refuses.
+func RootKeyFromBytes(b []byte) (RootKey, error) {
+	if len(b) != rootKeyBytes {
+		return RootKey{}, fmt.Errorf("media: a root key is %d bytes, not %d", rootKeyBytes, len(b))
+	}
+	r := RootKey{kind: Kind(b[0]), scheme: Scheme(b[1]), id: binary.BigEndian.Uint64(b[2:])}
+	if r.String() == "" || !ValidExternalID(r.id) {
+		return RootKey{}, fmt.Errorf("media: % x is not a series or movie key", b)
+	}
+	return r, nil
+}
+
+// KeyFromBytes is Key.Bytes' inverse, refusing what RootKeyFromBytes refuses,
+// any other length and a movie with a season or episode.
+func KeyFromBytes(b []byte) (Key, error) {
+	if len(b) != keyBytes {
+		return Key{}, fmt.Errorf("media: a key is %d bytes, not %d", keyBytes, len(b))
+	}
+	r, err := RootKeyFromBytes(b[:rootKeyBytes])
+	if err != nil {
+		return Key{}, err
+	}
+	k := Key{root: r, season: binary.BigEndian.Uint16(b[rootKeyBytes:]), episode: binary.BigEndian.Uint16(b[rootKeyBytes+2:])}
+	if r.kind == Movie && (k.season != 0 || k.episode != 0) {
+		return Key{}, fmt.Errorf("media: % x is a movie key with an episode", b)
+	}
+	return k, nil
+}
+
 var errTextTooLong = fmt.Errorf("media: a key's text is at most %d bytes", maxKeyText)
 
 func parseRoot(s string) (RootKey, string, bool) {

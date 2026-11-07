@@ -138,3 +138,44 @@ func TestBytesExactPrefix(t *testing.T) {
 		t.Errorf("Bytes = %x; want kind, scheme, big-endian 12, then four zero bytes", b)
 	}
 }
+
+func TestKeyFromBytes(t *testing.T) {
+	for _, s := range []string{"tmdb-603", "tt0111161", "tvdb-12-s00e00", "tmdbtv-1399-s01e02", "imdbtv-tt0944947-s65535e65535"} {
+		t.Run(s, func(t *testing.T) {
+			k, err := ParseKey(s)
+			if err != nil {
+				t.Fatalf("ParseKey: %v", err)
+			}
+			got, err := KeyFromBytes(k.Bytes())
+			if err != nil || got != k {
+				t.Errorf("KeyFromBytes(%x) = %v, %v; want %v", k.Bytes(), got, err, k)
+			}
+			root, err := RootKeyFromBytes(k.Root().Bytes())
+			if err != nil || root != k.Root() {
+				t.Errorf("RootKeyFromBytes(%x) = %v, %v; want %v", k.Root().Bytes(), root, err, k.Root())
+			}
+		})
+	}
+	movie, _ := ParseKey("tmdb-603")
+	refused := map[string][]byte{
+		"empty":                 nil,
+		"a root's ten bytes":    movie.Root().Bytes(),
+		"one byte more":         append(movie.Bytes(), 0),
+		"kind zero":             {0, byte(TMDB), 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
+		"a movie under TVDB":    {byte(Movie), byte(TVDB), 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
+		"an episode under None": {byte(Episode), byte(None), 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+		"id zero":               {byte(Movie), byte(TMDB), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		"id 2^53":               {byte(Movie), byte(TMDB), 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		"a movie with episode":  append(movie.Root().Bytes(), 0, 0, 0, 1),
+	}
+	for name, b := range refused {
+		t.Run(name, func(t *testing.T) {
+			if k, err := KeyFromBytes(b); err == nil {
+				t.Errorf("KeyFromBytes(%x) = %v; want a refusal", b, k)
+			}
+		})
+	}
+	if r, err := RootKeyFromBytes([]byte{byte(Movie), byte(TMDB), 0, 0, 0, 0, 0, 0, 0, 0}); err == nil {
+		t.Errorf("RootKeyFromBytes(id zero) = %v; want a refusal", r)
+	}
+}
