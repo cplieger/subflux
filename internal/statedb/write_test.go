@@ -44,12 +44,12 @@ func (f *commitFault) hook(ctx context.Context) error {
 	return nil
 }
 
-func faultyStore(t *testing.T, err error) (*Store, *commitFault) {
+func faultyStore(t *testing.T, err error) *Store {
 	t.Helper()
 	f := &commitFault{err: err}
 	cfg := productionConfig()
 	cfg.opts.CommitFault = f.hook
-	return mustOpen(t, filepath.Join(t.TempDir(), "subflux.bolt"), cfg), f
+	return mustOpen(t, filepath.Join(t.TempDir(), "subflux.bolt"), cfg)
 }
 
 func putCursor(s *Store, src string) func(*bolttable.Tx) error {
@@ -59,7 +59,7 @@ func putCursor(s *Store, src string) func(*bolttable.Tx) error {
 }
 
 func TestWriteHealth(t *testing.T) {
-	s, _ := faultyStore(t, errInjected)
+	s := faultyStore(t, errInjected)
 	ctx := t.Context()
 	if got := s.WriteHealth(); got != (WriteHealth{}) {
 		t.Fatalf("WriteHealth before any write: %+v", got)
@@ -113,7 +113,7 @@ func TestWriteHealth(t *testing.T) {
 }
 
 func TestWriteBatchFaultFailsOnlyItsCall(t *testing.T) {
-	s, _ := faultyStore(t, errInjected)
+	s := faultyStore(t, errInjected)
 	ctx := t.Context()
 	var wg sync.WaitGroup
 	errs := make([]error, 9)
@@ -147,7 +147,7 @@ func TestWriteCommitFailureLogs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.cause, func(t *testing.T) {
-			s, _ := faultyStore(t, errors.New(tc.text))
+			s := faultyStore(t, errors.New(tc.text))
 			rec := capture.Default(t)
 			if err := s.write(markFailing(t.Context()), "put cursor", s.db.Update, putCursor(s, "a")); !errors.Is(err, bolttable.ErrCommit) {
 				t.Fatalf("write: %v, want ErrCommit", err)
@@ -164,7 +164,7 @@ func TestWriteCommitFailureLogs(t *testing.T) {
 		})
 	}
 	t.Run("refusal_logs_nothing", func(t *testing.T) {
-		s, _ := faultyStore(t, errInjected)
+		s := faultyStore(t, errInjected)
 		rec := capture.Default(t)
 		_ = s.write(t.Context(), "refuse", s.db.Update, func(*bolttable.Tx) error { return errors.New("refused") })
 		if rec.Len() != 0 {

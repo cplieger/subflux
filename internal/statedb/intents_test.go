@@ -411,7 +411,7 @@ func TestEndDeliverOneTransaction(t *testing.T) {
 }
 
 func TestEndDeliverFailedCommitKeepsIntent(t *testing.T) {
-	s, _ := faultyStore(t, errInjected)
+	s := faultyStore(t, errInjected)
 	activate(t, s, Activation{Sources: []media.SourceID{"sonarr"}, Languages: policyOf(t, "en")})
 	k, inst := showEpisode(t, s, "sonarr", epPath)
 	beginDeliver(t, s, pendingDeliver(t, inst, managedName, 1, k))

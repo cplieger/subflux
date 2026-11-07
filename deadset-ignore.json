@@ -800,36 +800,6 @@
       "reason": "Retained until PAS-1 (internal/status#*): its first caller outside the package lands there."
     },
     {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Phase",
-      "path": "internal/status/jobs.go",
-      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Cause",
-      "path": "internal/status/jobs.go",
-      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#Job.Done",
-      "path": "internal/status/jobs.go",
-      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#JobLimits.PerOwner",
-      "path": "internal/status/persist.go",
-      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#JobLimits.Total",
-      "path": "internal/status/persist.go",
-      "reason": "Retained until PAS-1 (internal/status#*): its first reader lands there."
-    },
-    {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#ProviderState",
       "path": "internal/status/snapshot.go",
@@ -951,21 +921,9 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#FormatVersion",
-      "path": "internal/language/format.go",
-      "reason": "Retained until ST-1 (internal/language#FormatVersion): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#FromName",
       "path": "internal/language/fromname.go",
       "reason": "Retained until MS-2 (internal/language#FromName): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Grade",
-      "path": "internal/language/grade.go",
-      "reason": "Retained until ST-1 (internal/language#Policy.Grade): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -996,12 +954,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Targets",
       "path": "internal/language/policy.go",
       "reason": "Retained until MS-2 (internal/language#Policy.Targets): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Digest",
-      "path": "internal/language/policy.go",
-      "reason": "Retained until ST-1 (internal/language#Policy.Digest): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -1071,12 +1023,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Grade",
-      "path": "internal/language/grade_types.go",
-      "reason": "Policy.Grade's answer: its first caller outside the package, in ST-1, names it."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Name",
       "path": "internal/language/names.go",
       "reason": "Names' element type: its first caller outside the package, in AP-1, names it."
@@ -1098,12 +1044,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/language#ProviderMap",
       "path": "internal/language/providermap.go",
       "reason": "NewProviderMap's answer: its first caller outside the package, in SE-2, names it."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Variant",
-      "path": "internal/language/variant.go",
-      "reason": "A target's variant: Variant.Flags' first caller outside the package, in SE-2, names it."
     },
     {
       "code": "DS1301",
@@ -1131,50 +1071,8 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#Flags.Serves",
-      "path": "internal/language/variant.go",
-      "reason": "Retained until TS-2 (internal/language#Flags.Serves): mediawrite's Deliver, its first caller outside the package, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#Choose",
-      "path": "internal/media/choose.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#Key",
-      "path": "internal/media/key.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#Key.Root",
-      "path": "internal/media/key.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#ParseKey",
-      "path": "internal/media/key.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/media#ParseRootKey",
       "path": "internal/media/key.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#RootKey",
-      "path": "internal/media/key.go",
-      "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/media#Scheme",
-      "path": "internal/media/kind.go",
       "reason": "Retained until ST-1 (internal/media#*): its first callers outside the package, statedb's keys and codecs, land there."
     },
     {
@@ -1185,12 +1083,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue.Reordered",
       "path": "internal/mediasource/catalogue.go",
       "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
@@ -1198,60 +1090,6 @@
     {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue.Validate",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#CatalogueEpisode",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#CatalogueOrder",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#EpisodeTitle",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ExtraPlace",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Place",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#RootEvidence",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#RootEvidence.Validate",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#SeriesEvidence",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TitleSet",
       "path": "internal/mediasource/catalogue.go",
       "reason": "Retained until ST-1 (internal/mediasource#*): its first caller outside the package, statedb's pass and root codecs, lands there."
     },
@@ -1284,36 +1122,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/release/netregex#input.steps",
       "path": "internal/release/netregex/exec.go",
       "reason": "The cost counter TestWorstCaseAtTheClamp reads to pin the package doc's O(n²·m) bound; one increment per queue insertion, no production reader by design."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/rank#Facts.SeasonPack",
-      "path": "internal/rank/rank.go",
-      "reason": "Retained until ST-1 (internal/rank#*): Compare writes it, and its first production reader, ST1-8's Provenance codec storing rank.Facts, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/rank#Tri",
-      "path": "internal/rank/rank.go",
-      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/rank#MatchedBy",
-      "path": "internal/rank/rank.go",
-      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/rank#Facts",
-      "path": "internal/rank/rank.go",
-      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/rank#Fit",
-      "path": "internal/rank/rank.go",
-      "reason": "Retained until ST-1 (internal/rank#*): its first caller outside the package, ST1-8's Provenance codec storing rank.Facts, lands there."
     },
     {
       "code": "DS1501",
@@ -1575,12 +1383,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/timing#Decision",
-      "path": "internal/timing/outcome.go",
-      "reason": "Retained until ST-1 (internal/timing#Decision): statedb.Provenance, which stores a timing pass's outcome, is its first reader there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/timing#PreviewSpan",
       "path": "internal/timing/rendervtt.go",
       "reason": "Retained until TS-2 (internal/timing#PreviewSpan): the ffmpeg runner's Preview, its first reader outside the package, lands there."
@@ -1590,6 +1392,756 @@
       "symbol": "go://github.com/cplieger/subflux/internal/timing#lineScan.work",
       "path": "internal/timing/striphi.go",
       "reason": "The bytes-examined counter TestCleanStackedLabelsLinear holds to 4 times a line's length: the scan's linear bound is asserted through it."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Activation",
+      "path": "internal/statedb/activate.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Activate",
+      "path": "internal/statedb/activate.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Policy",
+      "path": "internal/statedb/activate.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CredentialDisable",
+      "path": "internal/statedb/credentials.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.CredentialDisable",
+      "path": "internal/statedb/credentials.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.DeleteCredentialDisable",
+      "path": "internal/statedb/credentials.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutCredentialDisable",
+      "path": "internal/statedb/credentials.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrCursorInvalid",
+      "path": "internal/statedb/cursor.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ListCursor",
+      "path": "internal/statedb/cursor.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Download",
+      "path": "internal/statedb/downloads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Provenance",
+      "path": "internal/statedb/downloads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RunID",
+      "path": "internal/statedb/downloads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RecordAttempts",
+      "path": "internal/statedb/downloads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#EmbeddedTrack",
+      "path": "internal/statedb/embedded.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Embedded",
+      "path": "internal/statedb/embedded.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutEmbedded",
+      "path": "internal/statedb/embedded.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#VideoProbe",
+      "path": "internal/statedb/embedded.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#VideoStamp",
+      "path": "internal/statedb/embedded.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RootEvidence",
+      "path": "internal/statedb/evidence.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#LocalFile",
+      "path": "internal/statedb/external.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutExternal",
+      "path": "internal/statedb/external.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta.Full",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta.Rev",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkConfig",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkHistory",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkUnidentified",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Changed",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Since",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#HistoryScope",
+      "path": "internal/statedb/history.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemHistory",
+      "path": "internal/statedb/history.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootHistory",
+      "path": "internal/statedb/history.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.History",
+      "path": "internal/statedb/history.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Coverage",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#InstanceID",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Op",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#OrdinalKey",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ParseInstanceID",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WorkCause",
+      "path": "internal/statedb/ids.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#FileRecord",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#FileRecord.Generation",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Identity",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Intent",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Intent.Inst",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Intent.Name",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Intent.Op",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Intent.SHA256",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#PendingDeliver",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Removal",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Baseline",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.BeginDelete",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.BeginDeliver",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.BeginRetime",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.EndDelete",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.EndDeliver",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.EndRetime",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PendingDeliverOf",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PendingWrites",
+      "path": "internal/statedb/intents.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.Coverage",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.Locked",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.Target",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.Variant",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrNotLockable",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Coverage",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.SetLock",
+      "path": "internal/statedb/locks.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#NoResult",
+      "path": "internal/statedb/noresults.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.NoResults",
+      "path": "internal/statedb/noresults.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutNoResults",
+      "path": "internal/statedb/noresults.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ObserveItems",
+      "path": "internal/statedb/observe.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#testClock.Now",
+      "path": "internal/statedb/observe_test.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Open",
+      "path": "internal/statedb/open.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store",
+      "path": "internal/statedb/open.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ReserveOrdinal",
+      "path": "internal/statedb/ordinals.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrPassUnknown",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrSourceInactive",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#PassID",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#PassScope",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.BeginPass",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.FinishPass",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.SourceCursor",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance.ID",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance.Items",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance.SceneName",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance.Source",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Instance.VideoPath",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow.Coverage",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow.HasHistory",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow.Inst",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow.Item",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow.Key",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow.HasHistory",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow.Root",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow.Source",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootTarget",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Files",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Instance",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Item",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ItemRow",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Items",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Root",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RootTargets",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Roots",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Unidentified",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow.Item",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow.Root",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow.Source",
+      "path": "internal/statedb/reads.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#coreTables.ns",
+      "path": "internal/statedb/schema.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.AckWork",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.DeferWork",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.EnqueueWork",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.NextWork",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.WorkReady",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Work",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Work.Cause",
+      "path": "internal/statedb/work.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.WriteHealth",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first callers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.Failures",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.Last",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.LastFailed",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.LastOK",
+      "path": "internal/statedb/write.go",
+      "reason": "Retained until ST-1 (internal/statedb#*): its first readers outside the package land with ST1-13's wiring."
     }
   ]
 }

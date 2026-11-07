@@ -38,7 +38,7 @@ func activate(t *testing.T, s *Store, a Activation) {
 func samePolicy(a, b language.Policy) bool { return a.Digest() == b.Digest() }
 
 func TestPolicyFollowsActivation(t *testing.T) {
-	s, _ := faultyStore(t, errInjected)
+	s := faultyStore(t, errInjected)
 	if !samePolicy(s.Policy(), language.Policy{}) {
 		t.Fatal("Policy before any Activate is not the zero policy")
 	}
@@ -113,7 +113,7 @@ func TestActivateConfigMarkFull(t *testing.T) {
 }
 
 func TestActivateFailureRestoresPrevious(t *testing.T) {
-	s, _ := faultyStore(t, errInjected)
+	s := faultyStore(t, errInjected)
 	en := policyOf(t, "en")
 	both := Activation{Sources: []media.SourceID{"sonarr", "radarr"}, Languages: en}
 	activate(t, s, both)
