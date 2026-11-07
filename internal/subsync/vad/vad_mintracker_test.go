@@ -98,7 +98,7 @@ func low16(got []int16) [16]int16 {
 // smoother returns meanVal unchanged.
 func TestFindMinimum_initial_state(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	result := v.findMinimum(500, 0)
 	if result != 1600 {
 		t.Errorf("findMinimum(500, 0) on fresh instance = %d, want 1600", result)
@@ -107,7 +107,7 @@ func TestFindMinimum_initial_state(t *testing.T) {
 
 func TestFindMinimum_decreasing_values(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	// Feed decreasing values; the minimum tracker should follow down.
 	var last int16
 	for i := range 50 {
@@ -121,7 +121,7 @@ func TestFindMinimum_decreasing_values(t *testing.T) {
 
 func TestFindMinimum_increasing_values(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	// Feed increasing values (1000 to 3450).
 	var last int16
 	for i := range 50 {
@@ -137,7 +137,7 @@ func TestFindMinimum_increasing_values(t *testing.T) {
 
 func TestFindMinimum_age_eviction(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	// Feed 110 frames with value 5000 to fill and age the tracker entries.
 	for i := range 110 {
 		v.frameCounter = int32(i)
@@ -154,7 +154,7 @@ func TestFindMinimum_age_eviction(t *testing.T) {
 
 func TestFindMinimum_channel_independence(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	// Feed different values to channel 0 and channel 1.
 	for i := range 50 {
 		v.frameCounter = int32(i)
@@ -181,7 +181,7 @@ func TestFindMinimum_sorted_insert(t *testing.T) {
 	t.Parallel()
 	seed := mintrackerSeed()
 	for _, fv := range []int16{5, 15, 25, 35, 45, 55, 65, 75, 85, 95, 105, 115, 125, 135, 145, 155, 165} {
-		v := newVADInst(ModeVeryAggressive)
+		v := newVADInst()
 		copy(v.lowValue[:16], seed[:])
 		v.findMinimum(fv, 0)
 		var got [16]int16
@@ -192,15 +192,12 @@ func TestFindMinimum_sorted_insert(t *testing.T) {
 	}
 }
 
-// TestFindMinimum_equal_value_inserts_above_the_match feeds a value that EQUALS
-// an existing tracker entry, once for each of the sixteen slots. A tie lands in
-// the slot above the entry it matches, because the list stays ascending and
-// every comparison in the search is strict; a value tying with the largest entry
-// is not inserted at all.
-//
-// The value list alone cannot witness this: a duplicate placed on either side of
-// the entry it ties with leaves the same sixteen values in the same order. The
-// ages are what differ, so both lists are compared.
+// TestFindMinimum_equal_value_inserts_above_the_match feeds a value equal to
+// each of the sixteen tracker entries in turn. A tie lands in the slot above
+// its match, since the list stays ascending and every comparison is strict; a
+// tie with the largest entry is not inserted. The values alone cannot witness
+// this (a duplicate on either side leaves the same list), so the ages are
+// compared too.
 func TestFindMinimum_equal_value_inserts_above_the_match(t *testing.T) {
 	t.Parallel()
 	seed := mintrackerSeed()
@@ -208,7 +205,7 @@ func TestFindMinimum_equal_value_inserts_above_the_match(t *testing.T) {
 	// 100-frame eviction limit, so nothing is evicted before the insert.
 	aged := [16]int16{6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}
 	for _, fv := range seed {
-		v := newVADInst(ModeVeryAggressive)
+		v := newVADInst()
 		copy(v.lowValue[:16], seed[:])
 		for i := range 16 {
 			v.indexVec[i] = 5
@@ -249,7 +246,7 @@ func TestFindMinimum_median_smoothing(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			v := newVADInst(ModeVeryAggressive)
+			v := newVADInst()
 			v.frameCounter = tc.frameCounter
 			v.meanVal[0] = tc.meanVal
 			copy(v.lowValue[:16], tc.sv[:])
@@ -271,7 +268,7 @@ func TestFindMinimum_median_smoothing(t *testing.T) {
 // start at 5 and a no-insert value is fed, so each age becomes 6.
 func TestFindMinimum_aging_increment(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	seed := mintrackerSeed()
 	copy(v.lowValue[:16], seed[:])
 	for i := range 16 {
@@ -290,7 +287,7 @@ func TestFindMinimum_aging_increment(t *testing.T) {
 // left and sv[15] becomes 10000.
 func TestFindMinimum_eviction_shift(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
+	v := newVADInst()
 	seed := mintrackerSeed()
 	copy(v.lowValue[:16], seed[:])
 	for i := range 16 {

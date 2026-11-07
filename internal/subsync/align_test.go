@@ -2,735 +2,148 @@ package subsync
 
 import (
 	"context"
-	"log/slog"
-	"strings"
+	"errors"
+	"slices"
 	"testing"
-	"time"
 
-	"github.com/cplieger/go/slogx/capture"
 	"pgregory.net/rapid"
 )
 
-func TestAlignConstantOffset(t *testing.T) {
+// bruteRating is the rating at offset o with no window: each pair's score
+// times its overlap in ms, summed from the pair's four slope changes.
+func bruteRating(ref, inc []Span, o int64) float64 {
+	var r float64
+	for _, a := range ref {
+		for _, b := range inc {
+			score := spanScore(a, b)
+			if score == 0 {
+				continue
+			}
+			for _, d := range []struct {
+				at int64
+				v  float64
+			}{{a.StartMs - b.EndMs, score}, {a.EndMs - b.EndMs, -score}, {a.StartMs - b.StartMs, -score}, {a.EndMs - b.StartMs, score}} {
+				if d.at < o {
+					r += d.v * float64(o-d.at)
+				}
+			}
+		}
+	}
+	return r
+}
+
+func sortedSpans(t *rapid.T, label string, n int, maxStart int64) []Span {
+	spans := make([]Span, n)
+	for i := range spans {
+		start := rapid.Int64Range(0, maxStart).Draw(t, label+"_start")
+		spans[i] = Span{start, start + rapid.Int64Range(0, 3_000).Draw(t, label+"_dur")}
+	}
+	slices.SortFunc(spans, func(a, b Span) int { return byStart(a, b.StartMs) })
+	return spans
+}
+
+func TestSweepMatchesBruteForce(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		window := rapid.Int64Range(1, 400).Draw(t, "window")
+		ref := sortedSpans(t, "ref", rapid.IntRange(1, 6).Draw(t, "nref"), 6_000)
+		inc := sortedSpans(t, "inc", rapid.IntRange(1, 6).Draw(t, "ninc"), 6_000)
+		got, rating, err := newSweeper(window).best(t.Context(), ref, inc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want int64
+		var wantRating float64
+		for o := -window; o <= window; o++ {
+			if r := bruteRating(ref, inc, o); r > wantRating+1e-9 {
+				want, wantRating = o, r
+			}
+		}
+		if got != want || rating < wantRating-1e-6 || rating > wantRating+1e-6 {
+			t.Fatalf("best = %d (rating %v), brute force %d (rating %v)", got, rating, want, wantRating)
+		}
+	})
+}
+
+func TestSweepRecoversShift(t *testing.T) {
+	t.Parallel()
+	ref := []Span{{1_000, 3_000}, {5_000, 6_500}, {9_000, 12_000}, {15_000, 15_800}, {20_000, 24_000}}
+	for _, shift := range []int64{-600_000, -7_250, 0, 3_200, 599_999, 600_000} {
+		inc := make([]Span, len(ref))
+		for i, r := range ref {
+			inc[i] = Span{r.StartMs - shift, r.EndMs - shift}
+		}
+		if got, _, err := newSweeper(windowMs).best(t.Context(), ref, inc); err != nil || got != shift {
+			t.Errorf("shift %d: best = %d, %v", shift, got, err)
+		}
+	}
+}
+
+func TestSweepIgnoresOffsetsPastTheWindow(t *testing.T) {
+	t.Parallel()
+	ref := []Span{{700_000, 702_000}, {705_000, 706_000}}
+	inc := []Span{{0, 2_000}, {5_000, 6_000}}
+	got, _, err := newSweeper(windowMs).best(t.Context(), ref, inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got < -windowMs || got > windowMs || got == 700_000 {
+		t.Errorf("best = %d, want an offset inside ±%d", got, windowMs)
+	}
+}
+
+func TestSweepWithNothingAboveZeroIsZero(t *testing.T) {
+	t.Parallel()
+	w := newSweeper(50)
+	if got, rating, _ := w.best(t.Context(), nil, []Span{{0, 10}}); got != 0 || rating != 0 {
+		t.Errorf("empty reference: best = %d, %v, want 0, 0", got, rating)
+	}
+	if got, rating, _ := w.best(t.Context(), []Span{{0, 10}}, []Span{{5_000, 5_010}}); got != 0 || rating != 0 {
+		t.Errorf("no pair inside the window: best = %d, %v, want 0, 0", got, rating)
+	}
+}
+
+func TestSweepCancelled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, _, err := newSweeper(10).best(ctx, []Span{{0, 1}}, []Span{{0, 1}}); !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
+	}
+}
+
+func TestSpanScore(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		ref  []timeSpan
-		inc  []timeSpan
-		want int64
-	}{
-		{
-			name: "empty_reference",
-			ref:  nil,
-			inc:  []timeSpan{{Start: 0, End: 1000}},
-			want: 0,
-		},
-		{
-			name: "empty_incorrect",
-			ref:  []timeSpan{{Start: 0, End: 1000}},
-			inc:  nil,
-			want: 0,
-		},
-		{
-			name: "identical_spans",
-			ref:  []timeSpan{{Start: 1000, End: 3000}, {Start: 5000, End: 7000}, {Start: 10000, End: 12000}},
-			inc:  []timeSpan{{Start: 1000, End: 3000}, {Start: 5000, End: 7000}, {Start: 10000, End: 12000}},
-			want: 0,
-		},
-		{
-			name: "known_offset",
-			ref:  []timeSpan{{Start: 5000, End: 7000}, {Start: 10000, End: 12000}, {Start: 15000, End: 17000}},
-			inc:  []timeSpan{{Start: 3000, End: 5000}, {Start: 8000, End: 10000}, {Start: 13000, End: 15000}},
-			want: 2000,
-		},
-		{
-			name: "negative_offset",
-			ref:  []timeSpan{{Start: 1000, End: 3000}, {Start: 5000, End: 7000}},
-			inc:  []timeSpan{{Start: 4000, End: 6000}, {Start: 8000, End: 10000}},
-			want: -3000,
-		},
-		{
-			name: "single_span_each",
-			ref:  []timeSpan{{Start: 10000, End: 12000}},
-			inc:  []timeSpan{{Start: 5000, End: 7000}},
-			want: 5000,
-		},
-		{
-			name: "large_offset",
-			ref:  []timeSpan{{Start: 100000, End: 102000}, {Start: 200000, End: 202000}},
-			inc:  []timeSpan{{Start: 0, End: 2000}, {Start: 100000, End: 102000}},
-			want: 100000,
-		},
-		{
-			name: "forces_merge_sort_path",
-			ref:  []timeSpan{{Start: 0, End: 2000}},
-			inc:  []timeSpan{{Start: 500000, End: 502000}},
-			want: -500000,
-		},
-		{
-			name: "zero_length_incorrect_spans",
-			ref:  []timeSpan{{Start: 5000, End: 7000}},
-			inc:  []timeSpan{{Start: 5000, End: 5000}, {Start: 5000, End: 7000}},
-			want: 0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := alignConstantOffset(t.Context(), tt.ref, tt.inc)
-			if got != tt.want {
-				t.Errorf("alignConstantOffset() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_alignConstantOffset_many_spans_merge_sort(t *testing.T) {
-	t.Parallel()
-	// 5 ref * 5 inc * 4 = 100 entries, range = 20001, 100 < 2000 → merge sort.
-	// This test verifies identical spans produce offset 0 via the merge sort path.
-	var ref, inc []timeSpan
-	for i := range 5 {
-		start := int64(i * 4000)
-		ref = append(ref, timeSpan{Start: start, End: start + 2000})
-		inc = append(inc, timeSpan{Start: start, End: start + 2000})
-	}
-
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != 0 {
-		t.Errorf("alignConstantOffset(many spans, same) = %d, want 0", got)
-	}
-}
-
-func Test_syncCues_empty_inputs(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty reference", func(t *testing.T) {
-		t.Parallel()
-		inc := []Cue{{Start: time.Second, End: 2 * time.Second, Text: "A"}}
-		shifted, offset := syncCues(t.Context(), nil, inc)
-		if offset != 0 {
-			t.Errorf("syncCues(t.Context(), nil, inc) offset = %v, want 0", offset)
-		}
-		if len(shifted) != 1 {
-			t.Errorf("syncCues(t.Context(), nil, inc) returned %d cues, want 1", len(shifted))
-		}
-	})
-
-	t.Run("empty incorrect", func(t *testing.T) {
-		t.Parallel()
-		ref := []Cue{{Start: time.Second, End: 2 * time.Second, Text: "A"}}
-		shifted, offset := syncCues(t.Context(), ref, nil)
-		if offset != 0 {
-			t.Errorf("syncCues(t.Context(), ref, nil) offset = %v, want 0", offset)
-		}
-		if shifted != nil {
-			t.Errorf("syncCues(t.Context(), ref, nil) returned %v, want nil", shifted)
-		}
-	})
-}
-
-func Test_alignConstantOffset_minOffset_arithmetic(t *testing.T) {
-	t.Parallel()
-	// If minOffset or maxOffset are computed wrong, the alignment result changes.
-	ref := []timeSpan{{Start: 10000, End: 15000}}
-	inc := []timeSpan{{Start: 20000, End: 25000}}
-	// Correct: minOffset = 10000 - 25000 = -15000, maxOffset = 15000 - 20000 = -5000
-	// The best offset should be -10000 (shift inc left by 10000 to align).
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -10000 {
-		t.Errorf("alignConstantOffset(ref=[10k-15k], inc=[20k-25k]) = %d, want -10000", got)
-	}
-}
-
-func Test_alignConstantOffset_rangeSize_boundary(t *testing.T) {
-	t.Parallel()
-	// Verify the function handles small ranges correctly.
-	// With identical spans, the offset should be near 0.
-	ref := []timeSpan{{Start: 100, End: 101}}
-	inc := []timeSpan{{Start: 100, End: 101}}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	// Bucket sort discrete bins may return -1 for identical 1ms spans.
-	if got < -1 || got > 1 {
-		t.Errorf("alignConstantOffset(identical 1ms spans) = %d, want ~0", got)
-	}
-}
-
-func Test_alignConstantOffset_numEntries_vs_rangeSize(t *testing.T) {
-	t.Parallel()
-	// Verify both algorithm paths produce correct results.
-	// Path selection: numEntries > rangeSize/10 → bucket sort, else merge sort.
-
-	// Force bucket sort: 10*10*4 = 400 entries, rangeSize ≈ 3801, 400 > 380.
-	var ref, inc []timeSpan
-	for i := range 10 {
-		s := int64(i * 200)
-		ref = append(ref, timeSpan{Start: s, End: s + 100})
-		inc = append(inc, timeSpan{Start: s + 500, End: s + 600})
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	// Bucket sort discrete bins may be off by 1.
-	if got < -502 || got > -498 {
-		t.Errorf("alignConstantOffset(bucket sort, +500 shift) = %d, want ~-500", got)
-	}
-
-	// Force merge sort: 1*1*4 = 4 entries, rangeSize ≈ 102001, 4 < 10200.
-	ref2 := []timeSpan{{Start: 0, End: 2000}}
-	inc2 := []timeSpan{{Start: 100000, End: 102000}}
-	got2 := alignConstantOffset(t.Context(), ref2, inc2)
-	if got2 != -100000 {
-		t.Errorf("alignConstantOffset(merge sort, -100000 shift) = %d, want -100000", got2)
-	}
-}
-
-// --- syncCues function ---
-
-func Test_syncCues_nonzero_offset_shifts_cues(t *testing.T) {
-	t.Parallel()
-	// When offset is non-zero, syncCues must return shifted cues.
-	ref := []Cue{
-		{Start: 5 * time.Second, End: 7 * time.Second, Text: "R1"},
-		{Start: 10 * time.Second, End: 12 * time.Second, Text: "R2"},
-		{Start: 15 * time.Second, End: 17 * time.Second, Text: "R3"},
-	}
-	inc := []Cue{
-		{Start: 3 * time.Second, End: 5 * time.Second, Text: "I1"},
-		{Start: 8 * time.Second, End: 10 * time.Second, Text: "I2"},
-		{Start: 13 * time.Second, End: 15 * time.Second, Text: "I3"},
-	}
-	shifted, offset := syncCues(t.Context(), ref, inc)
-	if offset != 2*time.Second {
-		t.Fatalf("syncCues() offset = %v, want 2s", offset)
-	}
-	if len(shifted) != len(inc) {
-		t.Fatalf("syncCues() returned %d cues, want %d", len(shifted), len(inc))
-	}
-	// Verify cues were actually shifted.
-	if shifted[0].Start != 5*time.Second {
-		t.Errorf("shifted[0].Start = %v, want 5s", shifted[0].Start)
-	}
-}
-
-func Test_syncCues_zero_offset_returns_original_slice(t *testing.T) {
-	t.Parallel()
-	// When offset is 0, syncCues returns the original slice, not a shifted copy.
-	cues := []Cue{
-		{Start: 1 * time.Second, End: 3 * time.Second, Text: "Same"},
-		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Same2"},
-	}
-	shifted, offset := syncCues(t.Context(), cues, cues)
-	if offset != 0 {
-		t.Errorf("syncCues(same, same) offset = %v, want 0", offset)
-	}
-	if len(shifted) != len(cues) {
-		t.Fatalf("syncCues(same, same) returned %d cues, want %d", len(shifted), len(cues))
-	}
-	// Verify identity: the returned slice shares the same backing array.
-	if &shifted[0] != &cues[0] {
-		t.Error("syncCues(same, same) returned a copy, want the original slice")
-	}
-}
-
-// --- Additional alignment precision tests ---
-
-func Test_alignConstantOffset_asymmetric_span_lengths(t *testing.T) {
-	t.Parallel()
-	// Tests the score ratio with asymmetric span lengths.
-	ref := []timeSpan{
-		{Start: 0, End: 10000},     // 10s span
-		{Start: 20000, End: 21000}, // 1s span
-	}
-	inc := []timeSpan{
-		{Start: 5000, End: 15000},  // 10s span, shifted +5000
-		{Start: 25000, End: 26000}, // 1s span, shifted +5000
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -5000 {
-		t.Errorf("alignConstantOffset(asymmetric) = %d, want -5000", got)
-	}
-}
-
-func Test_alignConstantOffset_three_spans_precise(t *testing.T) {
-	t.Parallel()
-	// Multiple spans with known offset to exercise all four delta computations.
-	ref := []timeSpan{
-		{Start: 1000, End: 3000},
-		{Start: 5000, End: 7000},
-		{Start: 9000, End: 11000},
-	}
-	inc := []timeSpan{
-		{Start: 2500, End: 4500},
-		{Start: 6500, End: 8500},
-		{Start: 10500, End: 12500},
-	}
-	// All shifted by -1500.
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -1500 {
-		t.Errorf("alignConstantOffset(3 spans, -1500) = %d, want -1500", got)
-	}
-}
-
-func genSpan(t *rapid.T, label string) timeSpan {
-	start := rapid.Int64Range(0, 300_000).Draw(t, label+"_start")
-	dur := rapid.Int64Range(2000, 5000).Draw(t, label+"_dur")
-	return timeSpan{Start: start, End: start + dur}
-}
-
-func Test_alignConstantOffset_recovers_known_shift(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		n := rapid.IntRange(5, 10).Draw(t, "num_spans")
-		ref := make([]timeSpan, n)
-		// Generate non-overlapping spans with gaps.
-		pos := int64(0)
-		for i := range n {
-			gap := rapid.Int64Range(1000, 5000).Draw(t, "gap")
-			dur := rapid.Int64Range(2000, 5000).Draw(t, "dur")
-			pos += gap
-			ref[i] = timeSpan{Start: pos, End: pos + dur}
-			pos += dur
-		}
-
-		shiftMs := rapid.Int64Range(-3000, 3000).Draw(t, "shift_ms")
-		inc := make([]timeSpan, n)
-		for i := range n {
-			inc[i] = timeSpan{
-				Start: ref[i].Start - shiftMs,
-				End:   ref[i].End - shiftMs,
-			}
-		}
-
-		got := alignConstantOffset(t.Context(), ref, inc)
-
-		diff := got - shiftMs
-		if diff < -2 || diff > 2 {
-			t.Errorf("alignConstantOffset() = %d, want %d (±2), diff=%d",
-				got, shiftMs, diff)
-		}
-	})
-}
-
-func Test_alignConstantOffset_never_panics(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		nRef := rapid.IntRange(0, 5).Draw(t, "n_ref")
-		nInc := rapid.IntRange(0, 5).Draw(t, "n_inc")
-
-		ref := make([]timeSpan, nRef)
-		for i := range nRef {
-			ref[i] = genSpan(t, "ref")
-		}
-		inc := make([]timeSpan, nInc)
-		for i := range nInc {
-			inc[i] = genSpan(t, "inc")
-		}
-
-		_ = alignConstantOffset(t.Context(), ref, inc)
-	})
-}
-
-// --- Alignment arithmetic precision tests ---
-// Carefully chosen inputs where a sign or operator slip in the offset-range
-// or score arithmetic produces a detectably wrong offset.
-
-// Non-zero starts make the minOffset = refStart - inEnd computation change
-// sign if its subtraction were flipped, so the exact offset below would not
-// be found.
-func Test_alignConstantOffset_minOffset_sign(t *testing.T) {
-	t.Parallel()
-	// ref: [100, 200], inc: [400, 500]. Correct offset = -300.
-	// minOffset = refStart - inEnd = 100 - 500 = -400.
-	ref := []timeSpan{{Start: 100, End: 200}}
-	inc := []timeSpan{{Start: 400, End: 500}}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -300 {
-		t.Errorf("alignConstantOffset(minOffset sign) = %d, want -300", got)
-	}
-}
-
-// A tight offset range: an error in the rangeSize = maxOffset - minOffset + 1
-// computation would mis-size the bucket array and change the result.
-func Test_alignConstantOffset_rangeSize_arithmetic(t *testing.T) {
-	t.Parallel()
-	// ref: [0, 100], inc: [50, 150]. offset = -50.
-	// minOffset = 0 - 150 = -150, maxOffset = 100 - 50 = 50.
-	// rangeSize = 50 - (-150) + 1 = 201.
-	// (If that subtraction were an addition: 50 + (-150) + 1 = -99 ≤ 0 → returns 0.)
-	ref := []timeSpan{{Start: 0, End: 100}}
-	inc := []timeSpan{{Start: 50, End: 150}}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -50 {
-		t.Errorf("alignConstantOffset(rangeSize) = %d, want -50", got)
-	}
-}
-
-// Spans with non-zero starts and different lengths: computing span length as
-// End + Start instead of End - Start would change the score weighting and
-// shift the detected offset.
-func Test_alignConstantOffset_span_length_arithmetic(t *testing.T) {
-	t.Parallel()
-	ref := []timeSpan{
-		{Start: 10000, End: 10100}, // len=100, but End+Start=20100
-		{Start: 20000, End: 25000}, // len=5000, but End+Start=45000
-	}
-	inc := []timeSpan{
-		{Start: 10200, End: 10300}, // shifted +200
-		{Start: 20200, End: 25200}, // shifted +200
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -200 {
-		t.Errorf("alignConstantOffset(span length) = %d, want -200", got)
-	}
-}
-
-// Spans with different lengths give score < 1.0; if the min/max length ratio
-// were a product instead of a quotient, the relative span-pair weighting would
-// change and the result would shift.
-func Test_alignConstantOffset_score_ratio_matters(t *testing.T) {
-	t.Parallel()
-	ref := []timeSpan{
-		{Start: 0, End: 100},      // 100ms (short)
-		{Start: 5000, End: 15000}, // 10000ms (long)
-	}
-	inc := []timeSpan{
-		{Start: 200, End: 300},    // 100ms, shifted +200 from ref[0]
-		{Start: 5200, End: 15200}, // 10000ms, shifted +200 from ref[1]
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -200 {
-		t.Errorf("alignConstantOffset(score ratio) = %d, want -200", got)
-	}
-}
-
-// Two offsets produce exactly equal ratings; the strict > keeps the first
-// peak while >= would switch to the last. Pins the tie-break direction.
-func Test_alignConstantOffset_tie_breaking(t *testing.T) {
-	t.Parallel()
-	// Two identical ref spans at different positions, one inc span.
-	// This creates a symmetric rating function with two equal peaks.
-	ref := []timeSpan{
-		{Start: 0, End: 1000},
-		{Start: 2000, End: 3000},
-	}
-	inc := []timeSpan{
-		{Start: 0, End: 1000},
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	// The exact peak depends on the algorithm path; verify it's reasonable.
-	if got < -3000 || got > 3000 {
-		t.Errorf("alignConstantOffset(tie) = %d, want within [-3000, 3000]", got)
-	}
-}
-
-func Test_alignConstantOffset_caps_large_span_counts(t *testing.T) {
-	t.Parallel()
-	// Verify that inputs exceeding maxAlignSpans are truncated without
-	// panic or OOM. Use tightly packed 1ms spans to minimize range.
-	n := maxAlignSpans + 10
-	ref := make([]timeSpan, n)
-	inc := make([]timeSpan, n)
-	for i := range n {
-		ref[i] = timeSpan{Start: int64(i), End: int64(i + 1)}
-		inc[i] = timeSpan{Start: int64(i), End: int64(i + 1)}
-	}
-	// Should complete without panic; exact offset is irrelevant.
-	alignConstantOffset(t.Context(), ref, inc)
-}
-
-func Test_alignConstantOffset_caps_at_exact_boundary(t *testing.T) {
-	t.Parallel()
-	// Exactly maxAlignSpans spans must NOT be capped (the guard is > not >=);
-	// a boundary slip would drop the last span and change the result.
-	n := maxAlignSpans
-	ref := make([]timeSpan, n)
-	inc := make([]timeSpan, n)
-	for i := range n {
-		ref[i] = timeSpan{Start: int64(i * 2), End: int64(i*2 + 1)}
-		inc[i] = timeSpan{Start: int64(i*2 + 100), End: int64(i*2 + 101)}
-	}
-	// Should complete without panic and use all spans.
-	got := alignConstantOffset(t.Context(), ref, inc)
-	// Bucket sort discrete bins produce -101 for this input (off-by-one from
-	// the continuous optimum of -100). The key assertion is that the result
-	// is close to -100 and doesn't change when all spans are included.
-	if got < -102 || got > -98 {
-		t.Errorf("alignConstantOffset(exactly maxAlignSpans) = %d, want ~-100", got)
-	}
-}
-
-func Test_alignConstantOffset_rangeSize_guard(t *testing.T) {
-	t.Parallel()
-	// The rangeSize <= 0 guard fires when maxOffset < minOffset.
-	// With valid (non-inverted) spans this can't happen, so the guard
-	// protects against degenerate inputs. Verify it returns 0 gracefully.
-	// Use inverted ref span: Start > End.
-	ref := []timeSpan{{Start: 1000, End: 500}} // inverted
-	inc := []timeSpan{{Start: 0, End: 100}}
-	// minOffset = 1000 - 100 = 900, maxOffset = 500 - 0 = 500
-	// rangeSize = 500 - 900 + 1 = -399 → guard returns 0.
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != 0 {
-		t.Errorf("alignConstantOffset(inverted ref, rangeSize<0) = %d, want 0", got)
-	}
-}
-
-func Test_alignConstantOffset_algorithm_selection_boundary(t *testing.T) {
-	t.Parallel()
-	// numEntries > rangeSize/10 → bucket sort, else merge sort.
-	// Test at the exact boundary: numEntries == rangeSize/10.
-	// 2 ref * 2 inc * 4 = 16 entries.
-	// rangeSize/10 = 16 → rangeSize = 160.
-	// With ref=[0,80], inc=[0,80]: minOffset = 0-80 = -80, maxOffset = 80-0 = 80
-	// rangeSize = 80 - (-80) + 1 = 161.
-	// numEntries = 2*2*4 = 16, rangeSize/10 = 16. 16 > 16 is false → merge sort.
-	ref := []timeSpan{
-		{Start: 0, End: 40},
-		{Start: 40, End: 80},
-	}
-	inc := []timeSpan{
-		{Start: 100, End: 140},
-		{Start: 140, End: 180},
-	}
-	got := alignConstantOffset(t.Context(), ref, inc)
-	if got != -100 {
-		t.Errorf("alignConstantOffset(algorithm boundary) = %d, want -100", got)
-	}
-}
-
-// --- spanScore ---
-
-func TestSpanScore_table(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		r, s timeSpan
+		r, s Span
 		want float64
 	}{
-		{"equal length spans", timeSpan{0, 2000}, timeSpan{0, 2000}, 1.0},
-		{"ref shorter than inc", timeSpan{0, 1000}, timeSpan{0, 2000}, 0.5},
-		{"inc shorter than ref", timeSpan{0, 4000}, timeSpan{0, 1000}, 0.25},
-		{"zero-length ref", timeSpan{500, 500}, timeSpan{0, 1000}, 0},
-		{"zero-length inc", timeSpan{0, 1000}, timeSpan{500, 500}, 0},
-		{"both zero-length", timeSpan{100, 100}, timeSpan{200, 200}, 0},
-		{"inverted ref", timeSpan{2000, 1000}, timeSpan{0, 1000}, 0},
-		{"inverted inc", timeSpan{0, 1000}, timeSpan{2000, 1000}, 0},
-		{"both inverted", timeSpan{2000, 1000}, timeSpan{3000, 2000}, 0},
-		{"1ms ref vs 1000ms inc", timeSpan{0, 1}, timeSpan{0, 1000}, 0.001},
+		{"equal length spans", Span{0, 2000}, Span{0, 2000}, 1.0},
+		{"ref shorter than inc", Span{0, 1000}, Span{0, 2000}, 0.5},
+		{"inc shorter than ref", Span{0, 4000}, Span{0, 1000}, 0.25},
+		{"zero-length ref", Span{500, 500}, Span{0, 1000}, 0},
+		{"zero-length inc", Span{0, 1000}, Span{500, 500}, 0},
+		{"inverted ref", Span{2000, 1000}, Span{0, 1000}, 0},
+		{"inverted inc", Span{0, 1000}, Span{2000, 1000}, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := spanScore(tt.r, tt.s)
-			if got != tt.want {
+			if got := spanScore(tt.r, tt.s); got != tt.want {
 				t.Errorf("spanScore(%v, %v) = %v, want %v", tt.r, tt.s, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSpanScore_always_in_unit_range(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		r := genSpan(t, "r")
-		s := genSpan(t, "s")
-		score := spanScore(r, s)
-		if score < 0 || score > 1 {
-			t.Errorf("spanScore(%v, %v) = %v, want in [0, 1]", r, s, score)
-		}
-	})
-}
-
-func TestSpanScore_commutative(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		r := genSpan(t, "r")
-		s := genSpan(t, "s")
-		ab := spanScore(r, s)
-		ba := spanScore(s, r)
-		if ab != ba {
-			t.Errorf("spanScore(%v, %v) = %v, but spanScore(%v, %v) = %v",
-				r, s, ab, s, r, ba)
-		}
-	})
-}
-
-func TestSpanScore_equal_length_is_one(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		start := rapid.Int64Range(0, 100_000).Draw(t, "start")
-		dur := rapid.Int64Range(1, 10_000).Draw(t, "dur")
-		r := timeSpan{Start: start, End: start + dur}
-		s := timeSpan{Start: start + 500, End: start + 500 + dur}
-		score := spanScore(r, s)
-		if score != 1.0 {
-			t.Errorf("spanScore(len=%d, len=%d) = %v, want 1.0", dur, dur, score)
-		}
-	})
-}
-
-// captureAlignLogs collects everything written to the default logger, at Debug
-// level and above, while fn runs. The default logger is process-global, so a
-// caller must not be parallel. Timestamps are dropped so lines are stable.
-func captureAlignLogs(t *testing.T, fn func()) string {
-	t.Helper()
-	var buf strings.Builder
-	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				return slog.Attr{}
-			}
-			return a
-		},
-	})))
-	fn()
-	return buf.String()
-}
-
-// tightSpans returns n spans of 1ms at 2ms intervals starting at base. Packing
-// them keeps the offset range small enough that span-count tests stay cheap.
-func tightSpans(n int, base int64) []timeSpan {
-	out := make([]timeSpan, n)
-	for i := range out {
-		out[i] = timeSpan{Start: base + int64(i)*2, End: base + int64(i)*2 + 1}
+func BenchmarkSweep(b *testing.B) {
+	spans := make([]Span, 2_000)
+	for i := range spans {
+		spans[i] = Span{int64(i) * 3_100, int64(i)*3_100 + 2_000}
 	}
-	return out
-}
-
-// The capping warning tells an operator that alignment silently dropped part of
-// the input, so a track exactly at the limit must not produce one.
-func TestAlignConstantOffset_warns_only_past_the_reference_span_limit(t *testing.T) {
-	// slog's default logger is process-global: this test must stay serial.
-	tests := []struct {
-		name     string
-		spans    int
-		wantWarn int
-	}{
-		{name: "at_the_limit", spans: maxAlignSpans, wantWarn: 0},
-		{name: "one_past_the_limit", spans: maxAlignSpans + 1, wantWarn: 1},
+	w := newSweeper(windowMs)
+	for b.Loop() {
+		_, _, _ = w.best(b.Context(), spans, spans)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ref := tightSpans(tt.spans, 0)
-			inc := []timeSpan{{Start: 100, End: 101}}
-			logs := captureAlignLogs(t, func() {
-				alignConstantOffset(t.Context(), ref, inc)
-			})
-			got := strings.Count(logs, "capping reference spans")
-			if got != tt.wantWarn {
-				t.Errorf("alignConstantOffset(%d reference spans) logged %d capping warnings, want %d",
-					tt.spans, got, tt.wantWarn)
-			}
-		})
-	}
-}
-
-func TestAlignConstantOffset_warns_only_past_the_incorrect_span_limit(t *testing.T) {
-	// slog's default logger is process-global: this test must stay serial.
-	tests := []struct {
-		name     string
-		spans    int
-		wantWarn int
-	}{
-		{name: "at_the_limit", spans: maxAlignSpans, wantWarn: 0},
-		{name: "one_past_the_limit", spans: maxAlignSpans + 1, wantWarn: 1},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ref := []timeSpan{{Start: 100, End: 101}}
-			inc := tightSpans(tt.spans, 0)
-			logs := captureAlignLogs(t, func() {
-				alignConstantOffset(t.Context(), ref, inc)
-			})
-			got := strings.Count(logs, "capping incorrect spans")
-			if got != tt.wantWarn {
-				t.Errorf("alignConstantOffset(%d incorrect spans) logged %d capping warnings, want %d",
-					tt.spans, got, tt.wantWarn)
-			}
-		})
-	}
-}
-
-// The dense delta array is chosen when the offset range is small relative to the
-// number of span pairs. Both quantities that decision rests on are reported, so
-// an operator diagnosing a slow or memory-hungry align can see why the path was
-// taken: the range spans minOffset..maxOffset inclusive, and each span pair
-// contributes four rating breakpoints.
-func TestAlignConstantOffset_reports_the_range_and_pair_count_it_chose_on(t *testing.T) {
-	// slog's default logger is process-global: this test must stay serial.
-	ref := []timeSpan{
-		{Start: 0, End: 20},
-		{Start: 25, End: 45},
-		{Start: 50, End: 70},
-		{Start: 75, End: 95},
-	}
-	inc := []timeSpan{
-		{Start: 200, End: 220},
-		{Start: 225, End: 245},
-		{Start: 250, End: 270},
-		{Start: 275, End: 295},
-	}
-	var got int64
-	logs := captureAlignLogs(t, func() {
-		got = alignConstantOffset(t.Context(), ref, inc)
-	})
-	if got != -201 {
-		t.Errorf("alignConstantOffset(4 reference, 4 incorrect spans) = %d, want -201", got)
-	}
-	// maxOffset 95-200 = -105, minOffset 0-295 = -295, so the range is 191ms.
-	if !strings.Contains(logs, "range_ms=191") {
-		t.Errorf("alignConstantOffset did not report range_ms=191; logged:\n%s", logs)
-	}
-	// 4 reference spans * 4 incorrect spans * 4 breakpoints.
-	if !strings.Contains(logs, "num_entries=64") {
-		t.Errorf("alignConstantOffset did not report num_entries=64; logged:\n%s", logs)
-	}
-	// 64 entries over a 191ms range clears the threshold, so the dense array wins.
-	if !strings.Contains(logs, "chose bucket sort") {
-		t.Errorf("alignConstantOffset did not choose the dense array; logged:\n%s", logs)
-	}
-}
-
-// Cancellation is sampled every few thousand span pairs rather than checked per
-// pair, so an alignment big enough to reach a sample abandons and reports no
-// offset while a small one runs to completion. A caller cannot read a non-zero
-// offset as proof the context was still live.
-func TestAlignConstantOffset_abandons_a_large_alignment_on_a_cancelled_context(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		spans    int
-		wantLive int64
-		wantDead int64
-	}{
-		{name: "too_small_to_reach_a_sample", spans: 4, wantLive: -61, wantDead: -61},
-		{name: "large_enough_to_reach_a_sample", spans: 110, wantLive: -61, wantDead: 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ref := spacedSpans(tt.spans, 0)
-			inc := spacedSpans(tt.spans, 60)
-			if live := alignConstantOffset(t.Context(), ref, inc); live != tt.wantLive {
-				t.Errorf("alignConstantOffset(%d spans, live context) = %d, want %d",
-					tt.spans, live, tt.wantLive)
-			}
-			dead, cancel := context.WithCancel(t.Context())
-			cancel()
-			if got := alignConstantOffset(dead, ref, inc); got != tt.wantDead {
-				t.Errorf("alignConstantOffset(%d spans, cancelled context) = %d, want %d",
-					tt.spans, got, tt.wantDead)
-			}
-		})
-	}
-}
-
-// spacedSpans returns n spans of 20ms at 40ms intervals starting at base.
-func spacedSpans(n int, base int64) []timeSpan {
-	out := make([]timeSpan, n)
-	for i := range out {
-		s := base + int64(i)*40
-		out[i] = timeSpan{Start: s, End: s + 20}
-	}
-	return out
 }

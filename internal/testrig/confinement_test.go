@@ -31,7 +31,7 @@ type importRule struct {
 
 // importRules is the architecture's confinement table; each row lands with
 // the landing that turns it on.
-var importRules = []importRule{releaseRule(modulePath), dialhookRule(modulePath), providertestRule(modulePath)}
+var importRules = []importRule{releaseRule(modulePath), dialhookRule(modulePath), providertestRule(modulePath), execRule(modulePath)}
 
 // dialhookRule keeps the test dial seam inside the provider boundary and its
 // test server: no adapter or other production code can carry a dial past
@@ -48,6 +48,12 @@ func dialhookRule(module string) importRule {
 // production build.
 func providertestRule(module string) importRule {
 	return importRule{imported: module + "/internal/provider/providertest", production: true}
+}
+
+// execRule keeps child processes behind the one ffmpeg runner, which owns
+// their deadlines, output caps and stderr bound.
+func execRule(module string) importRule {
+	return importRule{imported: "os/exec", allowed: []string{module + "/internal/subsync/ffmpeg"}, production: true}
 }
 
 // releaseRule keeps release.Parsed inside search's packages: rank, the
@@ -161,8 +167,8 @@ func TestConfinementChecker(t *testing.T) {
 			t.Errorf("every import: violations = %q, want f's and e's test import", got)
 		}
 	})
-	t.Run("dialhook and providertest rows", func(t *testing.T) {
-		for _, rule := range []importRule{dialhookRule(fixture), providertestRule(fixture)} {
+	t.Run("dialhook, providertest and exec rows", func(t *testing.T) {
+		for _, rule := range []importRule{dialhookRule(fixture), providertestRule(fixture), execRule(fixture)} {
 			if !rule.production || rule.imported == "" {
 				t.Errorf("row %+v checks test imports or nothing", rule)
 			}
@@ -172,6 +178,12 @@ func TestConfinementChecker(t *testing.T) {
 		}
 		if providertestRule(fixture).violation(fixture+"/internal/provider", fixture+"/internal/provider/providertest") == "" {
 			t.Error("the boundary may import providertest")
+		}
+		if execRule(fixture).violation(fixture+"/internal/subsync", "os/exec") == "" {
+			t.Error("subsync may run a child process")
+		}
+		if got := execRule(fixture).violation(fixture+"/internal/subsync/ffmpeg", "os/exec"); got != "" {
+			t.Errorf("the runner may not run a child process: %s", got)
 		}
 	})
 	t.Run("raw client", func(t *testing.T) {

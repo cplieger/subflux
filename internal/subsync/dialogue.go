@@ -1,10 +1,11 @@
-// dialogue.go provides dialogue cue filtering: identifies which subtitle cues are
-// actual dialogue vs non-dialogue (signs, karaoke, SDH, credits).
-
+// Package subsync aligns a subtitle to its video: the reference pipeline,
+// the audio path, the dialogue filter and the verdict. It does no I/O and
+// never logs.
 package subsync
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/cplieger/subflux/internal/timing"
@@ -45,6 +46,26 @@ var reFansubCredit = regexp.MustCompile(`^\{[^\\]`)
 
 // reFontFace extracts the font face name from subtitle text.
 var reFontFace = regexp.MustCompile(`font face="([^"]+)"`)
+
+// Span is one dialogue cue on the baseline timeline.
+type Span struct{ StartMs, EndMs int64 }
+
+// DialogueSpans keeps ASS and SSA Dialogue events whose style the classifier
+// calls dialogue, then every event surviving the SDH, music, karaoke-pair,
+// typesetting-font and credit filters.
+func DialogueSpans(c timing.Cues) []Span {
+	events := c.Events()
+	if c.Format() != timing.SRT {
+		styles := dialogueStyles(events)
+		events = slices.DeleteFunc(events, func(e timing.Event) bool { return !styles[e.Style] })
+	}
+	kept := filterDialogueCues(events, markKaraokePairs(events))
+	out := make([]Span, len(kept))
+	for i, e := range kept {
+		out[i] = Span{e.StartMs, e.EndMs}
+	}
+	return out
+}
 
 // cleanTextLen returns the byte length of subtitle text after stripping
 // HTML/ASS tags, hearing-impaired annotations, and music/lyrics lines.
@@ -94,7 +115,7 @@ type fontStats struct {
 // 80% of cues (skipping first/last 10% to exclude OP/ED). Picks the
 // font with the most total screen time among cues with reasonable
 // per-cue duration (0.5-15s). Returns empty string if no clear winner.
-func detectDialogueFont(cues []Cue) string {
+func detectDialogueFont(cues []timing.Event) string {
 	if len(cues) < 20 {
 		return ""
 	}
@@ -116,7 +137,7 @@ func detectDialogueFont(cues []Cue) string {
 			stats[font] = s
 		}
 		s.count++
-		dur := c.End.Milliseconds() - c.Start.Milliseconds()
+		dur := c.EndMs - c.StartMs
 		if dur > 0 {
 			s.totalMs += dur
 		}
@@ -171,14 +192,14 @@ func isForeignFont(text, dialogueFont string) bool {
 // non-dialogue cues (e.g. English translation lines paired with romaji
 // karaoke lines). Returns a set of cue indices that should be treated
 // as non-dialogue even though they lack ASS tags.
-func markKaraokePairs(cues []Cue) map[int]bool {
+func markKaraokePairs(cues []timing.Event) map[int]bool {
 	// Build a set of time ranges that are non-dialogue.
 	type timeKey struct{ startMs, endMs int64 }
 	nonDialogueTimes := make(map[timeKey]bool)
 	nonDialogueIdx := make(map[int]bool)
 	for i, c := range cues {
 		if isNonDialogueCue(c.Text) {
-			k := timeKey{c.Start.Milliseconds(), c.End.Milliseconds()}
+			k := timeKey{c.StartMs, c.EndMs}
 			nonDialogueTimes[k] = true
 			nonDialogueIdx[i] = true
 		}
@@ -190,7 +211,7 @@ func markKaraokePairs(cues []Cue) map[int]bool {
 		if nonDialogueIdx[i] {
 			continue // already non-dialogue
 		}
-		k := timeKey{c.Start.Milliseconds(), c.End.Milliseconds()}
+		k := timeKey{c.StartMs, c.EndMs}
 		if nonDialogueTimes[k] {
 			paired[i] = true
 		}
@@ -201,13 +222,13 @@ func markKaraokePairs(cues []Cue) map[int]bool {
 // filterDialogueCues returns only cues that are dialogue (non-zero
 // cleanTextLen, not karaoke pairs, not foreign-font typesetting,
 // and not fansub credits).
-func filterDialogueCues(cues []Cue, karaokePairs map[int]bool) []Cue {
+func filterDialogueCues(cues []timing.Event, karaokePairs map[int]bool) []timing.Event {
 	// Font detection runs on the full cue list intentionally: the 10%
 	// frequency threshold and 0.5-15s duration filter in detectDialogueFont
 	// already exclude typesetting fonts, and pre-filtering would require
 	// a second pass over the cues.
 	dialogueFont := detectDialogueFont(cues)
-	var out []Cue
+	var out []timing.Event
 	for i, c := range cues {
 		if karaokePairs[i] {
 			continue

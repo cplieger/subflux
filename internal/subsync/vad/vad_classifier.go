@@ -61,7 +61,7 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 	var deltaN, deltaS [vadTableSize]int16
 	var ngprvec, sgprvec [vadTableSize]int16
 
-	if totalPower > v.minEnergy {
+	if totalPower > vadMinEnergy {
 		// --- GMM likelihood computation ---
 		for ch := range vadNumCh {
 			llrContrib, localFlag := v.channelLLR(ch, features, &deltaN, &deltaS, &ngprvec, &sgprvec)
@@ -125,7 +125,7 @@ func (v *vadInst) channelLLR(ch int, features [vadNumCh]int16, deltaN, deltaS, n
 	if llr*4 > v.localThresh {
 		localFlag = 1
 	}
-	llrContrib = int32(llr) * int32(v.specWeights[ch])
+	llrContrib = int32(llr) * int32(specWeight[ch])
 
 	// Conditional probabilities for model update (Q14: 16384 = 1.0).
 	h0 := int16(h0test >> 12) //nolint:gosec // G115: fixed-point DSP

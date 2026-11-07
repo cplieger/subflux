@@ -151,21 +151,6 @@ func TestCrossCorrelateEdges_one_empty(t *testing.T) {
 	}
 }
 
-func TestCrossCorrelateEdges_caps_long_signals(t *testing.T) {
-	t.Parallel()
-	n := maxCorrelationFrames + 100
-	a := make([]float64, n)
-	b := make([]float64, n)
-	for i := 100; i < 200; i++ {
-		a[i] = 1.0
-		b[i] = 1.0
-	}
-	result := crossCorrelateEdges(t.Context(), a, b)
-	if result.Peak < 0 || result.Peak > 1 {
-		t.Errorf("CrossCorrelateEdges(capped) peak = %f, want in [0, 1]", result.Peak)
-	}
-}
-
 func TestCrossCorrelateEdges_zero_energy(t *testing.T) {
 	t.Parallel()
 	a := []float64{0, 0, 0, 0}

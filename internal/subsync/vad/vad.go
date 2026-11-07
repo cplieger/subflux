@@ -1,14 +1,9 @@
-// vad.go is a line-by-line pure Go port of WebRTC's Voice Activity Detector.
-//
-// Original: chromium/webrtc common_audio/vad/ (BSD-3-Clause).
-// Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
-//
-// Includes: allpass filter bank, log energy features, GMM classifier,
-// and adaptive model update. No cgo, no external dependencies.
-
+// Package vad is a line-by-line Go port of WebRTC's voice activity detector
+// (chromium/webrtc common_audio/vad/, BSD-3-Clause, Copyright (c) 2012 The
+// WebRTC project authors): the allpass filter bank, log energy features, GMM
+// classifier and adaptive model update. A Detector yields one log-likelihood
+// ratio per 10 ms frame and Deciders threshold that one stream.
 package vad
-
-import "context"
 
 const (
 	vadNumCh       = 6
@@ -45,13 +40,9 @@ type vadInst struct {
 	localThresh  int16
 	globalThresh int16
 
-	// Adaptation speed (Q15). Default: noise=655, speech=6554.
+	// Adaptation speed (Q15).
 	noiseUpdate  int16
 	speechUpdate int16
-
-	// Configurable parameters.
-	specWeights [vadNumCh]int16
-	minEnergy   int16
 
 	frameCounter int32
 }
@@ -78,26 +69,17 @@ const (
 	backEta           = 154  // Q8
 )
 
-// mode represents the VAD aggressiveness level (WebRTC modes 0-3).
-type mode int
+// WebRTC's mode 3 ("very aggressive") thresholds for 10 ms frames, the one
+// mode the sync engine runs.
+const (
+	mode3Local     = 94
+	mode3Global    = 1100
+	mode3Overhang1 = 6
+	mode3Overhang2 = 9
+)
 
-// ModeVeryAggressive is WebRTC VAD mode 3, the most restrictive level (fewest
-// false positives), and the one the sync engine runs.
-const ModeVeryAggressive mode = 3
-
-// Mode thresholds for 10ms frames (original WebRTC values).
-// [local, global, overhang1, overhang2]
-var vadModes = [4]struct{ local, global, oh1, oh2 int16 }{
-	{24, 57, 8, 14},  // Mode 0: Quality
-	{37, 100, 8, 14}, // Mode 1: Low bitrate
-	{82, 285, 6, 9},  // Mode 2: Aggressive
-	{94, 1100, 6, 9}, // Mode 3: Very aggressive
-}
-
-func newVADInst(mode mode) *vadInst {
-	if mode < 0 || int(mode) >= len(vadModes) {
-		mode = ModeVeryAggressive
-	}
+// newVADInst is WebRTC's mode 3 instance with its default adaptation rates.
+func newVADInst() *vadInst {
 	v := &vadInst{}
 	copy(v.noiseMeans[:], initNoiseMeans[:])
 	copy(v.speechMeans[:], initSpeechMeans[:])
@@ -109,113 +91,67 @@ func newVADInst(mode mode) *vadInst {
 	for i := range v.meanVal {
 		v.meanVal[i] = 1600
 	}
-	m := vadModes[int(mode)]
-	v.localThresh = m.local
-	v.globalThresh = m.global
-	v.overHangMax1 = m.oh1
-	v.overHangMax2 = m.oh2
+	v.localThresh = mode3Local
+	v.globalThresh = mode3Global
+	v.overHangMax1 = mode3Overhang1
+	v.overHangMax2 = mode3Overhang2
 	v.noiseUpdate = noiseUpdateConst
 	v.speechUpdate = speechUpdateConst
-	v.specWeights = specWeight
-	v.minEnergy = vadMinEnergy
 	return v
 }
 
-// newVADInstAdapt creates a VAD instance with custom adaptation speed.
-// adaptScale multiplies the default update constants (1.0 = default,
-// 2.0 = twice as fast, 0.5 = half speed).
-func newVADInstAdapt(mode mode, adaptScale float64) *vadInst {
-	v := newVADInst(mode)
-	// Clamp to prevent int16 overflow.
-	// speechUpdateConst * 5.0 = 32770, which overflows int16 by 3.
-	// The max safe scale is 32767/speechUpdateConst ≈ 4.9995.
-	maxScale := float64(32767) / float64(speechUpdateConst)
-	adaptScale = min(max(adaptScale, 0), maxScale)
-	v.noiseUpdate = int16(float64(noiseUpdateConst) * adaptScale)
-	v.speechUpdate = int16(float64(speechUpdateConst) * adaptScale)
-	if v.noiseUpdate < 1 {
-		v.noiseUpdate = 1
-	}
-	if v.speechUpdate < 1 {
-		v.speechUpdate = 1
-	}
-	return v
+// FrameSamples is 10 ms of 8 kHz mono PCM, the frame Detector.LLR reads.
+const FrameSamples = 80
+
+// Detector reads one 8 kHz mono stream frame by frame. It is not safe for
+// concurrent use.
+type Detector struct{ v *vadInst }
+
+// NewDetector returns a mode 3 detector whose model adapts at the smallest
+// step the fixed point allows.
+func NewDetector() *Detector {
+	v := newVADInst()
+	// WebRTC's default rates track a film's music and effects into the noise
+	// model; the smallest step is the tuning the audio path was measured
+	// with. It slows adaptation, it does not stop it.
+	v.noiseUpdate, v.speechUpdate = 1, 1
+	return &Detector{v: v}
 }
 
-// Tuning is the whole parameter set of one detection pass.
-//
-// A struct rather than positional parameters, and the reason is the two float64s.
-// Threshold and AdaptScale are the same type, so any transposition of them
-// COMPILES and simply detects differently — `125, 10, 0` and `0, 10, 125` are both
-// valid calls with wildly different behaviour and no error on either side. Mode and
-// OverhangFrames are distinct types and would be caught; those two would not. Named
-// fields make the mistake unwritable, which is the only guard available when the
-// compiler cannot help.
-//
-// The struct already existed for the two optional GMM knobs while four required
-// ones stayed loose, so a caller passed tuning both ways in the same call.
-// The two pointers lead because govet's fieldalignment counts leading pointer
-// bytes; the exported knobs follow in the order a caller thinks about them.
-type Tuning struct {
-	specWeights *[vadNumCh]int16 // nil = use default
-	minEnergy   *int16           // nil = use default
-
-	// Mode is the WebRTC aggressiveness level.
-	Mode mode
-	// Threshold is the GMM log-likelihood ratio a frame must reach to be called
-	// speech. NOT a duration: the safe and precise passes use 250 and 125.
-	Threshold float64
-	// OverhangFrames is how many frames the speech decision is held after the
-	// ratio drops below Threshold — a frame COUNT, not a percentage.
-	OverhangFrames int
-	// AdaptScale scales noise-model adaptation; 0 freezes it, which is what movie
-	// audio wants.
-	AdaptScale float64
+// LLR classifies the stream's next frame, which holds FrameSamples samples,
+// and returns its summed weighted log-likelihood ratio: the speech evidence
+// a Decider thresholds.
+func (d *Detector) LLR(frame []int16) float64 {
+	_, llr := d.v.processFrameLLR(frame[:FrameSamples])
+	return llr
 }
 
-// newVADInstTuned creates a VAD instance with custom tuning.
-func newVADInstTuned(t Tuning) *vadInst {
-	v := newVADInstAdapt(t.Mode, t.AdaptScale)
-	if t.specWeights != nil {
-		v.specWeights = *t.specWeights
-	}
-	if t.minEnergy != nil {
-		v.minEnergy = *t.minEnergy
-	}
-	return v
+// Decider turns one stream's ratios into speech decisions: a ratio at or
+// above its threshold is speech, and so are the overhang frames after it.
+type Decider struct {
+	threshold float64
+	overhang  int
+	remaining int
 }
 
-// FramesBinary returns a binary {-1, +1} speech decision per 10ms frame under the
-// given Tuning. PCM must be 8kHz mono s16le.
-//
-// Named FramesBinary rather than FramesBinaryThresholdTuned: the old name listed
-// the parameters it took, and they are all in Tuning now.
-func FramesBinary(ctx context.Context, pcm []int16, tuning Tuning) []float64 {
-	const frameSize = 80 // 10ms at 8kHz
-	// Trailing samples that don't fill a complete 80-sample frame are ignored.
-	nFrames := len(pcm) / frameSize
-	result := make([]float64, nFrames)
-	v := newVADInstTuned(tuning)
-	remaining := 0
-	for i := range nFrames {
-		// Check for cancellation every 1000 frames (amortized cost: negligible).
-		if i%1000 == 0 && ctx.Err() != nil {
-			return result[:i]
-		}
-		frame := pcm[i*frameSize : (i+1)*frameSize]
-		_, llr := v.processFrameLLR(frame)
-		switch {
-		case llr >= tuning.Threshold:
-			result[i] = 1.0
-			remaining = tuning.OverhangFrames
-		case remaining > 0:
-			result[i] = 1.0
-			remaining--
-		default:
-			result[i] = -1.0
-		}
+// NewDecider returns a decider with the given threshold and an overhang of
+// that many frames.
+func NewDecider(threshold float64, overhang int) *Decider {
+	return &Decider{threshold: threshold, overhang: overhang}
+}
+
+// Speech reports whether the frame whose ratio is llr is speech; frames are
+// passed in stream order.
+func (d *Decider) Speech(llr float64) bool {
+	if llr >= d.threshold {
+		d.remaining = d.overhang
+		return true
 	}
-	return result
+	if d.remaining > 0 {
+		d.remaining--
+		return true
+	}
+	return false
 }
 
 // processFrameLLR classifies one frame and returns both the binary decision
