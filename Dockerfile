@@ -171,7 +171,7 @@ ARG BUILD_VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 \
-    go build -trimpath -ldflags="-s -w -X github.com/cplieger/subflux/internal/obs.buildVersion=${BUILD_VERSION}" -o /subflux ./cmd/subflux \
+    go build -trimpath -ldflags="-s -w -X github.com/cplieger/subflux/internal/buildinfo.stamped=${BUILD_VERSION}" -o /subflux ./cmd/subflux \
     && mkdir -p /config-skel
 
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md ./

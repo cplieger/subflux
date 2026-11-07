@@ -7,8 +7,7 @@
 //     ##x## tokens. Claims: the episodes stated under a season, ranges expanded.
 //   - FirstIndex, Present: where a marker-shaped token starts, unreadable
 //     digits included, so such a name still reaches no fallback.
-//   - Season: the first S##E## marker or S## token, else "Season N", else the
-//     cross form.
+//   - Season: the first S##E## or S## token, else "Season N", else ##x##.
 //   - StatesEpisode: a marker, E##, EP##, Episode N, " - NN" after the season
 //     or a range right after it or opening a bracket; a season pack states a
 //     Season and none.
@@ -35,6 +34,13 @@ var markerRe = regexp.MustCompile(`(?i)s(\d+)e(\d+)`)
 const (
 	maxRangeSpan    = 50
 	maxRangeEpisode = 999
+)
+
+// A file suffix after a spaced number is at most three dotted tokens of up to
+// six bytes, as in ".eng.forced.srt": a longer dotted tail is a title's words.
+const (
+	maxSuffixes  = 3
+	maxSuffixLen = 6
 )
 
 // Marker is the season/episode pair one token claims. Both numbers are
@@ -91,20 +97,12 @@ func (t Target) Matches(name string) bool {
 }
 
 // MatchesBareEpisode reports whether name states t's episode as a bare leading
-// number, with no season anywhere in the name.
-//
-// Separate from Matches because it is only sound with information the NAME does
-// not carry: the season. Two conditions must hold before a caller uses it, and
-// neither is checkable from here.
-//
-// The season must be known from outside the name, and known reliably rather than
-// assumed. In subflux it is: the provider search sends seasonNumber to the API and
-// the result's season is stamped from that same request, so a target's season came
-// from Sonarr and not from any filename.
-//
-// And no member of the same archive may claim a readable marker, which only the
-// caller holding the whole member list can decide. That condition is what stops
-// this reading from ever outvoting a notation that does parse.
+// number, with no season anywhere in the name. The name does not carry the
+// season, so a caller uses it only when both conditions hold, neither checkable
+// here: t's season is known reliably from outside the name (a provider result's
+// season is stamped from the seasonNumber its search sent), and no member of the
+// same archive claims a readable marker, so this reading never outvotes a
+// notation that parses.
 func (t Target) MatchesBareEpisode(name string) bool {
 	if !t.fixed {
 		return false
@@ -233,12 +231,13 @@ func StatesEpisode(name string) bool {
 }
 
 // Absolute returns the episode a name with no marker shape states by one
-// number, as batch entries name their files ("[Group] Show - 26" for S02E01):
-// the last " - NN", since a title's own number comes before it, else the first
-// E##, EP## or Episode N, else the first spaced " NN ", since "10 bits" comes
-// after it. A number inside a range or a bare one in brackets is none. ok is
-// false when no form is present, when the deciding number does not fit an int,
-// or when Present reports a marker shape, which numbers the episode explicitly.
+// number, as batch entries name their files ("[Group] Show - 26"): the last
+// " - NN", since a title's number comes first, else the first E##, EP## or
+// Episode N, else the last spaced NN that is no bit depth and that a space,
+// the name's end or a file suffix follows ("Mob Psycho 100 05.mkv" states 5,
+// "Show 02 10 bits" 2). A range's number or a bracketed bare one is none. ok
+// is false when no form is present, the number overflows an int, or Present
+// reports a marker shape.
 func Absolute(name string) (episode int, ok bool) {
 	r := read(name)
 	if len(r.shapes) > 0 {
@@ -255,7 +254,7 @@ func Absolute(name string) (episode int, ok bool) {
 		case byE, byWord:
 			word = cmp.Or(word, u.nums[0])
 		case bySpace:
-			spaced = cmp.Or(spaced, u.nums[0])
+			spaced = u.nums[0]
 		}
 	}
 	digits := cmp.Or(dash, word, spaced)
@@ -583,7 +582,7 @@ func (r *reading) readNumber(toks []token, k int, lower string, anchored bool) i
 }
 
 // readDigits reads bare digits: outside brackets a number after " - " or
-// between spaces, and, where anchored (right after a season statement or
+// spaced as spacedEnd says, and, where anchored (right after a season statement or
 // opening a bracket), digits a range joiner parts from the next number.
 // Unanchored, such digits are a volume's, a part's or a title's ("Vol.1-6")
 // and it skips them whole. It returns the last token it read.
@@ -602,10 +601,37 @@ func (r *reading) readDigits(toks []token, k int, anchored bool) int {
 		for k+1 < len(toks) && joinsNumber(toks[k+1]) {
 			k++
 		}
-	case !t.inside && strings.HasSuffix(t.before, " ") && strings.HasPrefix(t.after, " "):
+	case !t.inside && strings.HasSuffix(t.before, " ") && spacedEnd(toks, k) && !bitDepth(toks, k):
 		r.runs = append(r.runs, run{nums: []string{digits}, at: t.at, form: bySpace})
 	}
 	return k
+}
+
+// spacedEnd reports whether a spaced number ends at token k: a space follows
+// it, the name ends there, or only a dotted file suffix does (".mkv",
+// ".en.srt"). A suffix token starts with a letter, so a dotted year or
+// resolution (".2010", ".1080p") is none.
+func spacedEnd(toks []token, k int) bool {
+	t := toks[k]
+	if strings.HasPrefix(t.after, " ") || k+1 == len(toks) && t.after == "" {
+		return true
+	}
+	tail := toks[k+1:]
+	if t.after != "." || len(tail) == 0 || len(tail) > maxSuffixes || tail[len(tail)-1].after != "" {
+		return false
+	}
+	for i, s := range tail {
+		if i > 0 && s.before != "." || len(s.text) > maxSuffixLen || !isLetter(s.text[0]) {
+			return false
+		}
+	}
+	return true
+}
+
+// bitDepth reports whether the token after k is "bit" or "bits", as in
+// "10 bits".
+func bitDepth(toks []token, k int) bool {
+	return k+1 < len(toks) && (strings.EqualFold(toks[k+1].text, "bit") || strings.EqualFold(toks[k+1].text, "bits"))
 }
 
 // extend joins t to the last run when a range joiner precedes it and t is a
@@ -750,6 +776,8 @@ func isAlnum(b byte) bool {
 }
 
 func isDigit(b byte) bool { return b >= '0' && b <= '9' }
+
+func isLetter(b byte) bool { return isAlnum(b) && !isDigit(b) }
 
 // Compile-time proof that both diagnostic renderings satisfy fmt.Stringer, per
 // the shared rule that a well-known interface method is paired with an assertion

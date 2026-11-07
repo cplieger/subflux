@@ -7,7 +7,6 @@ package subtitleext
 
 import (
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -39,14 +38,3 @@ func OnDisk(name string) bool { return lookup(name).onDisk }
 
 // WriterOutput reports whether name has an extension subflux writes.
 func WriterOutput(name string) bool { return lookup(name).writerOutput }
-
-// Extensions returns every extension in the table, lowercase with the
-// leading dot, sorted.
-func Extensions() []string {
-	out := make([]string, 0, len(table))
-	for ext := range table {
-		out = append(out, ext)
-	}
-	slices.Sort(out)
-	return out
-}

@@ -4,9 +4,8 @@ import (
 	"testing"
 )
 
-// FuzzDownloadCache_PutGet exercises the cache with arbitrary keys and values,
-// verifying the Get-after-Put invariant and that the cache never panics
-// regardless of key/value combinations.
+// FuzzDownloadCache_PutGet: a stored body is read back, and a second put
+// under its key keeps the first.
 func FuzzDownloadCache_PutGet(f *testing.F) {
 	f.Add("key1", []byte("data1"), "key2", []byte("data2"))
 	f.Add("", []byte{}, "a", []byte("b"))
@@ -45,14 +44,6 @@ func FuzzDownloadCache_PutGet(f *testing.F) {
 			} else if len(got) != len(v2) {
 				t.Fatalf("Get(k2) len = %d, want %d", len(got), len(v2))
 			}
-		}
-
-		// Clear never panics.
-		dc.clear()
-
-		// After clear, nothing is retrievable.
-		if _, found := dc.get(k1); found {
-			t.Fatal("Get returned true after Clear for k1")
 		}
 	})
 }

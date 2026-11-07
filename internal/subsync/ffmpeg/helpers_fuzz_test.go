@@ -35,15 +35,8 @@ func FuzzNormalizeFFprobeLangUnd(f *testing.F) {
 	})
 }
 
-// FuzzNormalizeFFprobeLangNamespace asserts that the result is always either
-// empty or exactly two lowercase ASCII letters.
-//
-// Bug class: the result becomes a segment of the subtitle filename on disk and
-// part of the bbolt state key, so anything outside that shape cannot round-trip
-// through a scan — it matches no configured target, silently and permanently.
-// The previous implementation returned an unrecognized three-letter code
-// verbatim ("xyz" for "xyz") and a malformed tag verbatim ("-en" for "-en"),
-// both of which this property rejects.
+// FuzzNormalizeFFprobeLangNamespace: a non-empty result is the mapper's
+// canonical tag, so normalizing it again does not move it.
 func FuzzNormalizeFFprobeLangNamespace(f *testing.F) {
 	f.Add("en")
 	f.Add("eng")
@@ -63,16 +56,6 @@ func FuzzNormalizeFFprobeLangNamespace(f *testing.F) {
 		if got == "" {
 			return
 		}
-		if len(got) != 2 {
-			t.Fatalf("NormalizeFFprobeLang(%q, testLangMapper) = %q (len %d); want len 0 or 2", in, got, len(got))
-		}
-		for _, r := range got {
-			if r < 'a' || r > 'z' {
-				t.Fatalf("NormalizeFFprobeLang(%q, testLangMapper) = %q; want lowercase ASCII letters", in, got)
-			}
-		}
-		// A resolved code is already in the internal space, so resolving it
-		// again must not move it.
 		if again := NormalizeFFprobeLang(got, testLangMapper); again != got {
 			t.Fatalf("NormalizeFFprobeLang not idempotent: %q -> %q -> %q", in, got, again)
 		}

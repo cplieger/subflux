@@ -1,0 +1,794 @@
+{
+ "id": 687355,
+ "title": "[BlackRabbit] Frieren - Beyond Journey's End (2023) - S01 v2 [Bluray-1080p][Opus 2.0][Dual Audio][AV1]",
+ "status": "complete",
+ "num_files": 28,
+ "anidb_aid": 17617,
+ "anidb_eid": null,
+ "files": [
+  {
+   "id": 1396788,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E01 - The Journeys End [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586174,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f0e.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E01+-+The+Journeys+End+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586175,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f12.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E01+-+The+Journeys+End+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396789,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E02 - It Didnt Have to Be Magic [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586172,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f0d.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E02+-+It+Didnt+Have+to+Be+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586173,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f0f.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E02+-+It+Didnt+Have+to+Be+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396790,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E03 - Killing Magic [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586176,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f25.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E03+-+Killing+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586177,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f27.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E03+-+Killing+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396791,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E04 - The Land Where Souls Rest [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586178,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f26.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E04+-+The+Land+Where+Souls+Rest+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586179,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f29.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E04+-+The+Land+Where+Souls+Rest+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396792,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E05 - Phantoms of the Dead [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586180,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f3e.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E05+-+Phantoms+of+the+Dead+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586181,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f3f.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E05+-+Phantoms+of+the+Dead+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396793,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E06 - The Hero of the Village [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586182,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f40.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E06+-+The+Hero+of+the+Village+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586183,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f42.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E06+-+The+Hero+of+the+Village+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396794,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E07 - Like a Fairy Tale [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586186,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f57.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E07+-+Like+a+Fairy+Tale+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586187,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f5a.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E07+-+Like+a+Fairy+Tale+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396795,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E08 - Frieren the Slayer [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586184,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f58.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E08+-+Frieren+the+Slayer+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586185,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f59.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E08+-+Frieren+the+Slayer+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396796,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E09 - Aura the Guillotine [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586188,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f74.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E09+-+Aura+the+Guillotine+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586189,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f75.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E09+-+Aura+the+Guillotine+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396797,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E10 - A Powerful Mage [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586190,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f77.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E10+-+A+Powerful+Mage+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586191,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f78.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E10+-+A+Powerful+Mage+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396798,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E11 - Winter in the Northern Lands [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586192,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f90.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E11+-+Winter+in+the+Northern+Lands+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586193,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f91.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E11+-+Winter+in+the+Northern+Lands+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396799,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E12 - A Real Hero [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586194,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f93.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E12+-+A+Real+Hero+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586195,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1f95.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E12+-+A+Real+Hero+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396800,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E13 - Aversion to Ones Own Kind [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586196,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fad.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E13+-+Aversion+to+Ones+Own+Kind+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586197,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fae.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E13+-+Aversion+to+Ones+Own+Kind+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396801,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E14 - Privilege of the Young [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586198,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fb1.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E14+-+Privilege+of+the+Young+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586199,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fb2.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E14+-+Privilege+of+the+Young+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396802,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E15 - Smells Like Trouble [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586200,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fc6.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E15+-+Smells+Like+Trouble+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586201,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fc8.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E15+-+Smells+Like+Trouble+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396803,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E16 - Long-Lived Friends [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586202,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fd3.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E16+-+Long-Lived+Friends+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586203,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fd4.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E16+-+Long-Lived+Friends+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396804,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E17 - Take Care [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586204,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fdb.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E17+-+Take+Care+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586205,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fde.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E17+-+Take+Care+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396805,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E18 - First-Class Mage Exam [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586206,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1fef.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E18+-+First-Class+Mage+Exam+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586207,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1ff1.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E18+-+First-Class+Mage+Exam+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396806,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E19 - Well-Laid Plans [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586208,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1ff6.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E19+-+Well-Laid+Plans+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586209,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/1ff8.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E19+-+Well-Laid+Plans+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396807,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E20 - Necessary Killing [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586210,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/200b.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E20+-+Necessary+Killing+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586211,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/200e.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E20+-+Necessary+Killing+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396808,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E21 - The World of Magic [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586212,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2012.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E21+-+The+World+of+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586213,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2013.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E21+-+The+World+of+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396809,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E22 - Future Enemies [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586214,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2027.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E22+-+Future+Enemies+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586215,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2028.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E22+-+Future+Enemies+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396810,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E23 - Conquering the Labyrinth [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586216,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/202e.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E23+-+Conquering+the+Labyrinth+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586217,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2031.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E23+-+Conquering+the+Labyrinth+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396811,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E24 - Perfect Replicas [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586218,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2041.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E24+-+Perfect+Replicas+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586219,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2043.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E24+-+Perfect+Replicas+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396812,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E25 - A Fatal Vulnerability [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586220,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/204b.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E25+-+A+Fatal+Vulnerability+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586221,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/204e.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E25+-+A+Fatal+Vulnerability+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396813,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E26 - The Height of Magic [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586222,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/205f.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E26+-+The+Height+of+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586223,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2063.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E26+-+The+Height+of+Magic+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396814,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E27 - An Era of Humans [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586224,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2066.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E27+-+An+Era+of+Humans+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586225,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/2067.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E27+-+An+Era+of+Humans+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  },
+  {
+   "id": 1396815,
+   "filename": "Frieren - Beyond Journey's End (2023) - S01E28 - It Would Be Embarrassing When We Met Again [Bluray-1080p][Opus 2.0][AV1]-BlackRabbit.mkv",
+   "attachments": [
+    {
+     "id": 3586226,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/207d.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E28+-+It+Would+Be+Embarrassing+When+We+Met+Again+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track4.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Full Subtitles [9volt]",
+      "forced": false,
+      "default": true
+     }
+    },
+    {
+     "id": 3586227,
+     "type": "subtitle",
+     "url": "https://storage.animetosho.net/attachments/10003/207f.xz?filename=Frieren+-+Beyond+Journey%27s+End+%282023%29+-+S01E28+-+It+Would+Be+Embarrassing+When+We+Met+Again+%5BBluray-1080p%5D%5BOpus+2.0%5D%5BAV1%5D-BlackRabbit_track5.eng.ass.xz",
+     "info": {
+      "language_code": "eng",
+      "name": "Signs & Songs [9volt]",
+      "forced": true,
+      "default": false
+     }
+    }
+   ]
+  }
+ ]
+}

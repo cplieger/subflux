@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
 	"github.com/cplieger/go/slogx/capture"
+	"github.com/cplieger/subflux/internal/buildinfo"
 	"github.com/cplieger/subflux/internal/obs"
 )
 
@@ -24,6 +25,12 @@ func scrape(t *testing.T, m *obs.Metrics) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func TestBuildInfoCarriesVersion(t *testing.T) {
+	if want := `subflux_build_info{version="` + buildinfo.Version() + `"} 1`; !strings.Contains(scrape(t, obs.New()), want) {
+		t.Errorf("the exposition lacks %s", want)
+	}
 }
 
 func TestHTTPDurationBuckets(t *testing.T) {

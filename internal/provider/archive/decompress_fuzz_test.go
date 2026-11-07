@@ -1,17 +1,9 @@
 package archive
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/cplieger/subflux/internal/httpwire"
-)
-
-// FuzzDecompressOutputCap tests that Decompress never produces output exceeding
-// the documented size cap (MaxJSONResponseBytes = 5 MB). Bug class: crafted
-// compressed payloads (decompression bombs) bypass the LimitReader guard due to
-// off-by-one in the limit or failure to check len after ReadAll.
-// Invariant: len(Decompress(data)) <= MaxJSONResponseBytes for compressed inputs,
-// or len(data) for pass-through (uncompressed) inputs.
+// FuzzDecompressOutputCap: a compressed input's output never passes
+// maxExtractSize, and a plain one passes through unchanged.
 func FuzzDecompressOutputCap(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte("plain text"))
@@ -32,9 +24,9 @@ func FuzzDecompressOutputCap(f *testing.F) {
 
 		if isGz || isXz {
 			// Compressed: output must respect the size cap.
-			if int64(len(out)) > httpwire.MaxJSONResponseBytes {
+			if int64(len(out)) > maxExtractSize {
 				t.Errorf("Decompress produced %d bytes, exceeds cap %d",
-					len(out), httpwire.MaxJSONResponseBytes)
+					len(out), maxExtractSize)
 			}
 		}
 	})

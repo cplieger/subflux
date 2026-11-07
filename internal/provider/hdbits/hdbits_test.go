@@ -1,853 +1,434 @@
-package hdbits
+package hdbits_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log/slog"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/go/slogx/capture"
-	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/subflux"
-	"pgregory.net/rapid"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/hdbits"
+	"github.com/cplieger/subflux/internal/provider/providertest"
+	"github.com/cplieger/subflux/internal/rank"
 )
 
-func TestHdbLangToISO(t *testing.T) {
-	t.Parallel()
+const (
+	host    = "hdbits.org"
+	passkey = "0123456789abcdef0123456789abcdef"
+	values  = "username: user-1\npasskey: " + passkey
+)
 
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{name: "en maps to en", input: "en", want: "en"},
-		{name: "fr maps to fr", input: "fr", want: "fr"},
-		{name: "es maps to es", input: "es", want: "es"},
-		{name: "de maps to de", input: "de", want: "de"},
-		{name: "it maps to it", input: "it", want: "it"},
-		{name: "pt maps to pt", input: "pt", want: "pt"},
-		{name: "nl maps to nl", input: "nl", want: "nl"},
-		{name: "ru maps to ru", input: "ru", want: "ru"},
-		{name: "ja maps to ja", input: "ja", want: "ja"},
-		{name: "zh maps to zh", input: "zh", want: "zh"},
-		{name: "ko maps to ko", input: "ko", want: "ko"},
-		{name: "pl maps to pl", input: "pl", want: "pl"},
-		{name: "sv maps to sv", input: "sv", want: "sv"},
-		{name: "no maps to no", input: "no", want: "no"},
-		{name: "da maps to da", input: "da", want: "da"},
-		{name: "fi maps to fi", input: "fi", want: "fi"},
-		{name: "uk maps to uk", input: "uk", want: "uk"},
-		{name: "br maps to pb", input: "br", want: "pb"},
-		{name: "gr maps to el", input: "gr", want: "el"},
-		{name: "cz maps to cs", input: "cz", want: "cs"},
-		{name: "se maps to sv", input: "se", want: "sv"},
-		{name: "dk maps to da", input: "dk", want: "da"},
-		{name: "kr maps to ko", input: "kr", want: "ko"},
-		{name: "cn maps to zh", input: "cn", want: "zh"},
-		{name: "il maps to he", input: "il", want: "he"},
-		{name: "si maps to sl", input: "si", want: "sl"},
-		{name: "unknown code", input: "xx", want: ""},
-		{name: "empty string", input: "", want: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := hdbLangToISO(tt.input)
-			if got != tt.want {
-				t.Errorf("hdbLangToISO(%q) = %q, want %q",
-					tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFactory_requires_credentials(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		settings map[string]any
-		name     string
-		wantErr  bool
-	}{
-		{name: "nil settings", settings: nil, wantErr: true},
-		{name: "missing both", settings: map[string]any{}, wantErr: true},
-		{name: "missing passkey", settings: map[string]any{"username": "user"}, wantErr: true},
-		{name: "missing username", settings: map[string]any{"passkey": "key"}, wantErr: true},
-		{name: "empty username", settings: map[string]any{"username": "", "passkey": "key"}, wantErr: true},
-		{name: "empty passkey", settings: map[string]any{"username": "user", "passkey": ""}, wantErr: true},
-		{name: "valid credentials", settings: map[string]any{"username": "user", "passkey": "key"}, wantErr: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			p, err := Factory(t.Context(), tt.settings)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("Factory() expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Factory() unexpected error: %v", err)
-			}
-			if p.Name() != subflux.ProviderNameHDBits {
-				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameHDBits)
-			}
-		})
-	}
-}
-
-// TestFactory_torrentCacheUsesOneHourTTL verifies the torrent-ID cache the
-// factory builds keeps entries alive for the full hour it declares, and drops
-// them once past it. The bubble's synthetic clock makes the real TTL boundary
-// testable: on a wall clock this could only afford a millisecond-scale proxy
-// that proves the TTL is merely non-zero, which is what the test asserted
-// before. cache.Cache is a mutex plus a time.Now comparison with no goroutine,
-// timer or descriptor of its own, and Factory performs no I/O, so nothing in
-// the bubble can park on an external fd and stall the clock.
-func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		p, err := Factory(t.Context(), map[string]any{
-			settingUsername: "user",
-			settingPasskey:  "passkey",
-		})
-		if err != nil {
-			t.Fatalf("Factory() error = %v, want nil", err)
-		}
-		prov, ok := p.(*source)
-		if !ok {
-			t.Fatalf("Factory() returned %T, want *Provider", p)
-		}
-
-		const key = "torrents:tvdb:1:s1"
-		want := []int{11, 22, 33}
-		prov.torrentCache.Set(key, want)
-
-		// One second short of the declared hour: still live.
-		synctest.Sleep(time.Hour - time.Second)
-
-		got, found := prov.torrentCache.Get(key)
-		if !found {
-			t.Fatalf("torrentCache.Get(%q) at 59m59s found = false, want true", key)
-		}
-		if !slices.Equal(got, want) {
-			t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
-		}
-
-		// Two seconds later the hour has elapsed: expired.
-		synctest.Sleep(2 * time.Second)
-
-		if _, found := prov.torrentCache.Get(key); found {
-			t.Errorf("torrentCache.Get(%q) at 1h0m1s found = true, want false "+
-				"(entry outlived the declared 1h TTL)", key)
-		}
-	})
-}
-
-// --- Subtitle Data Filtering ---
-
-func TestFilterSubtitleData(t *testing.T) {
-	t.Parallel()
-
-	type assertFunc func(t *testing.T, got []subflux.Subtitle)
-
-	tests := []struct {
-		req       *subflux.SearchRequest
-		assertFn  assertFunc
-		name      string
-		data      []hdbSubtitleItem
-		wantCount int
-	}{
-		{name: "nil data returns nil", data: nil, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "empty data returns nil", data: []hdbSubtitleItem{}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "basic movie result mapped correctly", data: []hdbSubtitleItem{{Title: "Test Sub", Filename: "test.srt", Language: "en", ID: 42}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].Provider != subflux.ProviderNameHDBits {
-				t.Errorf("Provider = %q, want %q", got[0].Provider, subflux.ProviderNameHDBits)
-			}
-			if got[0].ID != "42" {
-				t.Errorf("ID = %q, want %q", got[0].ID, "42")
-			}
-			if got[0].Language != "en" {
-				t.Errorf("Language = %q, want %q", got[0].Language, "en")
-			}
-			if got[0].ReleaseName != "Test Sub" {
-				t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Test Sub")
-			}
-			if got[0].MatchedBy != subflux.MatchByIMDB {
-				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByIMDB)
-			}
-		}},
-		{name: "episode sets matched_by to tvdb_id", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "episode"}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].MatchedBy != subflux.MatchByTVDB {
-				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTVDB)
-			}
-		}},
-		{name: "unknown language skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "xx", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "language not in requested list skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "fr", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "br mapped to pb", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "br", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"pb"}}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].Language != "pb" {
-				t.Errorf("Language = %q, want %q", got[0].Language, "pb")
-			}
-		}},
-		{name: "commentary title filtered", data: []hdbSubtitleItem{{Title: "Director's Commentary", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "commentary filename filtered", data: []hdbSubtitleItem{{Title: "Normal Title", Filename: "commentary.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "extras title filtered", data: []hdbSubtitleItem{{Title: "Extras Disc", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "extra without s not filtered", data: []hdbSubtitleItem{{Title: "Extraordinary Movie", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
-		{name: "case insensitive commentary", data: []hdbSubtitleItem{{Title: "COMMENTARY Track", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "nil languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: nil}, wantCount: 0, assertFn: nil},
-		{name: "empty languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{}}, wantCount: 0, assertFn: nil},
-		{name: "gr mapped to el", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "gr", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"el"}}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].Language != "el" {
-				t.Errorf("Language = %q, want %q", got[0].Language, "el")
-			}
-		}},
-		{name: "non-subtitle extension filtered", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.mp4", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 0, assertFn: nil},
-		{name: "no extension accepted", data: []hdbSubtitleItem{{Title: "Sub", Filename: "subtitle_no_ext", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
-		{name: "lyrics title filtered", data: []hdbSubtitleItem{{Title: "Song Lyrics", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "forced in filename not filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "forced.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 1, assertFn: nil},
-		{name: "lyrics filename filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "lyrics.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "multiple requested languages", data: []hdbSubtitleItem{
-			{Title: "English Sub", Filename: "en.srt", Language: "en", ID: 1},
-			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 2},
-			{Title: "German Sub", Filename: "de.srt", Language: "de", ID: 3},
-		}, req: &subflux.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].Language != "en" {
-				t.Errorf("got[0].Language = %q, want %q", got[0].Language, "en")
-			}
-			if got[1].Language != "fr" {
-				t.Errorf("got[1].Language = %q, want %q", got[1].Language, "fr")
-			}
-		}},
-		{name: "season and episode propagated", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "episode", Season: 3, Episode: 7}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].Season != 3 {
-				t.Errorf("Season = %d, want 3", got[0].Season)
-			}
-			if got[0].Episode != 7 {
-				t.Errorf("Episode = %d, want 7", got[0].Episode)
-			}
-		}},
-		{name: "multiple results mixed filtering", data: []hdbSubtitleItem{
-			{Title: "Good Sub", Filename: "good.srt", Language: "en", ID: 1},
-			{Title: "Commentary", Filename: "c.srt", Language: "en", ID: 2},
-			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 3},
-			{Title: "Also Good", Filename: "also.srt", Language: "en", ID: 4},
-		}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []subflux.Subtitle) {
-			t.Helper()
-			if got[0].ID != "1" {
-				t.Errorf("got[0].ID = %q, want %q", got[0].ID, "1")
-			}
-			if got[1].ID != "4" {
-				t.Errorf("got[1].ID = %q, want %q", got[1].ID, "4")
-			}
-		}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := filterSubtitleData(tt.data, tt.req)
-			if len(got) != tt.wantCount {
-				t.Fatalf("filterSubtitleData() = %d results, want %d", len(got), tt.wantCount)
-			}
-			if tt.assertFn != nil {
-				tt.assertFn(t, got)
-			}
-		})
-	}
-
-	// Subtitle extensions sub-table.
-	t.Run("subtitle extensions", func(t *testing.T) {
-		t.Parallel()
-		for ext, want := range map[string]int{
-			".srt": 1, ".ass": 1, ".ssa": 1, ".vtt": 1, ".zip": 1, ".rar": 1,
-			".sub": 0, ".idx": 0,
-		} {
-			t.Run(ext, func(t *testing.T) {
-				t.Parallel()
-				data := []hdbSubtitleItem{{Title: "Sub", Filename: "sub" + ext, Language: "en", ID: 1}}
-				req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
-				got := filterSubtitleData(data, req)
-				if len(got) != want {
-					t.Errorf("filterSubtitleData(filename=%q) = %d results, want %d", "sub"+ext, len(got), want)
-				}
-			})
-		}
-	})
-}
-
-func TestFlexInt_UnmarshalJSON(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		input   string
-		want    int
-		wantErr bool
-	}{
-		{name: "number", input: `42`, want: 42, wantErr: false},
-		{name: "zero", input: `0`, want: 0, wantErr: true}, // non-positive IDs rejected
-		{name: "quoted string", input: `"123"`, want: 123, wantErr: false},
-		{name: "quoted zero", input: `"0"`, want: 0, wantErr: true}, // non-positive IDs rejected
-		{name: "non-numeric string", input: `"abc"`, want: 0, wantErr: true},
-		{name: "empty string", input: `""`, want: 0, wantErr: true},
-		{name: "negative number", input: `-5`, want: 0, wantErr: true}, // non-positive IDs rejected
-		{name: "negative quoted string", input: `"-10"`, want: 0, wantErr: true},
-		{name: "large number", input: `2147483647`, want: 2147483647, wantErr: false},
-		{name: "float", input: `3.14`, want: 0, wantErr: true},
-		{name: "quoted float", input: `"3.14"`, want: 0, wantErr: true},
-		{name: "boolean", input: `true`, want: 0, wantErr: true},
-		{name: "null value", input: `null`, want: 0, wantErr: true}, // null rejected: id=0 would build getdox.php?id=0&passkey=...
-		{name: "array", input: `[1]`, want: 0, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var got flexInt
-			err := json.Unmarshal([]byte(tt.input), &got)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("Unmarshal(%s) expected error", tt.input)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Unmarshal(%s) unexpected error: %v", tt.input, err)
-			}
-			if int(got) != tt.want {
-				t.Errorf("Unmarshal(%s) = %d, want %d", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFlexInt_reset_on_reuse(t *testing.T) {
-	t.Parallel()
-
-	// A reused receiver must not retain a stale id: the reset-first
-	// invariant (matching jsonx field types and sibling consumers) keeps
-	// the value 0 when a later decode fails, instead of leaving the
-	// previous id in place.
-	var got flexInt
-	if err := json.Unmarshal([]byte(`42`), &got); err != nil {
-		t.Fatalf("Unmarshal(42) unexpected error: %v", err)
-	}
-	if int(got) != 42 {
-		t.Fatalf("Unmarshal(42) = %d, want 42", got)
-	}
-	if err := json.Unmarshal([]byte(`"abc"`), &got); err == nil {
-		t.Fatal(`Unmarshal("abc") expected error`)
-	}
-	if int(got) != 0 {
-		t.Errorf(`after failed decode, receiver = %d, want 0 (stale value retained)`, got)
-	}
-}
-
-func TestFlexInt_in_struct(t *testing.T) {
-	t.Parallel()
-
-	// Simulates the real HDBits API returning id as a string.
-	input := `{"title":"Test","filename":"test.srt","language":"en","id":"79310"}`
-	var item hdbSubtitleItem
-	if err := json.Unmarshal([]byte(input), &item); err != nil {
-		t.Fatalf("Unmarshal string id: %v", err)
-	}
-	if int(item.ID) != 79310 {
-		t.Errorf("ID = %d, want 79310", item.ID)
-	}
-
-	// Normal numeric id still works.
-	input = `{"title":"Test","filename":"test.srt","language":"en","id":42}`
-	if err := json.Unmarshal([]byte(input), &item); err != nil {
-		t.Fatalf("Unmarshal numeric id: %v", err)
-	}
-	if int(item.ID) != 42 {
-		t.Errorf("ID = %d, want 42", item.ID)
-	}
-}
-
-func TestFlexInt_round_trip(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		n := rapid.IntRange(1, 1<<31-1).Draw(t, "n")
-		// Round-trip via JSON number.
-		numJSON := []byte(strconv.Itoa(n))
-		var got flexInt
-		if err := json.Unmarshal(numJSON, &got); err != nil {
-			t.Fatalf("flexInt.UnmarshalJSON(%s) error: %v", numJSON, err)
-		}
-		if int(got) != n {
-			t.Errorf("flexInt round-trip via number: got %d, want %d", got, n)
-		}
-		// Round-trip via JSON string.
-		strJSON := fmt.Appendf(nil, "%q", strconv.Itoa(n))
-		var got2 flexInt
-		if err := json.Unmarshal(strJSON, &got2); err != nil {
-			t.Fatalf("flexInt.UnmarshalJSON(%s) error: %v", strJSON, err)
-		}
-		if int(got2) != n {
-			t.Errorf("flexInt round-trip via string: got %d, want %d", got2, n)
-		}
-	})
-}
-
-func TestClearCache_empties_both_caches(t *testing.T) {
-	t.Parallel()
-	p := &source{
-		torrentCache: cache.New[[]int](1 * time.Hour),
-		dlCache:      newDownloadCache(100, 2<<20),
-	}
-	p.dlCache.put("1", []byte{0x50, 0x4b}, nil)
-	p.torrentCache.Set("key", []int{1, 2})
-	p.ClearCache()
-
-	if _, ok := p.dlCache.get("1"); ok {
-		t.Error("dlCache still has entries after ClearCache")
-	}
-	if _, ok := p.torrentCache.Get("key"); ok {
-		t.Error("torrentCache still has entries after ClearCache")
-	}
-}
-
-func TestFilterSubtitleData_forced_in_title_not_filtered(t *testing.T) {
-	t.Parallel()
-	data := []hdbSubtitleItem{
-		{Title: "Forced Narrative", Filename: "sub.srt", Language: "en", ID: 1},
-	}
-	req := &subflux.SearchRequest{Languages: []string{"en"}}
-	got := filterSubtitleData(data, req)
-	if len(got) != 1 {
-		t.Errorf("filterSubtitleData() = %d results, want 1 (forced not filtered at provider level)", len(got))
-	}
-}
-
-func TestFilterSubtitleData_extras_word_boundary(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		title string
-		want  int
-	}{
-		{name: "extras at end", title: "Bonus Extras", want: 0},
-		{name: "extras mid-sentence", title: "The Extras Collection", want: 0},
-		{name: "extra without s", title: "Extra Features", want: 1},
-		{name: "extraordinary", title: "Extraordinary Movie", want: 1},
-		{name: "extras case insensitive", title: "EXTRAS Disc", want: 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			data := []hdbSubtitleItem{
-				{Title: tt.title, Filename: "sub.srt", Language: "en", ID: 1},
-			}
-			req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
-			got := filterSubtitleData(data, req)
-			if len(got) != tt.want {
-				t.Errorf("filterSubtitleData(title=%q) = %d results, want %d",
-					tt.title, len(got), tt.want)
-			}
-		})
-	}
-}
-
-func TestFilterSubtitleData_does_not_set_variant_fields(t *testing.T) {
-	t.Parallel()
-	data := []hdbSubtitleItem{
-		{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1},
-	}
-	req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
-	got := filterSubtitleData(data, req)
-	if len(got) != 1 {
-		t.Fatalf("filterSubtitleData() = %d results, want 1", len(got))
-	}
-	if got[0].HearingImp {
-		t.Error("filterSubtitleData() set HearingImp = true, want false")
-	}
-	if got[0].Forced {
-		t.Error("filterSubtitleData() set Forced = true, want false")
-	}
-	if got[0].DownloadURL != "" {
-		t.Errorf("filterSubtitleData() DownloadURL = %q, want empty", got[0].DownloadURL)
-	}
-}
-
-func TestHdbLangToISO_standard_codes_return_identity(t *testing.T) {
-	t.Parallel()
-	// Standard codes in LangRegistry should return themselves,
-	// unless an override maps them to something else.
-	for code := range classify.LangRegistry {
-		got := hdbLangToISO(code)
-		if override, ok := hdbLangOverrides[code]; ok {
-			if got != override {
-				t.Errorf("hdbLangToISO(%q) = %q, want %q (override)", code, got, override)
-			}
-		} else if got != code {
-			t.Errorf("hdbLangToISO(%q) = %q, want %q (identity via LangRegistry)", code, got, code)
-		}
-	}
-}
-
-func TestHdbLangToISO_unmapped_returns_empty(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		code := rapid.StringMatching(`[a-z]{2,4}`).Draw(t, "code")
-		got := hdbLangToISO(code)
-		_, isOverride := hdbLangOverrides[code]
-		_, isRegistry := classify.LangRegistry[code]
-		if !isOverride && !isRegistry && got != "" {
-			t.Errorf("hdbLangToISO(%q) = %q, want empty for unmapped code",
-				code, got)
-		}
-	})
-}
-
-func TestFactory_initializes_provider_correctly(t *testing.T) {
-	t.Parallel()
-	p, err := Factory(t.Context(), map[string]any{"username": "testuser", "passkey": "testkey"})
-	if err != nil {
-		t.Fatalf("Factory() error: %v", err)
-	}
-	hdb, ok := p.(*source)
-	if !ok {
-		t.Fatal("Factory() did not return *Provider")
-	}
-	if hdb.username != "testuser" {
-		t.Errorf("username = %q, want %q", hdb.username, "testuser")
-	}
-	if hdb.passkey != "testkey" {
-		t.Errorf("passkey = %q, want %q", hdb.passkey, "testkey")
-	}
-	if hdb.client == nil {
-		t.Error("client is nil")
-	}
-	if hdb.torrentCache == nil {
-		t.Error("torrentCache is nil")
-	}
-}
-
-func TestFilterSubtitleData_title_filename_concatenation(t *testing.T) {
-	t.Parallel()
-
-	t.Run("word split across title and filename does not match", func(t *testing.T) {
-		t.Parallel()
-		// "com" + " " + "mentary.srt" = "com mentary.srt" which does NOT contain "commentary"
-		data := []hdbSubtitleItem{
-			{Title: "com", Filename: "mentary.srt", Language: "en", ID: 1},
-		}
-		req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
-		got := filterSubtitleData(data, req)
-		if len(got) != 1 {
-			t.Errorf("filterSubtitleData() = %d results, want 1 (split word should not match)", len(got))
-		}
-	})
-
-	t.Run("commentary in title boundary", func(t *testing.T) {
-		t.Parallel()
-		data := []hdbSubtitleItem{
-			{Title: "Movie commentary", Filename: "sub.srt", Language: "en", ID: 1},
-		}
-		req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
-		got := filterSubtitleData(data, req)
-		if len(got) != 0 {
-			t.Errorf("filterSubtitleData() = %d results, want 0 (commentary at end of title)", len(got))
-		}
-	})
-}
-
-// BenchmarkFilterSubtitleData measures per-torrent subtitle filtering
-// performance with varying item counts.
-func BenchmarkFilterSubtitleData(b *testing.B) {
-	makeItems := func(n int) []hdbSubtitleItem {
-		items := make([]hdbSubtitleItem, n)
-		for i := range items {
-			items[i] = hdbSubtitleItem{
-				Title:    "Movie Subtitle " + strconv.Itoa(i),
-				Filename: "sub_" + strconv.Itoa(i) + ".srt",
-				Language: "en",
-				ID:       flexInt(i + 1),
-			}
-		}
-		return items
-	}
-	req := &subflux.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}
-
-	for _, n := range []int{10, 50, 100} {
-		items := makeItems(n)
-		b.Run(fmt.Sprintf("items=%d", n), func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				filterSubtitleData(items, req)
-			}
-		})
-	}
-}
-
-// --- buildLookup ---
-
-func TestBuildLookup(t *testing.T) {
-	t.Parallel()
-
-	p := &source{username: "user", passkey: "key"}
-
-	tests := []struct {
-		req          *subflux.SearchRequest
-		assertParams func(t *testing.T, params map[string]any)
-		name         string
-		wantCacheKey string
-		wantNil      bool
-	}{
-		// Valid inputs.
-		{
-			name:         "episode with valid tvdb",
-			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 12345, Season: 3},
-			wantCacheKey: "torrents:tvdb:12345:s3",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				if params["username"] != "user" {
-					t.Errorf("params[username] = %v, want %q", params["username"], "user")
-				}
-				if params["passkey"] != "key" {
-					t.Errorf("params[passkey] = %v, want %q", params["passkey"], "key")
-				}
-				tvdb, ok := params["tvdb"].(map[string]any)
-				if !ok {
-					t.Fatalf("params[tvdb] = %T, want map[string]any", params["tvdb"])
-				}
-				if tvdb["id"] != 12345 {
-					t.Errorf("params[tvdb][id] = %v, want 12345", tvdb["id"])
-				}
-				if tvdb["season"] != 3 {
-					t.Errorf("params[tvdb][season] = %v, want 3", tvdb["season"])
-				}
-				if _, hasImdb := params["imdb"]; hasImdb {
-					t.Error("params[imdb] set on episode lookup, want absent")
-				}
-			},
-		},
-		{
-			name:         "episode with season zero",
-			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 99, Season: 0},
-			wantCacheKey: "torrents:tvdb:99:s0",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				tvdb, ok := params["tvdb"].(map[string]any)
-				if !ok {
-					t.Fatalf("params[tvdb] = %T, want map[string]any", params["tvdb"])
-				}
-				if tvdb["id"] != 99 {
-					t.Errorf("params[tvdb][id] = %v, want 99", tvdb["id"])
-				}
-			},
-		},
-		{
-			name:         "movie with valid imdb",
-			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt1375666"},
-			wantCacheKey: "torrents:imdb:tt1375666",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				imdb, ok := params["imdb"].(map[string]any)
-				if !ok {
-					t.Fatalf("params[imdb] = %T, want map[string]any", params["imdb"])
-				}
-				if imdb["id"] != 1375666 {
-					t.Errorf("params[imdb][id] = %v, want 1375666", imdb["id"])
-				}
-				if _, hasTvdb := params["tvdb"]; hasTvdb {
-					t.Error("params[tvdb] set on movie lookup, want absent")
-				}
-			},
-		},
-		{
-			name:         "movie strips tt prefix and leading zeros",
-			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt0000042"},
-			wantCacheKey: "torrents:imdb:tt0000042",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				imdb := params["imdb"].(map[string]any)
-				if imdb["id"] != 42 {
-					t.Errorf("params[imdb][id] = %v, want 42 (leading zeros stripped)", imdb["id"])
-				}
-			},
-		},
-		{
-			name:         "non episode uses imdb branch",
-			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt500", TvdbID: 9999},
-			wantCacheKey: "torrents:imdb:tt500",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				if _, hasTvdb := params["tvdb"]; hasTvdb {
-					t.Error("params[tvdb] set when MediaType=movie, want IMDB branch only")
-				}
-				imdb := params["imdb"].(map[string]any)
-				if imdb["id"] != 500 {
-					t.Errorf("params[imdb][id] = %v, want 500", imdb["id"])
-				}
-			},
-		},
-		{
-			name:         "cache key distinguishes seasons",
-			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 1},
-			wantCacheKey: "torrents:tvdb:77:s1",
-			assertParams: func(t *testing.T, params map[string]any) {
-				t.Helper()
-				req2 := &subflux.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 2}
-				_, k2 := p.buildLookup(req2)
-				if k2 != "torrents:tvdb:77:s2" {
-					t.Errorf("S2 cacheKey = %q, want %q", k2, "torrents:tvdb:77:s2")
-				}
-			},
-		},
-		// Invalid inputs (params should be nil).
-		{name: "episode with zero tvdb", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: 0, Season: 1}, wantNil: true},
-		{name: "episode with negative tvdb", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: -1, Season: 1}, wantNil: true},
-		{name: "movie with empty imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: ""}, wantNil: true},
-		{name: "movie with non-numeric imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "ttabc"}, wantNil: true},
-		{name: "movie with letters inside imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt12x45"}, wantNil: true},
-		{name: "empty media type with empty imdb", req: &subflux.SearchRequest{MediaType: "", ImdbID: ""}, wantNil: true},
-		{name: "unknown media type with no imdb", req: &subflux.SearchRequest{MediaType: "other", ImdbID: ""}, wantNil: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			params, cacheKey := p.buildLookup(tt.req)
-			if tt.wantNil {
-				if params != nil {
-					t.Errorf("buildLookup() params = %v, want nil", params)
-				}
-				if cacheKey != "" {
-					t.Errorf("buildLookup() cacheKey = %q, want empty", cacheKey)
-				}
-				return
-			}
-			if params == nil {
-				t.Fatal("buildLookup() params = nil, want non-nil")
-			}
-			if cacheKey != tt.wantCacheKey {
-				t.Errorf("cacheKey = %q, want %q", cacheKey, tt.wantCacheKey)
-			}
-			if tt.assertParams != nil {
-				tt.assertParams(t, params)
-			}
-		})
-	}
-}
-
-// --- capTorrentIDs ---
-
-func TestCapTorrentIDs(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		ids    []int
-		maxCap int
-		want   []int
-	}{
-		{name: "nil stays nil", ids: nil, maxCap: 5, want: nil},
-		{name: "empty stays empty", ids: []int{}, maxCap: 5, want: []int{}},
-		{name: "under cap unchanged", ids: []int{1, 2, 3}, maxCap: 5, want: []int{1, 2, 3}},
-		{name: "at cap unchanged", ids: []int{1, 2, 3, 4, 5}, maxCap: 5, want: []int{1, 2, 3, 4, 5}},
-		{name: "over cap truncated to first maxCap", ids: []int{1, 2, 3, 4, 5, 6, 7}, maxCap: 5, want: []int{1, 2, 3, 4, 5}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := capTorrentIDs(tt.ids, tt.maxCap, "torrents:imdb:tt1")
-			if !slices.Equal(got, tt.want) {
-				t.Errorf("capTorrentIDs(%v, %d) = %v, want %v", tt.ids, tt.maxCap, got, tt.want)
-			}
-		})
-	}
-}
-
-// captureLogs routes the default logger into a buffer for the rest of the test
-// and restores it afterwards. The default logger is process-global, so a test
-// that calls this must not run in parallel.
-func captureLogs(t *testing.T) *bytes.Buffer {
+func tags(t *testing.T, ss ...string) []language.Tag {
 	t.Helper()
-	var buf bytes.Buffer
-	capture.SwapDefault(t, slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	return &buf
+	var out []language.Tag
+	for _, s := range ss {
+		tg, ok := language.Parse(s)
+		if !ok {
+			t.Fatalf("tag %q", s)
+		}
+		out = append(out, tg)
+	}
+	return out
 }
 
-// TestCapTorrentIDs_warnsOnlyWhenTruncating asserts the operator warning marks a
-// real truncation: a list exactly at the cap is complete, so warning about it
-// would be a false alarm about a pathological upstream.
-// Not parallel: it swaps the process-wide default logger.
-func TestCapTorrentIDs_warnsOnlyWhenTruncating(t *testing.T) {
-	const msg = "hdbits: torrent list exceeded cap, truncating"
+// recorded serves the recorded answers: Inception's 16 torrents by IMDb id,
+// their subtitle lists and one getdox body. list, when set, answers a
+// torrent's list first, returning false to fall through.
+type recorded struct {
+	list   func(w http.ResponseWriter, torrent int) bool
+	lists  map[string]json.RawMessage
+	mu     sync.Mutex
+	reqs   []string
+	times  []time.Time
+	bodies []map[string]any
+}
 
-	t.Run("at the cap", func(t *testing.T) {
-		logs := captureLogs(t)
-		capTorrentIDs([]int{1, 2, 3, 4, 5}, 5, "torrents:imdb:tt1")
-		if got := logs.String(); strings.Contains(got, msg) {
-			t.Errorf("capTorrentIDs(5 ids, cap 5) logged %q, want no truncation warning", got)
+func newRecorded(t *testing.T) *recorded {
+	b, err := os.ReadFile("testdata/subtitles-by-torrent.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := &recorded{}
+	if err := json.Unmarshal(b, &rec.lists); err != nil {
+		t.Fatal(err)
+	}
+	return rec
+}
+
+func (rec *recorded) requests() ([]string, []map[string]any) {
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	return slices.Clone(rec.reqs), slices.Clone(rec.bodies)
+}
+
+func (rec *recorded) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	if r.Method == http.MethodPost {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	rec.mu.Lock()
+	rec.reqs = append(rec.reqs, r.Method+" "+r.URL.Path)
+	rec.times = append(rec.times, time.Now())
+	rec.bodies = append(rec.bodies, body)
+	rec.mu.Unlock()
+	if r.URL.Path == "/getdox.php" {
+		q := r.URL.Query()
+		if q.Get("passkey") != passkey {
+			_, _ = w.Write([]byte(`{"status":5,"message":"Invalid authentication credentials"}`))
+			return
 		}
-	})
+		if q.Get("id") != "344222" {
+			http.NotFound(w, r)
+			return
+		}
+		b, _ := os.ReadFile("testdata/getdox-344222.srt")
+		_, _ = w.Write(b)
+		return
+	}
+	if body["username"] != "user-1" || body["passkey"] != passkey {
+		b, _ := os.ReadFile("testdata/auth-failed.json")
+		_, _ = w.Write(b)
+		return
+	}
+	switch r.URL.Path {
+	case "/api/test":
+		_, _ = w.Write([]byte(`{"status":0,"message":"OK"}`))
+	case "/api/torrents":
+		if imdb, _ := body["imdb"].(map[string]any); imdb["id"] == float64(1375666) {
+			b, _ := os.ReadFile("testdata/torrents-imdb-1375666.json")
+			_, _ = w.Write(b)
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":0,"data":[]}`))
+	case "/api/subtitles":
+		id, _ := body["torrent_id"].(float64)
+		if rec.list != nil && rec.list(w, int(id)) {
+			return
+		}
+		if l, ok := rec.lists[strconv.Itoa(int(id))]; ok {
+			_, _ = w.Write(l)
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":0,"data":[]}`))
+	default:
+		http.NotFound(w, r)
+	}
+}
 
-	t.Run("over the cap", func(t *testing.T) {
-		logs := captureLogs(t)
-		capTorrentIDs([]int{1, 2, 3, 4, 5, 6, 7}, 5, "torrents:imdb:tt1")
-		const want = `msg="hdbits: torrent list exceeded cap, truncating" returned=7 cap=5 cache_key=torrents:imdb:tt1`
-		if got := logs.String(); !strings.Contains(got, want) {
-			t.Errorf("capTorrentIDs(7 ids, cap 5) log = %q, want it to contain %q", got, want)
+func movie(t *testing.T, langs ...string) provider.Query {
+	return provider.Query{Kind: media.Movie, Titles: []string{"Inception"}, Year: 2010, External: media.ExternalIDs{IMDb: 1375666, TMDB: 27205}, Langs: tags(t, langs...)}
+}
+
+func isKind(err error, k provider.FailureKind) bool {
+	f, ok := errors.AsType[*provider.Failure](err)
+	return ok && f.Kind == k
+}
+
+func TestSearchRecorded(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		got, err := providertest.Build(t, hdbits.NewEntry(), values).Search(ctx, movie(t, "en", "el"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var en, el []string
+		for _, c := range got {
+			if c.MatchedBy != rank.ID {
+				t.Errorf("candidate %+v, want an id match", c)
+			}
+			s := c.Ref.Token()
+			if c.Flags.HI {
+				s += " HI"
+			}
+			switch c.Lang {
+			case tags(t, "en")[0]:
+				en = append(en, s)
+			case tags(t, "el")[0]:
+				el = append(el, s)
+			}
+		}
+		slices.Sort(en)
+		slices.Sort(el)
+		// uk is English; the SDH file is hearing impaired, "[retail+HI
+		// removed]" is not; the Extras archive is left out.
+		if want := []string{"478421.srt", "532620.srt", "532621.srt HI"}; !slices.Equal(en, want) {
+			t.Errorf("English %q, want %q", en, want)
+		}
+		if len(el) != 3 {
+			t.Errorf("Greek %q, want the three subtitles that are not extras", el)
+		}
+		reqs, bodies := rec.requests()
+		if len(reqs) != 17 || reqs[0] != "POST /api/torrents" || bodies[0]["imdb"] == nil {
+			t.Errorf("%d requests, first %q %v; want the torrent search and 16 lists", len(reqs), reqs[0], bodies[0])
 		}
 	})
 }
 
-// --- secret redaction (provider wiring) ---
+func TestSearchLookup(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		a := providertest.Build(t, hdbits.NewEntry(), values)
+		ep := provider.Query{Kind: media.Episode, External: media.ExternalIDs{TVDB: 81189, IMDb: 903747}, Numbering: media.Numbering{Scheme: media.TVDB, Season: 2, Episode: 3}, Langs: tags(t, "en")}
+		if _, err := a.Search(ctx, ep); err != nil {
+			t.Fatal(err)
+		}
+		_, bodies := rec.requests()
+		if tvdb, _ := bodies[0]["tvdb"].(map[string]any); tvdb["id"] != float64(81189) || tvdb["season"] != float64(2) || bodies[0]["imdb"] != nil {
+			t.Errorf("episode lookup %v, want the series' TVDB id and season", bodies[0])
+		}
+		ep.External.TVDB = 0
+		noIMDb := movie(t, "en")
+		noIMDb.External.IMDb = 0
+		for _, q := range []provider.Query{ep, noIMDb} {
+			if _, err := a.Search(ctx, q); !errors.As(err, new(*provider.Skipped)) {
+				t.Errorf("%+v: %v, want *Skipped", q.External, err)
+			}
+		}
+		if reqs, _ := rec.requests(); len(reqs) != 1 {
+			t.Errorf("requests %q, want only the first lookup", reqs)
+		}
+	})
+}
 
-// roundTripFunc adapts a function to http.RoundTripper so a test can drive
-// the provider's HTTP client without a real network.
-type roundTripFunc func(*http.Request) (*http.Response, error)
+// TestHDBitsListCached: a found torrent search or subtitle list is asked
+// once every 6 hours, an empty one every 15 minutes; a list is sent at most
+// every half second, and a cached one waits for nothing. Inception's 16
+// recorded lists hold 10 empty ones.
+func TestHDBitsListCached(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		a := providertest.Build(t, hdbits.NewEntry(), values)
+		other := movie(t, "en")
+		other.External.IMDb = 2
+		searches := func() (torrents, lists int) {
+			for _, q := range []provider.Query{movie(t, "en"), other} {
+				if _, err := a.Search(ctx, q); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reqs, _ := rec.requests()
+			all := strings.Join(reqs, "\n")
+			return strings.Count(all, "/api/torrents"), strings.Count(all, "/api/subtitles")
+		}
+		check := func(when string, torrents, lists, wantTorrents, wantLists int) {
+			t.Helper()
+			if torrents != wantTorrents || lists != wantLists {
+				t.Errorf("%s: %d torrent searches and %d lists, want %d and %d", when, torrents, lists, wantTorrents, wantLists)
+			}
+		}
+		n, l := searches()
+		check("first", n, l, 2, 16)
+		rec.mu.Lock()
+		var last time.Time
+		for i, r := range rec.reqs {
+			if r == "POST /api/subtitles" {
+				if !last.IsZero() && rec.times[i].Sub(last) < 500*time.Millisecond {
+					t.Errorf("list %d sent %v after the one before, want at least 500ms", i, rec.times[i].Sub(last))
+				}
+				last = rec.times[i]
+			}
+		}
+		rec.mu.Unlock()
+		start := time.Now()
+		n, l = searches()
+		check("again", n, l, 2, 16)
+		if d := time.Since(start); d != 0 {
+			t.Errorf("a cached search took %v, want no wait", d)
+		}
+		time.Sleep(15 * time.Minute)
+		n, l = searches()
+		check("after 15 minutes", n, l, 3, 26)
+		time.Sleep(6*time.Hour - 15*time.Minute)
+		n, l = searches()
+		check("after 6 hours", n, l, 5, 42)
+	})
+}
 
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+// TestFilenameNamesRelease: a file listed with no title takes its file
+// name's stem as its release; a titled one keeps its title.
+func TestFilenameNamesRelease(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		rec.list = func(w http.ResponseWriter, torrent int) bool {
+			if torrent != 792434 {
+				return false
+			}
+			_, _ = w.Write([]byte(`{"status":0,"data":[
+				{"id":1,"title":"","filename":"Inception.2010.2160p.WEB-DL.DTS-HD.MA.5.1-TheFarm.srt","language":"uk"},
+				{"id":2,"title":" ","filename":"Inception.2010.2160p.WEB-DL-TheFarm.SDH.srt","language":"uk"}]}`))
+			return true
+		}
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		got, err := providertest.Build(t, hdbits.NewEntry(), values).Search(ctx, movie(t, "en"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rels := map[string]string{}
+		for _, c := range got {
+			rels[c.Ref.Token()] = c.Release
+		}
+		want := map[string]string{
+			"1.srt":      "Inception.2010.2160p.WEB-DL.DTS-HD.MA.5.1-TheFarm",
+			"2.srt":      "Inception.2010.2160p.WEB-DL-TheFarm.SDH",
+			"532620.srt": "Inception 2010 2160p UHD BluRay DTS-HD MA 5.1 HDR x265-CtrlHD",
+		}
+		for tok, rel := range want {
+			if rels[tok] != rel {
+				t.Errorf("%s: release %q, want %q", tok, rels[tok], rel)
+			}
+		}
+	})
+}
 
-// TestDownload_redactsPasskeyFromTransportError verifies the public Download
-// path strips the passkey from transport errors: the getdox URL carries the
-// passkey as a query parameter, so a failed request surfaces it inside the
-// wrapping *url.Error unless the provider redacts it.
-func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
-	t.Parallel()
-	const passkey = "supersecret32hex"
-	p := &source{
-		passkey: passkey,
-		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
-			return nil, errors.New("dial tcp: i/o timeout")
-		})},
-		dlCache: newDownloadCache(10, 1<<20),
+// TestRefusedAccount: a refused account ends the search on the torrent
+// lookup or on a list, with the lists read before it.
+func TestRefusedAccount(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		a := providertest.Build(t, hdbits.NewEntry(), "username: user-1\npasskey: wrong")
+		if _, err := a.Search(ctx, movie(t, "en")); !isKind(err, provider.Auth) {
+			t.Errorf("search: %v, want Auth", err)
+		}
+		if err := a.(provider.Tester).Test(ctx); !isKind(err, provider.Auth) {
+			t.Errorf("Test: %v, want Auth", err)
+		}
+		if err := providertest.Build(t, hdbits.NewEntry(), values).(provider.Tester).Test(ctx); err != nil {
+			t.Errorf("Test refused a good account: %v", err)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		rec.list = func(w http.ResponseWriter, torrent int) bool {
+			if torrent == 86413 {
+				_, _ = w.Write([]byte(`{"status":5,"message":"Invalid authentication credentials"}`))
+				return true
+			}
+			return false
+		}
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		got, err := providertest.Build(t, hdbits.NewEntry(), values).Search(ctx, movie(t, "en", "el", "cs"))
+		reqs, _ := rec.requests()
+		if !isKind(err, provider.Auth) || len(got) == 0 || len(reqs) >= 17 {
+			t.Errorf("%d candidates, %v after %d requests; want the read lists, Auth and the later lists unasked", len(got), err, len(reqs))
+		}
+	})
+}
+
+// TestFailedListReported: a list failing otherwise is sent once, the other
+// lists are still read, and the failure comes back beside them.
+func TestFailedListReported(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		var asked int
+		rec.list = func(w http.ResponseWriter, torrent int) bool {
+			if torrent == 792434 {
+				asked++
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return true
+			}
+			return false
+		}
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		got, err := providertest.Build(t, hdbits.NewEntry(), values).Search(ctx, movie(t, "en"))
+		if !isKind(err, provider.Transient) || len(got) != 3 || asked != 1 {
+			t.Errorf("%d candidates, %v, the failing list asked %d times; want 3, Transient and once", len(got), err, asked)
+		}
+	})
+}
+
+func TestFetchRecorded(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), rec, host)
+		a := providertest.Build(t, hdbits.NewEntry(), values)
+		want, _ := os.ReadFile("testdata/getdox-344222.srt")
+		for _, tok := range []string{"344222.srt", "344222"} {
+			p, err := a.Fetch(ctx, provider.NewRef(tok))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.Name != tok || string(p.Bytes) != string(want) {
+				t.Errorf("payload %q of %d bytes", p.Name, len(p.Bytes))
+			}
+		}
+		if reqs, _ := rec.requests(); len(reqs) != 1 || reqs[0] != "GET /getdox.php" {
+			t.Errorf("requests %q, want one download served twice", reqs)
+		}
+		for _, tok := range []string{"", "abc", "0", "-1", "0344222", "344222.", "344222.s/rt", "344222.toolongext", "4294967296"} {
+			if _, err := a.Fetch(ctx, provider.NewRef(tok)); !isKind(err, provider.Permanent) {
+				t.Errorf("token %q: %v, want Permanent", tok, err)
+			}
+		}
+	})
+}
+
+// TestFetchVerdictNotCached: a getdox body that is the API's refusal is
+// Auth, quotes no passkey, and is not served again from the cache.
+func TestFetchVerdictNotCached(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rec := newRecorded(t)
+		ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/getdox.php" {
+				rec.ServeHTTP(w, r)
+				return
+			}
+		}), host)
+		a := providertest.Build(t, hdbits.NewEntry(), "username: user-1\npasskey: wrongpasskey0123456789")
+		for range 2 {
+			_, err := a.Fetch(ctx, provider.NewRef("344222.srt"))
+			if !isKind(err, provider.Auth) || strings.Contains(err.Error(), "wrongpasskey0123456789") {
+				t.Errorf("%v, want Auth without the passkey", err)
+			}
+		}
+		if reqs, _ := rec.requests(); len(reqs) != 2 {
+			t.Errorf("requests %q, want both fetches sent", reqs)
+		}
+	})
+}
+
+func TestProviderMaps(t *testing.T) {
+	m := hdbits.NewEntry().Languages
+	b, err := os.ReadFile("testdata/subtitles-by-torrent.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	_, err := p.Download(t.Context(), &subflux.Subtitle{ID: "123"})
-	if err == nil {
-		t.Fatal("Download() with a failing transport expected an error")
+	var lists map[string]struct {
+		Data []struct {
+			Language string `json:"language"`
+		} `json:"data"`
 	}
-	if strings.Contains(err.Error(), passkey) {
-		t.Errorf("Download() leaked passkey in error: %q", err.Error())
+	if err := json.Unmarshal(b, &lists); err != nil {
+		t.Fatal(err)
 	}
-	// Redaction unwraps the *url.Error but must preserve the underlying cause.
-	if !strings.Contains(err.Error(), "i/o timeout") {
-		t.Errorf("Download() error lost the transport cause: %q", err.Error())
+	for id, l := range lists {
+		for _, d := range l.Data {
+			if _, ok := m.Tag(d.Language); !ok {
+				t.Errorf("torrent %s: label %q maps to no tag", id, d.Language)
+			}
+		}
+	}
+	for _, tg := range m.Tags() {
+		w, ok := m.Wire(tg)
+		if back, _ := m.Tag(w); !ok || back != tg {
+			t.Errorf("%v does not round-trip through %q", tg, w)
+		}
+	}
+	for wire, want := range map[string]string{"uk": "en", "se": "sv", "si": "sl", "br": "pt-BR", "hk": "zh-Hant", "cn": "zh-Hans", "il": "he", "gr": "el"} {
+		if got, _ := m.Tag(wire); got != tags(t, want)[0] {
+			t.Errorf("%q maps to %v, want %s", wire, got, want)
+		}
 	}
 }
