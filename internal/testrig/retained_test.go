@@ -13,9 +13,9 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"ST-2", "ST-2b", "TS-2a", "TS-2b", "TS-2", "MS-2", "MR-1", "OW-6", "SE-2a",
-	"SE-2", "SE-2p", "PA-2", "AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3",
-	"WC-1a", "WC-1b", "WC-1", "UX-1b", "UX-1", "AUS-1",
+	"ST-2", "ST-2b", "TS-2b", "TS-2", "MS-2", "MR-1", "OW-6", "SE-2", "SE-2p",
+	"PA-2", "AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
+	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
 
 // refPrefix is how deadset spells a symbol of this module; rows hold the rest.
@@ -144,7 +144,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#CoverageCount.*", "AP-1b"},
 	{"internal/statedb#CoverageRow", "SE-2"},
 	{"internal/statedb#CoverageRow.*", "SE-2"},
-	{"internal/statedb#CredentialDisable", "SE-2a"},
 	{"internal/statedb#Delta", "MR-1"},
 	{"internal/statedb#Delta.*", "MR-1"},
 	{"internal/statedb#Download", "TS-2b"},
@@ -202,9 +201,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#Store.BeginRetime", "TS-2b"},
 	{"internal/statedb#Store.Changed", "MR-1"},
 	{"internal/statedb#Store.Coverage", "SE-2"},
-	{"internal/statedb#Store.CredentialDisable", "SE-2a"},
 	{"internal/statedb#Store.DeferWork", "SE-2"},
-	{"internal/statedb#Store.DeleteCredentialDisable", "SE-2a"},
 	{"internal/statedb#Store.Embedded", "TS-2"},
 	{"internal/statedb#Store.EndDelete", "TS-2b"},
 	{"internal/statedb#Store.EndDeliver", "TS-2b"},
@@ -225,7 +222,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#Store.PendingDeliverOf", "TS-2b"},
 	{"internal/statedb#Store.PendingWrites", "TS-2b"},
 	{"internal/statedb#Store.Policy", "MS-2"},
-	{"internal/statedb#Store.PutCredentialDisable", "SE-2a"},
 	{"internal/statedb#Store.PutEmbedded", "TS-2"},
 	{"internal/statedb#Store.PutExternal", "SE-2"},
 	{"internal/statedb#Store.PutNoResults", "SE-2"},
