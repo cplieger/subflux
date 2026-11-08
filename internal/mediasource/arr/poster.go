@@ -75,7 +75,11 @@ func (p *Poster) Fetch(ctx context.Context, url, apiKey string) (body io.ReadClo
 	req.Header.Set("X-Api-Key", apiKey)
 	resp, err := arr.Do(req) // #nosec G704 -- url is the configured arr origin's; CheckRedirect stops before any other origin
 	if err != nil {
-		return nil, "", false, Classify(httpclient.RedactTransportError(err, "poster", httpclient.Secret(apiKey)))
+		// A message holding the key comes back redacted with no chain, so the
+		// cause is classified from err itself.
+		safe := Classify(httpclient.RedactTransportError(err, "poster", httpclient.Secret(apiKey)))
+		safe.Cause = Classify(err).Cause
+		return nil, "", false, safe
 	}
 	defer drain(resp)
 	if !isRedirect(resp.StatusCode) {
