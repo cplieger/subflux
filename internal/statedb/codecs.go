@@ -79,6 +79,12 @@ var mediaKeys = keyCodec[media.Key]{
 	parse:   (*keyReader).key,
 }
 
+var rootKeys = keyCodec[media.RootKey]{
+	version: 1,
+	put:     func(dst []byte, k media.RootKey) []byte { return append(dst, k.Bytes()...) },
+	parse:   (*keyReader).rootKey,
+}
+
 var sourceKeys = keyCodec[media.SourceID]{
 	version: 1,
 	put:     func(dst []byte, s media.SourceID) []byte { return appendText(dst, string(s)) },

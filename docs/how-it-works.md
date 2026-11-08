@@ -73,7 +73,7 @@ Until a valid configuration is saved, the settings dialog opens on its own and t
 
 When a site rejects its credentials, such as a wrong password, passkey or API key, subflux stops calling it instead of retrying until the site locks the account. The first rejection pauses the site for 5 minutes and the second for 30 minutes. Each pause ends with one test request, and the third rejection disables the site.
 
-A disabled site raises an alert on the web page that stays until it is cleared, logs one ERROR line and sets `subflux_provider_health{provider,health="disabled"}` to 1. The disable survives a restart, and nothing turns the site back on by itself. Three things do:
+A disabled site raises an alert on the web page that stays until it is cleared, logs one ERROR line, sets `subflux_provider_health{provider,health="disabled"}` to 1 and fires the `SubfluxProviderUnusable` alert rule after 65 minutes. The disable survives a restart, and nothing turns the site back on by itself. Three things do:
 
 - Save the site with different credentials.
 - Press the site's **Test** button in the settings dialog. A pass with the recorded credentials turns the site back on. A pass with edited credentials asks you to save them.
@@ -94,7 +94,7 @@ subflux saves subtitles next to the media, so a read-only media folder prevents 
 - in a folder where a save just failed,
 - every 5 minutes in a folder found unwritable.
 
-When subtitles cannot be written in a folder, subflux stops searching for and downloading subtitles there. It shows an alert naming the folder and the error, and `subflux_media_root_unwritable{root}` reads 1 for that folder's media root. It resumes once a write test there succeeds. subflux never changes file or folder permissions. New subtitle files get the permissions your share's umask and ACLs give them.
+When subtitles cannot be written in a folder, subflux stops searching for and downloading subtitles there. It shows an alert on the web page naming the folder and the error. It resumes once a write test there succeeds. subflux never changes file or folder permissions. New subtitle files get the permissions your share's umask and ACLs give them.
 
 While such a folder stays unwritable, later imports from the same Sonarr or Radarr instance also wait, whatever folder they land in. That includes the other imports reported in the same check. None is lost. They are processed in order once the folder recovers, and the next full scan covers healthy folders meanwhile. A waiting import is also released once it no longer needs a subtitle there. That happens when you tag its series with one of your `search.exclude_arr_tags`, or when you delete its video. subflux checks it again at most 5 minutes plus one `poll_interval` after its last check.
 
@@ -102,7 +102,7 @@ If a configured media root is missing or cannot be written, full library scans d
 
 ## Missing and unmounted media
 
-A video counts as deleted only when it is missing from a media root that is present, readable and not empty. An unmounted share usually looks like an empty root. If the root is missing or empty, or a file check fails or takes over 10 seconds, subflux keeps the subtitle records and manual locks. It also holds new imports there, shows an alert naming the path and checks again every 5 minutes. `subflux_media_root_unavailable{root}` reads 1 meanwhile.
+A video counts as deleted only when it is missing from a media root that is present, readable and not empty. An unmounted share usually looks like an empty root. If the root is missing or empty, or a file check fails or takes over 10 seconds, subflux keeps the subtitle records and manual locks. It also holds new imports there, shows an alert naming the path and checks again every 5 minutes. The `SubfluxMediaUnavailable` alert rule fires once that has lasted 5 minutes.
 
 List each mounted share as its own `media_roots` entry, so an unmounted one shows up as an empty root.
 

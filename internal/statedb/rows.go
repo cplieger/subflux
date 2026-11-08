@@ -273,11 +273,16 @@ type coverageRow struct {
 	Pairs []coveragePair `json:"pairs"`
 }
 
+// LastRefusal is search's wire spelling of the last automatic refusal, held
+// only while the pair is Missing.
 type coveragePair struct {
-	Tag      rowTag `json:"tag"`
-	Variant  uint8  `json:"variant"`
-	Coverage uint8  `json:"coverage"`
+	LastRefusal string `json:"last_refusal,omitempty"`
+	Tag         rowTag `json:"tag"`
+	Variant     uint8  `json:"variant"`
+	Coverage    uint8  `json:"coverage"`
 }
+
+var errRefusalNotMissing = errors.New("statedb: a refusal stored on a pair that is not missing")
 
 func (r *coverageRow) check() error {
 	for _, p := range r.Pairs {
@@ -286,6 +291,39 @@ func (r *coverageRow) check() error {
 		}
 		if err := enumIn("coverage", p.Coverage, uint8(Missing), uint8(Exact)); err != nil {
 			return err
+		}
+		if p.LastRefusal != "" && p.Coverage != uint8(Missing) {
+			return errRefusalNotMissing
+		}
+	}
+	return nil
+}
+
+// 0x18 counts: a root's coverage summed per configured pair over its items
+// of owned instances that are not excluded, sorted by tag and variant.
+type countsRow struct {
+	Pairs []countPair `json:"pairs"`
+}
+
+type countPair struct {
+	Tag        rowTag `json:"tag"`
+	Items      int    `json:"items"`
+	Exact      int    `json:"exact"`
+	Substitute int    `json:"substitute"`
+	Missing    int    `json:"missing"`
+	Locked     int    `json:"locked"`
+	Variant    uint8  `json:"variant"`
+}
+
+var errCountsPartition = errors.New("statedb: exact, substitute and missing do not partition items")
+
+func (r *countsRow) check() error {
+	for _, p := range r.Pairs {
+		if err := checkVariant(p.Variant); err != nil {
+			return err
+		}
+		if p.Items < 1 || p.Exact < 0 || p.Substitute < 0 || p.Missing < 0 || p.Exact+p.Substitute+p.Missing != p.Items || p.Locked < 0 || p.Locked > p.Items {
+			return errCountsPartition
 		}
 	}
 	return nil

@@ -306,9 +306,13 @@ func (o *observation) noVideo(ref itemRef, k media.Key) error {
 	if err != nil {
 		return err
 	}
+	if found && rec.Inst != 0 {
+		// Rule 2 never moves a record off an instance, an ownerless one
+		// whose record names this sighting's ref included.
+		return nil
+	}
 	if found && !rec.names(ref) {
-		taken, err := o.heldElsewhere(&rec)
-		if err != nil || taken || rec.Inst != 0 {
+		if taken, err := o.heldElsewhere(&rec); err != nil || taken {
 			return err
 		}
 	}

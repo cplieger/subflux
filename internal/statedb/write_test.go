@@ -16,9 +16,9 @@ import (
 
 var errInjected = errors.New("injected commit fault")
 
-// commitFault fails every run of the one write call whose context carries
-// failThis, the way section 9's durability fault claims a call through its
-// token.
+// commitFault fails every run of the latest write call whose context
+// carries failThis, the way section 9's durability fault claims a call
+// through its token.
 type commitFault struct {
 	claimed atomic.Pointer[callToken]
 	err     error
@@ -36,7 +36,7 @@ func (f *commitFault) hook(ctx context.Context) error {
 		return errors.New("write call without a token")
 	}
 	if ctx.Value(failThis{}) != nil {
-		f.claimed.CompareAndSwap(nil, tok)
+		f.claimed.Store(tok)
 	}
 	if f.claimed.Load() == tok {
 		return f.err

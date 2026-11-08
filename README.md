@@ -115,7 +115,7 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 
 ## Troubleshooting
 
-The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page.
+The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`.
 
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
 - Full scans do not start. A folder in `media_roots` is missing or not writable. Fix it or remove it from the list.
@@ -126,15 +126,15 @@ The healthcheck runs `subflux health`, which passes while the web server is runn
 
 ## Monitoring
 
-subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Three Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
+subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
 
 ## Documentation
 
 - [Configuration](docs/configuration.md) lists every setting and command, for anyone writing `config.yaml` by hand.
 - [How subflux works](docs/how-it-works.md) covers scoring, timing, credential handling and the limits.
 - [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
-- [Monitoring and alerts](docs/monitoring.md) lists the metrics and the alert rules.
-- [Database maintenance](docs/database-maintenance.md) covers recovering and compacting the database.
+- [Monitoring and alerts](docs/monitoring.md) lists the metrics, the alert rules and the kinds of problem each rule pages for.
+- [Database maintenance](docs/database-maintenance.md) covers format resets, a database that cannot be opened and compaction.
 
 ## Credits
 

@@ -99,12 +99,6 @@ func (r *keyReader) uint64(what string) uint64 {
 	return binary.BigEndian.Uint64(b)
 }
 
-func (r *keyReader) owner() int64 { return int64(r.uint64("owner") ^ signFlip) } //nolint:gosec // G115: the flip is the encoding
-
-func (r *keyReader) time(what string) time.Time {
-	return time.Unix(0, int64(r.uint64(what)^signFlip)).UTC() //nolint:gosec // G115: the flip is the encoding
-}
-
 func (r *keyReader) text(what string) string {
 	if r.err != nil {
 		return ""
@@ -151,6 +145,18 @@ func (r *keyReader) key() media.Key {
 	k, err := media.KeyFromBytes(b)
 	if err != nil {
 		r.fail("media key")
+	}
+	return k
+}
+
+func (r *keyReader) rootKey() media.RootKey {
+	b := r.fixed(len(media.RootKey{}.Bytes()), "root key")
+	if b == nil {
+		return media.RootKey{}
+	}
+	k, err := media.RootKeyFromBytes(b)
+	if err != nil {
+		r.fail("root key")
 	}
 	return k
 }

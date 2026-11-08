@@ -48,7 +48,7 @@ func Start(tb testing.TB, o Options) *Rig {
 	tb.Helper()
 	dir := tb.TempDir()
 	r := &Rig{
-		Paths:  app.Paths{Config: filepath.Join(dir, "config.yaml"), Health: filepath.Join(dir, "healthy")},
+		Paths:  app.Paths{Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy")},
 		Client: &http.Client{Timeout: readyBudget},
 		done:   make(chan error, 1),
 	}

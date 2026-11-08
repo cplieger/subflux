@@ -19,7 +19,7 @@ import (
 // designSilent is design section 4's Silent column.
 var designSilent = []string{
 	"activation", "passes", "cursors", "stamps", "overlaps", "baselines",
-	"ordinals", "intents", "work", "jobs", "credentials", "no_results", "root_evidence",
+	"ordinals", "intents", "work", "jobs", "credentials", "no_results", "root_evidence", "counts",
 }
 
 func TestSilentSetMatchesDesign(t *testing.T) {
@@ -65,7 +65,7 @@ func TestNoCrossNamespaceDeclaration(t *testing.T) {
 			t.Error("auth declared prefix 0x15, which core's credentials table holds")
 		}
 	})
-	t.Run("core declares every table of section 4 up to 0x16", func(t *testing.T) {
+	t.Run("core declares every table of section 4 up to 0x18", func(t *testing.T) {
 		db, err := bolttable.Open(t.TempDir()+"/subflux.bolt", s, bolttable.Options{})
 		if err != nil {
 			t.Fatalf("Open: %v", err)
@@ -173,6 +173,11 @@ func TestRowDecodeRefuses(t *testing.T) {
 		{name: "a short sha256", decode: decodeAs(intentCodec), in: `{"sha256":"00","op":1}`},
 		{name: "a variant outside its set", decode: decodeAs(coverageCodec), in: `{"pairs":[{"tag":"en","variant":4,"coverage":1}]}`, enum: true},
 		{name: "a zero coverage", decode: decodeAs(coverageCodec), in: `{"pairs":[{"tag":"en","variant":1,"coverage":0}]}`, enum: true},
+		{name: "a refusal on an exact pair", decode: decodeAs(coverageCodec), in: `{"pairs":[{"tag":"en","last_refusal":"fetch_gone","variant":1,"coverage":3}]}`},
+		{name: "counts not partitioning items", decode: decodeAs(countsCodec), in: `{"pairs":[{"tag":"en","items":3,"exact":1,"substitute":1,"missing":0,"locked":0,"variant":1}]}`},
+		{name: "a zero-item count", decode: decodeAs(countsCodec), in: `{"pairs":[{"tag":"en","items":0,"exact":0,"substitute":0,"missing":0,"locked":0,"variant":1}]}`},
+		{name: "more locks than items", decode: decodeAs(countsCodec), in: `{"pairs":[{"tag":"en","items":1,"exact":1,"substitute":0,"missing":0,"locked":2,"variant":1}]}`},
+		{name: "a count variant outside its set", decode: decodeAs(countsCodec), in: `{"pairs":[{"tag":"en","items":1,"exact":1,"substitute":0,"missing":0,"locked":0,"variant":4}]}`, enum: true},
 		{name: "a flag bit outside the set", decode: decodeAs(localCodec), in: `{"files":[{"name":"a.srt","tag":"en","flags":4}]}`, enum: true},
 		{name: "an op outside its set", decode: decodeAs(intentCodec), in: `{"sha256":"` + strings.Repeat("00", 32) + `","op":4}`, enum: true},
 		{name: "a zero work cause", decode: decodeAs(workCodec), in: `{"not_before":"0001-01-01T00:00:00Z","first_deferral":"0001-01-01T00:00:00Z","gen":1,"seq":1,"cause":0}`, enum: true},

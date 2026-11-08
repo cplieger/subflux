@@ -76,22 +76,24 @@ func printableLine(s string) bool {
 	return utf8.ValidString(s) && !strings.ContainsFunc(s, func(r rune) bool { return !unicode.IsPrint(r) })
 }
 
-// AlertKind is a source's kind, the bounded label its gauge carries: a fixed
-// source's own name, or its constructor's kind. It is false for a source no
-// constant or constructor yields.
-func AlertKind(s AlertSource) (string, bool) {
+// AlertKindID splits a source into the labels its gauge series carries: its
+// kind, a fixed source's own name or its constructor's kind, and its id, the
+// text after the kind's separator (the value, or the digest of a hashed
+// source), empty for a fixed source. It is false for a source no constant or
+// constructor yields.
+func AlertKindID(s AlertSource) (kind, id string, ok bool) {
 	if slices.Contains(fixedKinds, s) {
-		return string(s), true
+		return string(s), "", true
 	}
 	for _, k := range entityKinds {
 		if v, ok := strings.CutPrefix(string(s), k+":"); ok && entitySource(k, v) == s {
-			return k, true
+			return k, v, true
 		}
 		if h, ok := strings.CutPrefix(string(s), k+"#"); ok && isDigest(h) {
-			return k, true
+			return k, h, true
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 // isDigest reports whether h is a lowercase hex SHA-256, as hex.EncodeToString

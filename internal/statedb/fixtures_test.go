@@ -91,7 +91,10 @@ func coreFixtures(t *testing.T) []fixture {
 		fix(t, "instances", func(c *coreTables) *bolttable.Table[InstanceID, instanceRow] { return c.instances }, instKeys, instanceCodec,
 			7, instanceRow{Owner: src, VideoPath: "/tv/Show/S01E02.mkv", SceneName: "Show.S01E02.1080p.WEB-DL", Items: []rowKey{{k: ep}}}),
 		fix(t, "coverage", func(c *coreTables) *bolttable.Table[media.Key, coverageRow] { return c.coverage }, mediaKeys, coverageCodec,
-			ep, coverageRow{Pairs: []coveragePair{{Tag: rowTag{t: en}, Variant: uint8(language.Standard), Coverage: uint8(Exact)}}}),
+			ep, coverageRow{Pairs: []coveragePair{
+				{Tag: rowTag{t: en}, Variant: uint8(language.Standard), Coverage: uint8(Exact)},
+				{Tag: rowTag{t: fr}, Variant: uint8(language.Standard), Coverage: uint8(Missing), LastRefusal: "different_cut"},
+			}}),
 		fix(t, "locks", func(c *coreTables) *bolttable.Table[lockKey, lockRow] { return c.locks }, lockKeys, lockCodec,
 			lockKey{Key: ep, Tag: en, Variant: language.HI}, lockRow{At: fixtureAt}),
 		fix(t, "files", func(c *coreTables) *bolttable.Table[fileKey, fileRow] { return c.files }, fileKeys, fileCodec,
@@ -120,6 +123,10 @@ func coreFixtures(t *testing.T) []fixture {
 			"subdl", credentialRow{At: fixtureAt, Fingerprint: "ab12", Reason: "invalid key"}),
 		fix(t, "no_results", func(c *coreTables) *bolttable.Table[noResultKey, noResultRow] { return c.noResults }, noResultKeys, noResultCodec,
 			noResultKey{Key: ep, Tag: en, Provider: "subdl"}, noResultRow{Next: fixtureAt.Add(time.Hour), Count: 2}),
+		fix(t, "counts", func(c *coreTables) *bolttable.Table[media.RootKey, countsRow] { return c.counts }, rootKeys, countsCodec,
+			ep.Root(), countsRow{Pairs: []countPair{
+				{Tag: rowTag{t: en}, Variant: uint8(language.Standard), Items: 3, Exact: 1, Substitute: 1, Missing: 1, Locked: 2},
+			}}),
 		fix(t, "root_evidence", func(c *coreTables) *bolttable.Table[rootRef, evidenceRow] { return c.rootEvidence }, rootRefKeys, evidenceCodec,
 			item.rootRef, evidenceRow{Bound: readingRow{
 				Titles: []titleSetRow{{Language: "eng", Found: true, Titles: []episodeTitleRow{{Title: "Two", ID: 349232}}}},

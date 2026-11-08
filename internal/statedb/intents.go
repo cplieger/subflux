@@ -256,13 +256,16 @@ func (s *Store) landDeliver(tx *bolttable.Tx, _ *activation, fk fileKey, ir *int
 	if err := s.putRecord(tx, fk, ir); err != nil {
 		return err
 	}
+	first := &ir.Attempts[0]
 	if ir.Record.Locked {
-		first := &ir.Attempts[0]
 		for _, x := range first.Items {
 			if err := s.setOneLock(tx, &lockKey{Key: x.k, Tag: first.Target.t, Variant: language.Variant(first.Variant)}, true); err != nil {
 				return err
 			}
 		}
+	}
+	if err := s.clearRefusals(tx, fk.Inst, first.Target.t, language.Variant(first.Variant)); err != nil {
+		return err
 	}
 	if err := s.appendDownloads(tx, ir.Attempts); err != nil {
 		return err
@@ -487,4 +490,19 @@ func (r *fileRow) record(fk fileKey) (FileRecord, error) {
 		rec.Provenance = new(r.Provenance.provenance())
 	}
 	return rec, nil
+}
+
+// clearRefusals clears the pair's refusal on every item of inst: a landed
+// delivery ends what the refusal explained.
+func (s *Store) clearRefusals(tx *bolttable.Tx, inst InstanceID, tag language.Tag, v language.Variant) error {
+	row, _, err := s.t.instances.Get(tx.Read(), inst)
+	if err != nil {
+		return err
+	}
+	for _, x := range row.Items {
+		if err := s.setRefusal(tx, x.k, tag, v, ""); err != nil {
+			return err
+		}
+	}
+	return nil
 }

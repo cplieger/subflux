@@ -114,40 +114,76 @@ func (s *Store) recomputeInstance(tx *bolttable.Tx, a *activation, id InstanceID
 // its instance's evidence (design section 6), and deletes k's locks on
 // pairs a no longer configures. With inventory, the recompute of a
 // PutExternal or a landed End, it also deletes locks no evidence can serve
-// once the instance's inventory is complete. An item of an ownerless
-// instance keeps its rows as stored, since its languages went with its
-// source; a key with no item record has no coverage.
+// once the instance's inventory is complete.
 func (s *Store) recomputeKey(tx *bolttable.Tx, a *activation, k media.Key, inventory bool) error {
-	r := tx.Read()
-	rec, found, err := s.t.items.Get(r, k)
-	if err != nil || !found {
+	j, found, err := s.judgeKey(tx.Read(), a, k)
+	if err != nil || !found || j.ownerless {
 		return err
 	}
-	ev, complete, ownerless, err := s.itemEvidence(r, a, k, &rec)
-	if err != nil || ownerless {
-		return err
-	}
-	sg, named, err := s.t.sightings.Get(r, rec.ref())
+	prev, _, err := s.t.coverage.Get(tx.Read(), k)
 	if err != nil {
 		return err
 	}
-	if !named {
-		return fmt.Errorf("statedb: item %s names a sighting that is gone", k)
-	}
-	pairs := configured(a, &sg)
-	row := coverageRow{Pairs: make([]coveragePair, 0, len(pairs))}
-	for i, p := range pairs {
-		pairs[i] = judge(a.policy, p.tag, p.variant, ev)
-		row.Pairs = append(row.Pairs, coveragePair{Tag: rowTag{t: p.tag}, Variant: uint8(p.variant), Coverage: uint8(pairs[i].coverage)})
-	}
-	if len(row.Pairs) == 0 {
+	if row, ok := j.row(&prev); !ok {
 		if _, err := s.t.coverage.Delete(tx, k); err != nil {
 			return err
 		}
 	} else if err := s.t.coverage.Put(tx, k, &row); err != nil {
 		return err
 	}
-	return s.judgeLocks(tx, k, pairs, inventory && complete)
+	return s.judgeLocks(tx, k, j.pairs, inventory && j.complete)
+}
+
+// keyJudgement is one item's configured pairs graded under an activation.
+type keyJudgement struct {
+	pairs []pairJudgement
+	// complete is whether the item's instance has its whole inventory
+	// stored.
+	complete bool
+	// ownerless marks an item of an ownerless instance: its rows stay as
+	// stored, since its languages went with its source.
+	ownerless bool
+}
+
+// judgeKey grades k's configured pairs under a; found is false for a key
+// with no item record, which has no coverage.
+func (s *Store) judgeKey(r *bolttable.ReadTx, a *activation, k media.Key) (keyJudgement, bool, error) {
+	rec, found, err := s.t.items.Get(r, k)
+	if err != nil || !found {
+		return keyJudgement{}, false, err
+	}
+	ev, complete, ownerless, err := s.itemEvidence(r, a, k, &rec)
+	if err != nil || ownerless {
+		return keyJudgement{ownerless: ownerless}, true, err
+	}
+	sg, named, err := s.t.sightings.Get(r, rec.ref())
+	if err != nil {
+		return keyJudgement{}, true, err
+	}
+	if !named {
+		return keyJudgement{}, true, fmt.Errorf("statedb: item %s names a sighting that is gone", k)
+	}
+	pairs := configured(a, &sg)
+	for i, p := range pairs {
+		pairs[i] = judge(a.policy, p.tag, p.variant, ev)
+	}
+	return keyJudgement{pairs: pairs, complete: complete}, true, nil
+}
+
+// row is the coverage row j stores, keeping prev's refusal on each pair
+// still Missing; false when no pair is configured, so the key stores none.
+func (j *keyJudgement) row(prev *coverageRow) (coverageRow, bool) {
+	row := coverageRow{Pairs: make([]coveragePair, 0, len(j.pairs))}
+	for _, p := range j.pairs {
+		cp := coveragePair{Tag: rowTag{t: p.tag}, Variant: uint8(p.variant), Coverage: uint8(p.coverage)}
+		if p.coverage == Missing {
+			if i := slices.IndexFunc(prev.Pairs, func(q coveragePair) bool { return q.Tag.t == p.tag && q.Variant == cp.Variant }); i >= 0 {
+				cp.LastRefusal = prev.Pairs[i].LastRefusal
+			}
+		}
+		row.Pairs = append(row.Pairs, cp)
+	}
+	return row, len(row.Pairs) > 0
 }
 
 // itemEvidence is the evidence of the instance rec names, none for no

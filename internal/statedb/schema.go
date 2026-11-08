@@ -11,13 +11,10 @@ import (
 // schemaName enters every namespace's format digest.
 const schemaName = "subflux"
 
-// coreTables is namespace core (design section 4): tables 0x01 to 0x17 with
+// coreTables is namespace core (design section 4): tables 0x01 to 0x18 with
 // their indexes, counter and cascades.
 type coreTables struct {
-	schema *bolttable.Schema
-	// ns lets a test schema declare one more core table, bumping core's
-	// digest without touching the production declarations.
-	ns           *bolttable.Namespace
+	schema       *bolttable.Schema
 	activation   *bolttable.Table[constKey, activationRow]
 	passes       *bolttable.Table[media.SourceID, passRow]
 	cursors      *bolttable.Table[media.SourceID, cursorRow]
@@ -41,6 +38,7 @@ type coreTables struct {
 	credentials  *bolttable.Table[string, credentialRow]
 	noResults    *bolttable.Table[noResultKey, noResultRow]
 	rootEvidence *bolttable.Table[rootRef, evidenceRow]
+	counts       *bolttable.Table[media.RootKey, countsRow]
 
 	unidentified *bolttable.Index[itemRef, sightingRow]
 	byPath       *bolttable.Index[InstanceID, instanceRow]
@@ -81,6 +79,7 @@ const (
 	pCredentials  byte = 0x15
 	pNoResults    byte = 0x16
 	pRootEvidence byte = 0x17
+	pCounts       byte = 0x18
 )
 
 // The value codecs' own versions; a row struct change bumps its constant.
@@ -94,7 +93,7 @@ var (
 	overlapCodec     = rowCodec[overlapRow, *overlapRow]{version: 1}
 	itemCodec        = rowCodec[itemRow, *itemRow]{version: 1}
 	instanceCodec    = rowCodec[instanceRow, *instanceRow]{version: 1}
-	coverageCodec    = rowCodec[coverageRow, *coverageRow]{version: taggedVersion(1)}
+	coverageCodec    = rowCodec[coverageRow, *coverageRow]{version: taggedVersion(2)}
 	lockCodec        = rowCodec[lockRow, *lockRow]{version: 1}
 	fileCodec        = rowCodec[fileRow, *fileRow]{version: timedVersion(1)}
 	baselineCodec    = rowCodec[baselineRow, *baselineRow]{version: timedVersion(1)}
@@ -108,6 +107,7 @@ var (
 	credentialCodec  = rowCodec[credentialRow, *credentialRow]{version: 1}
 	noResultCodec    = rowCodec[noResultRow, *noResultRow]{version: 1}
 	evidenceCodec    = rowCodec[evidenceRow, *evidenceRow]{version: 1}
+	countsCodec      = rowCodec[countsRow, *countsRow]{version: taggedVersion(1)}
 	downloadSeqCodec bolttable.Uint64Key
 )
 
@@ -117,13 +117,21 @@ var core = bolttable.Must(defineCore(bolttable.NewSchema(schemaName)))
 // defineCore declares namespace core in s, so a test schema can add another
 // namespace beside it.
 func defineCore(s *bolttable.Schema) (*coreTables, error) {
+	ns, err := s.Namespace("core")
+	if err != nil {
+		return nil, err
+	}
+	return defineCoreIn(s, ns)
+}
+
+// defineCoreIn declares core's tables in ns, s's namespace core, so a test
+// can declare one more table there and bump core's digest.
+func defineCoreIn(s *bolttable.Schema, ns *bolttable.Namespace) (*coreTables, error) {
 	d := declarer{}
-	ns := d.namespace(s, "core")
 	silent := bolttable.TableOptions{Silent: true}
 	live := bolttable.TableOptions{}
 	c := &coreTables{
 		schema:       s,
-		ns:           ns,
 		activation:   define(&d, ns, pActivation, "activation", constKeys, activationCodec, silent),
 		passes:       define(&d, ns, pPasses, "passes", sourceKeys, passCodec, silent),
 		cursors:      define(&d, ns, pCursors, "cursors", sourceKeys, cursorCodec, silent),
@@ -147,6 +155,7 @@ func defineCore(s *bolttable.Schema) (*coreTables, error) {
 		credentials:  define(&d, ns, pCredentials, "credentials", textKeys, credentialCodec, silent),
 		noResults:    define(&d, ns, pNoResults, "no_results", noResultKeys, noResultCodec, silent),
 		rootEvidence: define(&d, ns, pRootEvidence, "root_evidence", rootRefKeys, evidenceCodec, silent),
+		counts:       define(&d, ns, pCounts, "counts", rootKeys, countsCodec, silent),
 	}
 	plain := bolttable.IndexOptions{Version: 1}
 	unique := bolttable.IndexOptions{Version: 1, Unique: true}
@@ -182,12 +191,6 @@ func defineCore(s *bolttable.Schema) (*coreTables, error) {
 // declarer keeps the first declaration error, so defineCore reads as the
 // table of section 4 and checks once.
 type declarer struct{ err error }
-
-func (d *declarer) namespace(s *bolttable.Schema, name string) *bolttable.Namespace {
-	ns, err := s.Namespace(name)
-	d.err = err
-	return ns
-}
 
 func define[K, V any](d *declarer, ns *bolttable.Namespace, prefix byte, name string, k bolttable.KeyCodec[K], v bolttable.Codec[V], o bolttable.TableOptions) *bolttable.Table[K, V] {
 	if d.err != nil {
