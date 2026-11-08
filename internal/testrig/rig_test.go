@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/app"
+	"github.com/cplieger/subflux/internal/statedb"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -81,6 +82,52 @@ func TestRecoveredPanicCounted(t *testing.T) {
 	}
 }
 
+func TestBootOverRealStore(t *testing.T) {
+	first := Start(t, Options{Config: []byte("languages:\n  default: [{tag: en}]\n")})
+	paths := first.Paths
+	if err := first.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	booted := storeRev(t, paths.Store)
+	if booted == 0 {
+		t.Fatal("a fresh directory's boot left the store at revision 0, so its activation wrote nothing")
+	}
+	second := Start(t, Options{Mutate: func(c *app.Config) { c.Paths = paths }})
+	if err := second.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if got := storeRev(t, paths.Store); got != booted {
+		t.Errorf("a restart with unchanged settings moved Rev from %d to %d", booted, got)
+	}
+}
+
+// storeRev opens the stopped rig's store and reads its revision.
+func storeRev(t *testing.T, path string) uint64 {
+	t.Helper()
+	s, err := statedb.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	in, err := s.Inspect(t.Context(), statedb.InspectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return in.Rev
+}
+
+// save commits text through the rig's settings service.
+func save(t *testing.T, r *Rig, text string) {
+	t.Helper()
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(text), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, errs, err := r.Settings.Save(t.Context(), doc.Content[0], r.Settings.Snapshot().Revision()); err != nil || len(errs) != 0 {
+		t.Fatalf("Save(%q) = %v, %v", text, errs, err)
+	}
+}
+
 func TestConfigModeFollowsSave(t *testing.T) {
 	r := Start(t, Options{})
 	for _, line := range []string{`subflux_config_mode{mode="unconfigured"} 1`, `subflux_config_mode{mode="active"} 0`, `subflux_config_mode{mode="failed"} 0`} {
@@ -88,13 +135,7 @@ func TestConfigModeFollowsSave(t *testing.T) {
 			t.Errorf("an unconfigured boot lacks %s", line)
 		}
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("server:\n  log_level: info\nlanguages:\n  default: [{tag: en}]\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	if _, errs, err := r.Settings.Save(t.Context(), doc.Content[0], r.Settings.Snapshot().Revision()); err != nil || len(errs) != 0 {
-		t.Fatalf("Save = %v, %v", errs, err)
-	}
+	save(t, r, "server:\n  log_level: info\nlanguages:\n  default: [{tag: en}]\n")
 	want := []string{`subflux_config_mode{mode="active"} 1`, `subflux_config_mode{mode="unconfigured"} 0`, `subflux_config_mode{mode="failed"} 0`}
 	if !eventually(func() bool {
 		for _, line := range want {

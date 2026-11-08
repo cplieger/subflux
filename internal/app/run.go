@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,19 +14,25 @@ import (
 
 	"github.com/cplieger/go/health"
 	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
+	"github.com/cplieger/subflux/internal/statedb"
+	"github.com/cplieger/subflux/internal/status"
 )
 
 // Paths are the files the process reads and writes.
 type Paths struct {
 	Config string
+	// Store is the state file; statedb locks Store + ".lock" beside it.
+	Store string
 	// Health is the liveness marker the health subcommand stats.
 	Health string
 }
 
 // DefaultPaths are the container layout.
-var DefaultPaths = Paths{Config: "/config/config.yaml", Health: health.DefaultPath}
+var DefaultPaths = Paths{Config: "/config/config.yaml", Store: "/config/subflux.bolt", Health: health.DefaultPath}
 
 // Config is what Run boots from. Every field but Paths is optional.
 type Config struct {
@@ -39,7 +46,9 @@ type Config struct {
 	// Settings, when set, receives the settings service once it is built, so
 	// a test can save through it.
 	Settings func(*settings.Service)
-	Paths    Paths
+	// Gather, when set, receives the metrics registry's Gather (tests).
+	Gather func(func(context.Context) ([]measure.Family, error))
+	Paths  Paths
 }
 
 // The HTTP server's bounds; a streaming route clears its own write deadline
@@ -62,57 +71,114 @@ var (
 	readTimeout = 10 * time.Second
 )
 
+// activateFunc makes a parsed configuration live in the store.
+type activateFunc = func(context.Context, settings.Active) error
+
+// Test seams: what status persists through, the activate function boot and
+// every Save call, and a hook receiving the status store once built.
+var (
+	statusPersister = func(s *statedb.Store) status.Persister { return s }
+	wrapActivate    = func(f activateFunc) activateFunc { return f }
+	statusBuilt     = func(*status.Store) {}
+)
+
 // Run boots and serves until ctx ends or a component returns, then drains.
-// It returns a boot failure (the TCP bind included), the component's return
-// that began the drain ("<name> exited" when it returned nil), or a drain
-// overrun; nil when ctx's end began the drain. cmd/subflux exits 1 on any
+// It returns a boot failure (the store, the activation of the loaded
+// configuration and the TCP bind included), the component's return that
+// began the drain ("<name> exited" when it returned nil), or a drain
+// overrun; nil when ctx's end began the drain. The store stays open after an
+// overrun, for a request or job still on it. cmd/subflux exits 1 on any
 // error.
 func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam: callers build Config inline and Run reads it once
 	snap := settings.Load(cfg.Paths.Config, cfg.Registries)
-	level := setupLogging(snap, cfg.LogOutput)
+	level, format := setupLogging(snap, cfg.LogOutput)
 	logLoad(snap)
 	marker := health.NewMarker(cfg.Paths.Health)
 	latch := health.NewLatch(marker)
 	latch.Set(false)
 	defer marker.Cleanup()
 
+	store, err := statedb.Open(cfg.Paths.Store)
+	if err != nil {
+		slog.Error("app: could not open the state store", "path", cfg.Paths.Store, "error", err)
+		return fmt.Errorf("app: %w", err)
+	}
+	sv, err := serve(ctx, &cfg, &process{snap: snap, store: store, marker: marker, level: level, format: format})
+	if err != nil {
+		return errors.Join(err, store.Close())
+	}
+	latch.Set(true)
+	sv.beginDrain = latch.BeginDrain
+	return supervise(ctx, sv)
+}
+
+// process is what Run sets up before serve: the loaded snapshot, the open
+// store, the health marker and the log handler's level and format.
+type process struct {
+	snap   settings.Snapshot
+	store  *statedb.Store
+	marker health.Signal
+	level  *slog.LevelVar
+	format slogx.Format
+}
+
+// serve builds every component over the open store and binds the HTTP port,
+// returning the supervision Run drains; on an error nothing is running.
+func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
+	snap, store := p.snap, p.store
+	st, err := status.New(ctx, statusPersister(store))
+	if err != nil {
+		slog.Error("app: could not open the job records", "error", err)
+		return nil, fmt.Errorf("app: %w", err)
+	}
+	statusBuilt(st)
 	m := obs.New()
 	m.SetConfigMode(modeName(snap))
-	svc := settings.NewService(cfg.Paths.Config, cfg.Registries, snap, nil, nil)
+	if cfg.Gather != nil {
+		cfg.Gather(m.Gather)
+	}
+	activate := wrapActivate(func(ctx context.Context, a settings.Active) error {
+		return store.Activate(ctx, statedb.Activation{Languages: a.Languages})
+	})
+	svc := settings.NewService(cfg.Paths.Config, cfg.Registries, snap, activate, nil)
 	if cfg.Settings != nil {
 		cfg.Settings(svc)
+	}
+	if a, ok := snap.Active(); ok {
+		if err = activate(ctx, a); err != nil {
+			slog.Error("app: could not activate the loaded settings", "error", err)
+			return nil, fmt.Errorf("app: activate the loaded settings: %w", err)
+		}
 	}
 
 	ln := cfg.Listener
 	if ln == nil {
-		var err error
 		if ln, err = (&net.ListenConfig{}).Listen(ctx, "tcp", listenAddr); err != nil {
 			slog.Error("app: could not bind the HTTP port", "addr", listenAddr, "error", err)
-			return fmt.Errorf("app: listen on %s: %w", listenAddr, err)
+			return nil, fmt.Errorf("app: listen on %s: %w", listenAddr, err)
 		}
 	}
-	srv := httpserver.New(handler(m, marker, cfg.Routes),
+	srv := httpserver.New(handler(m, p.marker, cfg.Routes),
 		httpserver.WithReadTimeout(readTimeout),
 		httpserver.WithReadHeaderTimeout(readHeaderTimeout),
 		httpserver.WithWriteTimeout(writeTimeout),
 		httpserver.WithMaxHeaderBytes(maxHeaderBytes),
 		httpserver.WithSlogErrorLog(slog.LevelWarn),
 	)
-	producers := []component{
-		httpComponent(srv, ln),
-		{name: "settings change loop", run: func(ctx context.Context) error {
-			return changeLoop(ctx, svc, level, m, nil)
-		}},
-	}
+	loop := &changeLoop{svc: svc, level: p.level, metrics: m, alerts: st, running: p.format}
 	slog.Info("HTTP server listening", "addr", ln.Addr().String())
-	latch.Set(true)
-	return supervise(ctx, &supervision{
-		producers:        producers,
-		beginDrain:       latch.BeginDrain,
+	return &supervision{
+		producers: []component{
+			httpProducer(srv, ln),
+			{name: "settings change loop", run: loop.run},
+			{name: "alert metrics", run: func(ctx context.Context) error { return alertMetrics(ctx, st, m) }},
+		},
+		sinks:            []component{{name: "job records", run: st.Run}},
 		shutdownSettings: svc.Shutdown,
+		closeStore:       store.Close,
 		drainBudget:      drainBudget,
 		httpGrace:        httpGrace,
-	})
+	}, nil
 }
 
 // modeName is snap's mode as config_mode labels it.

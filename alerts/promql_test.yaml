@@ -1,0 +1,196 @@
+# Unit tests for promql.yaml: promtool test rules alerts/promql_test.yaml
+rule_files: [promql.yaml]
+evaluation_interval: 1m
+tests:
+  # Each kind with no rule of its own pages once it has stood for 15m.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="config"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="admin_socket"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="source_overlap",id="sonarr"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="provider_data",id="opensubtitles"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="media_server",id="plex"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: SubfluxConditionActive
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SubfluxConditionActive
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: config}
+            exp_annotations:
+              summary: subflux reports a problem of kind config
+              description: &condition >
+                subflux has reported this problem for 15m. The id label, when set,
+                names what it is about; docs/monitoring.md describes each kind.
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: admin_socket}
+            exp_annotations: {summary: subflux reports a problem of kind admin_socket, description: *condition}
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: source_overlap, id: sonarr}
+            exp_annotations: {summary: subflux reports a problem of kind source_overlap, description: *condition}
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: provider_data, id: opensubtitles}
+            exp_annotations: {summary: subflux reports a problem of kind provider_data, description: *condition}
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: media_server, id: plex}
+            exp_annotations: {summary: subflux reports a problem of kind media_server, description: *condition}
+
+  # A restart request, a deliberate setting and a kind with its own rule
+  # never reach the catch-all.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="restart_pending"}'
+        values: '1x90'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="auth_disabled"}'
+        values: '1x90'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="backup"}'
+        values: '1x90'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SubfluxConditionActive
+        exp_alerts: []
+
+  # job_records and pending_writes page alone, and stay silent while their
+  # cause is active on the same instance.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="job_records"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="b",kind="pending_writes"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: SubfluxConditionActive
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: job_records}
+            exp_annotations: {summary: subflux reports a problem of kind job_records, description: *condition}
+          - exp_labels: {severity: warning, job: subflux, instance: b, kind: pending_writes}
+            exp_annotations: {summary: subflux reports a problem of kind pending_writes, description: *condition}
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="store"}'
+        values: '1x60'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="job_records"}'
+        values: '1x60'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="media_root",id="/media/tv"}'
+        values: '1x60'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="pending_writes"}'
+        values: '1x60'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: SubfluxConditionActive
+        exp_alerts: []
+
+  # A cause on one instance never silences another instance's alert.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="store"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="b",kind="job_records"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="media_root",id="/media/tv"}'
+        values: '1x30'
+      - series: 'subflux_alerts_active{job="subflux",instance="b",kind="pending_writes"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: SubfluxConditionActive
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: b, kind: job_records}
+            exp_annotations: {summary: subflux reports a problem of kind job_records, description: *condition}
+          - exp_labels: {severity: warning, job: subflux, instance: b, kind: pending_writes}
+            exp_annotations: {summary: subflux reports a problem of kind pending_writes, description: *condition}
+
+  # A provider pages only once it outlasts one cooldown.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="provider",id="opensubtitles"}'
+        values: '1x70'
+    alert_rule_test:
+      - eval_time: 64m
+        alertname: SubfluxProviderUnusable
+        exp_alerts: []
+      - eval_time: 65m
+        alertname: SubfluxProviderUnusable
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: provider, id: opensubtitles}
+            exp_annotations:
+              summary: subflux cannot use the subtitle site opensubtitles
+              description: >
+                The site rejected its credentials, or has been unreachable for over
+                an hour. Check its credentials in the settings, and whether the
+                site is up.
+
+  # Each kind rule fires on its own kind only, and the catch-all on none of
+  # theirs nor on what follows from them.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="provider",id="opensubtitles"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="media_root",id="/media/tv"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="source",id="sonarr"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="store"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="config"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="job_records"}'
+        values: '1x70'
+      - series: 'subflux_alerts_active{job="subflux",instance="a",kind="pending_writes"}'
+        values: '1x70'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: SubfluxMediaUnavailable
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: SubfluxMediaUnavailable
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: media_root, id: /media/tv}
+            exp_annotations:
+              summary: subflux cannot read the media under /media/tv
+              description: >
+                A file under this media root could not be checked for 5m, so the
+                share is likely unmounted or hung. Check the mount.
+      - eval_time: 14m
+        alertname: SubfluxSourceUnreachable
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SubfluxSourceUnreachable
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: source, id: sonarr}
+            exp_annotations:
+              summary: subflux cannot reach the media source sonarr
+              description: >
+                subflux has not reached this Sonarr or Radarr instance for 15m.
+                Check its address, its API key and the network.
+      - eval_time: 4m
+        alertname: SubfluxStoreWriteFailing
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: SubfluxStoreWriteFailing
+        exp_alerts:
+          - exp_labels: {severity: critical, job: subflux, instance: a, kind: store}
+            exp_annotations:
+              summary: subflux cannot write its database
+              description: >
+                The last write to /config/subflux.bolt failed and none has
+                succeeded since. The /config volume may be full, read-only or
+                failing. The log names the error.
+      - eval_time: 65m
+        alertname: SubfluxProviderUnusable
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: provider, id: opensubtitles}
+            exp_annotations:
+              summary: subflux cannot use the subtitle site opensubtitles
+              description: >
+                The site rejected its credentials, or has been unreachable for over
+                an hour. Check its credentials in the settings, and whether the
+                site is up.
+      - eval_time: 65m
+        alertname: SubfluxConditionActive
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, kind: config}
+            exp_annotations: {summary: subflux reports a problem of kind config, description: *condition}

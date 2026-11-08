@@ -166,25 +166,30 @@ func (s *Store) onCommit(bolttable.Change) {
 }
 
 // beforeCommit replaces the touched rows with the library roots they change
-// (design section 3), read as stored after the write, and sets the history
-// mark for a download. A change marked config records no subjects, since
-// every reader answers it in full, and stores its revision as config_rev.
+// (design section 3), read as stored after the write, sets the history mark
+// for a download and recounts every such root (CR-UX-1). A change marked
+// config records no subjects, since every reader answers it in full, and
+// stores its revision as config_rev.
 func (s *Store) beforeCommit(tx *bolttable.Tx, p *bolttable.Pending) ([]bolttable.Subject, error) {
-	if slices.Contains(p.Marks, MarkConfig) {
-		return nil, s.storeConfigRev(tx, p.Rev)
-	}
 	out := subjects{seen: map[string]struct{}{}}
 	for _, sub := range p.Touched {
 		if err := s.mapSubject(tx, &out, sub); err != nil {
 			return nil, err
 		}
 	}
+	if err := s.recount(tx, out.roots); err != nil {
+		return nil, err
+	}
+	if slices.Contains(p.Marks, MarkConfig) {
+		return nil, s.storeConfigRev(tx, p.Rev)
+	}
 	return out.list, nil
 }
 
 type subjects struct {
-	seen map[string]struct{}
-	list []bolttable.Subject
+	seen  map[string]struct{}
+	list  []bolttable.Subject
+	roots []media.RootKey
 }
 
 func (o *subjects) add(kind byte, r media.RootKey) {
@@ -192,6 +197,9 @@ func (o *subjects) add(kind byte, r media.RootKey) {
 	if _, dup := o.seen[string(sub)]; !dup {
 		o.seen[string(sub)] = struct{}{}
 		o.list = append(o.list, sub)
+		if kind == subjectRoot {
+			o.roots = append(o.roots, r)
+		}
 	}
 	if kind == subjectWritten {
 		o.add(subjectRoot, r)

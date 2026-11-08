@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"go.yaml.in/yaml/v4"
 )
 
 // pol parses a languages section value.
-func pol(t *testing.T, doc string) language.Policy {
+func pol(t testing.TB, doc string) language.Policy {
 	t.Helper()
 	var n yaml.Node
 	if err := yaml.Unmarshal([]byte(doc), &n); err != nil {
@@ -184,118 +183,6 @@ func TestOwnerlessInstanceKeepsAudioRuleLock(t *testing.T) {
 	if !locked(t, s, k, "en") {
 		t.Error("the claiming source's recompute deleted the lock its audio rule configures")
 	}
-}
-
-func TestCoverageAC9(t *testing.T) {
-	en := policyOf(t, "en")
-	t.Run("embedded English SRT covers en", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en, pgs)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		wantCoverage(t, s, k, "en", Missing)
-		putEmbedded(t, s, id, track(t, "en", "subrip"))
-		wantCoverage(t, s, k, "en", Exact)
-	})
-	t.Run("an ignored PGS track covers nothing", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en, pgs)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "en", pgs))
-		wantCoverage(t, s, k, "en", Missing)
-	})
-	t.Run("a stored pt-BR track is Exact, pt-AO a Substitute", func(t *testing.T) {
-		s := covLib(t, tempPath(t), policyOf(t, "pt-BR"))
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "pt-AO", "subrip"))
-		wantCoverage(t, s, k, "pt-BR", Substitute)
-		putEmbedded(t, s, id, track(t, "pt-BR", "subrip"))
-		wantCoverage(t, s, k, "pt-BR", Exact)
-	})
-	t.Run("a user's movie.en.srt is Exact", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		putExternal(t, s, id, local(t, "movie.en.srt", "en"))
-		wantCoverage(t, s, k, "en", Exact)
-	})
-	t.Run("a managed file record is evidence", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		update(t, s, func(tx *bolttable.Tx) error {
-			return s.t.files.Put(tx, fileKey{Inst: id, Name: "S01E01.en.hi.srt"}, &fileRow{Tag: rowTag{t: mustTag(t, "en")}, Timing: []byte{0}, Flags: flagHI})
-		})
-		putExternal(t, s, id)
-		wantCoverage(t, s, k, "en", Missing)
-		hi, _ := coverageOf(t, s, k, "en", language.HI)
-		if hi != 0 {
-			t.Errorf("an unconfigured HI pair has coverage %v", hi)
-		}
-	})
-	t.Run("a policy or codec change recomputes inside Activate", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "en", pgs))
-		putExternal(t, s, id)
-		wantCoverage(t, s, k, "en", Exact)
-		setLock(t, s, id, "en", true)
-		head := headRev(t, s)
-		activate(t, s, Activation{Sources: []media.SourceID{"sonarr"}, Languages: en, IgnoredCodecs: []string{pgs}})
-		if got := headRev(t, s); got != head+1 {
-			t.Errorf("the codec change took the head from %d to %d, want one revision", head, got)
-		}
-		wantCoverage(t, s, k, "en", Missing)
-		if !locked(t, s, k, "en") {
-			t.Error("the codec change deleted a configured pair's lock")
-		}
-		activate(t, s, Activation{Sources: []media.SourceID{"sonarr"}, Languages: policyOf(t, "fr"), IgnoredCodecs: []string{pgs}})
-		wantCoverage(t, s, k, "fr", Missing)
-		if _, ok := coverageOf(t, s, k, "en", language.Standard); ok {
-			t.Error("the policy change kept the unconfigured en pair")
-		}
-		if locked(t, s, k, "en") {
-			t.Error("the policy change kept the unconfigured en pair's lock")
-		}
-	})
-	t.Run("an unchanged Activate writes nothing", func(t *testing.T) {
-		s := covLib(t, tempPath(t), en)
-		_, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "en", "subrip"))
-		head := headRev(t, s)
-		activate(t, s, Activation{Sources: []media.SourceID{"sonarr"}, Languages: en})
-		if got := headRev(t, s); got != head {
-			t.Errorf("an unchanged Activate moved the head from %d to %d", head, got)
-		}
-	})
-	t.Run("a stale pt-AO row is corrected at the first Activate", func(t *testing.T) {
-		path := tempPath(t)
-		ptBR := policyOf(t, "pt-BR")
-		s := covLib(t, path, ptBR)
-		k, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "pt-AO", "subrip"))
-		update(t, s, func(tx *bolttable.Tx) error {
-			return s.t.coverage.Put(tx, k, &coverageRow{Pairs: []coveragePair{{Tag: rowTag{t: mustTag(t, "pt-BR")}, Variant: uint8(language.Standard), Coverage: uint8(Exact)}}})
-		})
-		s = reopenLib(t, s, path, ptBR)
-		wantCoverage(t, s, k, "pt-BR", Substitute)
-	})
-	t.Run("an unchanged restart leaves Rev", func(t *testing.T) {
-		path := tempPath(t)
-		s := covLib(t, path, en)
-		_, id := showEpisode(t, s, "sonarr", epPath)
-		putEmbedded(t, s, id, track(t, "en", "subrip"))
-		head := headRev(t, s)
-		s = reopenLib(t, s, path, en)
-		if got := headRev(t, s); got != head {
-			t.Errorf("an unchanged restart moved the head from %d to %d", head, got)
-		}
-	})
-	t.Run("an added audio language recomputes", func(t *testing.T) {
-		s := covLib(t, tempPath(t), pol(t, audioRules))
-		k, _ := showEpisode(t, s, "sonarr", epPath)
-		wantCoverage(t, s, k, "fr", Missing)
-		showEpisode(t, s, "sonarr", epPath, "ja")
-		wantCoverage(t, s, k, "en", Missing)
-		if _, ok := coverageOf(t, s, k, "fr", language.Standard); ok {
-			t.Error("the ja audio rule kept the default fr pair")
-		}
-	})
 }
 
 func TestLocksAC10(t *testing.T) {

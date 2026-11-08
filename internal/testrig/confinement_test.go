@@ -31,7 +31,14 @@ type importRule struct {
 
 // importRules is the architecture's confinement table; each row lands with
 // the landing that turns it on.
-var importRules = []importRule{releaseRule(modulePath), dialhookRule(modulePath), providertestRule(modulePath), execRule(modulePath)}
+var importRules = []importRule{
+	releaseRule(modulePath),
+	dialhookRule(modulePath),
+	providertestRule(modulePath),
+	execRule(modulePath),
+	{imported: "go.etcd.io/bbolt/...", allowed: []string{"go.etcd.io/bbolt/...", "github.com/cplieger/bolttable/..."}, everyPackage: true},
+	{imported: "github.com/cplieger/bolttable/...", allowed: []string{modulePath + "/internal/statedb/..."}},
+}
 
 // dialhookRule keeps the test dial seam inside the provider boundary and its
 // test server: no adapter or other production code can carry a dial past

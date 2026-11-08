@@ -5,6 +5,7 @@
 package obs
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -29,6 +30,7 @@ type Metrics struct {
 	httpDuration *measure.Histogram
 	panics       *measure.Counter
 	configMode   *measure.LabeledGauge
+	alertsActive *measure.LabeledGauge
 }
 
 // New builds the registry, prefix subflux, with the platform series
@@ -41,9 +43,10 @@ func New() *Metrics {
 		httpDuration: measure.NewHistogram("http_request_duration_seconds", "HTTP request latency.", measure.WithBuckets(measure.APIBuckets())),
 		panics:       measure.NewCounter("panics_total", "HTTP handler panics recovered."),
 		configMode:   measure.NewLabeledGauge("config_mode", "1 for the configuration's current mode, 0 for the others.", []string{"mode"}),
+		alertsActive: measure.NewLabeledGauge("alerts_active", "1 for each active alert, by its kind and id.", []string{"kind", "id"}),
 	}
 	buildInfo := measure.NewLabeledGauge("build_info", "Always 1, labelled with the running version.", []string{"version"})
-	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, buildInfo)
+	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, m.alertsActive, buildInfo)
 	buildInfo.Set(1, buildinfo.Version())
 	for _, mode := range configModes {
 		m.configMode.Set(0, mode)
@@ -60,6 +63,12 @@ func (m *Metrics) Register(ms ...Metric) error {
 		}
 	}
 	return nil
+}
+
+// Gather reads every registered family, a declared family with no series
+// yet included, as measure's Registry.Gather does.
+func (m *Metrics) Gather(ctx context.Context) ([]measure.Family, error) {
+	return m.registry.Gather(ctx)
 }
 
 // Handler serves the exposition.
@@ -90,3 +99,9 @@ func (m *Metrics) SetConfigMode(mode string) {
 		m.configMode.Set(v, other)
 	}
 }
+
+// SetAlertActive sets the alerts_active series of one active alert.
+func (m *Metrics) SetAlertActive(kind, id string) { m.alertsActive.Set(1, kind, id) }
+
+// DeleteAlertActive removes a cleared alert's alerts_active series.
+func (m *Metrics) DeleteAlertActive(kind, id string) { m.alertsActive.Delete(kind, id) }

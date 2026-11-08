@@ -14,9 +14,11 @@ import (
 )
 
 // RootRow is one listed root: its display facts come from the source of its
-// lowest item that is owned or has no instance.
+// lowest item that is owned or has no instance, and Counts holds one entry
+// per pair its counted items configure, in Policy.Targets order.
 type RootRow struct {
 	Source     media.SourceID
+	Counts     []CoverageCount
 	Root       mediasource.Root
 	Key        media.RootKey
 	HasHistory bool
@@ -184,7 +186,11 @@ func (s *Store) rootRow(r *bolttable.ReadTx, root media.RootKey, rec *itemRow) (
 	if err != nil {
 		return RootRow{}, err
 	}
-	return RootRow{Key: root, Source: ref.Source, Root: rr.root(ref.Root), HasHistory: has}, nil
+	counts, err := s.rootCounts(r, root, s.Policy().Targets())
+	if err != nil {
+		return RootRow{}, err
+	}
+	return RootRow{Key: root, Source: ref.Source, Counts: counts, Root: rr.root(ref.Root), HasHistory: has}, nil
 }
 
 // Items returns up to limit of root's items in key order, skipping those of

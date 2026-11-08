@@ -15,13 +15,15 @@ import (
 // pair none of its items configures, or locking a pair none can serve.
 var ErrNotLockable = errors.New("statedb: nothing to lock")
 
-// CoverageRow is how one configured pair of an item is covered, and
-// whether the user locked it.
+// CoverageRow is how one configured pair of an item is covered, whether
+// the user locked it, and the wire spelling of the last automatic run's
+// refusal while the pair is Missing ("" otherwise).
 type CoverageRow struct {
-	Target   language.Tag
-	Variant  language.Variant
-	Coverage Coverage
-	Locked   bool
+	LastRefusal string
+	Target      language.Tag
+	Variant     language.Variant
+	Coverage    Coverage
+	Locked      bool
 }
 
 // Coverage returns k's configured pairs in Policy.TargetsFor order; none
@@ -46,7 +48,7 @@ func (s *Store) coverageRows(r *bolttable.ReadTx, k media.Key) ([]CoverageRow, e
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, CoverageRow{Target: p.Tag.t, Variant: language.Variant(p.Variant), Coverage: Coverage(p.Coverage), Locked: locked})
+		out = append(out, CoverageRow{Target: p.Tag.t, Variant: language.Variant(p.Variant), Coverage: Coverage(p.Coverage), Locked: locked, LastRefusal: p.LastRefusal})
 	}
 	return out, nil
 }
@@ -138,4 +140,46 @@ func (s *Store) configuring(r *bolttable.ReadTx, a *activation, inst *instanceRo
 		}
 	}
 	return keys, nil
+}
+
+// NoteRefusal stores refusal, search's wire spelling of why an automatic run
+// of the pair delivered nothing, on the pair's coverage of every item of
+// inst where it is Missing, in one write; a byte-equal value writes
+// nothing. The next recompute leaving the pair not Missing, and a landed
+// delivery of the pair, clear it. An unknown or ownerless instance, or an
+// empty refusal, is refused, writing nothing.
+func (s *Store) NoteRefusal(ctx context.Context, inst InstanceID, tag language.Tag, v language.Variant, refusal string) error {
+	if refusal == "" {
+		return errors.New("statedb: note refusal: an empty refusal")
+	}
+	return s.write(ctx, "note refusal", s.db.Update, func(tx *bolttable.Tx) error {
+		row, found, err := s.t.instances.Get(tx.Read(), inst)
+		if err != nil {
+			return err
+		}
+		if !found || row.Owner == "" {
+			return fmt.Errorf("statedb: note refusal: instance %d is unknown", inst)
+		}
+		for _, x := range row.Items {
+			if err := s.setRefusal(tx, x.k, tag, v, refusal); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// setRefusal sets refusal on k's (tag, v) pair when it is Missing; "" clears
+// it whatever the coverage.
+func (s *Store) setRefusal(tx *bolttable.Tx, k media.Key, tag language.Tag, v language.Variant, refusal string) error {
+	row, found, err := s.t.coverage.Get(tx.Read(), k)
+	if err != nil || !found {
+		return err
+	}
+	i := slices.IndexFunc(row.Pairs, func(p coveragePair) bool { return p.Tag.t == tag && p.Variant == uint8(v) })
+	if i < 0 || refusal != "" && row.Pairs[i].Coverage != uint8(Missing) {
+		return nil
+	}
+	row.Pairs[i].LastRefusal = refusal
+	return s.t.coverage.Put(tx, k, &row)
 }

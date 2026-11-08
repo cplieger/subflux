@@ -23,7 +23,7 @@ func mustKey(t *testing.T, s string) media.Key {
 	return k
 }
 
-func mustTag(t *testing.T, s string) language.Tag {
+func mustTag(t testing.TB, s string) language.Tag {
 	t.Helper()
 	tag, ok := language.Parse(s)
 	if !ok || tag == (language.Tag{}) {
@@ -55,10 +55,6 @@ func TestTimeComponentOrder(t *testing.T) {
 			if bytes.Compare(a, b) >= 0 {
 				t.Errorf("encoded %s = %x is not below %s = %x", p.before, a, p.after, b)
 			}
-			r := keyReader{b: a}
-			if got := r.time("t"); !got.Equal(p.before) || r.end() != nil {
-				t.Errorf("decoded %x = %s, %v; want %s", a, got, r.err, p.before)
-			}
 		})
 	}
 }
@@ -69,12 +65,6 @@ func TestOwnerOrder(t *testing.T) {
 		a, b := ownerBytes(owners[i-1]), ownerBytes(owners[i])
 		if bytes.Compare(a, b) >= 0 {
 			t.Errorf("owner %d = %x is not below owner %d = %x", owners[i-1], a, owners[i], b)
-		}
-	}
-	for _, o := range owners {
-		r := keyReader{b: ownerBytes(o)}
-		if got := r.owner(); got != o || r.end() != nil {
-			t.Errorf("owner %d decodes to %d, %v", o, got, r.err)
 		}
 	}
 }

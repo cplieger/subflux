@@ -1,6 +1,8 @@
 package status
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 )
@@ -42,8 +44,8 @@ func TestAlertSourceConstructors(t *testing.T) {
 				if again := c.make(v); again != src {
 					t.Errorf("%q: source %q then %q", v, src, again)
 				}
-				if k, ok := AlertKind(src); !ok || k != c.kind {
-					t.Errorf("AlertKind(%q) = %q, %v; want %q", src, k, ok, c.kind)
+				if k, _, ok := AlertKindID(src); !ok || k != c.kind {
+					t.Errorf("AlertKindID(%q) = %q, %v; want %q", src, k, ok, c.kind)
 				}
 			}
 		})
@@ -66,27 +68,44 @@ var fixedSources = map[AlertSource]string{
 	AlertPendingWrites:  "pending_writes",
 }
 
-func TestAlertKind(t *testing.T) {
-	if len(fixedKinds) != len(fixedSources) {
-		t.Errorf("fixedKinds %v; want the %d fixed sources", fixedKinds, len(fixedSources))
+func TestAlertKindIDSplitsSource(t *testing.T) {
+	long := strings.Repeat("x", 600)
+	sum := sha256.Sum256([]byte(long))
+	digest := hex.EncodeToString(sum[:])
+	for _, c := range constructors {
+		t.Run(c.kind, func(t *testing.T) {
+			if k, id, ok := AlertKindID(c.make("/media/tv")); !ok || k != c.kind || id != "/media/tv" {
+				t.Errorf("readable source = %q, %q, %v; want %q, %q", k, id, ok, c.kind, "/media/tv")
+			}
+			if k, id, ok := AlertKindID(c.make(long)); !ok || k != c.kind || id != digest {
+				t.Errorf("hashed source = %q, %q, %v; want %q and the value's SHA-256", k, id, ok, c.kind)
+			}
+		})
 	}
-	for f, name := range fixedSources {
-		if k, ok := AlertKind(f); !ok || k != name || string(f) != name {
-			t.Errorf("AlertKind(%q) = %q, %v; want %q", f, k, ok, name)
+	t.Run("fixed", func(t *testing.T) {
+		if len(fixedKinds) != len(fixedSources) {
+			t.Errorf("fixedKinds %v; want the %d fixed sources", fixedKinds, len(fixedSources))
 		}
-	}
-	forged := []AlertSource{
-		"bogus:x",
-		"provider:two\nlines",
-		AlertSource("provider:" + strings.Repeat("x", 600)),
-		"provider#zz",
-		AlertSource("provider#" + strings.Repeat("A", 64)),
-		"provider",
-		"",
-	}
-	for _, src := range forged {
-		if k, ok := AlertKind(src); ok {
-			t.Errorf("AlertKind(%q) = %q; want no constructor's source", src, k)
+		for f, name := range fixedSources {
+			if k, id, ok := AlertKindID(f); !ok || k != name || id != "" || string(f) != name {
+				t.Errorf("AlertKindID(%q) = %q, %q, %v; want %q with no id", f, k, id, ok, name)
+			}
 		}
-	}
+	})
+	t.Run("forged", func(t *testing.T) {
+		forged := []AlertSource{
+			"bogus:x",
+			"provider:two\nlines",
+			AlertSource("provider:" + strings.Repeat("x", 600)),
+			"provider#zz",
+			AlertSource("provider#" + strings.Repeat("A", 64)),
+			"provider",
+			"",
+		}
+		for _, src := range forged {
+			if k, id, ok := AlertKindID(src); ok {
+				t.Errorf("AlertKindID(%q) = %q, %q; want not ok", src, k, id)
+			}
+		}
+	})
 }

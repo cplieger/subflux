@@ -22,8 +22,8 @@ func FuzzAlertSource_boundedAndInjective(f *testing.F) {
 				if len(src) > MaxAlertSource || !printableLine(string(src)) {
 					t.Fatalf("%s: source %q out of bound", c.kind, src)
 				}
-				if k, ok := AlertKind(src); !ok || k != c.kind {
-					t.Fatalf("AlertKind(%q) = %q, %v; want %s", src, k, ok, c.kind)
+				if k, _, ok := AlertKindID(src); !ok || k != c.kind {
+					t.Fatalf("AlertKindID(%q) = %q, %v; want %s", src, k, ok, c.kind)
 				}
 			}
 		}

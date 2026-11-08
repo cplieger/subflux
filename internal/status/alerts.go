@@ -23,7 +23,7 @@ type Alert struct {
 // bytes. A source no constructor yields is dropped with ERROR, and a raise of
 // a retained kind outside its live set is dropped.
 func (s *Store) Reconcile(source AlertSource, active bool, text string) {
-	kind, ok := AlertKind(source)
+	kind, _, ok := AlertKindID(source)
 	if !ok {
 		slog.Error("status: dropped an alert of an unknown kind", "source", string(source))
 		return
@@ -65,7 +65,7 @@ func (s *Store) RetainAlerts(kind string, live []AlertSource) {
 	}
 	set := make(map[AlertSource]bool, len(live))
 	for _, src := range live {
-		if k, ok := AlertKind(src); !ok || k != kind {
+		if k, _, ok := AlertKindID(src); !ok || k != kind {
 			slog.Error("status: a retained source is not of its kind", "kind", kind, "source", string(src))
 			return
 		}
@@ -76,7 +76,7 @@ func (s *Store) RetainAlerts(kind string, live []AlertSource) {
 	s.retained[kind] = set
 	cleared := false
 	for src := range s.alerts {
-		if k, _ := AlertKind(src); k == kind && !set[src] {
+		if k, _, _ := AlertKindID(src); k == kind && !set[src] {
 			delete(s.alerts, src)
 			cleared = true
 		}

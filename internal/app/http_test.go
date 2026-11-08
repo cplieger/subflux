@@ -4,56 +4,57 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
-// pipeClosed reports whether c's end of a net.Pipe was closed.
-func pipeClosed(c net.Conn) bool {
-	_, err := c.Write([]byte{0})
-	return errors.Is(err, io.ErrClosedPipe)
+// acceptLog closes second when Accept is entered for the second time:
+// http.Server marks the first connection StateNew before that call.
+type acceptLog struct {
+	net.Listener
+	second chan struct{}
+	n      atomic.Int32
 }
 
-func TestNewConnsDrain(t *testing.T) {
-	pipe := func(t *testing.T) net.Conn {
-		t.Helper()
-		c, peer := net.Pipe()
-		t.Cleanup(func() { _ = c.Close(); _ = peer.Close() })
-		go func() { _, _ = io.Copy(io.Discard, peer) }()
-		return c
+func (a *acceptLog) Accept() (net.Conn, error) {
+	if a.n.Add(1) == 2 {
+		close(a.second)
 	}
+	return a.Listener.Accept()
+}
 
-	t.Run("tracked_before_drain", func(t *testing.T) {
-		n := &newConns{m: map[net.Conn]struct{}{}}
-		c := pipe(t)
-		n.track(c, http.StateNew)
-		n.closeAll()
-		if !pipeClosed(c) {
-			t.Error("closeAll left a StateNew connection open")
-		}
-	})
-
-	t.Run("arriving_during_drain", func(t *testing.T) {
-		n := &newConns{m: map[net.Conn]struct{}{}}
-		n.closeAll()
-		c := pipe(t)
-		n.track(c, http.StateNew)
-		if !pipeClosed(c) {
-			t.Error("a StateNew connection after closeAll stayed open")
-		}
-		if len(n.m) != 0 {
-			t.Errorf("tracked %d connections after closeAll, want 0", len(n.m))
-		}
-	})
-
-	t.Run("sent_a_request", func(t *testing.T) {
-		n := &newConns{m: map[net.Conn]struct{}{}}
-		c := pipe(t)
-		n.track(c, http.StateNew)
-		n.track(c, http.StateActive)
-		n.closeAll()
-		if pipeClosed(c) {
-			t.Error("closeAll closed a connection serving a request")
-		}
-	})
+func TestShutdownClosesSilentConnection(t *testing.T) {
+	shorten(t, &httpGrace, time.Second)
+	shorten(t, &drainBudget, 2*time.Second)
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	al := &acceptLog{Listener: ln, second: make(chan struct{})}
+	b := boot(t, "", func(c *Config) { c.Listener = al })
+	conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", b.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	select {
+	case <-al.second:
+	case <-time.After(waitBudget):
+		t.Fatal("the server never accepted the connection")
+	}
+	started := time.Now()
+	b.cancel()
+	if err := b.wait(t); err != nil {
+		t.Errorf("Run = %v with a connection that sent no request", err)
+	}
+	if took := time.Since(started); took > 500*time.Millisecond {
+		t.Errorf("the drain waited %v on a connection that sent no request", took)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(waitBudget)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Errorf("read on the silent connection after the drain = %v, want EOF", err)
+	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/timing"
 )
 
 func newStore(t *testing.T) *Store {
@@ -39,7 +40,7 @@ func update(t *testing.T, s *Store, fn func(*bolttable.Tx) error) {
 	}
 }
 
-func headRev(t *testing.T, s *Store) uint64 {
+func headRev(t testing.TB, s *Store) uint64 {
 	t.Helper()
 	var rev uint64
 	if err := s.db.View(t.Context(), func(r *bolttable.ReadTx) (err error) {
@@ -454,5 +455,57 @@ func TestUnmappedTableFailsCommit(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "no change mapping") || headRev(t, s) != before {
 		t.Errorf("a touch of an unmapped table: %v, head %d; want the commit refused at %d", err, headRev(t, s), before)
+	}
+}
+
+func TestPublishesRoot(t *testing.T) {
+	s := covLib(t, tempPath(t), policyOf(t, "en"))
+	k, id := showEpisode(t, s, "sonarr", epPath)
+	root := []media.RootKey{k.Root()}
+	publishes := func(t *testing.T, written bool, op func()) {
+		t.Helper()
+		before := headRev(t, s)
+		op()
+		d := since(t, s, before)
+		if !slices.Equal(d.Roots, root) || slices.Equal(d.Written, root) != written {
+			t.Errorf("Since = Roots %v Written %v; want Roots %v, written %v", d.Roots, d.Written, root, written)
+		}
+	}
+	t.Run("inventory change", func(t *testing.T) {
+		publishes(t, false, func() { putEmbedded(t, s, id, track(t, "en", "subrip")) })
+		publishes(t, false, func() { putExternal(t, s, id, local(t, "S01E01.fr.srt", "fr")) })
+	})
+	t.Run("lock toggle", func(t *testing.T) {
+		publishes(t, false, func() { setLock(t, s, id, "en", true) })
+		publishes(t, false, func() { setLock(t, s, id, "en", false) })
+	})
+	t.Run("timing save", func(t *testing.T) {
+		deliver(t, s, pendingDeliver(t, id, managedName, 1, k))
+		rec := recordAt(id, managedName, enTag, 1)
+		rec.Timing = timing.Shift{Ms: 500}
+		publishes(t, true, func() {
+			if err := s.BeginRetime(t.Context(), rec, nil); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.EndRetime(t.Context(), id, managedName, true); err != nil {
+				t.Fatal(err)
+			}
+		})
+	})
+}
+
+func TestSupersessionListsRootInWritten(t *testing.T) {
+	s := covLib(t, tempPath(t), policyOf(t, "en"))
+	k, id := showEpisode(t, s, "sonarr", epPath)
+	deliver(t, s, pendingDeliver(t, id, managedName, 1, k))
+	before := headRev(t, s)
+	if _, moved := showEpisode(t, s, "sonarr", "/tv/Show/S01E01.v2.mkv"); moved == id {
+		t.Fatal("the path change kept the old instance")
+	}
+	if d := since(t, s, before); !slices.Equal(d.Written, []media.RootKey{k.Root()}) {
+		t.Errorf("Since after the supersession = Written %v, want %v", d.Written, k.Root())
+	}
+	if _, found := getRow(t, s, s.t.files, fileKey{Inst: id, Name: managedName}); found {
+		t.Error("the superseded instance's file record survived")
 	}
 }

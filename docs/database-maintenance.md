@@ -1,83 +1,51 @@
 # Database maintenance
 
-This page covers recovering, compacting and cleaning up around the subflux database, `/config/subflux.bolt`, for readers whose container fails on a damaged file or whose database has grown large. The commands use `/opt/appdata/subflux`, the host folder the example `compose.yaml` mounts at `/config`. Use your own folder if it differs.
+This page covers what happens to the subflux database, `/config/subflux.bolt`, when its format changes, when the file is damaged and when it grows, for readers whose container stops at boot or whose database has grown large. The commands use `/opt/appdata/subflux`, the host folder the example `compose.yaml` mounts at `/config`. Use your own folder if it differs.
 
-## Recovering a damaged database
+## When the format changes
 
-A damaged database makes the container restart in a loop, with one of these errors in `docker logs subflux`:
+A release that changes how subflux stores its data resets the database instead of converting it. At the first start of such a release, subflux:
 
-- `invalid database`
-- `checksum mismatch`
-- `meta page invalid`
+1. keeps the whole old file beside the new one as `subflux.bolt.<8 hex digits>.<UTC time>.old`, such as `subflux.bolt.0a1b2c3d.20261103T120000.000000000Z.old`,
+2. deletes all but the two newest `.old` copies,
+3. recreates the parts of the database whose format changed, empty,
+4. logs one `statedb: store format changed, reset` warning naming each recreated part and the kept copy.
 
-To recover:
+The next scan refills the library from Sonarr, Radarr and the files on disk. A reset loses what only the database knew: manual locks, the download history, timing offsets and the job records. Settings live in `config.yaml`, outside the database, so no reset touches them. The first start after an upgrade from 0.9 resets the whole file, so its users, passkeys and API keys are not carried over.
+
+The copy is complete before anything is recreated, and a reset that fails leaves the file as it was. The `.old` copies are only for you: subflux never reads them, so delete them once you no longer need them.
+
+## When the database cannot be opened
+
+Every failure to open the database stops the boot, with an `app: could not open the state store` error in `docker logs subflux`. The file is left exactly as it was.
+
+- `statedb: the store is held by another process`: another program has the file open, such as a second subflux container on the same folder. subflux waits 5 seconds for it, then stops. Stop the other program and start the container again.
+- `bolttable: invalid database file`: the file is damaged or is not a database. Recover it as below.
+
+To recover a damaged file:
 
 1. Stop the container with `docker compose stop subflux`.
 2. Move the damaged file aside with `mv /opt/appdata/subflux/subflux.bolt /opt/appdata/subflux/subflux.bolt.corrupt`.
-3. Start the container. It creates a new, empty database.
-4. Wait for one full scan, which starts 30 seconds after the container starts. It rebuilds the existing subtitles, the subtitle file list and the scan records from the files on disk. The search history starts empty, so every item can be searched at once.
-5. Open the web page and create the admin account again. Users, passkeys and API keys are lost, so the server is back in its first-start state. You can also turn on OIDC in `config.yaml` to sign in without a local account.
-6. Set any manual locks again.
+3. If you have a copy of the file from before the damage, copy it to `/opt/appdata/subflux/subflux.bolt`. Otherwise skip this step, and subflux starts with an empty database.
+4. Start the container. An empty database is refilled by the next scan, and loses the same things a reset does.
 
-`subflux reset-password` cannot replace step 5. It changes the password of an existing user and answers 404 for an unknown name, so it cannot create the first account.
+## Compaction
 
-If you turned on backups, you can instead stop the container and copy the newest `subflux-<timestamp>.bolt` from the backup folder over `subflux.bolt`. That keeps users, locks and timing offsets as they were at the time of the copy.
-
-Recovery loses:
-
-- local users, passkeys and API keys,
-- manual locks and the manual download history,
-- timing offsets, which go back to zero,
-- the search backoff state, so every site can be asked again at once.
-
-Recovery rebuilds on its own:
-
-- the subtitle file list and coverage,
-- the record of automatic downloads, found during the first scan,
-- the scan records and the import cursors, set again by the first scan and the first import check.
-
-## Compacting the database
-
-The database reuses its free space but never shrinks its file. Compaction is worth it when either holds:
-
-- `subflux_store_freelist_bytes` is more than about half of `subflux_store_file_bytes`.
-- The file is over 100 MB, which is large for subtitle records.
-
-Normal use rarely needs it. It becomes useful after sustained heavy churn, such as repeated full rescans or a large library reorganization.
-
-The `bbolt` tool is not in the image, which holds a single program and no shell. Run it on the host against the mounted folder, either with `go install go.etcd.io/bbolt/cmd/bbolt@latest` or in a throwaway container as shown in step 2.
-
-1. Stop the container with `docker compose stop subflux`. bbolt holds an exclusive lock on the file while subflux runs.
-2. Compact the file:
-
-   ```sh
-   docker run --rm -v /opt/appdata/subflux:/config golang:alpine sh -c \
-     'go install go.etcd.io/bbolt/cmd/bbolt@latest && \
-      bbolt compact -o /config/subflux-compact.bolt /config/subflux.bolt && \
-      bbolt check /config/subflux-compact.bolt'
-   ```
-
-3. Make sure `bbolt check` reports no errors.
-4. Give the new file the owner of the original with `sudo chown --reference=/opt/appdata/subflux/subflux.bolt /opt/appdata/subflux/subflux-compact.bolt`. The throwaway container runs as root, so the new file belongs to root and subflux cannot open it.
-5. Replace the original with `mv /opt/appdata/subflux/subflux-compact.bolt /opt/appdata/subflux/subflux.bolt`.
-6. Start the container.
-
-Compaction rewrites the file in order and keeps only live data.
+The database reuses its free space but does not shrink its file on its own while running. At each start, subflux compacts the file when its free pages make up at least half of it and at least 64 MiB, and logs `statedb: store compacted`. A compaction that fails only logs a `statedb: store compaction failed` warning, and subflux starts on the uncompacted file. You never need to compact it by hand.
 
 ## Removing unused database files
 
-subflux keeps its data in `/config/subflux.bolt` and its backups as `subflux-<timestamp>.bolt`. It never reads, prunes or deletes files named `subflux.db`, `subflux.db-wal`, `subflux.db-shm` or `subflux-<timestamp>.db`. If your settings folder holds any of them, they are unused and only take up space.
+subflux keeps its data in `/config/subflux.bolt`, the lock file `subflux.bolt.lock` beside it, and the `.old` copies a reset keeps. It never reads, prunes or deletes files named `subflux.db`, `subflux.db-wal`, `subflux.db-shm` or `subflux-<timestamp>.db`. If your settings folder holds any of them, they are unused and only take up space.
 
 To remove them:
 
 1. Stop the container with `docker compose stop subflux`.
 2. Delete them with `sudo rm -f /opt/appdata/subflux/subflux.db /opt/appdata/subflux/subflux.db-wal /opt/appdata/subflux/subflux.db-shm /opt/appdata/subflux/subflux-*.db`.
-3. If `backup.path` points to another folder, delete `subflux-*.db` there too.
-4. Start the container.
+3. Start the container.
 
 ## Checking the host kernel
 
-ext4 with the `fast_commit` feature had a bug that could damage memory-mapped files on an unclean shutdown. bbolt maps its file into memory for reads, so the subflux database is exposed to it. The fix is in Linux 5.10.94 and later on the 5.10 branch, and 5.15.17 and later on the 5.15 branch.
+ext4 with the `fast_commit` feature had a bug that could damage memory-mapped files on an unclean shutdown. subflux maps its database file into memory for reads, so the file is exposed to it. The fix is in Linux 5.10.94 and later on the 5.10 branch, and 5.15.17 and later on the 5.15 branch.
 
 Run `uname -r` on the host and compare the version with those two.
 
@@ -93,5 +61,3 @@ On an affected ext4 host, do one of these:
 
 - Unmount the filesystem and turn `fast_commit` off with `tune2fs -O ^fast_commit /dev/sdXn`.
 - Upgrade the kernel to a fixed version.
-
-After the next start, `docker logs subflux` shows no `invalid database` or `checksum` errors in its first lines when the database opened cleanly.

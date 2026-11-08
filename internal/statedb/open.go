@@ -26,6 +26,9 @@ type Store struct {
 	now    func() time.Time
 	health bolttable.WriteHealth
 	sig    sync.Mutex
+	// backupMu runs one Backup at a time, so the stranded temporaries one
+	// removes are never another's in progress.
+	backupMu sync.Mutex
 	// actMu is the activation lock: Activate holds it exclusively from its
 	// read of the stored activation to installing the next; every write
 	// judged under the activation holds it shared, so none commits under an
@@ -53,10 +56,13 @@ func productionConfig() config {
 	}}
 }
 
+// ErrLocked is Open's failure while another process holds the store.
+var ErrLocked = errors.New("statedb: the store is held by another process")
+
 // Open opens or creates the store at path, holding path.lock until Close. A
 // format change resets the changed namespaces after keeping the whole file
 // as path.<8 hex>.<stamp>.old; another holder of the lock fails it with
-// bolttable.ErrLocked after 5 s. Every error leaves the live file unreset.
+// ErrLocked after 5 s. Every error leaves the live file unreset.
 func Open(path string) (*Store, error) {
 	cfg := productionConfig()
 	return open(path, &cfg)
@@ -68,6 +74,9 @@ func open(path string, cfg *config) (*Store, error) {
 	opts.BeforeCommit = s.beforeCommit
 	opts.OnCommit = s.onCommit
 	db, err := bolttable.Open(path, cfg.tables.schema, opts)
+	if errors.Is(err, bolttable.ErrLocked) {
+		return nil, fmt.Errorf("%w: %s: %w", ErrLocked, path, err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("statedb: open %s: %w", path, err)
 	}

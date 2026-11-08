@@ -3,11 +3,9 @@ package app
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
 
 	"github.com/cplieger/go/health"
 	"github.com/cplieger/go/httpserver"
@@ -38,61 +36,33 @@ func httpMetrics(m *obs.Metrics) (httpserver.LogOption, httpserver.RecoverOption
 		httpserver.WithPanicHook(func(any, []byte) { m.RecordPanic() })
 }
 
-// httpComponent serves srv on ln until its stop shuts srv down. Serve
-// returning while the component is live (a failed Accept) is a cause; the
-// drain's Shutdown then still waits for the requests in flight.
-func httpComponent(srv *http.Server, ln net.Listener) component {
-	idle := &newConns{m: map[net.Conn]struct{}{}}
-	srv.ConnState = idle.track
+// httpProducer serves srv on ln through httpserver.Run, whose shutdown on
+// ctx's end waits for the requests in flight within httpGrace. Its stop
+// waits for Run, which that grace bounds, so the overrun is Run's own
+// ErrShutdownGraceExpired. Run returns a serve error (a failed Accept) at
+// once, the drain's cause, and shuts nothing down on that path, so the stop
+// then waits for the requests still running on the connections Serve
+// accepted.
+func httpProducer(srv *http.Server, ln net.Listener) component {
+	returned := make(chan struct{})
+	var serveExited bool
 	return component{
 		name: "http server",
-		run: func(context.Context) error {
-			if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
-				return err
-			}
-			return nil
+		run: func(ctx context.Context) error {
+			defer close(returned)
+			return httpserver.Run(ctx, srv, ln, nil,
+				httpserver.WithShutdownGrace(httpGrace),
+				httpserver.WithServeExit(func(context.Context) { serveExited = true }))
 		},
 		stop: func(ctx context.Context) error {
-			idle.closeAll()
+			<-returned
+			if !serveExited {
+				return nil
+			}
 			if err := srv.Shutdown(ctx); err != nil {
 				return fmt.Errorf("shutdown: %w", err)
 			}
 			return nil
 		},
-	}
-}
-
-// newConns tracks connections that have not sent a request. http.Server's
-// Shutdown waits up to 5 s for such a connection (a browser's preconnect),
-// past httpGrace, so the drain closes them first, and closes on arrival one
-// Serve accepts before Shutdown closes the listener: no request is lost on
-// one (golang/go#22682).
-type newConns struct {
-	m        map[net.Conn]struct{}
-	mu       sync.Mutex
-	draining bool
-}
-
-func (n *newConns) track(c net.Conn, st http.ConnState) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if st != http.StateNew {
-		delete(n.m, c)
-		return
-	}
-	if n.draining {
-		_ = c.Close()
-		return
-	}
-	n.m[c] = struct{}{}
-}
-
-func (n *newConns) closeAll() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.draining = true
-	for c := range n.m {
-		_ = c.Close()
-		delete(n.m, c)
 	}
 }

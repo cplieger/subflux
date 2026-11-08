@@ -50,11 +50,16 @@ func withTables(c *coreTables) config {
 // bumpedCore is core plus one more table, so its digest differs from core's.
 func bumpedCore(t *testing.T) *coreTables {
 	t.Helper()
-	c, err := defineCore(bolttable.NewSchema(schemaName))
+	s := bolttable.NewSchema(schemaName)
+	ns, err := s.Namespace("core")
 	if err != nil {
-		t.Fatalf("defineCore: %v", err)
+		t.Fatalf("Namespace: %v", err)
 	}
-	if _, err := bolttable.Define(c.ns, 0x7F, "bump", bolttable.BytesKey{}, bolttable.JSON[struct{}](1), bolttable.TableOptions{}); err != nil {
+	c, err := defineCoreIn(s, ns)
+	if err != nil {
+		t.Fatalf("defineCoreIn: %v", err)
+	}
+	if _, err := bolttable.Define(ns, 0x7F, "bump", bolttable.BytesKey{}, bolttable.JSON[struct{}](1), bolttable.TableOptions{}); err != nil {
 		t.Fatalf("Define bump: %v", err)
 	}
 	return c
@@ -196,7 +201,7 @@ func TestOpenHoldsLockFile(t *testing.T) {
 		_ = s2.Close()
 		t.Fatal("Open succeeded while another holder had the lock")
 	}
-	if !errors.Is(err, bolttable.ErrLocked) {
+	if !errors.Is(err, ErrLocked) {
 		t.Errorf("Open under a held lock: %v, want ErrLocked", err)
 	}
 	if elapsed < 5*time.Second || elapsed >= 6*time.Second {

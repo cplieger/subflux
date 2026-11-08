@@ -1,4 +1,4 @@
-# Recommended alert rules for subflux, for Prometheus or the Mimir ruler.
+# Recommended alert rules for subflux.
 # Scrape subflux's /metrics endpoint and load this group into your ruler.
 # Firing alerts go through your Alertmanager. Thresholds, `for:` windows and
 # severity labels are starting points, so adjust them to your deployment.
@@ -7,6 +7,10 @@
 # rules pin `job="subflux"` because they read the synthetic `up` series. Set
 # that matcher to your scrape job name. The other rules carry no job matcher,
 # so add one if you run more than one instance.
+#
+# Every rule after SubfluxHTTP5xx reads subflux_alerts_active, which holds one
+# series per problem subflux reports, labelled with the problem's kind and id.
+# docs/monitoring.md lists each kind and its rule.
 groups:
   - name: subflux
     rules:
@@ -46,3 +50,67 @@ groups:
           description: >
             subflux returned more than 5 server errors in 10m. The subflux log
             names each failed request.
+      # A provider alert stands while a site's credentials are disabled, or
+      # while its 1-hour cooldown follows a DNS, connection or TLS failure; the
+      # next success clears it. 65m outlasts one cooldown, so an outage the
+      # call after it cures stays quiet.
+      - alert: SubfluxProviderUnusable
+        expr: subflux_alerts_active{kind="provider"} == 1
+        for: 65m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux cannot use the subtitle site {{ $labels.id }}"
+          description: >
+            The site rejected its credentials, or has been unreachable for over
+            an hour. Check its credentials in the settings, and whether the
+            site is up.
+      - alert: SubfluxMediaUnavailable
+        expr: subflux_alerts_active{kind="media_root"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux cannot read the media under {{ $labels.id }}"
+          description: >
+            A file under this media root could not be checked for 5m, so the
+            share is likely unmounted or hung. Check the mount.
+      - alert: SubfluxSourceUnreachable
+        expr: subflux_alerts_active{kind="source"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux cannot reach the media source {{ $labels.id }}"
+          description: >
+            subflux has not reached this Sonarr or Radarr instance for 15m.
+            Check its address, its API key and the network.
+      - alert: SubfluxStoreWriteFailing
+        expr: subflux_alerts_active{kind="store"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "subflux cannot write its database"
+          description: >
+            The last write to /config/subflux.bolt failed and none has
+            succeeded since. The /config volume may be full, read-only or
+            failing. The log names the error.
+      # Every other kind, so a kind added later is covered with no new rule.
+      # backup is left to the backup rule that returns with scheduled backups;
+      # restart_pending and auth_disabled are a restart request and a setting
+      # you chose. job_records and pending_writes follow from store and
+      # media_root on the same instance, so each cause pages once.
+      - alert: SubfluxConditionActive
+        expr: >
+          subflux_alerts_active{kind!~"provider|media_root|source|store|backup|restart_pending|auth_disabled|job_records|pending_writes"} == 1
+          or (subflux_alerts_active{kind="job_records"} == 1 unless on(job, instance) subflux_alerts_active{kind="store"})
+          or (subflux_alerts_active{kind="pending_writes"} == 1 unless on(job, instance) subflux_alerts_active{kind="media_root"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux reports a problem of kind {{ $labels.kind }}"
+          description: >
+            subflux has reported this problem for 15m. The id label, when set,
+            names what it is about; docs/monitoring.md describes each kind.
