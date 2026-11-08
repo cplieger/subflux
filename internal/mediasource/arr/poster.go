@@ -55,7 +55,7 @@ func (p *Poster) Fetch(ctx context.Context, url, apiKey string) (body io.ReadClo
 	ctx, cancel := httpclient.ContextWithDefaultTimeout(ctx, posterBudget)
 	defer cancel()
 	hops := 0
-	sameOrigin := httpclient.RedirectPolicyFunc(httpclient.WithSameOrigin(true), httpclient.WithMaxHops(maxPosterHops))
+	sameOrigin := httpclient.RedirectPolicy(httpclient.WithSameOrigin(true), httpclient.WithMaxHops(maxPosterHops))
 	arr := *p.arr
 	arr.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		var refused *httpclient.RedirectRefusedError
