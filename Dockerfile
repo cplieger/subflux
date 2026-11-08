@@ -13,7 +13,7 @@ ARG FFMPEG_VERSION=9.0.2
 ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
 # --- Source downloads (cached independently) ---
-FROM alpine:3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4 AS sources
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 ARG FFMPEG_VERSION
@@ -88,7 +88,7 @@ EOF
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
 # Produces ~5MB ffmpeg + ~2MB ffprobe. No network, no HW accel.
-FROM alpine:3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4 AS ffmpeg-builder
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS ffmpeg-builder
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
