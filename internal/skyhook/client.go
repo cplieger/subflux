@@ -47,7 +47,7 @@ func New(base *http.Client, log *slog.Logger) *Client {
 		*c = *base
 	}
 	c.Transport = ssrf.SafeTransport(append(slices.Clone(transportOptions), ssrf.WithLogger(log))...)
-	c.CheckRedirect = httpclient.RedirectPolicyFunc(httpclient.WithSameOrigin(true))
+	c.CheckRedirect = httpclient.RedirectPolicy(httpclient.WithSameOrigin(true))
 	return &Client{http: c, log: log}
 }
 
