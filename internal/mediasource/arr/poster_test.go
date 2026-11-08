@@ -3,12 +3,15 @@ package arr_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/arr"
 )
@@ -109,4 +112,24 @@ func classifiedCause(err error) mediasource.Cause {
 		return 0
 	}
 	return se.Cause
+}
+
+// keyEchoTransport fails every request with a refused redirect whose message
+// carries the request's key, as a proxy or a custom transport might.
+type keyEchoTransport struct{}
+
+func (keyEchoTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("upstream echoed %s: %w", r.Header.Get("X-Api-Key"),
+		&httpclient.RedirectRefusedError{Reason: httpclient.RedirectTooMany})
+}
+
+func TestPosterKeyInTransportErrorKeepsCause(t *testing.T) {
+	p := arr.NewPoster(&http.Client{Transport: keyEchoTransport{}})
+	_, _, _, err := p.Fetch(t.Context(), "http://arr.invalid/cover.jpg", testKey)
+	if got := classifiedCause(err); got != mediasource.Protocol {
+		t.Errorf("cause = %v, want protocol (a refused redirect): %v", got, err)
+	}
+	if err == nil || strings.Contains(err.Error(), testKey) {
+		t.Errorf("error %v: want one with the key redacted", err)
+	}
 }
