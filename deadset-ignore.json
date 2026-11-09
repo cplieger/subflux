@@ -57,12 +57,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertPendingWrites",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until TS-2 (internal/status#AlertPendingWrites): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#SourceAlert",
       "path": "internal/status/sources.go",
       "reason": "Retained until MS-2 (internal/status#SourceAlert): its first caller outside the package lands there."
@@ -489,12 +483,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Policy",
-      "path": "internal/statedb/activate.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.Policy): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Backup",
       "path": "internal/statedb/backup.go",
       "reason": "Retained until PA-2 (internal/statedb#Store.Backup): its first caller outside the package lands there."
@@ -537,12 +525,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ListCursor",
-      "path": "internal/statedb/cursor.go",
-      "reason": "Retained until AP-1b (internal/statedb#ListCursor): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrCursorInvalid",
       "path": "internal/statedb/cursor.go",
       "reason": "Retained until OW-6 (internal/statedb#ErrCursorInvalid): its first caller outside the package lands there."
@@ -582,12 +564,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RootEvidence",
       "path": "internal/statedb/evidence.go",
       "reason": "Retained until MS-2 (internal/statedb#Store.RootEvidence): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutExternal",
-      "path": "internal/statedb/external.go",
-      "reason": "Retained until SE-2 (internal/statedb#Store.PutExternal): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -639,39 +615,15 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#HistoryScope",
-      "path": "internal/statedb/history.go",
-      "reason": "Retained until SE-2 (internal/statedb#HistoryScope): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootHistory",
       "path": "internal/statedb/history.go",
       "reason": "Retained until AP-1 (internal/statedb#RootHistory): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemHistory",
-      "path": "internal/statedb/history.go",
-      "reason": "Retained until SE-2 (internal/statedb#ItemHistory): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.History",
-      "path": "internal/statedb/history.go",
-      "reason": "Retained until SE-2 (internal/statedb#Store.History): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ParseInstanceID",
       "path": "internal/statedb/ids.go",
       "reason": "Retained until AP-1b (internal/statedb#ParseInstanceID): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Coverage",
-      "path": "internal/statedb/ids.go",
-      "reason": "Retained until AP-1 (internal/statedb#Coverage): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -800,12 +752,6 @@
       "reason": "Retained until OW-6 (internal/statedb#ErrNotLockable): its first caller outside the package lands there."
     },
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow",
-      "path": "internal/statedb/locks.go",
-      "reason": "Retained until SE-2 (internal/statedb#CoverageRow): its first caller outside the package lands there."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.LastRefusal",
       "path": "internal/statedb/locks.go",
@@ -822,12 +768,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageRow.Locked",
       "path": "internal/statedb/locks.go",
       "reason": "Retained until SE-2 (internal/statedb#CoverageRow.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Coverage",
-      "path": "internal/statedb/locks.go",
-      "reason": "Retained until SE-2 (internal/statedb#Store.Coverage): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -861,24 +801,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ObserveItems",
-      "path": "internal/statedb/observe.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.ObserveItems): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#PassID",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#PassID): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#PassScope",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#PassScope): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrSourceInactive",
       "path": "internal/statedb/pass.go",
       "reason": "Retained until MS-2 (internal/statedb#ErrSourceInactive): its first caller outside the package lands there."
@@ -888,18 +810,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrPassUnknown",
       "path": "internal/statedb/pass.go",
       "reason": "Retained until OW-6 (internal/statedb#ErrPassUnknown): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.BeginPass",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.BeginPass): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.FinishPass",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.FinishPass): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -936,12 +846,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow.HasHistory",
       "path": "internal/statedb/reads.go",
       "reason": "Retained until AP-1b (internal/statedb#RootRow.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ItemRow",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until AP-1b (internal/statedb#ItemRow): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -1038,12 +942,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Items",
       "path": "internal/statedb/reads.go",
       "reason": "Retained until AP-1b (internal/statedb#Store.Items): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ItemRow",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until AP-1b (internal/statedb#Store.ItemRow): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",

@@ -13,8 +13,7 @@ type Config struct {
 	RemoveEmpty          bool
 }
 
-// CleanOptions is the section as timing.Clean takes it.
-func CleanOptions(c Config) timing.CleanOptions {
+func (c Config) cleanOptions() timing.CleanOptions {
 	return timing.CleanOptions{
 		StripHI: c.StripHI, StripTags: c.StripTags, CleanWhitespace: c.CleanWhitespace, RemoveEmpty: c.RemoveEmpty,
 		NormalizeUTF8: c.NormalizeUTF8, NormalizeLineEndings: c.NormalizeLineEndings,
