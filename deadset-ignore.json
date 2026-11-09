@@ -369,6 +369,66 @@
     },
     {
       "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AccountStore",
+      "path": "internal/statedb/accounts.go",
+      "reason": "Retained until PA-2 (internal/statedb#AccountStore): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Accounts",
+      "path": "internal/statedb/accounts.go",
+      "reason": "Retained until PA-2 (internal/statedb#Store.Accounts): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MethodStateOf",
+      "path": "internal/statedb/accounts_methods.go",
+      "reason": "Retained until PA-2 (internal/statedb#MethodStateOf): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ActivateAuth",
+      "path": "internal/statedb/accounts_methods.go",
+      "reason": "Retained until PA-2 (internal/statedb#Store.ActivateAuth): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets",
+      "path": "internal/statedb/secrets.go",
+      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets.FailureKey",
+      "path": "internal/statedb/secrets.go",
+      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets.*): its first reader lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets.DeviceKey",
+      "path": "internal/statedb/secrets.go",
+      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets.*): its first reader lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.AuthSecrets",
+      "path": "internal/statedb/secrets.go",
+      "reason": "Retained until PA-2 (internal/statedb#Store.AuthSecrets): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkAccounts",
+      "path": "internal/statedb/feed.go",
+      "reason": "Retained until AP-1b (internal/statedb#MarkAccounts): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#authTables.sessionByID",
+      "path": "internal/statedb/schema.go",
+      "reason": "The index exists for its unique constraint, which bolttable applies on every sessions write, so a session ID is unique across users (account rule 4, TestSessionIDUniqueAcrossUsers); no production path looks a session up by ID alone, and the field is the handle TestFormatGolden pins the index's stored entries through."
+    },
+    {
+      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta",
       "path": "internal/statedb/feed.go",
       "reason": "Retained until MR-1 (internal/statedb#Delta): its first caller outside the package lands there."

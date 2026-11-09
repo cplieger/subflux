@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"ST-2", "ST-2b", "TS-2b", "TS-2", "MR-1", "OW-6", "SE-2", "SE-2p",
+	"ST-2b", "TS-2", "MR-1", "OW-6", "SE-2", "SE-2p",
 	"PA-2", "AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
@@ -122,6 +122,10 @@ var retained = []struct{ pattern, until string }{
 	{"internal/settings#Service.Merge", "AP-1"},
 	{"internal/settings#Service.Save", "PA-2"},
 	{"internal/settings#Snapshot.Document", "PA-2"},
+	{"internal/statedb#AccountStore", "PA-2"},
+	{"internal/statedb#AccountStore.*", "PA-2"},
+	{"internal/statedb#AuthSecrets", "PA-2"},
+	{"internal/statedb#AuthSecrets.*", "PA-2"},
 	{"internal/statedb#Coverage", "AP-1"},
 	{"internal/statedb#Coverage.MarshalText", "AP-1"},
 	{"internal/statedb#Coverage.UnmarshalText", "AP-1"},
@@ -146,10 +150,11 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#ItemRow", "AP-1b"},
 	{"internal/statedb#ItemRow.*", "AP-1b"},
 	{"internal/statedb#ListCursor", "AP-1b"},
-	{"internal/statedb#MarkAccounts", "ST-2"},
+	{"internal/statedb#MarkAccounts", "AP-1b"},
 	{"internal/statedb#MarkConfig", "AP-1b"},
 	{"internal/statedb#MarkHistory", "AP-1b"},
 	{"internal/statedb#MarkUnidentified", "AP-1b"},
+	{"internal/statedb#MethodStateOf", "PA-2"},
 	{"internal/statedb#Mismatch", "PA-2"},
 	{"internal/statedb#Mismatch.*", "PA-2"},
 	{"internal/statedb#NamespaceStat", "PA-2"},
@@ -160,7 +165,10 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#RootRow", "AP-1b"},
 	{"internal/statedb#RootRow.*", "AP-1b"},
 	{"internal/statedb#RootTarget", "MR-1"},
+	{"internal/statedb#Store.Accounts", "PA-2"},
 	{"internal/statedb#Store.AckWork", "SE-2"},
+	{"internal/statedb#Store.ActivateAuth", "PA-2"},
+	{"internal/statedb#Store.AuthSecrets", "PA-2"},
 	{"internal/statedb#Store.Backup", "PA-2"},
 	{"internal/statedb#Store.Changed", "MR-1"},
 	{"internal/statedb#Store.Coverage", "SE-2"},

@@ -1,12 +1,21 @@
 package statedb
 
 import (
+	"context"
+	"crypto/sha256"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/netip"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
+	"github.com/cplieger/access/account"
+	"github.com/cplieger/access/ratelimit"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -286,4 +295,304 @@ func epKeyB(b *testing.B, tvdb uint64) media.Key {
 		b.Fatal("no key")
 	}
 	return k
+}
+
+func benchAccounts(b *testing.B) (*Store, *AccountStore) {
+	b.Helper()
+	s, err := open(filepath.Join(b.TempDir(), "subflux.bolt"), new(productionConfig()))
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = s.Close() })
+	return s, s.Accounts()
+}
+
+func benchCommits(b *testing.B, s *Store) uint64 {
+	b.Helper()
+	st, err := s.db.Stats(b.Context())
+	if err != nil {
+		b.Fatal(err)
+	}
+	return st.Commits
+}
+
+// countParams is OWASP's cheapest Argon2id row, which access's own
+// BenchmarkCountCommit derives at behind a four-derivation budget, so the
+// two sets of figures compare.
+var countParams = access.Argon2Params{Memory: 7168, Iterations: 5, Parallelism: 1, SaltLength: 16, KeyLength: 32}
+
+// timedAccounts adds up the wall time every Update spends.
+type timedAccounts struct {
+	*AccountStore
+	nanos atomic.Int64
+}
+
+func (t *timedAccounts) Update(ctx context.Context, fn func(tx account.Tx) error) error {
+	start := time.Now()
+	err := t.AccountStore.Update(ctx, fn)
+	t.nanos.Add(int64(time.Since(start)))
+	return err
+}
+
+// countService is an account.Service over store whose limiter admits every
+// attempt, with the password hash it gives the users it signs in.
+func countService(b *testing.B, store *timedAccounts) (*account.Service, access.Hash) {
+	b.Helper()
+	ctx := b.Context()
+	budget, err := access.NewHashBudget(4 * access.HashCost(countParams))
+	if err != nil {
+		b.Fatal(err)
+	}
+	h, err := access.NewHasher(access.HasherConfig{Params: countParams, Budget: budget, Wait: 10 * time.Minute})
+	if err != nil {
+		b.Fatal(err)
+	}
+	hash, err := h.Hash(ctx, "correct horse battery staple")
+	if err != nil {
+		b.Fatal(err)
+	}
+	authn, err := access.New(store.AccountStore, access.Config{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	lc := ratelimit.DefaultConfig()
+	wide := ratelimit.Rate{Limit: 1 << 30, Window: time.Hour}
+	lc.IP, lc.Account, lc.Device, lc.Request = wide, wide, wide, wide
+	lc.Devices = access.NewEphemeralSealer()
+	lim, err := ratelimit.New(ctx, lc)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = lim.Shutdown(context.Background()) })
+	svc, err := account.New(ctx, account.Config{
+		Store:         store,
+		Policy:        account.RolePolicy{},
+		Authenticator: authn,
+		Hasher:        h,
+		Limiter:       lim,
+		Rules:         func() account.Rules { return account.Rules{} },
+		Logger:        slog.New(slog.DiscardHandler),
+		FailureKey:    make([]byte, 32),
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = svc.Shutdown(context.Background()) })
+	return svc, hash
+}
+
+// BenchmarkCountCommit is one burst of concurrent wrong-password
+// PasswordLogin attempts per iteration against a fresh user, so no burst
+// reaches the failure cap. It reports each attempt's mean wall time, the
+// share of it spent inside Update (a failed attempt's one Update is its
+// count commit), that time itself and the durable commits per attempt.
+func BenchmarkCountCommit(b *testing.B) {
+	for _, callers := range []int{1, 16} {
+		b.Run(fmt.Sprintf("%d_concurrent", callers), func(b *testing.B) {
+			s, a := benchAccounts(b)
+			timed := &timedAccounts{AccountStore: a}
+			svc, hash := countService(b, timed)
+			ctx := b.Context()
+			var spent atomic.Int64
+			var inUpdate time.Duration
+			var commits uint64
+			attempts := 0
+			for b.Loop() {
+				b.StopTimer()
+				name := fmt.Sprintf("user%d", attempts)
+				if err := a.CreateUser(ctx, &access.User{Username: name, Role: access.RoleUser, Enabled: true, PasswordHash: hash, CreatedAt: time.Now()}); err != nil {
+					b.Fatal(err)
+				}
+				fromCommits, fromNanos := benchCommits(b, s), timed.nanos.Load()
+				b.StartTimer()
+				var wg sync.WaitGroup
+				for i := range callers {
+					ip := netip.AddrFrom4([4]byte{10, byte(attempts >> 8), byte(attempts), byte(i)})
+					wg.Go(func() {
+						start := time.Now()
+						_, err := svc.PasswordLogin(ctx, account.Client{UserAgent: "bench", IP: ip, Peer: ip},
+							account.Credentials{Username: name, Password: access.NewSecret("wrong password")})
+						spent.Add(int64(time.Since(start)))
+						if !errors.Is(err, account.ErrInvalidCredentials) {
+							b.Errorf("PasswordLogin = %v, want ErrInvalidCredentials", err)
+						}
+					})
+				}
+				wg.Wait()
+				b.StopTimer()
+				inUpdate += time.Duration(timed.nanos.Load() - fromNanos)
+				commits += benchCommits(b, s) - fromCommits
+				attempts += callers
+				b.StartTimer()
+			}
+			b.ReportMetric(float64(spent.Load())/float64(attempts)/float64(time.Millisecond), "ms/attempt")
+			b.ReportMetric(float64(inUpdate)/float64(spent.Load()), "commit-share")
+			b.ReportMetric(float64(inUpdate)/float64(attempts)/float64(time.Millisecond), "commit-ms/attempt")
+			b.ReportMetric(float64(commits)/float64(attempts), "commits/attempt")
+		})
+	}
+}
+
+// boundUsers is the user count rule 15's bound is taken at, the 1,000
+// access's BenchmarkPruneAtBound uses.
+const boundUsers = 1000
+
+func failureName(name string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(name))) }
+
+// failuresAtBound is a store at rule 15's bound for boundUsers users: two
+// records of each user's name and 2 x account.MaxUntrustedCounts records of
+// names that are no user's. It returns the users' failure names, which a
+// prune keeps.
+func failuresAtBound(b *testing.B) (*AccountStore, []string) {
+	b.Helper()
+	_, a := benchAccounts(b)
+	ctx := b.Context()
+	keep := make([]string, boundUsers)
+	for i := range keep {
+		keep[i] = failureName(fmt.Sprintf("user%d", i))
+	}
+	if err := a.Update(ctx, func(tx account.Tx) error {
+		for i := range boundUsers {
+			name := fmt.Sprintf("user%d", i)
+			if err := tx.CreateUser(ctx, &access.User{Username: name, Role: access.RoleUser, Enabled: true, CreatedAt: time.Unix(1, 0).UTC()}); err != nil {
+				return err
+			}
+			for _, trusted := range []bool{false, true} {
+				ref := account.FailureRef{Name: keep[i], Method: access.MethodPassword, Trusted: trusted}
+				if err := tx.PutAuthFailure(ctx, account.FailureCount{FailureRef: ref, Count: 1}); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		b.Fatal(err)
+	}
+	fillOthers(b, a)
+	return a, keep
+}
+
+func fillOthers(b *testing.B, a *AccountStore) {
+	b.Helper()
+	ctx := b.Context()
+	if err := a.Update(ctx, func(tx account.Tx) error {
+		for i := range 2 * account.MaxUntrustedCounts {
+			ref := account.FailureRef{Name: failureName(fmt.Sprintf("other%d", i)), Method: access.MethodPassword}
+			if err := tx.PutAuthFailure(ctx, account.FailureCount{FailureRef: ref, Count: 1}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		b.Fatal(err)
+	}
+}
+
+// BenchmarkPublishFailures is one count commit, an Update holding one
+// PutAuthFailure, while the store holds rule 15's bound of failure records.
+func BenchmarkPublishFailures(b *testing.B) {
+	a, keep := failuresAtBound(b)
+	ctx := b.Context()
+	ref := account.FailureRef{Name: keep[0], Method: access.MethodPassword}
+	n := 1
+	for b.Loop() {
+		n++
+		if err := a.Update(ctx, func(tx account.Tx) error {
+			return tx.PutAuthFailure(ctx, account.FailureCount{FailureRef: ref, Count: n})
+		}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkPruneFailures is account's failure-record sweep as one Update
+// (ListUsers, UnreportedLocks, PruneAuthFailures of every name that is no
+// user's) over rule 15's bound.
+func BenchmarkPruneFailures(b *testing.B) {
+	a, keep := failuresAtBound(b)
+	ctx := b.Context()
+	refill := false
+	for b.Loop() {
+		if refill {
+			b.StopTimer()
+			fillOthers(b, a)
+			b.StartTimer()
+		}
+		refill = true
+		var removed int64
+		if err := a.Update(ctx, func(tx account.Tx) error {
+			if _, err := tx.ListUsers(ctx); err != nil {
+				return err
+			}
+			if _, err := tx.UnreportedLocks(ctx); err != nil {
+				return err
+			}
+			n, err := tx.PruneAuthFailures(ctx, keep)
+			removed = n
+			return err
+		}); err != nil {
+			b.Fatal(err)
+		}
+		if removed != 2*account.MaxUntrustedCounts {
+			b.Fatalf("pruned %d records, want %d", removed, 2*account.MaxUntrustedCounts)
+		}
+	}
+}
+
+// BenchmarkSignInBurst is one burst per iteration of the stamps 16
+// concurrent sign-ins write: a session's activity, a key's use, a passkey's
+// sign count and a failure count each. Every one is silent, so the burst
+// must reserve no revision (AC1).
+func BenchmarkSignInBurst(b *testing.B) {
+	const signIns = 16
+	s, a := benchAccounts(b)
+	ctx := b.Context()
+	type signIn struct {
+		session access.Hash
+		cred    []byte
+		key     int64
+		user    int64
+	}
+	var ins []signIn
+	at := time.Unix(1, 0).UTC()
+	for i := range signIns {
+		u := &access.User{Username: fmt.Sprintf("user%d", i), Role: access.RoleUser, Enabled: true, CreatedAt: at}
+		if err := a.CreateUser(ctx, u); err != nil {
+			b.Fatal(err)
+		}
+		in := signIn{session: access.NewHash(fmt.Sprintf("session-%d", i)), cred: fmt.Appendf(nil, "cred-%d", i), user: u.ID}
+		sess := &access.Session{CreatedAt: at, LastActivity: at, AuthTime: at, ID: fmt.Sprintf("s%d", i), TokenHash: in.session, AuthMethod: access.MethodPassword, UserID: u.ID}
+		key := &access.Key{CreatedAt: at, KeyHash: access.NewHash(fmt.Sprintf("key-%d", i)), UserID: u.ID}
+		err := errors.Join(a.CreateSession(ctx, sess), a.CreateAPIKey(ctx, key),
+			a.CreatePasskey(ctx, &access.PasskeyCredential{CreatedAt: at, UserID: u.ID, CredentialID: in.cred, RawFlags: 1}))
+		if err != nil {
+			b.Fatal(err)
+		}
+		in.key = key.ID
+		ins = append(ins, in)
+	}
+	head := headRev(b, s)
+	n := 0
+	for b.Loop() {
+		n++
+		stamp := at.Add(time.Duration(n) * time.Second)
+		var wg sync.WaitGroup
+		for i, in := range ins {
+			wg.Go(func() {
+				err := errors.Join(
+					a.UpdateSessionActivity(ctx, in.session, access.SessionActivity{At: stamp, IP: "192.0.2.1"}),
+					a.TouchAPIKey(ctx, in.key, stamp),
+					a.UpdatePasskeyAfterLogin(ctx, in.user, in.cred, access.PasskeyLoginUpdate{At: stamp, SignCount: uint32(n), RawFlags: 5}),
+					a.PutAuthFailure(ctx, account.FailureCount{Name: failureName(fmt.Sprintf("user%d", i)), Method: access.MethodPassword, Count: n}),
+				)
+				if err != nil {
+					b.Error(err)
+				}
+			})
+		}
+		wg.Wait()
+	}
+	if rev := headRev(b, s); rev != head {
+		b.Errorf("%d bursts moved the head from %d to %d", n, head, rev)
+	}
 }

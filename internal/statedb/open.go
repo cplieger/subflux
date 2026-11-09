@@ -16,6 +16,7 @@ import (
 type Store struct {
 	db *bolttable.DB
 	t  *coreTables
+	a  *authTables
 	// changed is the current generation's Changed channel; sig guards it.
 	changed chan struct{}
 	// workReady holds at most one pending wake for the work drainer.
@@ -39,7 +40,7 @@ type Store struct {
 // config is what open varies: the schema's tables, the bolttable options
 // and the clock.
 type config struct {
-	tables *coreTables
+	tables *tables
 	now    func() time.Time
 	opts   bolttable.Options
 }
@@ -48,7 +49,7 @@ type config struct {
 // waits 5 s for the lock, a format change resets every listed name keeping
 // two .old copies, and a file half free and 64 MiB free compacts.
 func productionConfig() config {
-	return config{tables: core, now: time.Now, opts: bolttable.Options{
+	return config{tables: production, now: time.Now, opts: bolttable.Options{
 		LockWait:  5 * time.Second,
 		Compact:   bolttable.CompactPolicy{MinFreeRatio: 0.5, MinFreeBytes: 64 << 20},
 		Reset:     bolttable.ResetPolicy{Allow: func(bolttable.NamespaceDigest) bool { return true }, Keep: 2},
@@ -69,7 +70,7 @@ func Open(path string) (*Store, error) {
 }
 
 func open(path string, cfg *config) (*Store, error) {
-	s := &Store{t: cfg.tables, now: cfg.now, changed: make(chan struct{}), workReady: make(chan struct{}, 1)}
+	s := &Store{t: cfg.tables.core, a: cfg.tables.auth, now: cfg.now, changed: make(chan struct{}), workReady: make(chan struct{}, 1)}
 	opts := cfg.opts
 	opts.BeforeCommit = s.beforeCommit
 	opts.OnCommit = s.onCommit

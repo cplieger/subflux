@@ -42,11 +42,21 @@ func (l goldenLine) String() string {
 	return fmt.Sprintf("%s %s %d %s", l.kind, l.name, l.version, b)
 }
 
-// TestFormatGolden pins core's stored format from the production codecs:
-// a byte change under an unchanged codec version is a silent format change
-// a reopen would misread, and a version bump with no byte change resets
-// every user's core for nothing.
+// TestFormatGolden pins core's and auth's stored format from the production
+// codecs: a byte change under an unchanged codec version is a silent format
+// change a reopen would misread, and a version bump with no byte change
+// resets every user's namespace for nothing.
 func TestFormatGolden(t *testing.T) {
+	t.Run("every hash and handle is stored", func(t *testing.T) {
+		for _, f := range authFixtures(t) {
+			stored := string(f.key) + string(f.value)
+			for _, h := range f.held {
+				if !strings.Contains(stored, h) {
+					t.Errorf("%s stores neither key nor value holding %q", f.name, h)
+				}
+			}
+		}
+	})
 	got := formatLines(t)
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		var b strings.Builder
@@ -129,17 +139,18 @@ func parseGolden(raw []byte) (map[string]goldenLine, error) {
 	return out, nil
 }
 
-// formatLines is core's digest, each fixture row's key and value, every
-// index entry those rows produce, and the time component of instants on
-// both sides of the epoch.
+// formatLines is each namespace's digest, each fixture row's key and value,
+// every index entry those rows produce, and the time component of instants
+// on both sides of the epoch.
 func formatLines(t *testing.T) []goldenLine {
 	t.Helper()
-	db, c := openCore(t)
-	fixtures := coreFixtures(t)
+	db, ts := openSchema(t)
+	c, a := ts.core, ts.auth
+	fixtures := allFixtures(t)
 	if err := db.Update(t.Context(), func(tx *bolttable.Tx) error {
 		for _, f := range fixtures {
-			if err := f.put(tx, c); err != nil {
-				return fmt.Errorf("%s: %w", f.table, err)
+			if err := f.put(tx, ts); err != nil {
+				return fmt.Errorf("%s: %w", f.name, err)
 			}
 		}
 		// The sparse indexes' rows: an unidentified sighting and an
@@ -162,8 +173,8 @@ func formatLines(t *testing.T) []goldenLine {
 	}
 	for _, f := range fixtures {
 		lines = append(lines,
-			goldenLine{kind: "key", name: f.table, version: f.keyVersion, bytes: f.key},
-			goldenLine{kind: "value", name: f.table, version: f.valueVersion, bytes: f.value})
+			goldenLine{kind: "key", name: f.name, version: f.keyVersion, bytes: f.key},
+			goldenLine{kind: "value", name: f.name, version: f.valueVersion, bytes: f.value})
 	}
 	if err := db.View(t.Context(), func(r *bolttable.ReadTx) error {
 		for _, ix := range []struct {
@@ -181,6 +192,19 @@ func formatLines(t *testing.T) []goldenLine {
 			{"jobs.ended", entriesOf(c.jobsEnded)},
 			{"jobs.owner_ended", entriesOf(c.ownerEnded)},
 			{"jobs.user_ended", entriesOf(c.userEnded)},
+			{"users.username", entriesOf(a.byUsername)},
+			{"users.oidc", entriesOf(a.byOIDC)},
+			{"users.handle", entriesOf(a.byHandle)},
+			{"sessions.hash", entriesOf(a.sessionByHash)},
+			{"sessions.id", entriesOf(a.sessionByID)},
+			{"passkeys.credential", entriesOf(a.byCredential)},
+			{"keys.hash", entriesOf(a.keyByHash)},
+			{"keys.user", entriesOf(a.keysByUser)},
+			{"tokens.subject", entriesOf(a.tokensBySub)},
+			{"tokens.expires", entriesOf(a.tokensByExpiry)},
+			{"tokens.issued_by", entriesOf(a.tokensByIssuer)},
+			{"failures.unreported", entriesOf(a.unreported)},
+			{"key_attributions.user", entriesOf(a.attrsByUser)},
 		} {
 			entries, err := ix.scan(r)
 			if err != nil {

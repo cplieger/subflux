@@ -3,6 +3,7 @@ package statedb
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/cplieger/bolttable"
@@ -179,6 +180,23 @@ func (r *keyReader) inst() InstanceID {
 		r.fail("instance zero")
 	}
 	return id
+}
+
+// id reads a user, passkey, key or attribution ID: positive as an int64.
+func (r *keyReader) id() int64 {
+	v := r.uint64("id")
+	if r.err == nil && (v == 0 || v > math.MaxInt64) {
+		r.fail("id out of range")
+	}
+	return int64(v) //nolint:gosec // G115: v <= MaxInt64, checked above
+}
+
+func (r *keyReader) bool(what string) bool {
+	b := r.fixed(1, what)
+	if len(b) == 1 && b[0] > 1 {
+		r.fail(what)
+	}
+	return len(b) == 1 && b[0] == 1
 }
 
 func (r *keyReader) variant() language.Variant {

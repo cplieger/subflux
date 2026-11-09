@@ -1,6 +1,7 @@
 package statedb
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
+	"github.com/cplieger/access/account"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -23,10 +26,11 @@ var rescanSeed = flag.Uint64("rescan.seed", 0, "run TestTablesAgainstRescan with
 var rescanSeeds = []uint64{1, 2, 3, 5, 8, 13, 21, 34}
 
 // TestTablesAgainstRescan runs random observe, finish, activate,
-// write-protocol, lock and download sequences, and after every operation
-// checks the store against a model of the sightings the sources reported,
-// an independent coverage recomputation, the change feed, the
-// append-only log and every parent a row depends on.
+// write-protocol, lock, download and account sequences, and after every
+// operation checks the store against a model of the sightings the sources
+// reported and the accounts the operations left, an independent coverage
+// recomputation, the change feed, the append-only log and every parent a
+// row depends on.
 func TestTablesAgainstRescan(t *testing.T) {
 	seeds := rescanSeeds
 	if *rescanSeed != 0 {
@@ -35,7 +39,7 @@ func TestTablesAgainstRescan(t *testing.T) {
 	for _, seed := range seeds {
 		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
 			r := newRescan(t, seed)
-			for step := range 40 {
+			for step := range 60 {
 				name := r.step()
 				t.Log(step, name)
 				r.check(fmt.Sprintf("step %d (%s)", step, name))
@@ -71,8 +75,9 @@ type rescan struct {
 	// store must hold.
 	seen map[itemRef]bool
 	// log is the download log after the previous step, by sequence.
-	log map[uint64]string
-	n   int
+	log  map[uint64]string
+	acct rescanAccounts
+	n    int
 }
 
 func newRescan(t *testing.T, seed uint64) *rescan {
@@ -80,7 +85,7 @@ func newRescan(t *testing.T, seed uint64) *rescan {
 	r := &rescan{
 		t: t, s: s, clock: clock, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)),
 		policy: map[string]language.Policy{"en": pol(t, "default:\n  - tag: en\n  - tag: pt-BR\n"), "audio": pol(t, audioRules)},
-		seen:   map[itemRef]bool{}, log: map[uint64]string{},
+		seen:   map[itemRef]bool{}, log: map[uint64]string{}, acct: newRescanAccounts(),
 	}
 	r.act = Activation{Sources: rescanSources, Languages: r.policy["en"]}
 	activate(t, s, r.act)
@@ -92,32 +97,36 @@ func (r *rescan) pick(n int) int { return r.rng.IntN(n) }
 func (r *rescan) chance(p float64) bool { return r.rng.Float64() < p }
 
 // step runs one random operation and answers its name. Before it runs, it
-// snapshots what the feed check compares.
+// snapshots what the feed checks compare.
 func (r *rescan) step() string {
-	before := r.snapshot()
+	before, beforeAuth := r.snapshot(), r.authRows()
 	head := headRev(r.t, r.s)
 	var name string
+	var accountStep bool
 	switch n := r.pick(100); {
-	case n < 35:
+	case n < 26:
 		name = r.pass()
-	case n < 42:
+	case n < 31:
 		name = r.activate()
-	case n < 55:
+	case n < 40:
 		name = r.inventory()
-	case n < 67:
+	case n < 48:
 		name = r.lock()
-	case n < 78:
+	case n < 56:
 		name = r.writeProtocol()
-	case n < 82:
+	case n < 59:
 		name = r.noteRefusal()
-	case n < 90:
+	case n < 64:
 		name = r.download()
+	case n < 92:
+		name, accountStep = r.account(), true
 	default:
 		days := []int{1, 29, 31}[r.pick(3)]
 		r.clock.advance(time.Duration(days) * 24 * time.Hour)
 		name = fmt.Sprintf("advance %d days", days)
 	}
 	r.checkFeed(name, head, before)
+	r.checkAuthFeed(name, accountStep, head, beforeAuth)
 	return name
 }
 
@@ -507,6 +516,7 @@ func (r *rescan) check(step string) {
 	r.checkCounts(step, &st, r.checkCoverage(step, &st))
 	r.checkLog(step, &st)
 	checkEvidenceHasRoot(r.t, r.s, step)
+	r.checkAccounts(step)
 }
 
 func setOf[K comparable](ks []K) map[K]bool {
@@ -773,4 +783,575 @@ func (r *rescan) checkLog(step string, st *rescanState) {
 		}
 	}
 	r.log = st.downloads
+}
+
+// rescanAccounts is the account model: the rows the account operations
+// left, by the IDs the store assigned.
+type rescanAccounts struct {
+	users    map[int64]string
+	sessions map[access.SessionRef]rescanSession
+	passkeys map[access.PasskeyRef]rescanPasskey
+	keys     map[int64]rescanKey
+	tokens   map[string]rescanToken
+	attrs    map[int64]int64
+	// last is the highest user, key and attribution ID the store assigned:
+	// rule 17 never assigns one again.
+	last map[string]int64
+}
+
+type rescanSession struct {
+	created, last time.Time
+	hash          string
+	idleCap       time.Duration
+}
+
+type rescanPasskey struct {
+	cred      string
+	signCount uint32
+}
+
+type rescanKey struct {
+	used  time.Time
+	owner int64
+}
+
+type rescanToken struct {
+	expires time.Time
+	subject int64
+}
+
+func newRescanAccounts() rescanAccounts {
+	return rescanAccounts{
+		users: map[int64]string{}, sessions: map[access.SessionRef]rescanSession{}, passkeys: map[access.PasskeyRef]rescanPasskey{},
+		keys: map[int64]rescanKey{}, tokens: map[string]rescanToken{}, attrs: map[int64]int64{}, last: map[string]int64{},
+	}
+}
+
+func cmpSessionRef(a, b access.SessionRef) int {
+	return cmp.Or(cmp.Compare(a.UserID, b.UserID), cmp.Compare(a.ID, b.ID))
+}
+
+func cmpPasskeyRef(a, b access.PasskeyRef) int {
+	return cmp.Or(cmp.Compare(a.UserID, b.UserID), cmp.Compare(a.ID, b.ID))
+}
+
+// pickOf answers a random key of the non-empty m, drawn in sorted order so
+// a seed replays.
+func pickOf[K comparable, V any](r *rescan, m map[K]V, order func(a, b K) int) K {
+	ks := slices.SortedFunc(maps.Keys(m), order)
+	return ks[r.pick(len(ks))]
+}
+
+// at is a stamp within an hour either side of the store's clock, so later
+// stamps can come before earlier ones and rule 21 decides what stays.
+func (r *rescan) at() time.Time {
+	return r.clock.Now().Add(time.Duration(r.pick(121)-60) * time.Minute)
+}
+
+// account runs one random account operation among those the model holds a
+// row for, creates weighted so the others find rows to act on.
+func (r *rescan) account() string {
+	m := &r.acct
+	always := func() bool { return true }
+	users := func() bool { return len(m.users) > 0 }
+	sessions := func() bool { return len(m.sessions) > 0 }
+	passkeys := func() bool { return len(m.passkeys) > 0 }
+	keys := func() bool { return len(m.keys) > 0 }
+	var ops []func(*AccountStore) string
+	for _, op := range []struct {
+		run    func(*AccountStore) string
+		ready  func() bool
+		weight int
+	}{
+		{r.createUser, always, 3},
+		{r.deleteUser, users, 1},
+		{r.createSession, users, 3},
+		{r.rotateSession, sessions, 3},
+		{r.touchSession, sessions, 3},
+		{r.expireSessions, sessions, 2},
+		{r.deleteSession, sessions, 1},
+		{r.createPasskey, users, 2},
+		{r.passkeySignIn, passkeys, 2},
+		{r.deletePasskey, passkeys, 1},
+		{r.createKey, users, 2},
+		{r.useKey, keys, 2},
+		{r.deleteKey, keys, 1},
+		{r.createToken, always, 2},
+		{r.consumeToken, always, 2},
+		{r.createAttribution, users, 1},
+	} {
+		if op.ready() {
+			for range op.weight {
+				ops = append(ops, op.run)
+			}
+		}
+	}
+	r.n++
+	return ops[r.pick(len(ops))](r.s.Accounts())
+}
+
+// assigned checks a create's new ID against rule 17 and records it.
+func (r *rescan) assigned(kind string, id int64) {
+	if id <= r.acct.last[kind] {
+		r.t.Errorf("%s ID %d assigned after %d", kind, id, r.acct.last[kind])
+	}
+	r.acct.last[kind] = max(r.acct.last[kind], id)
+}
+
+func (r *rescan) createUser(a *AccountStore) string {
+	name := fmt.Sprintf("user%d", r.pick(6))
+	u := &access.User{Username: name, Role: access.RoleUser, Enabled: true, CreatedAt: r.clock.Now(), WebAuthnHandle: access.GenerateWebAuthnHandle()}
+	err := a.CreateUser(r.t.Context(), u)
+	if taken := slices.Contains(slices.Collect(maps.Values(r.acct.users)), name); taken {
+		if !errors.Is(err, account.ErrUsernameTaken) {
+			r.t.Fatalf("CreateUser(%s), a taken name: %v, want ErrUsernameTaken", name, err)
+		}
+		return fmt.Sprintf("CreateUser %s: taken", name)
+	}
+	if err != nil {
+		r.t.Fatalf("CreateUser(%s): %v", name, err)
+	}
+	r.assigned("user", u.ID)
+	r.acct.users[u.ID] = name
+	return fmt.Sprintf("CreateUser %s: %d", name, u.ID)
+}
+
+// deleteUser deletes a user and, in the model, everything its cascades
+// reach: sessions, passkeys and keys with their stamps, the tokens acting
+// on it and its key attributions.
+func (r *rescan) deleteUser(a *AccountStore) string {
+	id := pickOf(r, r.acct.users, cmp.Compare[int64])
+	if err := a.DeleteUser(r.t.Context(), id); err != nil {
+		r.t.Fatalf("DeleteUser(%d): %v", id, err)
+	}
+	delete(r.acct.users, id)
+	maps.DeleteFunc(r.acct.sessions, func(k access.SessionRef, _ rescanSession) bool { return k.UserID == id })
+	maps.DeleteFunc(r.acct.passkeys, func(k access.PasskeyRef, _ rescanPasskey) bool { return k.UserID == id })
+	maps.DeleteFunc(r.acct.keys, func(_ int64, k rescanKey) bool { return k.owner == id })
+	maps.DeleteFunc(r.acct.tokens, func(_ string, tok rescanToken) bool { return tok.subject == id })
+	maps.DeleteFunc(r.acct.attrs, func(_, owner int64) bool { return owner == id })
+	return fmt.Sprintf("DeleteUser %d", id)
+}
+
+func (r *rescan) createSession(a *AccountStore) string {
+	user := pickOf(r, r.acct.users, cmp.Compare[int64])
+	now := r.clock.Now()
+	sess := &access.Session{
+		CreatedAt: now, LastActivity: now, AuthTime: now, ID: fmt.Sprintf("s%d", r.n), TokenHash: access.NewHash(fmt.Sprintf("session-%d", r.n)),
+		AuthMethod: access.MethodPassword, UserID: user,
+	}
+	if r.chance(0.3) {
+		sess.IdleCap = 30 * time.Minute
+	}
+	if err := a.CreateSession(r.t.Context(), sess); err != nil {
+		r.t.Fatalf("CreateSession(%d, %s): %v", user, sess.ID, err)
+	}
+	r.acct.sessions[access.SessionRef{UserID: user, ID: sess.ID}] = rescanSession{created: now, last: now, hash: sess.TokenHash.Reveal(), idleCap: sess.IdleCap}
+	return fmt.Sprintf("CreateSession %d %s", user, sess.ID)
+}
+
+// rotateSession rotates a session to a new hash, through ExpectHash; a
+// stale ExpectHash is refused and changes nothing.
+func (r *rescan) rotateSession(a *AccountStore) string {
+	ref := pickOf(r, r.acct.sessions, cmpSessionRef)
+	m := r.acct.sessions[ref]
+	stale := r.chance(0.2)
+	expect := access.NewHash(m.hash)
+	if stale {
+		expect = access.NewHash("stale")
+	}
+	next := access.Session{
+		CreatedAt: m.created, LastActivity: r.at(), AuthTime: m.created, ID: ref.ID, TokenHash: access.NewHash(fmt.Sprintf("session-%d", r.n)),
+		AuthMethod: access.MethodPassword, UserID: ref.UserID, IdleCap: m.idleCap,
+	}
+	err := a.RotateSession(r.t.Context(), account.Rotation{ID: ref.ID, UserID: ref.UserID, ExpectHash: expect, Next: next})
+	if stale {
+		if !errors.Is(err, account.ErrNotFound) {
+			r.t.Fatalf("RotateSession(%v) with a stale hash: %v, want ErrNotFound", ref, err)
+		}
+		return fmt.Sprintf("RotateSession %v: stale", ref)
+	}
+	if err != nil {
+		r.t.Fatalf("RotateSession(%v): %v", ref, err)
+	}
+	m.hash, m.last = next.TokenHash.Reveal(), later(m.last, next.LastActivity)
+	r.acct.sessions[ref] = m
+	return fmt.Sprintf("RotateSession %v", ref)
+}
+
+func later(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
+}
+
+func (r *rescan) touchSession(a *AccountStore) string {
+	ref := pickOf(r, r.acct.sessions, cmpSessionRef)
+	m := r.acct.sessions[ref]
+	at := r.at()
+	if err := a.UpdateSessionActivity(r.t.Context(), access.NewHash(m.hash), access.SessionActivity{At: at, IP: "192.0.2.1"}); err != nil {
+		r.t.Fatalf("UpdateSessionActivity(%v): %v", ref, err)
+	}
+	m.last = later(m.last, at)
+	r.acct.sessions[ref] = m
+	return fmt.Sprintf("UpdateSessionActivity %v", ref)
+}
+
+// expireSessions sweeps at most limit of the sessions access.ValidateSession
+// refuses at now, and requires the refs returned to be that many of them.
+func (r *rescan) expireSessions(a *AccountStore) string {
+	now := r.clock.Now().Add([]time.Duration{0, 45 * time.Minute, 2 * time.Hour}[r.pick(3)])
+	limit := 1 + r.pick(3)
+	expired := map[access.SessionRef]bool{}
+	for ref, m := range r.acct.sessions {
+		sess := access.Session{CreatedAt: m.created, LastActivity: m.last, AuthTime: m.created, IdleCap: m.idleCap}
+		if access.ValidateSession(&sess, cleanupTimeouts, now) != nil {
+			expired[ref] = true
+		}
+	}
+	refs, err := a.CleanupExpiredSessions(r.t.Context(), now, cleanupTimeouts, limit)
+	if err != nil {
+		r.t.Fatalf("CleanupExpiredSessions: %v", err)
+	}
+	if want := min(limit, len(expired)); len(refs) != want {
+		r.t.Errorf("CleanupExpiredSessions(limit %d) deleted %v, want %d of the %d expired", limit, refs, want, len(expired))
+	}
+	for _, ref := range refs {
+		if !expired[ref] {
+			r.t.Errorf("CleanupExpiredSessions deleted %v, which is live or gone", ref)
+		}
+		delete(expired, ref)
+		delete(r.acct.sessions, ref)
+	}
+	return fmt.Sprintf("CleanupExpiredSessions limit %d: %d", limit, len(refs))
+}
+
+func (r *rescan) deleteSession(a *AccountStore) string {
+	ref := pickOf(r, r.acct.sessions, cmpSessionRef)
+	if err := a.DeleteSession(r.t.Context(), ref); err != nil {
+		r.t.Fatalf("DeleteSession(%v): %v", ref, err)
+	}
+	delete(r.acct.sessions, ref)
+	return fmt.Sprintf("DeleteSession %v", ref)
+}
+
+func (r *rescan) createPasskey(a *AccountStore) string {
+	user := pickOf(r, r.acct.users, cmp.Compare[int64])
+	cred := &access.PasskeyCredential{CreatedAt: r.clock.Now(), UserID: user, CredentialID: fmt.Appendf(nil, "cred-%d", r.n), RawFlags: 1}
+	if err := a.CreatePasskey(r.t.Context(), cred); err != nil {
+		r.t.Fatalf("CreatePasskey(%d): %v", user, err)
+	}
+	r.acct.passkeys[access.PasskeyRef{UserID: user, ID: cred.ID}] = rescanPasskey{cred: string(cred.CredentialID)}
+	return fmt.Sprintf("CreatePasskey %d: %d", user, cred.ID)
+}
+
+func (r *rescan) passkeySignIn(a *AccountStore) string {
+	ref := pickOf(r, r.acct.passkeys, cmpPasskeyRef)
+	m := r.acct.passkeys[ref]
+	m.signCount++
+	if err := a.UpdatePasskeyAfterLogin(r.t.Context(), ref.UserID, []byte(m.cred), access.PasskeyLoginUpdate{At: r.at(), SignCount: m.signCount, RawFlags: 5}); err != nil {
+		r.t.Fatalf("UpdatePasskeyAfterLogin(%v): %v", ref, err)
+	}
+	r.acct.passkeys[ref] = m
+	return fmt.Sprintf("UpdatePasskeyAfterLogin %v", ref)
+}
+
+func (r *rescan) deletePasskey(a *AccountStore) string {
+	ref := pickOf(r, r.acct.passkeys, cmpPasskeyRef)
+	if err := a.DeletePasskey(r.t.Context(), ref); err != nil {
+		r.t.Fatalf("DeletePasskey(%v): %v", ref, err)
+	}
+	delete(r.acct.passkeys, ref)
+	return fmt.Sprintf("DeletePasskey %v", ref)
+}
+
+func (r *rescan) createKey(a *AccountStore) string {
+	user := pickOf(r, r.acct.users, cmp.Compare[int64])
+	key := &access.Key{CreatedAt: r.clock.Now(), KeyHash: access.NewHash(fmt.Sprintf("key-%d", r.n)), UserID: user}
+	if err := a.CreateAPIKey(r.t.Context(), key); err != nil {
+		r.t.Fatalf("CreateAPIKey(%d): %v", user, err)
+	}
+	r.assigned("key", key.ID)
+	r.acct.keys[key.ID] = rescanKey{owner: user}
+	return fmt.Sprintf("CreateAPIKey %d: %d", user, key.ID)
+}
+
+func (r *rescan) useKey(a *AccountStore) string {
+	id := pickOf(r, r.acct.keys, cmp.Compare[int64])
+	at := r.at()
+	if err := a.TouchAPIKey(r.t.Context(), id, at); err != nil {
+		r.t.Fatalf("TouchAPIKey(%d): %v", id, err)
+	}
+	k := r.acct.keys[id]
+	k.used = later(k.used, at)
+	r.acct.keys[id] = k
+	return fmt.Sprintf("TouchAPIKey %d", id)
+}
+
+func (r *rescan) deleteKey(a *AccountStore) string {
+	id := pickOf(r, r.acct.keys, cmp.Compare[int64])
+	if err := a.DeleteAPIKey(r.t.Context(), access.KeyRef{ID: id, UserID: r.acct.keys[id].owner}); err != nil {
+		r.t.Fatalf("DeleteAPIKey(%d): %v", id, err)
+	}
+	delete(r.acct.keys, id)
+	return fmt.Sprintf("DeleteAPIKey %d", id)
+}
+
+// createToken creates an invite, or a recovery token for a user, expiring
+// up to an hour either side of the store's clock.
+func (r *rescan) createToken(a *AccountStore) string {
+	tok := access.OneTimeToken{
+		CreatedAt: r.clock.Now(), ExpiresAt: r.clock.Now().Add(time.Duration(r.pick(121)-60) * time.Minute),
+		Hash: access.NewHash(fmt.Sprintf("token-%d", r.n)), Purpose: access.PurposeInvite, Role: access.RoleUser,
+	}
+	if len(r.acct.users) > 0 && r.chance(0.6) {
+		tok.Purpose, tok.Role, tok.Subject = access.PurposeRecovery, "", pickOf(r, r.acct.users, cmp.Compare[int64])
+	}
+	if err := a.CreateOneTimeToken(r.t.Context(), tok); err != nil {
+		r.t.Fatalf("CreateOneTimeToken(%s, %d): %v", tok.Purpose, tok.Subject, err)
+	}
+	r.acct.tokens[tok.Hash.Reveal()] = rescanToken{expires: tok.ExpiresAt, subject: tok.Subject}
+	return fmt.Sprintf("CreateOneTimeToken %s %d", tok.Purpose, tok.Subject)
+}
+
+// consumeToken consumes a token, or one no token has: found exactly when
+// it expires after the store's clock, and gone either way.
+func (r *rescan) consumeToken(a *AccountStore) string {
+	hash := "token-none"
+	if len(r.acct.tokens) > 0 && r.chance(0.85) {
+		hash = pickOf(r, r.acct.tokens, cmp.Compare[string])
+	}
+	now := r.clock.Now()
+	_, found, err := a.ConsumeOneTimeToken(r.t.Context(), access.NewHash(hash), now)
+	if err != nil {
+		r.t.Fatalf("ConsumeOneTimeToken(%s): %v", hash, err)
+	}
+	m, held := r.acct.tokens[hash]
+	if want := held && m.expires.After(now); found != want {
+		r.t.Errorf("ConsumeOneTimeToken(%s) found %v, want %v", hash, found, want)
+	}
+	delete(r.acct.tokens, hash)
+	return fmt.Sprintf("ConsumeOneTimeToken %s: %v", hash, found)
+}
+
+func (r *rescan) createAttribution(a *AccountStore) string {
+	user := pickOf(r, r.acct.users, cmp.Compare[int64])
+	rec := &access.KeyAttribution{At: r.clock.Now(), Action: access.AttributionCreated, KeyLineage: []int64{1 + int64(r.pick(4))}, UserID: user}
+	if err := a.CreateKeyAttribution(r.t.Context(), rec); err != nil {
+		r.t.Fatalf("CreateKeyAttribution(%d): %v", user, err)
+	}
+	r.assigned("attribution", rec.ID)
+	r.acct.attrs[rec.ID] = user
+	return fmt.Sprintf("CreateKeyAttribution %d: %d", user, rec.ID)
+}
+
+// authState is every auth row the account invariants read, from one View.
+type authState struct {
+	users      map[int64]userRow
+	sessions   map[access.SessionRef]sessionRow
+	activity   map[access.SessionRef]activityRow
+	passkeys   map[access.PasskeyRef]passkeyRow
+	passkeyUse map[access.PasskeyRef]passkeyUseRow
+	keys       map[int64]keyRow
+	keyUse     map[int64]keyUseRow
+	tokens     map[string]tokenRow
+	attrs      map[int64]attributionRow
+	userCount  int64
+}
+
+func (r *rescan) loadAuth() authState {
+	st := authState{
+		users: map[int64]userRow{}, sessions: map[access.SessionRef]sessionRow{}, activity: map[access.SessionRef]activityRow{},
+		passkeys: map[access.PasskeyRef]passkeyRow{}, passkeyUse: map[access.PasskeyRef]passkeyUseRow{}, keys: map[int64]keyRow{},
+		keyUse: map[int64]keyUseRow{}, tokens: map[string]tokenRow{}, attrs: map[int64]attributionRow{},
+	}
+	a := r.s.a
+	if err := r.s.db.View(r.t.Context(), func(rtx *bolttable.ReadTx) error {
+		n, err := a.userCount.Value(rtx)
+		st.userCount = n
+		return errors.Join(err,
+			scanInto(rtx, a.users, st.users), scanInto(rtx, a.sessions, st.sessions), scanInto(rtx, a.activity, st.activity),
+			scanInto(rtx, a.passkeys, st.passkeys), scanInto(rtx, a.passkeyUse, st.passkeyUse), scanInto(rtx, a.keys, st.keys),
+			scanInto(rtx, a.keyUse, st.keyUse), scanInto(rtx, a.tokens, st.tokens), scanInto(rtx, a.attributions, st.attrs),
+		)
+	}); err != nil {
+		r.t.Fatal(err)
+	}
+	return st
+}
+
+// checkAccounts requires the auth rows to be the model's, every companion
+// stamp row beside its parent and every parent beside its stamp row, every
+// row naming a user to name one that exists, and the users counter to
+// equal a count of the users rows.
+func (r *rescan) checkAccounts(step string) {
+	st, m, t := r.loadAuth(), &r.acct, r.t
+	users := map[int64]string{}
+	for id, u := range st.users {
+		users[id] = u.Username
+	}
+	if !maps.Equal(users, m.users) {
+		t.Errorf("%s: users %v, the model %v", step, users, m.users)
+	}
+	if st.userCount != int64(len(st.users)) {
+		t.Errorf("%s: the users counter is %d over %d users rows", step, st.userCount, len(st.users))
+	}
+	sessions := map[access.SessionRef]rescanSession{}
+	for ref, row := range st.sessions {
+		sessions[ref] = rescanSession{created: row.CreatedAt, last: st.activity[ref].LastActivity, hash: row.TokenHash, idleCap: time.Duration(row.IdleCap)}
+	}
+	if !maps.EqualFunc(sessions, m.sessions, sameSession) {
+		t.Errorf("%s: sessions %+v, the model %+v", step, sessions, m.sessions)
+	}
+	passkeys := map[access.PasskeyRef]rescanPasskey{}
+	for ref, row := range st.passkeys {
+		passkeys[ref] = rescanPasskey{cred: string(row.CredentialID), signCount: st.passkeyUse[ref].SignCount}
+	}
+	if !maps.Equal(passkeys, m.passkeys) {
+		t.Errorf("%s: passkeys %+v, the model %+v", step, passkeys, m.passkeys)
+	}
+	keys := map[int64]rescanKey{}
+	for id, row := range st.keys {
+		keys[id] = rescanKey{used: st.keyUse[id].LastUsedAt, owner: row.UserID}
+	}
+	if !maps.EqualFunc(keys, m.keys, func(a, b rescanKey) bool { return a.owner == b.owner && a.used.Equal(b.used) }) {
+		t.Errorf("%s: keys %+v, the model %+v", step, keys, m.keys)
+	}
+	tokens := map[string]rescanToken{}
+	for hash, row := range st.tokens {
+		tokens[hash] = rescanToken{expires: row.ExpiresAt, subject: row.Subject}
+	}
+	if !maps.EqualFunc(tokens, m.tokens, func(a, b rescanToken) bool { return a.subject == b.subject && a.expires.Equal(b.expires) }) {
+		t.Errorf("%s: tokens %+v, the model %+v", step, tokens, m.tokens)
+	}
+	attrs := map[int64]int64{}
+	for id, row := range st.attrs {
+		attrs[id] = row.UserID
+	}
+	if !maps.Equal(attrs, m.attrs) {
+		t.Errorf("%s: key attributions %v, the model %v", step, attrs, m.attrs)
+	}
+	st.checkCompanions(t, step)
+}
+
+func sameSession(a, b rescanSession) bool {
+	return a.hash == b.hash && a.idleCap == b.idleCap && a.created.Equal(b.created) && a.last.Equal(b.last)
+}
+
+// companions requires parent and stamp rows to come and go together.
+func companions[K comparable, P, S any](t *testing.T, step, what string, parents map[K]P, stamps map[K]S) {
+	t.Helper()
+	for k := range stamps {
+		if _, ok := parents[k]; !ok {
+			t.Errorf("%s: a %s stamp row for %v has no parent row", step, what, k)
+		}
+	}
+	for k := range parents {
+		if _, ok := stamps[k]; !ok {
+			t.Errorf("%s: %s %v has no stamp row", step, what, k)
+		}
+	}
+}
+
+func (st *authState) checkCompanions(t *testing.T, step string) {
+	t.Helper()
+	companions(t, step, "session", st.sessions, st.activity)
+	companions(t, step, "passkey", st.passkeys, st.passkeyUse)
+	companions(t, step, "key", st.keys, st.keyUse)
+	owned := func(what string, k any, user int64) {
+		if _, ok := st.users[user]; !ok {
+			t.Errorf("%s: %s %v names user %d, which is gone", step, what, k, user)
+		}
+	}
+	for ref := range st.sessions {
+		owned("session", ref, ref.UserID)
+	}
+	for ref := range st.passkeys {
+		owned("passkey", ref, ref.UserID)
+	}
+	for id, row := range st.keys {
+		owned("key", id, row.UserID)
+	}
+	for id, row := range st.attrs {
+		owned("key attribution", id, row.UserID)
+	}
+	for hash, row := range st.tokens {
+		if row.Subject != 0 {
+			owned("token", hash, row.Subject)
+		}
+	}
+}
+
+// authRows renders every auth row as its stored JSON by table, for the
+// account feed check.
+func (r *rescan) authRows() map[string]map[string]string {
+	out := map[string]map[string]string{}
+	add := func(table string, k, v any) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			r.t.Fatal(err)
+		}
+		if out[table] == nil {
+			out[table] = map[string]string{}
+		}
+		out[table][fmt.Sprint(k)] = string(b)
+	}
+	st := r.loadAuth()
+	for k, v := range st.users {
+		add("users", k, v)
+	}
+	for k, v := range st.sessions {
+		add("sessions", k, v)
+	}
+	for k, v := range st.activity {
+		add("session_activity", k, v)
+	}
+	for k, v := range st.passkeys {
+		add("passkeys", k, v)
+	}
+	for k, v := range st.passkeyUse {
+		add("passkey_use", k, v)
+	}
+	for k, v := range st.keys {
+		add("keys", k, v)
+	}
+	for k, v := range st.keyUse {
+		add("key_use", k, v)
+	}
+	for k, v := range st.tokens {
+		add("tokens", k, v)
+	}
+	for k, v := range st.attrs {
+		add("key_attributions", k, v)
+	}
+	return out
+}
+
+// stampTables are the auth tables a step may change without moving the head
+// (AC1).
+var stampTables = []string{"session_activity", "passkey_use", "key_use"}
+
+// checkAuthFeed requires an account step that changed no auth row, and any
+// step that changed only stamp rows, to leave the head revision where it
+// was, and a step that changed any other auth row to mark accounts.
+func (r *rescan) checkAuthFeed(step string, accountStep bool, head uint64, before map[string]map[string]string) {
+	after := r.authRows()
+	var changed []string
+	for table := range unionKeys(before, after) {
+		if !maps.Equal(before[table], after[table]) {
+			changed = append(changed, table)
+		}
+	}
+	slices.Sort(changed)
+	switch {
+	case slices.ContainsFunc(changed, func(table string) bool { return !slices.Contains(stampTables, table) }):
+		if d := since(r.t, r.s, head); !d.Full && !slices.Contains(d.Marks, MarkAccounts) {
+			r.t.Errorf("%s: %v changed and Since lists Marks %v", step, changed, d.Marks)
+		}
+	case accountStep || len(changed) > 0:
+		if rev := headRev(r.t, r.s); rev != head {
+			r.t.Errorf("%s: auth tables changed %v and the head moved from %d to %d", step, changed, head, rev)
+		}
+	}
 }

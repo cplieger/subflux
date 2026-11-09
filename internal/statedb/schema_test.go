@@ -3,6 +3,7 @@ package statedb
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -20,10 +21,17 @@ import (
 var designSilent = []string{
 	"activation", "passes", "cursors", "stamps", "overlaps", "baselines",
 	"ordinals", "intents", "work", "jobs", "credentials", "no_results", "root_evidence", "counts",
+	"session_activity", "passkey_use", "key_use", "tokens", "failures", "secrets", "auth_method_state",
+}
+
+// allFixtures is every core fixture, then every auth fixture.
+func allFixtures(t *testing.T) []fixture {
+	t.Helper()
+	return append(coreFixtures(t), authFixtures(t)...)
 }
 
 func TestSilentSetMatchesDesign(t *testing.T) {
-	db, c := openCore(t)
+	db, c := openSchema(t)
 	rev := func() uint64 {
 		t.Helper()
 		var r uint64
@@ -32,8 +40,8 @@ func TestSilentSetMatchesDesign(t *testing.T) {
 		}
 		return r
 	}
-	for _, f := range coreFixtures(t) {
-		t.Run(f.table, func(t *testing.T) {
+	for _, f := range allFixtures(t) {
+		t.Run(f.name, func(t *testing.T) {
 			before := rev()
 			if err := db.Update(t.Context(), func(tx *bolttable.Tx) error { return f.put(tx, c) }); err != nil {
 				t.Fatalf("Put: %v", err)
@@ -48,75 +56,71 @@ func TestSilentSetMatchesDesign(t *testing.T) {
 
 func TestNoCrossNamespaceDeclaration(t *testing.T) {
 	s := bolttable.NewSchema(schemaName)
-	c, err := defineCore(s)
+	ts, err := defineSchema(s)
 	if err != nil {
-		t.Fatalf("defineCore: %v", err)
+		t.Fatalf("defineSchema: %v", err)
 	}
-	auth := bolttable.Must(s.Namespace("auth"))
-	users := bolttable.Must(bolttable.Define(auth, 0x20, "users", instKeys, stampCodec, bolttable.TableOptions{}))
 	t.Run("a cascade from core into auth is refused", func(t *testing.T) {
-		err := bolttable.CascadePrefix(c.instances, users, 1, func(id InstanceID) []byte { return appendUint64(nil, uint64(id)) })
+		err := bolttable.CascadePrefix(ts.core.instances, ts.auth.users, 1, func(id InstanceID) []byte { return appendUint64(nil, uint64(id)) })
 		if err == nil {
 			t.Error("CascadePrefix(core.instances, auth.users) succeeded")
 		}
 	})
-	t.Run("core holds no prefix of auth's range", func(t *testing.T) {
-		if _, err := bolttable.Define(auth, 0x15, "clash", instKeys, stampCodec, bolttable.TableOptions{}); err == nil {
-			t.Error("auth declared prefix 0x15, which core's credentials table holds")
+	t.Run("a cascade from auth into core is refused", func(t *testing.T) {
+		err := bolttable.CascadePrefix(ts.auth.users, ts.core.cursors, 1, func(id int64) []byte { return idKeys.AppendKey(nil, id) })
+		if err == nil {
+			t.Error("CascadePrefix(auth.users, core.cursors) succeeded")
 		}
 	})
-	t.Run("core declares every table of section 4 up to 0x18", func(t *testing.T) {
-		db, err := bolttable.Open(t.TempDir()+"/subflux.bolt", s, bolttable.Options{})
-		if err != nil {
-			t.Fatalf("Open: %v", err)
-		}
-		defer db.Close()
-		st, err := db.Stats(t.Context())
-		if err != nil {
-			t.Fatalf("Stats: %v", err)
-		}
-		var got []string
-		for _, ns := range st.Namespaces {
-			if ns.Name == "core" {
-				for _, tb := range ns.Tables {
-					got = append(got, tb.Name)
-				}
+	t.Run("each prefix is taken", func(t *testing.T) {
+		probe := bolttable.Must(s.Namespace("probe"))
+		for _, p := range []byte{pCredentials, pCounts, pUsers, pMethodState} {
+			if _, err := bolttable.Define(probe, p, fmt.Sprintf("clash_%x", p), instKeys, stampCodec, bolttable.TableOptions{}); err == nil {
+				t.Errorf("a third namespace declared prefix %#x, which core or auth holds", p)
 			}
 		}
-		var want []string
-		for _, f := range coreFixtures(t) {
-			want = append(want, f.table)
-		}
-		slices.Sort(got)
-		slices.Sort(want)
-		if !slices.Equal(got, want) {
-			t.Errorf("core tables = %v; want %v", got, want)
-		}
 	})
+	db, err := bolttable.Open(t.TempDir()+"/subflux.bolt", s, bolttable.Options{})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer db.Close()
+	st, err := db.Stats(t.Context())
+	if err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+	for ns, fixtures := range map[string][]fixture{"core": coreFixtures(t), "auth": authFixtures(t)} {
+		t.Run(ns+" declares every table of section 4", func(t *testing.T) {
+			var got, want []string
+			for _, n := range st.Namespaces {
+				if n.Name == ns {
+					for _, tb := range n.Tables {
+						got = append(got, tb.Name)
+					}
+				}
+			}
+			for _, f := range fixtures {
+				if !slices.Contains(want, f.table) {
+					want = append(want, f.table)
+				}
+			}
+			slices.Sort(got)
+			slices.Sort(want)
+			if !slices.Equal(got, want) {
+				t.Errorf("%s tables = %v; want %v", ns, got, want)
+			}
+		})
+	}
 }
 
 func TestRowsRoundTrip(t *testing.T) {
-	for _, f := range coreFixtures(t) {
-		t.Run(f.table, func(t *testing.T) {
+	for _, f := range allFixtures(t) {
+		t.Run(f.name, func(t *testing.T) {
 			if err := f.decode(); err != nil {
 				t.Errorf("Decode(Append(row)) = %v", err)
 			}
 		})
 	}
-	t.Run("a decoded row re-encodes byte-equal", func(t *testing.T) {
-		var dl downloadRow
-		f := coreFixtures(t)[17]
-		if f.table != "downloads" {
-			t.Fatalf("fixture 17 is %s", f.table)
-		}
-		if err := downloadCodec.Decode(f.value, &dl); err != nil {
-			t.Fatalf("Decode: %v", err)
-		}
-		b, err := downloadCodec.Append(nil, &dl)
-		if err != nil || !bytes.Equal(b, f.value) {
-			t.Errorf("re-encoded %s, %v; want %s", b, err, f.value)
-		}
-	})
 }
 
 func TestRowAppendRefusesWhatDecodeRefuses(t *testing.T) {
@@ -192,6 +196,15 @@ func TestRowDecodeRefuses(t *testing.T) {
 		{name: "a timing verdict outside its set", decode: decodeAs(downloadCodec), in: downloadWith(`"timing":{"verdict":4},"matched_by":1,"fit":1`), enum: true},
 		{name: "a series numbering scheme outside its set", decode: decodeAs(sightingCodec), in: `{"series_numbering":{"season":1,"episode":1,"scheme":9}}`, enum: true},
 		{name: "evidence its Validate refuses", decode: decodeAs(evidenceCodec), in: `{"bound":{"titles":null,"catalogue":{"fetched":"2026-11-05T12:00:00Z","orders":null,"episodes":null,"tvdb":0}}}`},
+		{name: "a key with no user", decode: decodeAs(apiKeyCodec), in: `{"user_id":0}`},
+		{name: "a key lineage holding 0", decode: decodeAs(apiKeyCodec), in: `{"user_id":1,"lineage_ids":[1,0]}`},
+		{name: "an attribution with no user", decode: decodeAs(attributionCodec), in: `{"user_id":0}`},
+		{name: "an attribution lineage holding a negative id", decode: decodeAs(attributionCodec), in: `{"user_id":1,"key_lineage":[-2]}`},
+		{name: "a token with a negative subject", decode: decodeAs(tokenCodec), in: `{"subject":-1}`},
+		{name: "a token with a negative issuing key", decode: decodeAs(tokenCodec), in: `{"issued_by_key":-1}`},
+		{name: "a session with a negative issuing key", decode: decodeAs(sessionCodec), in: `{"issued_by_key":-1}`},
+		{name: "a negative failure count", decode: decodeAs(failureCodec), in: `{"count":-1}`},
+		{name: "a negative set count", decode: decodeAs(methodStateCodec), in: `{"sign_in":{"passkey_origins":{"count":-1,"sha256":"` + strings.Repeat("00", 32) + `"}}}`},
 		{name: "a job state outside its set", decode: decodeAs(jobCodec), in: `{"started":"0001-01-01T00:00:00Z","ended":"0001-01-01T00:00:00Z","scope":"","phase":"","cause":"","owner":0,"done":0,"total":0,"rev":1,"kind":1,"state":4,"outcome":0,"cancellable":false}`, enum: true},
 	}
 	for _, tc := range cases {

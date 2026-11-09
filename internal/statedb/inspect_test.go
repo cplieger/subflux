@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -140,8 +141,15 @@ func TestInspectReportsRevisions(t *testing.T) {
 			rows[ns.Name+"."+tb.Name] = tb.Rows
 		}
 	}
-	if len(in.Namespaces) != 1 || in.Namespaces[0].Name != "core" || in.Namespaces[0].Format == ([32]byte{}) {
-		t.Errorf("Inspect() namespaces = %+v, want core with its digest", in.Namespaces)
+	var names []string
+	for _, ns := range in.Namespaces {
+		names = append(names, ns.Name)
+		if ns.Format == ([32]byte{}) {
+			t.Errorf("Inspect() namespace %s has no digest", ns.Name)
+		}
+	}
+	if !slices.Equal(names, []string{"core", "auth"}) {
+		t.Errorf("Inspect() namespaces = %v, want core and auth", names)
 	}
 	if rows["core.items"] != 1 || rows["core.instances"] != 1 {
 		t.Errorf("table rows = %v, want one item and one instance", rows)
