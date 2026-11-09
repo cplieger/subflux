@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"ST-2b", "TS-2", "MR-1", "OW-6", "SE-2", "SE-2p",
+	"ST-2b", "TS-2", "MR-1", "SE-2", "SE-2p",
 	"PA-2", "AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
@@ -139,9 +139,9 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#Delta", "MR-1"},
 	{"internal/statedb#Delta.*", "MR-1"},
 	{"internal/statedb#EmbeddedTrack", "TS-2"},
-	{"internal/statedb#ErrCursorInvalid", "OW-6"},
-	{"internal/statedb#ErrNotLockable", "OW-6"},
-	{"internal/statedb#ErrPassUnknown", "OW-6"},
+	{"internal/statedb#ErrCursorInvalid", "AP-1"},
+	{"internal/statedb#ErrNotLockable", "AP-1"},
+	{"internal/statedb#ErrPassUnknown", "AP-1"},
 	{"internal/statedb#ErrSourceInactive", "AP-1"},
 	{"internal/statedb#HistoryScope", "SE-2"},
 	{"internal/statedb#InspectOptions", "PA-2"},

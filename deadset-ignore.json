@@ -123,6 +123,12 @@
     },
     {
       "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Codes",
+      "path": "internal/settings/codes.go",
+      "reason": "Retained until AP-1 (internal/settings#Codes): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Automatic",
       "path": "internal/language/grade.go",
       "reason": "Retained until SE-2 (internal/language#Policy.Automatic): its first caller outside the package lands there."
@@ -315,9 +321,15 @@
     },
     {
       "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Codes",
+      "path": "internal/statedb/codes.go",
+      "reason": "Retained until AP-1 (internal/statedb#Codes): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrCursorInvalid",
       "path": "internal/statedb/cursor.go",
-      "reason": "Retained until OW-6 (internal/statedb#ErrCursorInvalid): its first caller outside the package lands there."
+      "reason": "Retained until AP-1 (internal/statedb#ErrCursorInvalid): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -587,7 +599,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrNotLockable",
       "path": "internal/statedb/locks.go",
-      "reason": "Retained until OW-6 (internal/statedb#ErrNotLockable): its first caller outside the package lands there."
+      "reason": "Retained until AP-1 (internal/statedb#ErrNotLockable): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -635,7 +647,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrPassUnknown",
       "path": "internal/statedb/pass.go",
-      "reason": "Retained until OW-6 (internal/statedb#ErrPassUnknown): its first caller outside the package lands there."
+      "reason": "Retained until AP-1 (internal/statedb#ErrPassUnknown): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
