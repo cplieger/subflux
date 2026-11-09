@@ -177,13 +177,11 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 			return nil, fmt.Errorf("app: listen on %s: %w", listenAddr, err)
 		}
 	}
-	srv := httpserver.New(handler(m, p.marker, cfg.Routes),
-		httpserver.WithReadTimeout(readTimeout),
-		httpserver.WithReadHeaderTimeout(readHeaderTimeout),
-		httpserver.WithWriteTimeout(writeTimeout),
-		httpserver.WithMaxHeaderBytes(maxHeaderBytes),
-		httpserver.WithSlogErrorLog(slog.LevelWarn),
-	)
+	srv := httpserver.New(handler(m, p.marker, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
+	srv.ReadTimeout = readTimeout
+	srv.ReadHeaderTimeout = readHeaderTimeout
+	srv.WriteTimeout = writeTimeout
+	srv.MaxHeaderBytes = maxHeaderBytes
 	loop := &changeLoop{svc: svc, level: p.level, metrics: m, alerts: st, applied: sources.signal, running: p.format}
 	slog.Info("HTTP server listening", "addr", ln.Addr().String())
 	return &supervision{

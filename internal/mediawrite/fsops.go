@@ -95,7 +95,7 @@ func probeWritable(ctx context.Context, root *os.Root, log *slog.Logger) error {
 		return err
 	}
 	if !res.Writable() {
-		return fmt.Errorf("write probe: %s: %w", res.Stage, res.Err)
+		return fmt.Errorf("write probe: %s: %w", res.Phase, res.Err)
 	}
 	if _, err := filesafe.CleanupStaleTempsInRoot(ctx, root, staleTempAge); err != nil {
 		log.Warn("mediawrite: sweeping the write probe's temps failed", "root", root.Name(), "err", err)
