@@ -3,7 +3,7 @@ module github.com/cplieger/subflux
 go 1.27.3
 
 require (
-	github.com/cplieger/access v1.0.0-dev.6
+	github.com/cplieger/access v1.0.0-dev.7
 	github.com/cplieger/animap/mapread v0.3.2
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.10
 	github.com/cplieger/bolttable v1.1.0-dev.2
@@ -19,7 +19,7 @@ require (
 	github.com/cplieger/go/ssrf v1.0.0
 	github.com/cplieger/go/textsafe v1.0.0
 	github.com/cplieger/go/yamlenv v1.0.0
-	github.com/cplieger/langtag/v3 v3.2.0-dev.1
+	github.com/cplieger/langtag/v3 v3.2.0-dev.2
 	github.com/dlclark/regexp2/v2 v2.13.0
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/ulikunitz/xz v0.5.17
