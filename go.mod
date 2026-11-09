@@ -12,6 +12,7 @@ require (
 	github.com/cplieger/go/httpserver v1.0.0-dev.5
 	github.com/cplieger/go/jsonx v1.0.0-dev.2
 	github.com/cplieger/go/keyenc v1.2.0-dev.2
+	github.com/cplieger/go/keylock v1.0.0
 	github.com/cplieger/go/measure v1.0.0-dev.4
 	github.com/cplieger/go/slogx v1.0.0-dev.2
 	github.com/cplieger/go/ssrf v1.0.0-dev.2
@@ -23,12 +24,10 @@ require (
 	github.com/ulikunitz/xz v0.5.17
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.24.0
+	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
 )
 
-require (
-	go.etcd.io/bbolt v1.5.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-)
+require go.etcd.io/bbolt v1.5.0 // indirect
