@@ -7,18 +7,18 @@ require (
 	github.com/cplieger/animap/mapread v0.3.2
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.9
 	github.com/cplieger/bolttable v1.0.0-dev.6
-	github.com/cplieger/go/filesafe v1.0.0-dev.4
-	github.com/cplieger/go/health v1.0.0-dev.3
-	github.com/cplieger/go/httpclient v1.0.0-dev.5
-	github.com/cplieger/go/httpserver v1.0.0-dev.5
-	github.com/cplieger/go/jsonx v1.0.0-dev.2
-	github.com/cplieger/go/keyenc v1.2.0-dev.2
+	github.com/cplieger/go/filesafe v1.0.0
+	github.com/cplieger/go/health v1.0.0
+	github.com/cplieger/go/httpclient v1.0.0
+	github.com/cplieger/go/httpserver v1.0.0
+	github.com/cplieger/go/jsonx v1.0.0
+	github.com/cplieger/go/keyenc v1.2.0
 	github.com/cplieger/go/keylock v1.0.0
-	github.com/cplieger/go/measure v1.0.0-dev.4
-	github.com/cplieger/go/slogx v1.0.0-dev.2
-	github.com/cplieger/go/ssrf v1.0.0-dev.2
-	github.com/cplieger/go/textsafe v1.0.0-dev.1
-	github.com/cplieger/go/yamlenv v1.0.0-dev.2
+	github.com/cplieger/go/measure v1.0.0
+	github.com/cplieger/go/slogx v1.0.0
+	github.com/cplieger/go/ssrf v1.0.0
+	github.com/cplieger/go/textsafe v1.0.0
+	github.com/cplieger/go/yamlenv v1.0.0
 	github.com/cplieger/langtag/v3 v3.2.0-dev.1
 	github.com/dlclark/regexp2/v2 v2.13.0
 	github.com/nwaples/rardecode/v2 v2.4.6
