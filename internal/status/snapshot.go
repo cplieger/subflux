@@ -4,38 +4,7 @@ import (
 	"cmp"
 	"maps"
 	"slices"
-	"time"
 )
-
-// Health is a provider's state.
-type Health uint8
-
-// The provider states; the zero Health is none of them.
-const (
-	OK Health = iota + 1
-	Degraded
-	Disabled
-)
-
-// ProviderState is one provider's health, until when it holds, and why.
-type ProviderState struct {
-	Until  time.Time
-	ID     string
-	Reason string
-	Health Health
-}
-
-// SetProvider records p, its Reason cut as an alert's text is.
-func (s *Store) SetProvider(p ProviderState) {
-	p.Reason = cutText(p.Reason)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if cur, ok := s.providers[p.ID]; ok && cur.Health == p.Health && cur.Reason == p.Reason && cur.Until.Equal(p.Until) {
-		return
-	}
-	s.providers[p.ID] = p
-	s.bump()
-}
 
 // Snapshot is one consistent reading of the store.
 type Snapshot struct {

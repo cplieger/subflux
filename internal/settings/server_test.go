@@ -251,6 +251,59 @@ func TestServerSection(t *testing.T) {
 	})
 }
 
+func TestHostsExemptLoopback(t *testing.T) {
+	served := func(srv Server, peer, host string) bool {
+		h := srv.Hosts().Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+		r := httptest.NewRequest(http.MethodGet, "http://"+host+"/", nil)
+		r.RemoteAddr = peer
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code == http.StatusNoContent
+	}
+	t.Run("a parsed list", func(t *testing.T) {
+		a, ok := loadText(t, "server: {allowed_hosts: [nas.lan]}\n"+validLanguages).Active()
+		if !ok {
+			t.Fatal("the section did not parse")
+		}
+		for _, tc := range []struct {
+			name, peer, host string
+			admit            bool
+		}{
+			{"IPv4 loopback peer naming itself", "127.0.0.1:50000", "127.0.0.1:8374", true},
+			{"IPv6 loopback peer naming itself", "[::1]:50000", "[::1]:8374", true},
+			{"a listed host", "192.0.2.7:50000", "nas.lan", true},
+			{"public peer naming loopback", "192.0.2.7:50000", "127.0.0.1:8374", false},
+			{"loopback peer naming an unlisted host", "127.0.0.1:50000", "evil.example", false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := served(a.Server, tc.peer, tc.host); got != tc.admit {
+					t.Errorf("served %v, want %v", got, tc.admit)
+				}
+			})
+		}
+	})
+	for _, tc := range []struct{ name, text string }{
+		{"only an invalid entry", "server: {allowed_hosts: [http://nas.lan]}\n" + validLanguages},
+		{"not a list", "server: {allowed_hosts: nas.lan}\n" + validLanguages},
+		{"a blank element", "server: {allowed_hosts: [\"\"]}\n" + validLanguages},
+		{"a null element", "server: {allowed_hosts: [~]}\n" + validLanguages},
+		{"a mapping element", "server: {allowed_hosts: [{}]}\n" + validLanguages},
+		{"a second document", "server: {allowed_hosts: [nas.lan]}\n---\nx: 1\n"},
+		{"a non-mapping root", "[server]\n"},
+	} {
+		t.Run("fail-closed on "+tc.name, func(t *testing.T) {
+			srv, _ := loadText(t, tc.text).Server()
+			for _, peer := range []string{"127.0.0.1:50000", "[::1]:50000", "192.0.2.7:50000"} {
+				for _, host := range []string{"127.0.0.1:8374", "[::1]:8374", "localhost", "nas.lan"} {
+					if served(srv, peer, host) {
+						t.Errorf("peer %s naming %s served", peer, host)
+					}
+				}
+			}
+		})
+	}
+}
+
 // loopback reports whether s's policy admits a loopback peer naming
 // localhost.
 func loopback(s Server) bool {
