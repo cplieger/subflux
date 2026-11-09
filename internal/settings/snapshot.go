@@ -108,9 +108,8 @@ func (s Snapshot) Failure() ([]formschema.FieldError, bool) {
 
 // Server is the server section in force: Active's, Unconfigured's defaults,
 // or in Failed the section when its own parse succeeded; false only in Failed
-// when it did not. A false Server is still the fail-closed value: no trusted
-// proxy, and the host policy of the entries as written, or one denying every
-// Host when the file failed at its root.
+// when it did not. A false Server is still the fail-closed value with no
+// trusted proxy; failClosedServer and denyAllServer own its host policy.
 func (s Snapshot) Server() (Server, bool) {
 	if s.p == nil {
 		return denyAllServer(), false

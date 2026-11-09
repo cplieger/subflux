@@ -74,11 +74,11 @@ func (s Server) TrustedProxies() []netip.Prefix {
 	return slices.Clone(s.p.proxies)
 }
 
-// Hosts is httpserver.ParseHostList over allowed_hosts with
-// WithLoopbackExempt(true), so a loopback peer naming a loopback Host is
-// admitted: inactive only when no file exists or it is one mapping whose list
-// is absent, null or empty. A list with any element but no valid entry, or a
-// root-level failure, denies every Host, a loopback peer's included.
+// Hosts is httpserver.ParseHostList over allowed_hosts: inactive only when no
+// file exists or it is one mapping whose list is absent, null or empty. A valid
+// section's list takes WithLoopbackExempt(true), so a loopback peer naming a
+// loopback Host is admitted. A failed file's policy never exempts loopback;
+// failClosedServer and denyAllServer own which Hosts it admits.
 func (s Server) Hosts() *httpserver.HostPolicy {
 	if s.p == nil {
 		return nil

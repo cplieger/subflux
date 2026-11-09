@@ -17,6 +17,8 @@ type Store struct {
 	alerts    map[AlertSource]Alert
 	retained  map[string]map[AlertSource]bool
 	providers map[string]ProviderState
+	// liveProviders is RetainProviders' last set, nil before its first call.
+	liveProviders map[string]bool
 	// gen is closed and replaced by each mutation, so every observer that
 	// read it before the mutation wakes.
 	gen  chan struct{}
