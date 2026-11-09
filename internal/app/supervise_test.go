@@ -191,6 +191,36 @@ func TestSuperviseFirstCause(t *testing.T) {
 			t.Error("the store closed after a stop error")
 		}
 	})
+	t.Run("stopped_producer_returns_after_grace", func(t *testing.T) {
+		j := &journal{}
+		grace := errors.New("grace expired")
+		ctx, cancel := context.WithCancel(t.Context())
+		sv := base(j)
+		sv.httpGrace = 50 * time.Millisecond
+		phaseEnded := make(chan struct{})
+		sv.producers = []component{{
+			name: "http server",
+			run: func(context.Context) error {
+				<-phaseEnded
+				time.Sleep(50 * time.Millisecond)
+				return grace
+			},
+			stop: func(ctx context.Context) error {
+				<-ctx.Done()
+				close(phaseEnded)
+				return nil
+			},
+		}, blocker(j, "loop")}
+		done := superviseAsync(ctx, sv)
+		cancel()
+		err := result(t, done)
+		if !errors.Is(err, grace) || strings.Contains(err.Error(), "overran") {
+			t.Errorf("supervise = %v, want the stopped producer's own error alone", err)
+		}
+		if j.index("store closed") >= 0 {
+			t.Error("the store closed after a stopped producer's error")
+		}
+	})
 	t.Run("producer_overrun", func(t *testing.T) {
 		j := &journal{}
 		boom := errors.New("listener gone")

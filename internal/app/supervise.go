@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 )
 
 // component is one long-running part of the process, named for the cause it
 // becomes when it returns. A producer's stop, when set, ends what its
-// context's cancellation does not (HTTP shutdown); the drain calls it.
+// context's cancellation does not (HTTP shutdown); the drain calls it, then
+// waits for that producer's return with no deadline of its own, so the stop
+// bounds its producer.
 type component struct {
 	run  func(ctx context.Context) error
 	stop func(ctx context.Context) error
@@ -37,9 +38,10 @@ type exit struct {
 // supervise returns at the first of: ctx ends (nil), or a component returns
 // while its phase is live, the cause even when nil ("<name> exited"). Each
 // cause runs one drain: beginDrain; within httpGrace the producers cancelled,
-// stopped and awaited, then the settings shut down; then the sinks
-// cancelled and awaited until drainBudget. An overrun or a drain-time error
-// joins the cause and leaves the store open for a request or job still on it.
+// stopped (each stop bounding its own) and awaited, then the settings shut
+// down; then the sinks cancelled and awaited until drainBudget. An overrun
+// or a drain-time error joins the cause and leaves the store open for a
+// request or job still on it.
 func supervise(ctx context.Context, sv *supervision) error {
 	// Only the drain stops a component, so beginDrain precedes every stop.
 	prodCtx, cancelProducers := context.WithCancel(context.WithoutCancel(ctx))
@@ -65,7 +67,7 @@ func supervise(ctx context.Context, sv *supervision) error {
 	cancelSinks()
 	phase2, cancel2 := context.WithDeadline(context.Background(), deadline)
 	defer cancel2()
-	if !await(phase2, sinks) {
+	if !awaitAll(phase2, sinks) {
 		drainErrs = append(drainErrs, errors.New("app: sinks overran the drain budget"))
 	}
 	for len(exits) > 0 {
@@ -84,19 +86,20 @@ func supervise(ctx context.Context, sv *supervision) error {
 	return cause
 }
 
-func (sv *supervision) phaseOne(producers <-chan struct{}) []error {
+func (sv *supervision) phaseOne(producers []<-chan struct{}) []error {
 	ctx, cancel := context.WithTimeout(context.Background(), sv.httpGrace)
 	defer cancel()
 	var errs []error
-	for _, c := range sv.producers {
+	for i, c := range sv.producers {
 		if c.stop == nil {
 			continue
 		}
 		if err := c.stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", c.name, err))
 		}
+		<-producers[i]
 	}
-	if !await(ctx, producers) {
+	if !awaitAll(ctx, producers) {
 		errs = append(errs, errors.New("app: producers overran the HTTP grace"))
 	}
 	if err := sv.shutdownSettings(ctx); err != nil {
@@ -115,11 +118,14 @@ func appendDrainErr(errs []error, e exit) []error {
 }
 
 // start runs each component on ctx, reporting its return on exits, and
-// returns a channel closed once all have returned.
-func start(ctx context.Context, cs []component, exits chan<- exit) <-chan struct{} {
-	var wg sync.WaitGroup
-	for _, c := range cs {
-		wg.Go(func() {
+// returns one channel per component, closed once its exit is on exits.
+func start(ctx context.Context, cs []component, exits chan<- exit) []<-chan struct{} {
+	done := make([]<-chan struct{}, len(cs))
+	for i, c := range cs {
+		returned := make(chan struct{})
+		done[i] = returned
+		go func() {
+			defer close(returned)
 			err := c.run(ctx)
 			live := ctx.Err() == nil
 			switch {
@@ -129,14 +135,18 @@ func start(ctx context.Context, cs []component, exits chan<- exit) <-chan struct
 				err = fmt.Errorf("%s: %w", c.name, err)
 			}
 			exits <- exit{name: c.name, err: err, live: live}
-		})
+		}()
 	}
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
 	return done
+}
+
+func awaitAll(ctx context.Context, done []<-chan struct{}) bool {
+	for _, d := range done {
+		if !await(ctx, d) {
+			return false
+		}
+	}
+	return true
 }
 
 func await(ctx context.Context, done <-chan struct{}) bool {

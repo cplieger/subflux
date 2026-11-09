@@ -1,10 +1,15 @@
 package statedb
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
+	"github.com/cplieger/access/account"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -14,11 +19,14 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// fixture is one row of one core table with its encoded key and value.
+// fixture is one row of one table with its encoded key and value. name
+// tells apart two fixtures of one table in the golden file; held lists the
+// hash and handle texts its key or value must carry.
 type fixture struct {
-	put          func(*bolttable.Tx, *coreTables) error
+	put          func(*bolttable.Tx, *tables) error
 	decode       func() error
-	table        string
+	table, name  string
+	held         []string
 	key, value   []byte
 	keyVersion   uint32
 	valueVersion uint32
@@ -26,18 +34,46 @@ type fixture struct {
 
 func fix[K, V any](t *testing.T, table string, pick func(*coreTables) *bolttable.Table[K, V], kc bolttable.KeyCodec[K], vc bolttable.Codec[V], k K, v V) fixture {
 	t.Helper()
+	return rowFixture(t, table, func(ts *tables) *bolttable.Table[K, V] { return pick(ts.core) }, kc, vc, k, v)
+}
+
+func authFix[K, V any](t *testing.T, table string, pick func(*authTables) *bolttable.Table[K, V], kc bolttable.KeyCodec[K], vc bolttable.Codec[V], k K, v V, held ...string) fixture {
+	t.Helper()
+	f := rowFixture(t, table, func(ts *tables) *bolttable.Table[K, V] { return pick(ts.auth) }, kc, vc, k, v)
+	f.held = held
+	return f
+}
+
+// rowFixture encodes k and v, and its decode checks that the value decodes
+// and re-encodes to the same bytes.
+func rowFixture[K, V any](t *testing.T, table string, pick func(*tables) *bolttable.Table[K, V], kc bolttable.KeyCodec[K], vc bolttable.Codec[V], k K, v V) fixture {
+	t.Helper()
 	val, err := vc.Append(nil, &v)
 	if err != nil {
 		t.Fatalf("%s: Append: %v", table, err)
 	}
 	return fixture{
 		table:        table,
+		name:         table,
 		key:          kc.AppendKey(nil, k),
 		value:        val,
 		keyVersion:   kc.Version(),
 		valueVersion: vc.Version(),
-		put:          func(tx *bolttable.Tx, c *coreTables) error { return pick(c).Put(tx, k, &v) },
-		decode:       func() error { var got V; return vc.Decode(val, &got) },
+		put:          func(tx *bolttable.Tx, ts *tables) error { return pick(ts).Put(tx, k, &v) },
+		decode: func() error {
+			var got V
+			if err := vc.Decode(val, &got); err != nil {
+				return err
+			}
+			again, err := vc.Append(nil, &got)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(again, val) {
+				return fmt.Errorf("re-encoded %s, want %s", again, val)
+			}
+			return nil
+		},
 	}
 }
 
@@ -142,17 +178,97 @@ func coreFixtures(t *testing.T) []fixture {
 	}
 }
 
-// openCore opens a fresh file under a schema holding only core.
-func openCore(t *testing.T) (*bolttable.DB, *coreTables) {
+// The hash and handle texts the auth fixtures hold, as Reveal() returns
+// them; none is a real credential.
+const (
+	fixturePasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$aGFzaGhhc2g"
+	fixtureSessionHash  = "session-hash-fixture"
+	fixtureKeyHash      = "api-key-hash-fixture"
+	fixtureTokenHash    = "one-time-hash-fixture"
+)
+
+// authFixtures holds one row per auth table, in prefix order, and one
+// attribution per action.
+func authFixtures(t *testing.T) []fixture {
 	t.Helper()
-	c, err := defineCore(bolttable.NewSchema(schemaName))
-	if err != nil {
-		t.Fatalf("defineCore: %v", err)
+	b64 := base64.StdEncoding.EncodeToString
+	handle, credID, publicKey, aaguid, attestation := []byte("handle-1"), []byte("credential-1"), []byte("public-key-1"), []byte("aaguid-1"), []byte("attestation-1")
+	session := access.SessionRef{UserID: 3, ID: "0123456789abcdef"}
+	passkey := access.PasskeyRef{UserID: 3, ID: 4}
+	discoverable := true
+	fs := []fixture{
+		authFix(t, "users", func(a *authTables) *bolttable.Table[int64, userRow] { return a.users }, idKeys, userCodec,
+			3, userRow{
+				CreatedAt: fixtureAt, UpdatedAt: fixtureAt.Add(time.Second), Username: "ada", Email: "ada@example.com", DisplayName: "Ada",
+				PasswordHash: fixturePasswordHash, Role: string(access.RoleAdmin), OIDCIssuer: "https://idp.example", OIDCSubject: "sub-1",
+				WebAuthnHandle: handle, Enabled: true,
+			}, fixturePasswordHash, b64(handle)),
+		authFix(t, "sessions", func(a *authTables) *bolttable.Table[access.SessionRef, sessionRow] { return a.sessions }, sessionKeys, sessionCodec,
+			session, sessionRow{
+				CreatedAt: fixtureAt, AuthTime: fixtureAt.Add(time.Second), TokenHash: fixtureSessionHash, AuthMethod: string(access.MethodPasskey),
+				Kind: string(access.SessionRecovery), UserAgent: "Firefox", Label: "laptop", IssuedByKey: 5,
+				IdleCap: int64(30 * time.Minute), AbsoluteCap: int64(12 * time.Hour),
+			}, fixtureSessionHash),
+		authFix(t, "session_activity", func(a *authTables) *bolttable.Table[access.SessionRef, activityRow] { return a.activity }, sessionKeys, activityCodec,
+			session, activityRow{LastActivity: fixtureAt.Add(time.Minute), LastIP: "2001:db8::1"}),
+		authFix(t, "passkeys", func(a *authTables) *bolttable.Table[access.PasskeyRef, passkeyRow] { return a.passkeys }, passkeyKeys, passkeyCodec,
+			passkey, passkeyRow{
+				CreatedAt: fixtureAt, Discoverable: &discoverable, AttestationType: "none", AttestationFormat: "packed", RPID: "subflux.example",
+				Transport: "internal", Name: "phone", Attachment: string(access.AttachmentPlatform),
+				CredentialID: credID, PublicKey: publicKey, AAGUID: aaguid, RawAttestation: attestation,
+			}, b64(credID), b64(publicKey), b64(attestation)),
+		authFix(t, "passkey_use", func(a *authTables) *bolttable.Table[access.PasskeyRef, passkeyUseRow] { return a.passkeyUse }, passkeyKeys, passkeyUseCodec,
+			passkey, passkeyUseRow{At: fixtureAt.Add(time.Hour), SignCount: 7, RawFlags: 0x1D, CloneWarning: true}),
+		authFix(t, "keys", func(a *authTables) *bolttable.Table[int64, keyRow] { return a.keys }, idKeys, apiKeyCodec,
+			5, keyRow{
+				CreatedAt: fixtureAt, ExpiresAt: fixtureAt.Add(24 * time.Hour), KeyHash: fixtureKeyHash, KeyPrefix: "sfx_", KeySuffix: "a1b2",
+				Label: "backup", Scopes: []string{"read", "write"}, LineageIDs: []int64{1, 2, 5}, UserID: 3,
+			}, fixtureKeyHash),
+		authFix(t, "key_use", func(a *authTables) *bolttable.Table[int64, keyUseRow] { return a.keyUse }, idKeys, keyUseCodec,
+			5, keyUseRow{LastUsedAt: fixtureAt.Add(2 * time.Hour)}),
+		authFix(t, "tokens", func(a *authTables) *bolttable.Table[string, tokenRow] { return a.tokens }, textKeys, tokenCodec,
+			fixtureTokenHash, tokenRow{
+				CreatedAt: fixtureAt, ExpiresAt: fixtureAt.Add(time.Hour), Purpose: string(access.PurposeInvite), Role: string(access.RoleUser),
+				IssuedByKey: 5,
+			}, fixtureTokenHash),
+		authFix(t, "failures", func(a *authTables) *bolttable.Table[account.FailureRef, failureRow] { return a.failures }, failureKeys, failureCodec,
+			account.FailureRef{Name: "name-hmac", Method: access.MethodPassword, Trusted: true},
+			failureRow{LockedAt: fixtureAt, Count: 10, Locked: true, Unreported: true}),
+		authFix(t, "secrets", func(a *authTables) *bolttable.Table[constKey, secretsRow] { return a.secrets }, constKeys, secretsCodec,
+			constKey{}, secretsRow{FailureKey: sum32{8}, DeviceKey: sum32{9}}),
 	}
-	db, err := bolttable.Open(filepath.Join(t.TempDir(), "subflux.bolt"), c.schema, bolttable.Options{})
+	for i, action := range []access.AttributionAction{
+		access.AttributionCreated, access.AttributionInviteAccepted, access.AttributionRecoveryStarted,
+		access.AttributionRecovered, access.AttributionEnabled, access.AttributionDisabled,
+	} {
+		f := authFix(t, "key_attributions", func(a *authTables) *bolttable.Table[int64, attributionRow] { return a.attributions }, idKeys, attributionCodec,
+			int64(i+1), attributionRow{At: fixtureAt, Action: string(action), KeyLineage: []int64{1, 2, 5}, UserID: 3})
+		f.name = "key_attributions." + string(action)
+		fs = append(fs, f)
+	}
+	return append(fs, authFix(t, "auth_method_state", func(a *authTables) *bolttable.Table[constKey, methodStateRow] { return a.methodState }, constKeys, methodStateCodec,
+		constKey{}, methodStateRow{
+			PasswordLogin: true, OIDCIssuer: "https://idp.example", RPID: "subflux.example",
+			SignIn: signInKeyRow{
+				OIDCClientID: "subflux", OIDCRedirectURL: "https://subflux.example/auth/oidc/callback", OIDCClientSecret: sum32{10},
+				OIDCAutoProvision: true, DisableAuth: true,
+				OIDCAllowedGroups: setDigestRow{Count: 2, SHA256: sum32{11}}, PasskeyOrigins: setDigestRow{Count: 1, SHA256: sum32{12}},
+			},
+		}))
+}
+
+// openSchema opens a fresh file under a fresh copy of the production schema,
+// with no statedb hooks.
+func openSchema(t *testing.T) (*bolttable.DB, *tables) {
+	t.Helper()
+	ts, err := defineSchema(bolttable.NewSchema(schemaName))
+	if err != nil {
+		t.Fatalf("defineSchema: %v", err)
+	}
+	db, err := bolttable.Open(filepath.Join(t.TempDir(), "subflux.bolt"), ts.schema, bolttable.Options{})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return db, c
+	return db, ts
 }

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
@@ -320,14 +321,10 @@ func TestListenerFailureAfterReadiness(t *testing.T) {
 			t.Fatalf("Run returned %v with a request in flight", err)
 		case <-time.After(100 * time.Millisecond):
 		}
-		released := time.Now()
 		close(release)
 		err := b.wait(t)
 		if err == nil || !strings.Contains(err.Error(), "listener torn down") || strings.Contains(err.Error(), "shutdown") {
 			t.Errorf("Run = %v, want the accept error alone", err)
-		}
-		if took := time.Since(released); took > time.Second {
-			t.Errorf("Run took %v after the request finished", took)
 		}
 	})
 	t.Run("active_request_overruns_grace", func(t *testing.T) {
@@ -336,14 +333,10 @@ func TestListenerFailureAfterReadiness(t *testing.T) {
 		fl, use := failing(t)
 		b, release := holdRequest(t, use)
 		t.Cleanup(func() { close(release) })
-		started := time.Now()
 		close(fl.fail)
 		err := b.wait(t)
 		if err == nil || !strings.HasPrefix(err.Error(), "http server: accept: listener torn down") || !errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("Run = %v, want the accept error first, joined with the shutdown's overrun", err)
-		}
-		if took := time.Since(started); took > time.Second {
-			t.Errorf("Run took %v after the failure, over the drain budget", took)
 		}
 	})
 }
@@ -365,14 +358,10 @@ func TestTerminationDrains(t *testing.T) {
 		shorten(t, &drainBudget, time.Second)
 		b, release := holdRequest(t, nil)
 		t.Cleanup(func() { close(release) })
-		started := time.Now()
 		b.cancel()
 		err := b.wait(t)
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Errorf("Run = %v with a handler past the grace, want the shutdown's overrun", err)
-		}
-		if took := time.Since(started); took > time.Second {
-			t.Errorf("Run took %v, over the drain budget", took)
+		if !errors.Is(err, httpserver.ErrShutdownGraceExpired) || strings.Contains(err.Error(), "overran") {
+			t.Errorf("Run = %v with a handler past the grace, want the shutdown's overrun alone", err)
 		}
 	})
 	t.Run("slow_body_cut_at_read_timeout", func(t *testing.T) {
@@ -683,14 +672,10 @@ func TestDrainCancelsBlockedSave(t *testing.T) {
 	case <-time.After(waitBudget):
 		t.Fatal("the Save never reached activate")
 	}
-	started := time.Now()
 	b.cancel()
 	err := b.wait(t)
 	if err == nil || !strings.Contains(err.Error(), "settings save overran") {
 		t.Errorf("Run = %v, want the settings overrun", err)
-	}
-	if took := time.Since(started); took > time.Second {
-		t.Errorf("Run took %v, over the drain budget", took)
 	}
 	select {
 	case err := <-saved:

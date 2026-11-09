@@ -240,6 +240,9 @@ func (s *Store) mapSubject(tx *bolttable.Tx, out *subjects, sub bolttable.Subjec
 	case pDownloads:
 		tx.Mark(MarkHistory)
 		return s.addDownloadRoots(r, out, b)
+	case pUsers, pSessions, pPasskeys, pKeys, pAttributions:
+		tx.Mark(MarkAccounts)
+		return nil
 	}
 	return fmt.Errorf("statedb: table %#x has no change mapping", sub[0])
 }

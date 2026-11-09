@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
+	"github.com/cplieger/access/account"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -134,6 +136,26 @@ func TestKeyCodecsRoundTrip(t *testing.T) {
 			t.Errorf("round trip = %q, %v; want %q", got, err, want)
 		}
 	})
+	t.Run("session", func(t *testing.T) {
+		want := access.SessionRef{UserID: 3, ID: "s10"}
+		if got, err := sessionKeys.ParseKey(sessionKeys.AppendKey(nil, want)); err != nil || got != want {
+			t.Errorf("round trip = %+v, %v; want %+v", got, err, want)
+		}
+	})
+	t.Run("passkey", func(t *testing.T) {
+		want := access.PasskeyRef{UserID: 3, ID: 1<<53 - 1}
+		if got, err := passkeyKeys.ParseKey(passkeyKeys.AppendKey(nil, want)); err != nil || got != want {
+			t.Errorf("round trip = %+v, %v; want %+v", got, err, want)
+		}
+	})
+	t.Run("failure", func(t *testing.T) {
+		for _, trusted := range []bool{false, true} {
+			want := account.FailureRef{Name: "n", Method: access.MethodPasskey, Trusted: trusted}
+			if got, err := failureKeys.ParseKey(failureKeys.AppendKey(nil, want)); err != nil || got != want {
+				t.Errorf("round trip = %+v, %v; want %+v", got, err, want)
+			}
+		}
+	})
 	t.Run("constant", func(t *testing.T) {
 		if _, err := constKeys.ParseKey(constKeys.AppendKey(nil, constKey{})); err != nil {
 			t.Errorf("round trip: %v", err)
@@ -195,6 +217,13 @@ func TestEnumOutOfSetIsCorrupt(t *testing.T) {
 		{"bad source id", func() error { _, err := sourceKeys.ParseKey(appendText(nil, "Sonarr")); return err }},
 		{"trailing byte", func() error { _, err := instKeys.ParseKey(append(appendUint64(nil, 1), 0)); return err }},
 		{"short length prefix", func() error { _, err := textKeys.ParseKey([]byte{5, 'a'}); return err }},
+		{"user id 0", func() error { _, err := idKeys.ParseKey(appendUint64(nil, 0)); return err }},
+		{"negative user id", func() error { _, err := idKeys.ParseKey(appendUint64(nil, 1<<63)); return err }},
+		{"passkey id 0", func() error { _, err := passkeyKeys.ParseKey(appendUint64(appendUint64(nil, 1), 0)); return err }},
+		{"trusted 2", func() error {
+			_, err := failureKeys.ParseKey(append(appendText(appendText(nil, "n"), "password"), 2))
+			return err
+		}},
 		{"movie with an episode", func() error {
 			_, err := mediaKeys.ParseKey(append(k.Root().Bytes(), 0, 1, 0, 2))
 			return err

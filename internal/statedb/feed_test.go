@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -393,6 +394,27 @@ func TestMarksAreExportedConstants(t *testing.T) {
 			t.Errorf("marks %v, want [%s]", d.Marks, MarkHistory)
 		}
 	})
+	for name, put := range map[string]func(*bolttable.Tx) error{
+		"user": func(tx *bolttable.Tx) error { return s.a.users.Put(tx, 1, &userRow{Username: "ada"}) },
+		"session": func(tx *bolttable.Tx) error {
+			return s.a.sessions.Put(tx, access.SessionRef{UserID: 1, ID: "s1"}, &sessionRow{TokenHash: "h1"})
+		},
+		"passkey": func(tx *bolttable.Tx) error {
+			return s.a.passkeys.Put(tx, access.PasskeyRef{UserID: 1, ID: 1}, &passkeyRow{CredentialID: []byte{1}})
+		},
+		"key": func(tx *bolttable.Tx) error { return s.a.keys.Put(tx, 1, &keyRow{KeyHash: "k1", UserID: 1}) },
+		"key_attribution": func(tx *bolttable.Tx) error {
+			return s.a.attributions.Put(tx, 1, &attributionRow{Action: string(access.AttributionCreated), UserID: 1})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			before := headRev(t, s)
+			update(t, s, put)
+			if d := since(t, s, before); !slices.Equal(d.Marks, []string{MarkAccounts}) || len(d.Roots) != 0 {
+				t.Errorf("got %+v, want only [%s]", d, MarkAccounts)
+			}
+		})
+	}
 	t.Run("unidentified_sighting_appearing", func(t *testing.T) {
 		before := headRev(t, s)
 		update(t, s, func(tx *bolttable.Tx) error {
@@ -445,9 +467,9 @@ func TestMarksAreExportedConstants(t *testing.T) {
 	})
 }
 
-// bumpedCore's table 0x7F is live and has no change mapping.
+// bumped's table 0x7F is live and has no change mapping.
 func TestUnmappedTableFailsCommit(t *testing.T) {
-	s := mustOpen(t, filepath.Join(t.TempDir(), "subflux.bolt"), withTables(bumpedCore(t)))
+	s := mustOpen(t, filepath.Join(t.TempDir(), "subflux.bolt"), withTables(bumped(t, "core")))
 	before := headRev(t, s)
 	err := s.db.Update(t.Context(), func(tx *bolttable.Tx) error {
 		tx.Touch(bolttable.Subject{0x7F, 1})

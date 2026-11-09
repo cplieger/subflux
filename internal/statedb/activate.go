@@ -12,8 +12,11 @@ import (
 
 // Activation is the configuration every source fact is judged under: the
 // sources in force, the language policy and the embedded codecs coverage
-// ignores.
+// ignores. Auth, when set, is the sign-in configuration table 2B records,
+// and Guard judges a change to it (design 5.4).
 type Activation struct {
+	Auth          *AuthMethodState
+	Guard         MethodGuard
 	Languages     language.Policy
 	Sources       []media.SourceID
 	IgnoredCodecs []string
@@ -35,13 +38,13 @@ func (a *activation) sameAs(r *activationRow) bool {
 	return slices.Equal(a.sources, r.Sources) && slices.Equal(a.codecs, r.Codecs) && a.policy.Digest() == [32]byte(r.Policy)
 }
 
-// Activate installs a. When its sources, policy digest or ignored codecs
-// differ from the stored ones, one write applies design 5.4's removal to
-// every removed source and marks config, so every reader re-reads in full.
-// The first Activate after Open, and one changing the policy or codecs,
-// also recomputes every item's coverage in that write, deleting only
-// unconfigured pairs' locks; byte-equal rows write nothing. A failed
-// Activate keeps the previous activation in force.
+// Activate installs a. Changed sources, policy or codecs make one write
+// that applies design 5.4's removal and marks config, so every reader
+// re-reads in full; the first Activate after Open, and a policy or codec
+// change, also recompute coverage there, deleting only unconfigured pairs'
+// locks. An a.Auth that differs from table 2B's row is judged by a.Guard and
+// recorded in that write, under an equal digest too. A failed Activate, a
+// Guard refusal included, writes nothing and keeps the previous activation.
 func (s *Store) Activate(ctx context.Context, a Activation) error {
 	next, err := normalize(a)
 	if err != nil {
@@ -49,20 +52,18 @@ func (s *Store) Activate(ctx context.Context, a Activation) error {
 	}
 	s.actMu.Lock()
 	defer s.actMu.Unlock()
-	var stored activationRow
-	if err := s.db.View(ctx, func(r *bolttable.ReadTx) (err error) {
-		stored, _, err = s.t.activation.Get(r, constKey{})
-		return err
-	}); err != nil {
+	stored, authBefore, authStored, err := s.storedActivation(ctx)
+	if err != nil {
 		return err
 	}
 	changed := !next.sameAs(&stored)
 	// The first Activate after Open recomputes whatever the stored digest:
 	// the digest names the configuration, not this binary's grading code.
 	recompute := s.active.Load() == nil || next.policy.Digest() != [32]byte(stored.Policy) || !slices.Equal(next.codecs, stored.Codecs)
-	if changed || recompute {
-		err := s.write(ctx, "activate", s.db.Update, func(tx *bolttable.Tx) error {
-			return s.writeActivation(tx, &stored, next, changed, recompute)
+	authChanged := a.Auth != nil && (!authStored || authBefore != *a.Auth)
+	if changed || recompute || authChanged {
+		err := s.accountWrite(ctx, "activate", s.db.Update, func(x *accountTx) error {
+			return s.writeActivation(ctx, x, &a, &stored, next, changed, recompute)
 		})
 		if err != nil {
 			return err
@@ -72,14 +73,32 @@ func (s *Store) Activate(ctx context.Context, a Activation) error {
 	return nil
 }
 
-func (s *Store) writeActivation(tx *bolttable.Tx, stored *activationRow, next *activation, changed, recompute bool) error {
+// storedActivation reads the stored activation and table 2B's row in one
+// View.
+func (s *Store) storedActivation(ctx context.Context) (stored activationRow, auth AuthMethodState, authStored bool, err error) {
+	err = s.db.View(ctx, func(r *bolttable.ReadTx) (err error) {
+		if stored, _, err = s.t.activation.Get(r, constKey{}); err != nil {
+			return err
+		}
+		auth, authStored, err = authReader{a: s.a, r: r}.methodState()
+		return err
+	})
+	return stored, auth, authStored, err
+}
+
+func (s *Store) writeActivation(ctx context.Context, x *accountTx, a *Activation, stored *activationRow, next *activation, changed, recompute bool) error {
+	if a.Auth != nil {
+		if err := guardAndWrite(ctx, x, a.Auth, a.Guard); err != nil {
+			return err
+		}
+	}
 	if changed {
-		if err := s.applyActivation(tx, stored, next); err != nil {
+		if err := s.applyActivation(x.tx, stored, next); err != nil {
 			return err
 		}
 	}
 	if recompute {
-		return s.recomputeAll(tx, next)
+		return s.recomputeAll(x.tx, next)
 	}
 	return nil
 }
@@ -96,6 +115,9 @@ func (s *Store) Policy() language.Policy {
 // normalize sorts a's sources and codecs; a source id outside media's
 // grammar is refused by the activation row's encoder, writing nothing.
 func normalize(a Activation) (*activation, error) {
+	if a.Auth != nil && a.Guard == nil {
+		return nil, errNoGuard
+	}
 	sources := slices.Clone(a.Sources)
 	slices.Sort(sources)
 	for i := 1; i < len(sources); i++ {
