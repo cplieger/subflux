@@ -6,8 +6,8 @@ github.com/cplieger/animap/mapread v0.3.2 h1:oBS2esAwE3WSMWb9ypUGw2vAAV/lHWDKlOb
 github.com/cplieger/animap/mapread v0.3.2/go.mod h1:/KLtoKslemgqFHUACjfaCz7F78WQpd3FDjQJ4oY8lic=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.10 h1:FB+xzYFPUFpRu1BPGSSlPOivx46WjmEmW4CRb/ZactE=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.10/go.mod h1:PMkC+UXPfSJy6A3O7yH/FyPs3atkHjb01I38s47HGFQ=
-github.com/cplieger/bolttable v1.1.0-dev.2 h1:3TlemJYshG9cZ/lsXgd07PLDBG9rPVCiaTMH5nYV1SI=
-github.com/cplieger/bolttable v1.1.0-dev.2/go.mod h1:d3lFiW0HhHdnV6CHfeXsPWQ2DfvXfPM6lKs1qWXim+A=
+github.com/cplieger/bolttable v1.1.0 h1:3nXc5p+GoOB1lYsvMhjG+PBOsIdYgZgIiDClF0EiqN4=
+github.com/cplieger/bolttable v1.1.0/go.mod h1:d3lFiW0HhHdnV6CHfeXsPWQ2DfvXfPM6lKs1qWXim+A=
 github.com/cplieger/go/filesafe v1.0.0 h1:V63mC2Kc1PlbAKhiCXMA5WiellXJtWPtNJwTG2Q37us=
 github.com/cplieger/go/filesafe v1.0.0/go.mod h1:Pu9t7x6mRQwXm09EdWaQvVK++fpjgGP7+58XiMxGYks=
 github.com/cplieger/go/health v1.0.0 h1:MK3skKEoRhmsrt64O/OSbpbL9Dib0drAeWLQLLhjmPU=
