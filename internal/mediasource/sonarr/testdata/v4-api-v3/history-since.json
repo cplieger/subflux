@@ -1,0 +1,121 @@
+[
+ {
+  "episodeId": 8171,
+  "seriesId": 133,
+  "sourceTitle": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 [WEBDL-1080p]-GROUP1.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 406,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T14:58:50Z",
+  "eventType": "episodeFileDeleted",
+  "data": {
+   "reason": "MissingFromDisk",
+   "releaseGroup": "GROUP1",
+   "size": "1472489192",
+   "indexerFlags": "0",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961051
+ },
+ {
+  "episodeId": 21606,
+  "seriesId": 254,
+  "sourceTitle": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E01 [WEBDL-1080p]-GROUP2.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   },
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 329,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T14:59:16Z",
+  "eventType": "episodeFileDeleted",
+  "data": {
+   "reason": "MissingFromDisk",
+   "releaseGroup": "GROUP2",
+   "size": "942424971",
+   "indexerFlags": "0",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961052
+ },
+ {
+  "episodeId": 54086,
+  "seriesId": 697,
+  "sourceTitle": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E01 [WEBDL-1080p]-GROUP3.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   },
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 431,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T14:59:52Z",
+  "eventType": "episodeFileDeleted",
+  "data": {
+   "reason": "MissingFromDisk",
+   "releaseGroup": "GROUP3",
+   "size": "1525795716",
+   "indexerFlags": "Freeleech75",
+   "releaseType": "SeasonPack"
+  },
+  "id": 961053
+ }
+]

@@ -26,18 +26,6 @@ var ScheduleSchema = formschema.Schema{Fields: []formschema.Field{
 	},
 }}
 
-// DefaultSchedule is an absent section's schedule: ScheduleSchema's
-// defaults.
-var DefaultSchedule = defaultSchedule()
-
-func defaultSchedule() Schedule {
-	s, errs := ParseSchedule(nil)
-	if len(errs) > 0 {
-		panic("mediasource: ScheduleSchema's defaults are refused")
-	}
-	return s
-}
-
 // ParseSchedule decodes the scan section, n being its node or nil when
 // absent, reporting each error at scan.<key>; Decode marks both scalars
 // plain.

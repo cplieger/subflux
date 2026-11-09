@@ -1,0 +1,20 @@
+[
+ {
+  "path": "/media/tv",
+  "accessible": true,
+  "isEmpty": false,
+  "freeSpace": 45280543113216,
+  "totalSpace": 209980993044480,
+  "unmappedFolders": [],
+  "id": 6
+ },
+ {
+  "path": "/media/anime",
+  "accessible": true,
+  "isEmpty": false,
+  "freeSpace": 45280543113216,
+  "totalSpace": 209980993044480,
+  "unmappedFolders": [],
+  "id": 8
+ }
+]

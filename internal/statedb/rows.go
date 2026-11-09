@@ -571,6 +571,7 @@ type jobRow struct {
 	Ended       time.Time  `json:"ended"`
 	Key         *jobKeyRow `json:"key,omitempty"`
 	Scope       string     `json:"scope"`
+	Source      string     `json:"source"`
 	Phase       string     `json:"phase"`
 	Cause       string     `json:"cause"`
 	Owner       int64      `json:"owner"`

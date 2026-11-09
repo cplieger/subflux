@@ -69,9 +69,10 @@ type Deps struct {
 // Set is the configured sources behind one check of every answer. It is
 // safe for concurrent use.
 type Set struct {
-	byID map[media.SourceID]*source
-	log  *slog.Logger
-	ids  []media.SourceID
+	orders OrderJoin
+	byID   map[media.SourceID]*source
+	log    *slog.Logger
+	ids    []media.SourceID
 }
 
 type source struct {
@@ -86,15 +87,18 @@ type source struct {
 	roots   rootCache
 }
 
-// NewSet builds each entry's adapter, refusing an unknown type, a duplicate
-// id or a failing New: ParseConfigs ran each check, so any of them is a
-// programming fault.
-func NewSet(kinds []AdapterKind, cfgs []Config, deps Deps) (*Set, error) {
+// NewSet builds each entry's adapter over deps, keying episodes through
+// orders, refusing an unknown type, a duplicate id, a failing New or a nil
+// orders: ParseConfigs ran each check, so any of them is a programming fault.
+func NewSet(kinds []AdapterKind, cfgs []Config, deps Deps, orders OrderJoin) (*Set, error) {
+	if orders == nil || reflect.ValueOf(orders).Kind() == reflect.Pointer && reflect.ValueOf(orders).IsNil() {
+		return nil, errors.New("mediasource: NewSet needs an OrderJoin")
+	}
 	log := deps.Logger
 	if log == nil {
 		log = slog.Default()
 	}
-	s := &Set{byID: make(map[media.SourceID]*source, len(cfgs)), log: log}
+	s := &Set{orders: orders, byID: make(map[media.SourceID]*source, len(cfgs)), log: log}
 	for _, cfg := range cfgs {
 		i := slices.IndexFunc(kinds, func(k AdapterKind) bool { return k.Type == cfg.Type })
 		if i < 0 {
@@ -176,12 +180,13 @@ func answered(err error) bool {
 }
 
 // Items walks the source's library, yielding each root after its answer
-// check and exclusion. A root breaking a per-root bound goes to unread with
-// nothing yielded, as do the adapter's own reports; an identity violation
+// check, exclusion and aired keys. A root breaking a per-root bound, or whose
+// aired order cannot be read, goes to unread with nothing yielded, as do the
+// adapter's own reports; an identity violation or a join's store failure
 // fails the call. The walk ends with the error of the walkFailBudget-th
-// consecutive unread root, or of the unread root past maxUnreadRoots. The
-// caller's yield or unread error comes back unwrapped. unread must be
-// non-nil.
+// consecutive unread root the source failed, or of the unread root past
+// maxUnreadRoots. The caller's yield or unread error comes back unwrapped.
+// unread must be non-nil.
 func (s *Set) Items(ctx context.Context, id media.SourceID, yield func(Root, []Item) error, unread Unread) error {
 	a, err := s.call(id, "Items", nil)
 	if err != nil {
@@ -191,8 +196,8 @@ func (s *Set) Items(ctx context.Context, id media.SourceID, yield func(Root, []I
 	if err != nil {
 		return err
 	}
-	w := &walk{a: a, yield: yield, unread: unread, excluded: excluded, seen: map[NativeRef]struct{}{}}
-	err = a.src.adapter.Items(ctx, w.root, w.adapterUnread)
+	w := &walk{a: a, orders: s.orders, yield: yield, unread: unread, excluded: excluded, seen: map[NativeRef]struct{}{}}
+	err = a.src.adapter.Items(ctx, func(r Root, items []Item) error { return w.root(ctx, r, items) }, w.adapterUnread)
 	if w.end != nil {
 		return w.end
 	}
@@ -203,6 +208,7 @@ func (s *Set) Items(ctx context.Context, id media.SourceID, yield func(Root, []I
 // caller's own or a refusal, and wins over whatever the adapter returns.
 type walk struct {
 	end      error
+	orders   OrderJoin
 	a        *answer
 	yield    func(Root, []Item) error
 	unread   Unread
@@ -212,7 +218,7 @@ type walk struct {
 	total    int
 }
 
-func (w *walk) root(r Root, items []Item) error { //nolint:gocritic // hugeParam: an adapter yields each Root by value
+func (w *walk) root(ctx context.Context, r Root, items []Item) error { //nolint:gocritic // hugeParam: an adapter yields each Root by value
 	if w.end != nil {
 		return w.end
 	}
@@ -223,8 +229,17 @@ func (w *walk) root(r Root, items []Item) error { //nolint:gocritic // hugeParam
 	if se != nil {
 		return w.skip(r.Native, se)
 	}
+	root := w.a.root(r)
+	se, err := w.a.key(ctx, w.orders, &root, titlesOf(items), out)
+	switch {
+	case err != nil:
+		w.end = err
+		return err
+	case se != nil:
+		return w.skipJoin(r.Native, se)
+	}
 	w.run = 0
-	if err := w.yield(w.a.root(r), out); err != nil {
+	if err := w.yield(root, out); err != nil {
 		w.end = err
 		return err
 	}
@@ -270,13 +285,29 @@ func (w *walk) skip(ref NativeRef, se *SourceError) error {
 	return nil
 }
 
+// skipJoin reports a root whose aired order cannot be read: the source
+// answered it, so it neither counts toward nor breaks the run of
+// walkFailBudget, but it counts toward maxUnreadRoots.
+func (w *walk) skipJoin(ref NativeRef, se *SourceError) error {
+	w.total++
+	if w.total > maxUnreadRoots {
+		return w.stop(se)
+	}
+	if err := w.unread(ref, se); err != nil {
+		w.end = err
+		return err
+	}
+	return nil
+}
+
 func (w *walk) stop(se *SourceError) error {
 	w.end = se
 	return se
 }
 
-// Root reads one root fresh, with its items, after the answer check; false
-// with no error when the source has no such root.
+// Root reads one root fresh, with its items, after the answer check and
+// aired keys; false with no error when the source has no such root. A root
+// whose aired order cannot be read answers that *SourceError.
 func (s *Set) Root(ctx context.Context, id media.SourceID, ref NativeRef) (Root, []Item, bool, error) {
 	a, err := s.call(id, "Root", nil)
 	if err != nil {
@@ -306,7 +337,15 @@ func (s *Set) Root(ctx context.Context, id media.SourceID, ref NativeRef) (Root,
 	if se != nil {
 		return Root{}, nil, false, se
 	}
-	return a.root(r), out, true, nil
+	root := a.root(r)
+	se, err = a.key(ctx, s.orders, &root, titlesOf(items), out)
+	switch {
+	case err != nil:
+		return Root{}, nil, false, err
+	case se != nil:
+		return Root{}, nil, false, se
+	}
+	return root, out, true, nil
 }
 
 // Changes answers the roots changed since cur and the cursor after them;

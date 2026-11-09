@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
 )
 
 // script is an adapter whose every answer a test sets; a nil func answers
@@ -114,7 +115,7 @@ func oneSet(t *testing.T, s *script, cfg mediasource.Config) (*mediasource.Set, 
 	t.Helper()
 	log, rec := capture.New()
 	cfg.ID, cfg.Type = "src", "script"
-	set, err := mediasource.NewSet([]mediasource.AdapterKind{scriptKind("script", s)}, []mediasource.Config{cfg}, mediasource.Deps{Logger: log})
+	set, err := mediasource.NewSet([]mediasource.AdapterKind{scriptKind("script", s)}, []mediasource.Config{cfg}, mediasource.Deps{Logger: log}, sourcetest.OwnPlaces{})
 	if err != nil {
 		t.Fatal(err)
 	}

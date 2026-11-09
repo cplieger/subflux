@@ -34,8 +34,9 @@ type CatalogueOrder struct {
 	Type, Name string
 	// Places is parallel to Catalogue.Episodes.
 	Places []Place
-	// Extra are the order's episodes the aired list lacks, ascending by season
-	// and episode.
+	// Extra are the order's places Places cannot hold, an episode the aired
+	// list lacks or an aired episode's second place, ascending by season and
+	// episode.
 	Extra []ExtraPlace
 }
 
@@ -58,7 +59,7 @@ type ExtraPlace struct {
 type CatalogueEpisode struct {
 	// AirDate is YYYY-MM-DD, or "" when SkyHook lists none.
 	AirDate string
-	// ID is the TVDB episode id, SkyHook's metadataId, distinct in a catalogue.
+	// ID is the TVDB episode id, SkyHook's tvdbId, distinct in a catalogue.
 	ID uint64
 	// Season, Episode and Absolute are aired; Absolute is 0 when none.
 	Season, Episode, Absolute int
@@ -120,19 +121,6 @@ func (c Catalogue) Reordered() bool { //nolint:gocritic // hugeParam: Catalogue 
 	}
 	return false
 }
-
-// Validate refuses a series or episode id [media.ValidExternalID] refuses, a
-// repeated episode id, a season or episode [media.ValidEpisodeNumber]
-// refuses, an air date neither "" nor YYYY-MM-DD, a repeated or empty order
-// type, an "official" or "absolute" one, Places not parallel to Episodes, and
-// Extra out of order. Two Extra entries may share a place, as
-// two Places may.
-func (c Catalogue) Validate() error { return refusal(c.validate()) } //nolint:gocritic // hugeParam: Catalogue is a value type, checked where it is decoded
-
-// Validate refuses a Language that is not three ASCII lowercase letters, a
-// title when Found is false, an empty title, and ids [media.ValidExternalID]
-// refuses or not strictly ascending.
-func (t TitleSet) Validate() error { return refusal(t.validate()) }
 
 // Validate refuses an invalid reading, title sets repeated or out of order by
 // Language, a title for an id its catalogue lacks, and a Held for another

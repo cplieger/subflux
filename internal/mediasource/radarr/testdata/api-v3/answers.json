@@ -1,0 +1,72 @@
+[
+ {
+  "file": "api.json",
+  "path": "/api",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "system-status.json",
+  "path": "/api/v3/system/status",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "movie.json",
+  "path": "/api/v3/movie",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "movie-152.json",
+  "path": "/api/v3/movie/152",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "movie-3017.json",
+  "path": "/api/v3/movie/3017",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "movie-2807.json",
+  "path": "/api/v3/movie/2807",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "movie-999999.404.json",
+  "path": "/api/v3/movie/999999",
+  "query": "",
+  "status": 404,
+  "contentType": "application/problem+json; charset=utf-8"
+ },
+ {
+  "file": "tag.json",
+  "path": "/api/v3/tag",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "rootfolder.json",
+  "path": "/api/v3/rootfolder",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "history-since.json",
+  "path": "/api/v3/history/since",
+  "query": "date=*&includeMovie=false",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ }
+]

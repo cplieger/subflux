@@ -1,0 +1,5151 @@
+[
+ {
+  "seriesId": 697,
+  "tvdbId": 830421,
+  "episodeFileId": 423446,
+  "seasonNumber": 1,
+  "episodeNumber": 1,
+  "title": "Hitagi Crab - Part 1",
+  "airDate": "2009-07-03",
+  "airDateUtc": "2009-07-03T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E01 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E01 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1911928165,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:57",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423446
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 1,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54086
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 830451,
+  "episodeFileId": 423453,
+  "seasonNumber": 1,
+  "episodeNumber": 2,
+  "title": "Hitagi Crab - Part 2",
+  "airDate": "2009-07-10",
+  "airDateUtc": "2009-07-10T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E02 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E02 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 2280353951,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:32",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423453
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 2,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54087
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 882021,
+  "episodeFileId": 423462,
+  "seasonNumber": 1,
+  "episodeNumber": 3,
+  "title": "Mayoi Snail - Part 1",
+  "airDate": "2009-07-17",
+  "airDateUtc": "2009-07-17T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E03 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E03 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 951627221,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:59",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423462
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 3,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54088
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 908301,
+  "episodeFileId": 423468,
+  "seasonNumber": 1,
+  "episodeNumber": 4,
+  "title": "Mayoi Snail - Part 2",
+  "airDate": "2009-07-24",
+  "airDateUtc": "2009-07-24T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E04 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E04 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 942212932,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:38",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423468
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 4,
+  "sceneAbsoluteEpisodeNumber": 4,
+  "sceneEpisodeNumber": 4,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54089
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 935411,
+  "episodeFileId": 423471,
+  "seasonNumber": 1,
+  "episodeNumber": 5,
+  "title": "Mayoi Snail - Part 3",
+  "airDate": "2009-07-31",
+  "airDateUtc": "2009-07-31T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E05 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E05 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1277101746,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:04",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423471
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 5,
+  "sceneAbsoluteEpisodeNumber": 5,
+  "sceneEpisodeNumber": 5,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54090
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 960831,
+  "episodeFileId": 423473,
+  "seasonNumber": 1,
+  "episodeNumber": 6,
+  "title": "Suruga Monkey - Part 1",
+  "airDate": "2009-08-09",
+  "airDateUtc": "2009-08-09T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E06 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E06 - [v3 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1632545516,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 251,
+     "name": "v3"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2828,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:25",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423473
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 6,
+  "sceneAbsoluteEpisodeNumber": 6,
+  "sceneEpisodeNumber": 6,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54091
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 966311,
+  "episodeFileId": 423475,
+  "seasonNumber": 1,
+  "episodeNumber": 7,
+  "title": "Suruga Monkey - Part 2",
+  "airDate": "2009-08-21",
+  "airDateUtc": "2009-08-21T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E07 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E07 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1772450894,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:26",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423475
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 7,
+  "sceneAbsoluteEpisodeNumber": 7,
+  "sceneEpisodeNumber": 7,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54092
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 966321,
+  "episodeFileId": 423477,
+  "seasonNumber": 1,
+  "episodeNumber": 8,
+  "title": "Suruga Monkey - Part 3",
+  "airDate": "2009-08-28",
+  "airDateUtc": "2009-08-28T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E08 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E08 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1316080184,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423477
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 8,
+  "sceneAbsoluteEpisodeNumber": 8,
+  "sceneEpisodeNumber": 8,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54093
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 966331,
+  "episodeFileId": 423479,
+  "seasonNumber": 1,
+  "episodeNumber": 9,
+  "title": "Nadeko Snake - Part 1",
+  "airDate": "2009-09-04",
+  "airDateUtc": "2009-09-04T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E09 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E09 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1191383099,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:09",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423479
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 9,
+  "sceneAbsoluteEpisodeNumber": 9,
+  "sceneEpisodeNumber": 9,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54094
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 1056211,
+  "episodeFileId": 423481,
+  "seasonNumber": 1,
+  "episodeNumber": 10,
+  "title": "Nadeko Snake - Part 2",
+  "airDate": "2009-09-11",
+  "airDateUtc": "2009-09-11T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E10 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E10 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1671430242,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:35",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423481
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 10,
+  "sceneAbsoluteEpisodeNumber": 10,
+  "sceneEpisodeNumber": 10,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54095
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 1074891,
+  "episodeFileId": 423483,
+  "seasonNumber": 1,
+  "episodeNumber": 11,
+  "title": "Tsubasa Cat - Part 1",
+  "airDate": "2009-09-18",
+  "airDateUtc": "2009-09-18T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E11 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E11 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1418874277,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:30",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423483
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 11,
+  "sceneAbsoluteEpisodeNumber": 11,
+  "sceneEpisodeNumber": 11,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54096
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 1074901,
+  "episodeFileId": 423484,
+  "seasonNumber": 1,
+  "episodeNumber": 12,
+  "title": "Tsubasa Cat - Part 2",
+  "airDate": "2009-09-25",
+  "airDateUtc": "2009-09-25T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E12 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E12 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1553353962,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:27",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423484
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 12,
+  "sceneAbsoluteEpisodeNumber": 12,
+  "sceneEpisodeNumber": 12,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54097
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 1124541,
+  "episodeFileId": 423485,
+  "seasonNumber": 1,
+  "episodeNumber": 13,
+  "title": "Tsubasa Cat - Part 3",
+  "airDate": "2009-11-02",
+  "airDateUtc": "2009-11-02T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E13 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E13 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1145306549,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:07",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423485
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 13,
+  "sceneAbsoluteEpisodeNumber": 13,
+  "sceneEpisodeNumber": 13,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54098
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 1327321,
+  "episodeFileId": 423486,
+  "seasonNumber": 1,
+  "episodeNumber": 14,
+  "title": "Tsubasa Cat - Part 4",
+  "airDate": "2010-02-23",
+  "airDateUtc": "2010-02-23T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E14 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E14 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1693659672,
+   "dateAdded": "2026-01-29T22:17:21Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423486
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 14,
+  "sceneAbsoluteEpisodeNumber": 14,
+  "sceneEpisodeNumber": 14,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54099
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 2409291,
+  "episodeFileId": 423487,
+  "seasonNumber": 1,
+  "episodeNumber": 15,
+  "title": "Tsubasa Cat - Part 5",
+  "airDate": "2010-06-25",
+  "airDateUtc": "2010-06-25T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Monogatari (2009) - S01E15 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E15 - [v4 Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 1560907817,
+   "dateAdded": "2026-01-29T22:17:21Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 252,
+     "name": "v4"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 2829,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423487
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 15,
+  "sceneAbsoluteEpisodeNumber": 15,
+  "sceneEpisodeNumber": 15,
+  "sceneSeasonNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 54100
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4229864,
+  "episodeFileId": 423445,
+  "seasonNumber": 2,
+  "episodeNumber": 1,
+  "title": "Karen Bee - Part 1",
+  "airDate": "2012-01-07",
+  "airDateUtc": "2012-01-07T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 2,
+   "relativePath": "Season 02/Monogatari (2009) - S02E01 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 02/Monogatari (2009) - S02E01 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "size": 6626754648,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 5.1,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn/jpn",
+    "audioStreamCount": 3,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x816",
+    "runTime": "1:03:30",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423445
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 16,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54101
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4230994,
+  "episodeFileId": 423451,
+  "seasonNumber": 2,
+  "episodeNumber": 2,
+  "title": "Karen Bee - Part 2",
+  "airDate": "2012-01-14",
+  "airDateUtc": "2012-01-14T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 2,
+   "relativePath": "Season 02/Monogatari (2009) - S02E02 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 02/Monogatari (2009) - S02E02 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "size": 9726505886,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 5.1,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn/jpn",
+    "audioStreamCount": 3,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x816",
+    "runTime": "1:08:15",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423451
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 17,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54102
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4230993,
+  "episodeFileId": 423457,
+  "seasonNumber": 2,
+  "episodeNumber": 3,
+  "title": "Karen Bee - Part 3",
+  "airDate": "2012-01-21",
+  "airDateUtc": "2012-01-21T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 2,
+   "relativePath": "Season 02/Monogatari (2009) - S02E03 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 02/Monogatari (2009) - S02E03 - [Bluray-1080p][Opus 5.1][JA][x265 10bit]-smol.mkv",
+   "size": 9169209764,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 5.1,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn/jpn",
+    "audioStreamCount": 3,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x816",
+    "runTime": "1:22:10",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423457
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 18,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54103
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4230992,
+  "episodeFileId": 423463,
+  "seasonNumber": 2,
+  "episodeNumber": 4,
+  "title": "Karen Bee - Part 4",
+  "airDate": "2012-01-28",
+  "airDateUtc": "2012-01-28T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 2,
+   "relativePath": "Season 02/Monogatari (2009) - S02E04 - [Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 02/Monogatari (2009) - S02E04 - [Bluray-1080p][Opus 2.0][JA][x265 10bit]-MTBB.mkv",
+   "size": 12078444650,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "MTBB",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 259,
+     "name": "Anime BD Tier 03"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 1225,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x816",
+    "runTime": "2:24:24",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423463
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 19,
+  "sceneAbsoluteEpisodeNumber": 4,
+  "sceneEpisodeNumber": 4,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54104
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246705,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 5,
+  "title": "Karen Bee - Part 5",
+  "airDate": "2012-02-04",
+  "airDateUtc": "2012-02-04T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 20,
+  "sceneAbsoluteEpisodeNumber": 5,
+  "sceneEpisodeNumber": 5,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54105
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246706,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 6,
+  "title": "Karen Bee - Part 6",
+  "airDate": "2012-02-11",
+  "airDateUtc": "2012-02-11T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 21,
+  "sceneAbsoluteEpisodeNumber": 6,
+  "sceneEpisodeNumber": 6,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54106
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246707,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 7,
+  "title": "Karen Bee - Part 7",
+  "airDate": "2012-02-18",
+  "airDateUtc": "2012-02-18T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 22,
+  "sceneAbsoluteEpisodeNumber": 7,
+  "sceneEpisodeNumber": 7,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54107
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246708,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 8,
+  "title": "Tsukihi Phoenix - Part 1",
+  "airDate": "2012-02-26",
+  "airDateUtc": "2012-02-26T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 23,
+  "sceneAbsoluteEpisodeNumber": 8,
+  "sceneEpisodeNumber": 8,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54108
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246709,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 9,
+  "title": "Tsukihi Phoenix - Part 2",
+  "airDate": "2012-03-04",
+  "airDateUtc": "2012-03-04T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 24,
+  "sceneAbsoluteEpisodeNumber": 9,
+  "sceneEpisodeNumber": 9,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54109
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246710,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 10,
+  "title": "Tsukihi Phoenix - Part 3",
+  "airDate": "2012-03-10",
+  "airDateUtc": "2012-03-10T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 25,
+  "sceneAbsoluteEpisodeNumber": 10,
+  "sceneEpisodeNumber": 10,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54110
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4246711,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 11,
+  "title": "Tsukihi Phoenix - Part 4",
+  "airDate": "2012-03-17",
+  "airDateUtc": "2012-03-17T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 26,
+  "sceneAbsoluteEpisodeNumber": 11,
+  "sceneEpisodeNumber": 11,
+  "sceneSeasonNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 54111
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4318918,
+  "episodeFileId": 423448,
+  "seasonNumber": 3,
+  "episodeNumber": 1,
+  "title": "Tsubasa Tiger - Part 1",
+  "airDate": "2013-07-07",
+  "airDateUtc": "2013-07-07T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1724494485,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn/jpn",
+    "audioStreamCount": 3,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:17",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423448
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 27,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54112
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590169,
+  "episodeFileId": 423455,
+  "seasonNumber": 3,
+  "episodeNumber": 2,
+  "title": "Tsubasa Tiger - Part 2",
+  "airDate": "2013-07-14",
+  "airDateUtc": "2013-07-14T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1778996242,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn/jpn",
+    "audioStreamCount": 3,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:49",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423455
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 28,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54113
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590170,
+  "episodeFileId": 423460,
+  "seasonNumber": 3,
+  "episodeNumber": 3,
+  "title": "Tsubasa Tiger - Part 3",
+  "airDate": "2013-07-21",
+  "airDateUtc": "2013-07-21T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1998056655,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:00",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423460
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 29,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54114
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590171,
+  "episodeFileId": 423466,
+  "seasonNumber": 3,
+  "episodeNumber": 4,
+  "title": "Tsubasa Tiger - Part 4",
+  "airDate": "2013-07-28",
+  "airDateUtc": "2013-07-28T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1861575515,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423466
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 30,
+  "sceneAbsoluteEpisodeNumber": 4,
+  "sceneEpisodeNumber": 4,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54115
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590172,
+  "episodeFileId": 423470,
+  "seasonNumber": 3,
+  "episodeNumber": 5,
+  "title": "Tsubasa Tiger - Part 5",
+  "airDate": "2013-08-04",
+  "airDateUtc": "2013-08-04T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E05 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E05 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1819143969,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:07",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423470
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 31,
+  "sceneAbsoluteEpisodeNumber": 5,
+  "sceneEpisodeNumber": 5,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54116
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590173,
+  "episodeFileId": 423472,
+  "seasonNumber": 3,
+  "episodeNumber": 6,
+  "title": "Mayoi Jiangshi - Part 1",
+  "airDate": "2013-08-18",
+  "airDateUtc": "2013-08-18T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E06 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E06 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1916387072,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:57",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423472
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 32,
+  "sceneAbsoluteEpisodeNumber": 6,
+  "sceneEpisodeNumber": 6,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54117
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590174,
+  "episodeFileId": 423474,
+  "seasonNumber": 3,
+  "episodeNumber": 7,
+  "title": "Mayoi Jiangshi - Part 2",
+  "airDate": "2013-08-25",
+  "airDateUtc": "2013-08-25T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E07 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E07 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2085439340,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:59",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423474
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 33,
+  "sceneAbsoluteEpisodeNumber": 7,
+  "sceneEpisodeNumber": 7,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54118
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590175,
+  "episodeFileId": 423476,
+  "seasonNumber": 3,
+  "episodeNumber": 8,
+  "title": "Mayoi Jiangshi - Part 3",
+  "airDate": "2013-09-01",
+  "airDateUtc": "2013-09-01T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E08 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E08 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1860799800,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:08",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423476
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 34,
+  "sceneAbsoluteEpisodeNumber": 8,
+  "sceneEpisodeNumber": 8,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54119
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590176,
+  "episodeFileId": 423478,
+  "seasonNumber": 3,
+  "episodeNumber": 9,
+  "title": "Mayoi Jiangshi - Part 4",
+  "airDate": "2013-09-08",
+  "airDateUtc": "2013-09-08T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E09 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E09 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1978487717,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:56",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423478
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 35,
+  "sceneAbsoluteEpisodeNumber": 9,
+  "sceneEpisodeNumber": 9,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54120
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590177,
+  "episodeFileId": 423480,
+  "seasonNumber": 3,
+  "episodeNumber": 10,
+  "title": "Nadeko Medusa - Part 1",
+  "airDate": "2013-09-22",
+  "airDateUtc": "2013-09-22T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E10 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E10 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1691781795,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:53",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423480
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 36,
+  "sceneAbsoluteEpisodeNumber": 10,
+  "sceneEpisodeNumber": 10,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54121
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4590178,
+  "episodeFileId": 423482,
+  "seasonNumber": 3,
+  "episodeNumber": 11,
+  "title": "Nadeko Medusa - Part 2",
+  "airDate": "2013-09-29",
+  "airDateUtc": "2013-09-29T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 3,
+   "relativePath": "Season 03/Monogatari (2009) - S03E11 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 03/Monogatari (2009) - S03E11 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1928696819,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:43",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423482
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 37,
+  "sceneAbsoluteEpisodeNumber": 11,
+  "sceneEpisodeNumber": 11,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54122
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4641341,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 12,
+  "title": "Nadeko Medusa - Part 3",
+  "airDate": "2013-10-06",
+  "airDateUtc": "2013-10-06T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 38,
+  "sceneAbsoluteEpisodeNumber": 12,
+  "sceneEpisodeNumber": 12,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54123
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4667938,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 13,
+  "title": "Nadeko Medusa - Part 4",
+  "airDate": "2013-10-13",
+  "airDateUtc": "2013-10-13T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 39,
+  "sceneAbsoluteEpisodeNumber": 13,
+  "sceneEpisodeNumber": 13,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54124
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4667939,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 14,
+  "title": "Shinobu Time - Part 1",
+  "airDate": "2013-10-27",
+  "airDateUtc": "2013-10-27T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 40,
+  "sceneAbsoluteEpisodeNumber": 14,
+  "sceneEpisodeNumber": 14,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54125
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4667940,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 15,
+  "title": "Shinobu Time - Part 2",
+  "airDate": "2013-11-03",
+  "airDateUtc": "2013-11-03T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 41,
+  "sceneAbsoluteEpisodeNumber": 15,
+  "sceneEpisodeNumber": 15,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54126
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4667941,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 16,
+  "title": "Shinobu Time - Part 3",
+  "airDate": "2013-11-10",
+  "airDateUtc": "2013-11-10T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 42,
+  "sceneAbsoluteEpisodeNumber": 16,
+  "sceneEpisodeNumber": 16,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54127
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4676676,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 17,
+  "title": "Shinobu Time - Part 4",
+  "airDate": "2013-11-17",
+  "airDateUtc": "2013-11-17T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 43,
+  "sceneAbsoluteEpisodeNumber": 17,
+  "sceneEpisodeNumber": 17,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54128
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4676677,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 18,
+  "title": "Hitagi End - Part 1",
+  "airDate": "2013-11-24",
+  "airDateUtc": "2013-11-24T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 44,
+  "sceneAbsoluteEpisodeNumber": 18,
+  "sceneEpisodeNumber": 18,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54129
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4676678,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 19,
+  "title": "Hitagi End - Part 2",
+  "airDate": "2013-12-01",
+  "airDateUtc": "2013-12-01T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 45,
+  "sceneAbsoluteEpisodeNumber": 19,
+  "sceneEpisodeNumber": 19,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54130
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4676679,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 20,
+  "title": "Hitagi End - Part 3",
+  "airDate": "2013-12-08",
+  "airDateUtc": "2013-12-08T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 46,
+  "sceneAbsoluteEpisodeNumber": 20,
+  "sceneEpisodeNumber": 20,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54131
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4714691,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 21,
+  "title": "Hitagi End - Part 4",
+  "airDate": "2013-12-15",
+  "airDateUtc": "2013-12-15T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 47,
+  "sceneAbsoluteEpisodeNumber": 21,
+  "sceneEpisodeNumber": 21,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54132
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4714694,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 22,
+  "title": "Hitagi End - Part 5",
+  "airDate": "2013-12-22",
+  "airDateUtc": "2013-12-22T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 48,
+  "sceneAbsoluteEpisodeNumber": 22,
+  "sceneEpisodeNumber": 22,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54133
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4732908,
+  "episodeFileId": 0,
+  "seasonNumber": 3,
+  "episodeNumber": 23,
+  "title": "Hitagi End - Part 6",
+  "airDate": "2013-12-29",
+  "airDateUtc": "2013-12-29T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 49,
+  "sceneAbsoluteEpisodeNumber": 23,
+  "sceneEpisodeNumber": 23,
+  "sceneSeasonNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 54134
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5276091,
+  "episodeFileId": 423449,
+  "seasonNumber": 4,
+  "episodeNumber": 1,
+  "title": "Ougi Formula - Parts 1 & 2",
+  "airDate": "2015-10-04",
+  "airDateUtc": "2015-10-04T12:30:00Z",
+  "runtime": 50,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 4,
+   "relativePath": "Season 04/Monogatari (2009) - S04E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 04/Monogatari (2009) - S04E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1705643921,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:15",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423449
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 50,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54135
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5325616,
+  "episodeFileId": 423452,
+  "seasonNumber": 4,
+  "episodeNumber": 2,
+  "title": "Sodachi Riddle - Part 1",
+  "airDate": "2015-10-11",
+  "airDateUtc": "2015-10-11T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 4,
+   "relativePath": "Season 04/Monogatari (2009) - S04E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 04/Monogatari (2009) - S04E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2466648482,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "23:47",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423452
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 51,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54136
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5325617,
+  "episodeFileId": 423458,
+  "seasonNumber": 4,
+  "episodeNumber": 3,
+  "title": "Sodachi Riddle - Part 2",
+  "airDate": "2015-10-18",
+  "airDateUtc": "2015-10-18T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 4,
+   "relativePath": "Season 04/Monogatari (2009) - S04E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 04/Monogatari (2009) - S04E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2645079336,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:51",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423458
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 52,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54137
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5325618,
+  "episodeFileId": 423464,
+  "seasonNumber": 4,
+  "episodeNumber": 4,
+  "title": "Sodachi Lost - Part 1",
+  "airDate": "2015-10-25",
+  "airDateUtc": "2015-10-25T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 4,
+   "relativePath": "Season 04/Monogatari (2009) - S04E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 04/Monogatari (2009) - S04E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2817970963,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "31:04",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423464
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 53,
+  "sceneAbsoluteEpisodeNumber": 4,
+  "sceneEpisodeNumber": 4,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54138
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5325619,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 5,
+  "title": "Sodachi Lost - Part 2",
+  "airDate": "2015-11-01",
+  "airDateUtc": "2015-11-01T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 54,
+  "sceneAbsoluteEpisodeNumber": 5,
+  "sceneEpisodeNumber": 5,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54139
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356170,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 6,
+  "title": "Sodachi Lost - Part 3",
+  "airDate": "2015-11-08",
+  "airDateUtc": "2015-11-08T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 55,
+  "sceneAbsoluteEpisodeNumber": 6,
+  "sceneEpisodeNumber": 6,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54140
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356171,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 7,
+  "title": "Shinobu Mail - Part 1",
+  "airDate": "2015-11-15",
+  "airDateUtc": "2015-11-15T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 56,
+  "sceneAbsoluteEpisodeNumber": 7,
+  "sceneEpisodeNumber": 7,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54141
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356172,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 8,
+  "title": "Shinobu Mail - Part 2",
+  "airDate": "2015-11-22",
+  "airDateUtc": "2015-11-22T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 57,
+  "sceneAbsoluteEpisodeNumber": 8,
+  "sceneEpisodeNumber": 8,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54142
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356173,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 9,
+  "title": "Shinobu Mail - Part 3",
+  "airDate": "2015-11-29",
+  "airDateUtc": "2015-11-29T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 58,
+  "sceneAbsoluteEpisodeNumber": 9,
+  "sceneEpisodeNumber": 9,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54143
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356174,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 10,
+  "title": "Shinobu Mail - Part 4",
+  "airDate": "2015-12-06",
+  "airDateUtc": "2015-12-06T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 59,
+  "sceneAbsoluteEpisodeNumber": 10,
+  "sceneEpisodeNumber": 10,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54144
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356176,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 11,
+  "title": "Shinobu Mail - Part 5",
+  "airDate": "2015-12-13",
+  "airDateUtc": "2015-12-13T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 60,
+  "sceneAbsoluteEpisodeNumber": 11,
+  "sceneEpisodeNumber": 11,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54145
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356177,
+  "episodeFileId": 0,
+  "seasonNumber": 4,
+  "episodeNumber": 12,
+  "title": "Shinobu Mail - Part 6",
+  "airDate": "2015-12-20",
+  "airDateUtc": "2015-12-20T12:30:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 61,
+  "sceneAbsoluteEpisodeNumber": 12,
+  "sceneEpisodeNumber": 12,
+  "sceneSeasonNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 54146
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6253102,
+  "episodeFileId": 423447,
+  "seasonNumber": 5,
+  "episodeNumber": 1,
+  "title": "Mayoi Hell - Part 1",
+  "airDate": "2017-08-12",
+  "airDateUtc": "2017-08-12T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 5,
+   "relativePath": "Season 05/Monogatari (2009) - S05E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 05/Monogatari (2009) - S05E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1753343652,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:50",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423447
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 62,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54147
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6277681,
+  "episodeFileId": 423454,
+  "seasonNumber": 5,
+  "episodeNumber": 2,
+  "title": "Mayoi Hell - Part 2",
+  "airDate": "2017-08-12",
+  "airDateUtc": "2017-08-12T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 5,
+   "relativePath": "Season 05/Monogatari (2009) - S05E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 05/Monogatari (2009) - S05E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1824244641,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:56",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423454
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 63,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54148
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6253103,
+  "episodeFileId": 423461,
+  "seasonNumber": 5,
+  "episodeNumber": 3,
+  "title": "Hitagi Rendezvous - Part 1",
+  "airDate": "2017-08-12",
+  "airDateUtc": "2017-08-12T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 5,
+   "relativePath": "Season 05/Monogatari (2009) - S05E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 05/Monogatari (2009) - S05E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1923837455,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:40",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423461
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 64,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54149
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6277689,
+  "episodeFileId": 423467,
+  "seasonNumber": 5,
+  "episodeNumber": 4,
+  "title": "Hitagi Rendezvous - Part 2",
+  "airDate": "2017-08-12",
+  "airDateUtc": "2017-08-12T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 5,
+   "relativePath": "Season 05/Monogatari (2009) - S05E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 05/Monogatari (2009) - S05E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1360684974,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:59",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423467
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 65,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54150
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6277745,
+  "episodeFileId": 423469,
+  "seasonNumber": 5,
+  "episodeNumber": 5,
+  "title": "Ougi Dark - Part 1",
+  "airDate": "2017-08-13",
+  "airDateUtc": "2017-08-13T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 5,
+   "relativePath": "Season 05/Monogatari (2009) - S05E05 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 05/Monogatari (2009) - S05E05 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2369001404,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:30",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423469
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 66,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54151
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6277744,
+  "episodeFileId": 0,
+  "seasonNumber": 5,
+  "episodeNumber": 6,
+  "title": "Ougi Dark - Part 2",
+  "airDate": "2017-08-13",
+  "airDateUtc": "2017-08-13T12:55:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 67,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54152
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 6253482,
+  "episodeFileId": 0,
+  "seasonNumber": 5,
+  "episodeNumber": 7,
+  "title": "Ougi Dark - Part 3",
+  "airDate": "2017-08-13",
+  "airDateUtc": "2017-08-13T13:20:00Z",
+  "runtime": 25,
+  "finaleType": "series",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 68,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 54153
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 3406651,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 1,
+  "title": "Episode 5.5 (Recap)",
+  "airDate": "2009-08-07",
+  "airDateUtc": "2009-08-07T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54154
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4139150,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 2,
+  "title": "Kizumonogatari I: Iron Blood Arc",
+  "airDate": "2016-01-08",
+  "airDateUtc": "2016-01-08T12:30:00Z",
+  "runtime": 64,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54155
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4450835,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 3,
+  "title": "Tsubasa Family - Part 1",
+  "airDate": "2012-12-31",
+  "airDateUtc": "2012-12-31T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54156
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4450836,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 4,
+  "title": "Tsubasa Family - Part 2",
+  "airDate": "2012-12-31",
+  "airDateUtc": "2012-12-31T12:55:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54157
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4450837,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 5,
+  "title": "Tsubasa Family - Part 3",
+  "airDate": "2012-12-31",
+  "airDateUtc": "2012-12-31T13:20:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54158
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4450838,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 6,
+  "title": "Tsubasa Family - Part 4",
+  "airDate": "2012-12-31",
+  "airDateUtc": "2012-12-31T13:45:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54159
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4632072,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 7,
+  "title": "Summary I",
+  "airDate": "2013-08-11",
+  "airDateUtc": "2013-08-11T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54160
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4653110,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 8,
+  "title": "Summary II",
+  "airDate": "2013-09-15",
+  "airDateUtc": "2013-09-15T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54161
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4664003,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 9,
+  "title": "Summary III",
+  "airDate": "2013-10-20",
+  "airDateUtc": "2013-10-20T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54162
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4653123,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 10,
+  "title": "Suruga Devil - Part 1",
+  "airDate": "2014-08-16",
+  "airDateUtc": "2014-08-16T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54163
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4834515,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 11,
+  "title": "Suruga Devil - Part 2",
+  "airDate": "2014-08-16",
+  "airDateUtc": "2014-08-16T12:55:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54164
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4834516,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 12,
+  "title": "Suruga Devil - Part 3",
+  "airDate": "2014-08-16",
+  "airDateUtc": "2014-08-16T13:20:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54165
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4834517,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 13,
+  "title": "Suruga Devil - Part 4",
+  "airDate": "2014-08-16",
+  "airDateUtc": "2014-08-16T13:45:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54166
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 4834518,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 14,
+  "title": "Suruga Devil - Part 5",
+  "airDate": "2014-08-16",
+  "airDateUtc": "2014-08-16T14:10:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54167
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5020935,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 15,
+  "title": "Yotsugi Doll - Part 1",
+  "airDate": "2014-12-31",
+  "airDateUtc": "2014-12-31T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54168
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5087115,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 16,
+  "title": "Yotsugi Doll - Part 2",
+  "airDate": "2014-12-31",
+  "airDateUtc": "2014-12-31T12:55:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54169
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5087116,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 17,
+  "title": "Yotsugi Doll - Part 3",
+  "airDate": "2014-12-31",
+  "airDateUtc": "2014-12-31T13:20:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54170
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5087117,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 18,
+  "title": "Yotsugi Doll - Part 4",
+  "airDate": "2014-12-31",
+  "airDateUtc": "2014-12-31T13:45:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54171
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356163,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 19,
+  "title": "Kizumonogatari II: Passionate Blood Arc",
+  "airDate": "2016-08-19",
+  "airDateUtc": "2016-08-19T12:30:00Z",
+  "runtime": 68,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54172
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5356165,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 20,
+  "title": "Kizumonogatari III: Cold Blood Arc",
+  "airDate": "2017-01-06",
+  "airDateUtc": "2017-01-06T12:30:00Z",
+  "runtime": 82,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54173
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5442151,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 21,
+  "title": "Koyomi Stone",
+  "airDate": "2016-01-09",
+  "airDateUtc": "2016-01-09T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54174
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5474009,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 22,
+  "title": "Koyomi Flower",
+  "airDate": "2016-01-16",
+  "airDateUtc": "2016-01-16T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54175
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5483454,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 23,
+  "title": "Koyomi Sand",
+  "airDate": "2016-01-23",
+  "airDateUtc": "2016-01-23T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54176
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484971,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 24,
+  "title": "Koyomi Water",
+  "airDate": "2016-01-30",
+  "airDateUtc": "2016-01-30T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54177
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484972,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 25,
+  "title": "Koyomi Wind",
+  "airDate": "2016-02-06",
+  "airDateUtc": "2016-02-06T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54178
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484973,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 26,
+  "title": "Koyomi Tree",
+  "airDate": "2016-02-13",
+  "airDateUtc": "2016-02-13T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54179
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484974,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 27,
+  "title": "Koyomi Tea",
+  "airDate": "2016-02-20",
+  "airDateUtc": "2016-02-20T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54180
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484976,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 28,
+  "title": "Koyomi Mountain",
+  "airDate": "2016-02-27",
+  "airDateUtc": "2016-02-27T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54181
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484977,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 29,
+  "title": "Koyomi Torus",
+  "airDate": "2016-03-05",
+  "airDateUtc": "2016-03-05T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54182
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484978,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 30,
+  "title": "Koyomi Seed",
+  "airDate": "2016-03-12",
+  "airDateUtc": "2016-03-12T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54183
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484979,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 31,
+  "title": "Koyomi Nothing",
+  "airDate": "2016-03-19",
+  "airDateUtc": "2016-03-19T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54184
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 5484980,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 32,
+  "title": "Koyomi Dead",
+  "airDate": "2016-03-26",
+  "airDateUtc": "2016-03-26T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54185
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7110187,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 33,
+  "title": "Koyomi Reverse - Part 1",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54186
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7111621,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 34,
+  "title": "Koyomi Reverse - Part 2",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T12:55:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54187
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7111624,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 35,
+  "title": "Koyomi Reverse - Part 3",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T13:20:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54188
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7111625,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 36,
+  "title": "Koyomi Reverse - Part 4",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T13:45:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54189
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7111626,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 37,
+  "title": "Koyomi Reverse - Part 5",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T14:10:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54190
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 7111627,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 38,
+  "title": "Koyomi Reverse - Part 6",
+  "airDate": "2018-11-10",
+  "airDateUtc": "2018-11-10T14:35:00Z",
+  "runtime": 25,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 54191
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601303,
+  "episodeFileId": 423450,
+  "seasonNumber": 6,
+  "episodeNumber": 1,
+  "title": "OROKAMONOGATARI: Tsukihi Undo",
+  "airDate": "2024-09-29",
+  "airDateUtc": "2024-09-29T12:30:00Z",
+  "runtime": 32,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 6,
+   "relativePath": "Season 06/Monogatari (2009) - S06E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 06/Monogatari (2009) - S06E01 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1585964520,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:29",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423450
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 69,
+  "sceneAbsoluteEpisodeNumber": 1,
+  "sceneEpisodeNumber": 1,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108740
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601304,
+  "episodeFileId": 423456,
+  "seasonNumber": 6,
+  "episodeNumber": 2,
+  "title": "NADEMONOGATARI: Nadeko Draw (1)",
+  "airDate": "2024-10-06",
+  "airDateUtc": "2024-10-06T12:30:00Z",
+  "runtime": 24,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 6,
+   "relativePath": "Season 06/Monogatari (2009) - S06E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 06/Monogatari (2009) - S06E02 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 1658763838,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "24:57",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423456
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 70,
+  "sceneAbsoluteEpisodeNumber": 2,
+  "sceneEpisodeNumber": 2,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108741
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601305,
+  "episodeFileId": 423459,
+  "seasonNumber": 6,
+  "episodeNumber": 3,
+  "title": "NADEMONOGATARI: Nadeko Draw (2)",
+  "airDate": "2024-10-13",
+  "airDateUtc": "2024-10-13T12:30:00Z",
+  "runtime": 24,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 6,
+   "relativePath": "Season 06/Monogatari (2009) - S06E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 06/Monogatari (2009) - S06E03 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2282902388,
+   "dateAdded": "2026-01-29T22:17:19Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "25:02",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423459
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 71,
+  "sceneAbsoluteEpisodeNumber": 3,
+  "sceneEpisodeNumber": 3,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108742
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601306,
+  "episodeFileId": 423465,
+  "seasonNumber": 6,
+  "episodeNumber": 4,
+  "title": "NADEMONOGATARI: Nadeko Draw (3)",
+  "airDate": "2024-10-20",
+  "airDateUtc": "2024-10-20T12:30:00Z",
+  "runtime": 25,
+  "episodeFile": {
+   "seriesId": 697,
+   "seasonNumber": 6,
+   "relativePath": "Season 06/Monogatari (2009) - S06E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "path": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 06/Monogatari (2009) - S06E04 [Bluray-1080p][Opus 2.0][JA][x265 10bit]-smol.mkv",
+   "size": 2151484202,
+   "dateAdded": "2026-01-29T22:17:20Z",
+   "releaseGroup": "smol",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 253,
+     "name": "10bit"
+    },
+    {
+     "id": 257,
+     "name": "Anime BD Tier 01"
+    },
+    {
+     "id": 395,
+     "name": "SeaDex (best)"
+    },
+    {
+     "id": 336,
+     "name": "x265 (HD)"
+    }
+   ],
+   "customFormatScore": 3025,
+   "indexerFlags": 80,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 2,
+    "audioCodec": "Opus",
+    "audioLanguages": "jpn/jpn",
+    "audioStreamCount": 2,
+    "videoBitDepth": 10,
+    "videoBitrate": 0,
+    "videoCodec": "x265",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "26:26",
+    "scanType": "Progressive",
+    "subtitles": "eng/enm/eng"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 423465
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 72,
+  "sceneAbsoluteEpisodeNumber": 4,
+  "sceneEpisodeNumber": 4,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108743
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601320,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 5,
+  "title": "NADEMONOGATARI: Nadeko Draw (4)",
+  "airDate": "2024-10-27",
+  "airDateUtc": "2024-10-27T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 73,
+  "sceneAbsoluteEpisodeNumber": 5,
+  "sceneEpisodeNumber": 5,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108744
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601321,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 6,
+  "title": "NADEMONOGATARI: Nadeko Draw (5)",
+  "airDate": "2024-11-03",
+  "airDateUtc": "2024-11-03T12:30:00Z",
+  "runtime": 27,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 74,
+  "sceneAbsoluteEpisodeNumber": 6,
+  "sceneEpisodeNumber": 6,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108745
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601322,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 7,
+  "title": "WAZAMONOGATARI: Acerola Bon Appétit (1)",
+  "airDate": "2024-11-10",
+  "airDateUtc": "2024-11-10T12:30:00Z",
+  "runtime": 24,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 75,
+  "sceneAbsoluteEpisodeNumber": 7,
+  "sceneEpisodeNumber": 7,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108746
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601323,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 8,
+  "title": "WAZAMONOGATARI: Acerola Bon Appétit (2)",
+  "airDate": "2024-11-17",
+  "airDateUtc": "2024-11-17T12:30:00Z",
+  "runtime": 24,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 76,
+  "sceneAbsoluteEpisodeNumber": 8,
+  "sceneEpisodeNumber": 8,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108747
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601324,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 9,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (1)",
+  "airDate": "2024-11-24",
+  "airDateUtc": "2024-11-24T12:30:00Z",
+  "runtime": 24,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 77,
+  "sceneAbsoluteEpisodeNumber": 9,
+  "sceneEpisodeNumber": 9,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108748
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601325,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 10,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (2)",
+  "airDate": "2024-12-01",
+  "airDateUtc": "2024-12-01T12:30:00Z",
+  "runtime": 24,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 78,
+  "sceneAbsoluteEpisodeNumber": 10,
+  "sceneEpisodeNumber": 10,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108749
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601326,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 11,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (3)",
+  "airDate": "2024-12-08",
+  "airDateUtc": "2024-12-08T12:30:00Z",
+  "runtime": 24,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 79,
+  "sceneAbsoluteEpisodeNumber": 11,
+  "sceneEpisodeNumber": 11,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108750
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601328,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 12,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (4)",
+  "airDate": "2024-12-15",
+  "airDateUtc": "2024-12-15T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 80,
+  "sceneAbsoluteEpisodeNumber": 12,
+  "sceneEpisodeNumber": 12,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108751
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601329,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 13,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (5)",
+  "airDate": "2024-12-22",
+  "airDateUtc": "2024-12-22T12:30:00Z",
+  "runtime": 25,
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 81,
+  "sceneAbsoluteEpisodeNumber": 13,
+  "sceneEpisodeNumber": 13,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108752
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10601331,
+  "episodeFileId": 0,
+  "seasonNumber": 6,
+  "episodeNumber": 14,
+  "title": "SHINOBUMONOGATARI: Shinobu Mustard (6)",
+  "airDate": "2024-12-29",
+  "airDateUtc": "2024-12-29T12:30:00Z",
+  "runtime": 26,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 82,
+  "sceneAbsoluteEpisodeNumber": 14,
+  "sceneEpisodeNumber": 14,
+  "sceneSeasonNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 108753
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 10641492,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 41,
+  "title": "A Cruel Fairy Tale: The Beautiful Princess",
+  "airDate": "2024-08-17",
+  "airDateUtc": "2024-08-17T12:30:00Z",
+  "runtime": 13,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 110576
+ },
+ {
+  "seriesId": 697,
+  "tvdbId": 11283266,
+  "episodeFileId": 0,
+  "seasonNumber": 7,
+  "episodeNumber": 1,
+  "title": "WAZAMONOGATARI: Karen Ogre",
+  "runtime": 0,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 141841
+ }
+]

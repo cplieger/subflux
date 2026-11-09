@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/mediasource"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -49,12 +50,16 @@ func (m *Mode) UnmarshalText(b []byte) error {
 }
 
 // Registries lists the adapter kinds each hand-walked section accepts.
-type Registries struct{}
+type Registries struct {
+	Sources []mediasource.AdapterKind
+}
 
 // Active is a configuration that parsed, one field per section.
 type Active struct {
 	Languages language.Policy
 	Server    Server
+	Sources   []mediasource.Config
+	Scan      mediasource.Schedule
 }
 
 // Snapshot is one immutable reading of the file. Only Load and Service.Save
@@ -63,7 +68,6 @@ type Active struct {
 type Snapshot struct{ p *snapshot }
 
 type snapshot struct {
-	active Active
 	// server is the section in force; serverOK is false only in Failed when
 	// the section's own parse failed, and server is then its fail-closed value.
 	server Server
@@ -73,6 +77,7 @@ type snapshot struct {
 	revision  string
 	failure   []formschema.FieldError
 	file      fileState
+	active    Active
 	mode      Mode
 	serverOK  bool
 }

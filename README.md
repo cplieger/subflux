@@ -72,15 +72,14 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
-| `sonarr.api_key`, `radarr.api_key` | required | The API key from the General page of that app's Settings |
+| `sources[]` | _(none)_ | The Sonarr and Radarr instances to read, at most 16, each with an `id`, a `type` (`sonarr` or `radarr`), its `url` and its `api_key` |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
 | `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
-| `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
-| `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |
+| `scan.change_interval` | `30s` | How often subflux checks each source for new imports |
+| `scan.whole_interval` | `24h` | Time between the end of one full library scan and the start of the next |
 | `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
-| `search.exclude_arr_tags` | `no-subflux` | Sonarr or Radarr tags whose shows and movies subflux skips |
+| `sources[].exclude_tags[]` | `[no-subflux]` | Tags whose shows and movies subflux skips |
 | `post_processing.audio_sync_fallback` | `false` | Re-time against the audio when the video has no subtitle track to compare with |
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
 | `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |

@@ -1,0 +1,266 @@
+[
+ {
+  "episodeId": 21606,
+  "seriesId": 254,
+  "sourceTitle": "Shoah.S01E01.1080p.WEB-DL.GROUP1.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 456,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T03:13:25Z",
+  "downloadId": "download-1",
+  "eventType": "grabbed",
+  "data": {
+   "indexer": "indexer-1",
+   "nzbInfoUrl": "https://indexer.example/details/guid-1",
+   "releaseGroup": "GROUP1",
+   "age": "0",
+   "ageHours": "0.15007130147222222",
+   "ageMinutes": "9.004280353333334",
+   "publishedDate": "2026-10-24T03:04:25Z",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "size": "1502890370",
+   "guid": "guid-1",
+   "tvdbId": "396113",
+   "tvRageId": "0",
+   "imdbId": "tt0090015",
+   "protocol": "2",
+   "customFormatScore": "456",
+   "seriesMatchType": "Title",
+   "releaseSource": "Rss",
+   "indexerFlags": "Freeleech, Internal",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961283
+ },
+ {
+  "episodeId": 21606,
+  "seriesId": 254,
+  "sourceTitle": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E01 [WEBDL-1080p]-GROUP2.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 406,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T03:14:00Z",
+  "eventType": "episodeFileDeleted",
+  "data": {
+   "reason": "Upgrade",
+   "releaseGroup": "GROUP2",
+   "size": "1472489192",
+   "indexerFlags": "Freeleech",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961284
+ },
+ {
+  "episodeId": 21606,
+  "seriesId": 254,
+  "sourceTitle": "Shoah.S01E01.1080p.WEB-DL.GROUP1",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 456,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T03:14:00Z",
+  "downloadId": "download-1",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "453679",
+   "droppedPath": "/downloads/complete/Shoah.S01E01.1080p.WEB-DL.GROUP1.mkv",
+   "importedPath": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E01 [WEBDL-1080p]-GROUP1.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP1",
+   "customFormatScore": "456",
+   "size": "1502890370",
+   "indexerFlags": "Freeleech, Internal",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961285
+ },
+ {
+  "episodeId": 180639,
+  "seriesId": 2188,
+  "sourceTitle": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 [WEBDL-1080p]-GROUP3.mkv",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   },
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 329,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T09:20:00Z",
+  "eventType": "episodeFileDeleted",
+  "data": {
+   "reason": "Upgrade",
+   "releaseGroup": "GROUP3",
+   "size": "942424971",
+   "indexerFlags": "Freeleech",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961373
+ },
+ {
+  "episodeId": 180639,
+  "seriesId": 2188,
+  "sourceTitle": "Firefly.S01E01.1080p.WEB-DL.GROUP1",
+  "languages": [
+   {
+    "id": 8,
+    "name": "Japanese"
+   },
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 479,
+  "qualityCutoffNotMet": true,
+  "date": "2026-10-24T09:20:00Z",
+  "downloadId": "download-2",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "453680",
+   "droppedPath": "/downloads/complete/Firefly.S01E01.1080p.WEB-DL.GROUP1.mkv",
+   "importedPath": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 [WEBDL-1080p]-GROUP1.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP1",
+   "customFormatScore": "479",
+   "size": "966964024",
+   "indexerFlags": "Freeleech, Internal",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961374
+ },
+ {
+  "episodeId": 180653,
+  "seriesId": 2189,
+  "sourceTitle": "Monogatari.S01E01.1080p.WEB-DL.GROUP4",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 3583,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-24T10:12:00Z",
+  "downloadId": "download-3",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "453681",
+   "droppedPath": "/downloads/complete/Monogatari.S01E01.1080p.WEB-DL.GROUP4.mkv",
+   "importedPath": "/media/anime/Monogatari (2009) {imdb-tt1480925}/Season 01/Monogatari (2009) - S01E01 [WEBDL-1080p]-GROUP4.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP4",
+   "customFormatScore": "3583",
+   "size": "3823853595",
+   "indexerFlags": "Freeleech, Internal",
+   "releaseType": "SingleEpisode"
+  },
+  "id": 961379
+ }
+]

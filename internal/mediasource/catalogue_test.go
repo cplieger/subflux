@@ -58,6 +58,12 @@ func TestReorderedFromMovedNotListing(t *testing.T) {
 	}
 }
 
+// checkCatalogue and checkTitles answer the refusal RootEvidence.Validate
+// gives for c's or s's own rules.
+func checkCatalogue(c Catalogue) error { return refusal(c.validate()) }
+
+func checkTitles(s TitleSet) error { return refusal(s.validate()) }
+
 func TestMovedCountsRegularEpisodes(t *testing.T) {
 	c := catalogue(6, dvd([]Place{
 		{Season: 1, Episode: 2, Listed: true}, // moved
@@ -101,10 +107,10 @@ func TestPlaceParallelToEpisodes(t *testing.T) {
 		t.Run("refuses "+name, func(t *testing.T) {
 			c := catalogue(3, dvd(listed(3)))
 			mutate(&c)
-			if err := c.Validate(); err == nil {
-				t.Errorf("Validate() = nil; want a refusal")
+			if err := checkCatalogue(c); err == nil {
+				t.Errorf("validate() = nil; want a refusal")
 			} else if !strings.HasPrefix(err.Error(), "mediasource: ") || strings.Contains(err.Error(), "\n") {
-				t.Errorf("Validate() = %q; want one plain line", err)
+				t.Errorf("validate() = %q; want one plain line", err)
 			}
 		})
 	}
@@ -112,12 +118,12 @@ func TestPlaceParallelToEpisodes(t *testing.T) {
 		c := catalogue(3, dvd([]Place{{Season: 65535, Episode: 0, Listed: true}, {}, {Season: 0, Episode: 65535, Listed: true}}))
 		c.Episodes[2].ID = 1<<53 - 1
 		c.Episodes[1].AirDate = ""
-		if err := c.Validate(); err != nil {
-			t.Errorf("Validate() = %v", err)
+		if err := checkCatalogue(c); err != nil {
+			t.Errorf("validate() = %v", err)
 		}
 	})
 	t.Run("accepts no order but the aired one", func(t *testing.T) {
-		if err := catalogue(3).Validate(); err != nil {
+		if err := checkCatalogue(catalogue(3)); err != nil {
 			t.Errorf("Validate() = %v", err)
 		}
 	})
@@ -142,14 +148,14 @@ func TestPlaceParallelToEpisodes(t *testing.T) {
 	}
 	for name, s := range refusedTitles {
 		t.Run("title set refuses "+name, func(t *testing.T) {
-			if err := s.Validate(); err == nil {
-				t.Errorf("Validate() = nil; want a refusal")
+			if err := checkTitles(s); err == nil {
+				t.Errorf("validate() = nil; want a refusal")
 			}
 		})
 	}
 	t.Run("title set accepts ascending ids and an empty 404", func(t *testing.T) {
 		for _, s := range []TitleSet{titles(true, 101, 102, 1<<53-1), titles(false)} {
-			if err := s.Validate(); err != nil {
+			if err := checkTitles(s); err != nil {
 				t.Errorf("Validate(%+v) = %v", s, err)
 			}
 		}
@@ -166,10 +172,10 @@ func TestExtraPlacesValidated(t *testing.T) {
 	for i := range 9 {
 		nine = append(nine, ExtraPlace{Season: 1 + i/4, Episode: 10 + i%4, AirDate: "2005-03-24"})
 	}
-	if err := office(nine...).Validate(); err != nil {
+	if err := checkCatalogue(office(nine...)); err != nil {
 		t.Errorf("The Office's 9 DVD-only episodes: Validate() = %v", err)
 	}
-	if err := office(ExtraPlace{Season: 2, Episode: 1}, ExtraPlace{Season: 2, Episode: 1}).Validate(); err != nil {
+	if err := checkCatalogue(office(ExtraPlace{Season: 2, Episode: 1}, ExtraPlace{Season: 2, Episode: 1})); err != nil {
 		t.Errorf("two extras at one place: Validate() = %v", err)
 	}
 	refused := map[string][]ExtraPlace{
@@ -181,8 +187,8 @@ func TestExtraPlacesValidated(t *testing.T) {
 	}
 	for name, extra := range refused {
 		t.Run("refuses "+name, func(t *testing.T) {
-			if err := office(extra...).Validate(); err == nil {
-				t.Errorf("Validate() = nil; want a refusal")
+			if err := checkCatalogue(office(extra...)); err == nil {
+				t.Errorf("validate() = nil; want a refusal")
 			}
 		})
 	}
@@ -250,7 +256,7 @@ func TestRootEvidenceValidated(t *testing.T) {
 	for name, r := range refused {
 		t.Run("refuses "+name, func(t *testing.T) {
 			if err := r.Validate(); err == nil {
-				t.Errorf("Validate() = nil; want a refusal")
+				t.Errorf("validate() = nil; want a refusal")
 			}
 		})
 	}

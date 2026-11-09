@@ -41,9 +41,9 @@ type Service struct {
 	closing chan struct{}
 	drained chan struct{}
 	path    string
+	r       Registries
 	// seen is the file as this service last read or wrote it; slot guards it.
 	seen      fileState
-	r         Registries
 	closeOnce sync.Once
 	drainOnce sync.Once
 	diverged  atomic.Bool

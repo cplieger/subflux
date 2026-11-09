@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cplieger/subflux/internal/media"
 )
 
 // JobID is a job's opaque id: the 32 lowercase hex digits Begin assigns.
@@ -77,6 +79,8 @@ type Job struct {
 	Scope   string
 	Phase   string
 	Cause   string
+	// Source is the media source a scan job reads, "" for every other job.
+	Source media.SourceID
 	// Owner is the starting principal's user ID, BypassOwner for the bypass
 	// principal, SystemOwner only for scheduled work (OwnerOf).
 	Owner       int64

@@ -13,9 +13,6 @@ func TestParseScheduleBounds(t *testing.T) {
 	if got, errs := mediasource.ParseSchedule(nil); got != want || errs != nil {
 		t.Errorf("absent section = %+v %v, want %+v", got, errs, want)
 	}
-	if mediasource.DefaultSchedule != want {
-		t.Errorf("DefaultSchedule = %+v, want %+v", mediasource.DefaultSchedule, want)
-	}
 	ok := map[string]mediasource.Schedule{
 		"change_interval: 10s":                    {Change: 10 * time.Second, Whole: 24 * time.Hour},
 		"change_interval: 1h\nwhole_interval: 1h": {Change: time.Hour, Whole: time.Hour},

@@ -80,8 +80,7 @@ func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 		}
 	}
 	got, gotStatus := make(chan *settings.Service, 1), make(chan *status.Store, 1)
-	shorten(t, &statusBuilt, func(s *status.Store) { gotStatus <- s })
-	cfg := Config{Paths: b.paths, LogOutput: io.Discard, Settings: func(s *settings.Service) { got <- s }}
+	cfg := Config{Paths: b.paths, LogOutput: io.Discard, Settings: func(s *settings.Service) { got <- s }, Status: func(s *status.Store) { gotStatus <- s }}
 	if cfg.Listener == nil {
 		ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 		if err != nil {

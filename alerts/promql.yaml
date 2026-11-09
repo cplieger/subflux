@@ -85,6 +85,24 @@ groups:
           description: >
             subflux has not reached this Sonarr or Radarr instance for 15m.
             Check its address, its API key and the network.
+      # Each source is compared with its own instance's full scan interval,
+      # so one Prometheus scraping several subflux instances judges each by
+      # its own setting. A source's series starts at its scan loop's start,
+      # so a source that never completes a full scan fires too.
+      - alert: SubfluxScanStalled
+        expr: >
+          (time() - subflux_scan_last_complete_timestamp_seconds)
+          > on(job, instance) group_left()
+          (2 * subflux_scan_whole_interval_seconds)
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux has not completed a full scan of {{ $labels.source }}"
+          description: >
+            No full scan of this media source has completed in over two full
+            scan intervals. The source may be failing every scan, or a scan
+            may be stuck. The subflux log names the error.
       - alert: SubfluxStoreWriteFailing
         expr: subflux_alerts_active{kind="store"} == 1
         for: 5m

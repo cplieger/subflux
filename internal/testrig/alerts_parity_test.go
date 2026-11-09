@@ -39,7 +39,7 @@ var alertParity = []parityRow{
 	{old: "SubfluxProviderCredentialsRejected", successor: "SubfluxProviderUnusable", dropped: "the AniDB client-key setting arm: the setting is deleted"},
 	{old: "SubfluxMediaUnavailable", successor: "SubfluxMediaUnavailable"},
 	{old: "SubfluxMediaUnwritable", removal: "folder level: each video's write problem is reported on its own; the root level is SubfluxMediaUnavailable"},
-	{old: "SubfluxScanStalled", pending: "MS2-15"},
+	{old: "SubfluxScanStalled", successor: "SubfluxScanStalled"},
 	{old: "SubfluxBackupStale", pending: "PA2-5"},
 }
 

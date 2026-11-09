@@ -1,0 +1,111 @@
+{
+ "title": "Firefly",
+ "alternateTitles": [
+  {
+   "title": "Firefly - Der Aufbruch der Serenity",
+   "seasonNumber": -1
+  }
+ ],
+ "sortTitle": "firefly",
+ "status": "ended",
+ "ended": true,
+ "network": "FOX",
+ "images": [
+  {
+   "coverType": "banner",
+   "url": "/MediaCover/133/banner.jpg?lastWrite=638275700600492574",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/graphical/7097-g.jpg"
+  },
+  {
+   "coverType": "poster",
+   "url": "/MediaCover/133/poster.jpg?lastWrite=638275700611012664",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/posters/78874-2.jpg"
+  },
+  {
+   "coverType": "fanart",
+   "url": "/MediaCover/133/fanart.jpg?lastWrite=638275700611612670",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/fanart/original/78874-5.jpg"
+  },
+  {
+   "coverType": "clearlogo",
+   "url": "/MediaCover/133/clearlogo.png?lastWrite=638317160751581293",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/v4/series/78874/clearlogo/611b6261b69a7.png"
+  }
+ ],
+ "originalLanguage": {
+  "id": 1,
+  "name": "English"
+ },
+ "seasons": [
+  {
+   "seasonNumber": 0,
+   "monitored": false,
+   "statistics": {
+    "episodeFileCount": 0,
+    "episodeCount": 0,
+    "totalEpisodeCount": 6,
+    "sizeOnDisk": 0,
+    "releaseGroups": [],
+    "percentOfEpisodes": 0
+   }
+  },
+  {
+   "seasonNumber": 1,
+   "monitored": false,
+   "statistics": {
+    "episodeFileCount": 14,
+    "episodeCount": 14,
+    "totalEpisodeCount": 14,
+    "sizeOnDisk": 39738721787,
+    "releaseGroups": [
+     "FLUX"
+    ],
+    "percentOfEpisodes": 100
+   }
+  }
+ ],
+ "year": 2002,
+ "path": "/media/tv/Firefly (2002) {imdb-tt0303461}",
+ "qualityProfileId": 10,
+ "seasonFolder": true,
+ "monitored": false,
+ "monitorNewItems": "all",
+ "useSceneNumbering": false,
+ "runtime": 48,
+ "tvdbId": 78874,
+ "tvRageId": 3548,
+ "tvMazeId": 180,
+ "tmdbId": 1437,
+ "firstAired": "2002-09-20T00:00:00Z",
+ "lastAired": "2003-07-28T00:00:00Z",
+ "seriesType": "standard",
+ "cleanTitle": "firefly",
+ "imdbId": "tt0303461",
+ "titleSlug": "firefly",
+ "rootFolderPath": "/media/tv",
+ "certification": "TV-14",
+ "genres": [
+  "Adventure",
+  "Drama",
+  "Science Fiction"
+ ],
+ "tags": [],
+ "added": "2022-10-04T20:15:12Z",
+ "ratings": {
+  "votes": 304848,
+  "value": 8.9
+ },
+ "statistics": {
+  "seasonCount": 1,
+  "episodeFileCount": 14,
+  "episodeCount": 14,
+  "totalEpisodeCount": 20,
+  "sizeOnDisk": 39738721787,
+  "releaseGroups": [
+   "FLUX"
+  ],
+  "percentOfEpisodes": 100
+ },
+ "languageProfileId": 1,
+ "id": 133
+}

@@ -1,0 +1,1344 @@
+[
+ {
+  "seriesId": 133,
+  "tvdbId": 415679,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 1,
+  "title": "Serenity",
+  "airDate": "2005-09-03",
+  "airDateUtc": "2005-09-03T04:00:00Z",
+  "runtime": 119,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "absoluteEpisodeNumber": 15,
+  "unverifiedSceneNumbering": false,
+  "id": 8165
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 967981,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 2,
+  "title": "Done the Impossible",
+  "airDate": "2006-07-28",
+  "airDateUtc": "2006-07-28T04:00:00Z",
+  "runtime": 45,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 8166
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 4360465,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 3,
+  "title": "Browncoats Unite",
+  "airDate": "2012-11-11",
+  "airDateUtc": "2012-11-11T05:00:00Z",
+  "runtime": 45,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 8167
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 8894465,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 4,
+  "title": "R. Tam Sessions",
+  "airDate": "2005-09-07",
+  "airDateUtc": "2005-09-07T04:00:00Z",
+  "runtime": 8,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 8168
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 9296666,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 5,
+  "title": "Here's How It Was: The Making of 'Firefly'",
+  "airDate": "2003-12-09",
+  "airDateUtc": "2003-12-09T05:00:00Z",
+  "runtime": 28,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 8169
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 9296672,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 6,
+  "title": "Serenity: The 10th Character",
+  "airDate": "2003-12-09",
+  "airDateUtc": "2003-12-09T05:48:00Z",
+  "runtime": 10,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 8170
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297989,
+  "episodeFileId": 411544,
+  "seasonNumber": 1,
+  "episodeNumber": 1,
+  "title": "The Train Job",
+  "airDate": "2002-09-20",
+  "airDateUtc": "2002-09-20T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 44,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E01 - Serenity [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 - Serenity [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 5190727203,
+   "dateAdded": "2026-01-12T01:53:16Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "1:26:42",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411544
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 2,
+  "unverifiedSceneNumbering": false,
+  "id": 8171
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297990,
+  "episodeFileId": 411545,
+  "seasonNumber": 1,
+  "episodeNumber": 2,
+  "title": "Bushwhacked",
+  "airDate": "2002-09-27",
+  "airDateUtc": "2002-09-27T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E02 - The Train Job [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E02 - The Train Job [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2557607861,
+   "dateAdded": "2026-01-12T01:53:16Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "43:21",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411545
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 3,
+  "unverifiedSceneNumbering": false,
+  "id": 8172
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297991,
+  "episodeFileId": 411546,
+  "seasonNumber": 1,
+  "episodeNumber": 3,
+  "title": "Our Mrs. Reynolds",
+  "airDate": "2002-10-04",
+  "airDateUtc": "2002-10-04T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E03 - Bushwhacked [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E03 - Bushwhacked [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2560724583,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:30",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411546
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 6,
+  "unverifiedSceneNumbering": false,
+  "id": 8173
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297992,
+  "episodeFileId": 411547,
+  "seasonNumber": 1,
+  "episodeNumber": 4,
+  "title": "Jaynestown",
+  "airDate": "2002-10-18",
+  "airDateUtc": "2002-10-18T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E04 - Shindig [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E04 - Shindig [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2591894068,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:35",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411547
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 7,
+  "unverifiedSceneNumbering": false,
+  "id": 8174
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297993,
+  "episodeFileId": 411548,
+  "seasonNumber": 1,
+  "episodeNumber": 5,
+  "title": "Out of Gas",
+  "airDate": "2002-10-25",
+  "airDateUtc": "2002-10-25T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E05 - Safe [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E05 - Safe [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2713150198,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:34",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411548
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 8,
+  "unverifiedSceneNumbering": false,
+  "id": 8175
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297994,
+  "episodeFileId": 411549,
+  "seasonNumber": 1,
+  "episodeNumber": 6,
+  "title": "Shindig",
+  "airDate": "2002-11-01",
+  "airDateUtc": "2002-11-01T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E06 - Our Mrs. Reynolds [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E06 - Our Mrs. Reynolds [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2651178736,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:34",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411549
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 4,
+  "unverifiedSceneNumbering": false,
+  "id": 8176
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297995,
+  "episodeFileId": 411550,
+  "seasonNumber": 1,
+  "episodeNumber": 7,
+  "title": "Safe",
+  "airDate": "2002-11-08",
+  "airDateUtc": "2002-11-08T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E07 - Jaynestown [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E07 - Jaynestown [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2711863367,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411550
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 5,
+  "unverifiedSceneNumbering": false,
+  "id": 8177
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297996,
+  "episodeFileId": 411551,
+  "seasonNumber": 1,
+  "episodeNumber": 8,
+  "title": "Ariel",
+  "airDate": "2002-11-15",
+  "airDateUtc": "2002-11-15T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E08 - Out of Gas [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E08 - Out of Gas [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2760703391,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:32",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411551
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 9,
+  "unverifiedSceneNumbering": false,
+  "id": 8178
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297997,
+  "episodeFileId": 411552,
+  "seasonNumber": 1,
+  "episodeNumber": 9,
+  "title": "War Stories",
+  "airDate": "2002-12-06",
+  "airDateUtc": "2002-12-06T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E09 - Ariel [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E09 - Ariel [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2636578176,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:35",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411552
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 10,
+  "unverifiedSceneNumbering": false,
+  "id": 8179
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297998,
+  "episodeFileId": 411553,
+  "seasonNumber": 1,
+  "episodeNumber": 10,
+  "title": "Objects in Space",
+  "airDate": "2002-12-13",
+  "airDateUtc": "2002-12-13T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 46,
+  "finaleType": "season",
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E10 - War Stories [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E10 - War Stories [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2562672314,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:30",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411553
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 14,
+  "unverifiedSceneNumbering": false,
+  "id": 8180
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 297999,
+  "episodeFileId": 411554,
+  "seasonNumber": 1,
+  "episodeNumber": 11,
+  "title": "Serenity",
+  "airDate": "2002-12-20",
+  "airDateUtc": "2002-12-20T05:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 87,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E11 - Trash [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E11 - Trash [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2733627193,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411554
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 1,
+  "unverifiedSceneNumbering": false,
+  "id": 8181
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 298001,
+  "episodeFileId": 411555,
+  "seasonNumber": 1,
+  "episodeNumber": 12,
+  "title": "Heart of Gold",
+  "airDate": "2003-06-23",
+  "airDateUtc": "2003-06-23T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E12 - The Message [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E12 - The Message [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2702266675,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:22",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411555
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 13,
+  "unverifiedSceneNumbering": false,
+  "id": 8182
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 298002,
+  "episodeFileId": 411556,
+  "seasonNumber": 1,
+  "episodeNumber": 13,
+  "title": "Trash",
+  "airDate": "2003-07-21",
+  "airDateUtc": "2003-07-21T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E13 - Heart of Gold [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E13 - Heart of Gold [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2724193509,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411556
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 11,
+  "unverifiedSceneNumbering": false,
+  "id": 8183
+ },
+ {
+  "seriesId": 133,
+  "tvdbId": 298003,
+  "episodeFileId": 411557,
+  "seasonNumber": 1,
+  "episodeNumber": 14,
+  "title": "The Message",
+  "airDate": "2003-07-28",
+  "airDateUtc": "2003-07-28T04:00:00Z",
+  "lastSearchTime": "2026-01-04T16:05:24Z",
+  "runtime": 45,
+  "finaleType": "series",
+  "episodeFile": {
+   "seriesId": 133,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E14 - Objects in Space [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E14 - Objects in Space [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2641534513,
+   "dateAdded": "2026-01-12T01:53:17Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 256000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:50",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng/cze/dan/ger/gre/spa/spa/fin/fre/hun/jpn/kor/dut/nor/pol/por/rum/swe/tur/chi/chi"
+   },
+   "qualityCutoffNotMet": false,
+   "id": 411557
+  },
+  "hasFile": true,
+  "monitored": false,
+  "absoluteEpisodeNumber": 12,
+  "unverifiedSceneNumbering": false,
+  "id": 8184
+ }
+]

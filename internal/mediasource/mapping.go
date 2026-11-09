@@ -18,10 +18,7 @@ func newMapper(ms []PathMapping) mapper {
 	return mapper{maps: sorted}
 }
 
-var (
-	errPathRule = errors.New("is not an absolute, clean, single-line UTF-8 path of at most 4096 bytes")
-	errAliased  = errors.New("lies under a mapping's to while matching no from, so it would alias a mapped path")
-)
+var errPathRule = errors.New("is not an absolute, clean, single-line UTF-8 path of at most 4096 bytes")
 
 // toLocal maps a reported path under the longest From containing it by
 // component; an unmatched path passes through unless a To contains it.
@@ -40,7 +37,7 @@ func (m mapper) toLocal(reported string) (string, error) {
 	}
 	for _, pm := range m.maps {
 		if _, ok := under(pm.To, reported); ok {
-			return "", errAliased
+			return "", &AliasedPathError{Path: reported, To: pm.To}
 		}
 	}
 	return reported, nil

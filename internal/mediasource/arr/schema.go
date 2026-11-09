@@ -14,6 +14,14 @@ import (
 // Values is an arr entry's decoded settings.
 type Values struct{ URL, APIKey, PublicURL string }
 
+// LinkBase is the base a root's Link is built under: public_url, else url.
+func (v Values) LinkBase() string {
+	if v.PublicURL != "" {
+		return v.PublicURL
+	}
+	return v.URL
+}
+
 // Schema is the form both apps share: url and api_key required, public_url
 // optional; app names the application in labels and help.
 func Schema(app string) formschema.Schema {

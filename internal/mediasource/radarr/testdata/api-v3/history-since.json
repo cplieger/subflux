@@ -1,0 +1,251 @@
+[
+ {
+  "movieId": 152,
+  "sourceTitle": "My.Neighbor.Totoro.1988.1080p.BluRay.x264-GROUP1.mkv",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 7,
+    "name": "Bluray-1080p",
+    "source": "bluray",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 16538,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-24T08:47:23Z",
+  "downloadId": "download-1",
+  "eventType": "grabbed",
+  "data": {
+   "indexer": "indexer-1",
+   "nzbInfoUrl": "https://indexer.example/details/guid-1",
+   "releaseGroup": "GROUP1",
+   "age": "0",
+   "ageHours": "0.55053422",
+   "ageMinutes": "33.032053426666664",
+   "publishedDate": "2026-10-24T08:14:22Z",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "size": "15265870104",
+   "guid": "guid-1",
+   "tmdbId": "0",
+   "imdbId": "0096283",
+   "protocol": "2",
+   "customFormatScore": "16538",
+   "movieMatchType": "Id",
+   "releaseSource": "Rss",
+   "indexerFlags": "G_Halfleech, G_Internal"
+  },
+  "id": 94215
+ },
+ {
+  "movieId": 152,
+  "sourceTitle": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}/My Neighbor Totoro (1988) - [Bluray-1080p]-GROUP2.mkv",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "webdl",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 8500,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-24T08:50:00Z",
+  "eventType": "movieFileDeleted",
+  "data": {
+   "reason": "Upgrade",
+   "releaseGroup": "GROUP2",
+   "size": "7413836034",
+   "indexerFlags": "G_Freeleech, G_Internal"
+  },
+  "id": 94216
+ },
+ {
+  "movieId": 152,
+  "sourceTitle": "My.Neighbor.Totoro.1988.1080p.BluRay.x264-GROUP1",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 7,
+    "name": "Bluray-1080p",
+    "source": "bluray",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 16538,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-24T08:50:00Z",
+  "downloadId": "download-1",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "33318",
+   "droppedPath": "/downloads/complete/My.Neighbor.Totoro.1988.1080p.BluRay.x264-GROUP1.mkv",
+   "importedPath": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}/My Neighbor Totoro (1988) - [Bluray-1080p]-GROUP1.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP1",
+   "customFormatScore": "16538",
+   "size": "15265870104",
+   "indexerFlags": "G_Halfleech, G_Internal"
+  },
+  "id": 94217
+ },
+ {
+  "movieId": 3017,
+  "sourceTitle": "/media/movies/Scrapper (2023) {imdb-tt8649252}/Scrapper (2023) - [Bluray-1080p]-GROUP2.mkv",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "webdl",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 8500,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-25T05:20:00Z",
+  "eventType": "movieFileDeleted",
+  "data": {
+   "reason": "Upgrade",
+   "releaseGroup": "GROUP2",
+   "size": "6904402508",
+   "indexerFlags": "G_Freeleech, G_Internal"
+  },
+  "id": 94219
+ },
+ {
+  "movieId": 3017,
+  "sourceTitle": "Scrapper.2023.1080p.BluRay.x264-GROUP3",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 7,
+    "name": "Bluray-1080p",
+    "source": "bluray",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 10000,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-25T05:20:00Z",
+  "downloadId": "download-2",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "33321",
+   "droppedPath": "/downloads/complete/Scrapper.2023.1080p.BluRay.x264-GROUP3.mp4",
+   "importedPath": "/media/movies/Scrapper (2023) {imdb-tt8649252}/Scrapper (2023) - [Bluray-1080p]-GROUP3.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP3",
+   "customFormatScore": "10000",
+   "size": "6220465410",
+   "indexerFlags": "G_Halfleech, G_Internal"
+  },
+  "id": 94220
+ },
+ {
+  "movieId": 152,
+  "sourceTitle": "My.Neighbor.Totoro.1988.1080p.BluRay.x264-GROUP3",
+  "languages": [
+   {
+    "id": 1,
+    "name": "English"
+   }
+  ],
+  "quality": {
+   "quality": {
+    "id": 7,
+    "name": "Bluray-1080p",
+    "source": "bluray",
+    "resolution": 1080,
+    "modifier": "none"
+   },
+   "revision": {
+    "version": 1,
+    "real": 0,
+    "isRepack": false
+   }
+  },
+  "customFormats": [],
+  "customFormatScore": 12100,
+  "qualityCutoffNotMet": false,
+  "date": "2026-10-25T13:53:00Z",
+  "downloadId": "download-3",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "33324",
+   "droppedPath": "/downloads/complete/My.Neighbor.Totoro.1988.1080p.BluRay.x264-GROUP3.mp4",
+   "importedPath": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}/My Neighbor Totoro (1988) - [Bluray-1080p]-GROUP3.mkv",
+   "downloadClient": "client",
+   "downloadClientName": "client",
+   "releaseGroup": "GROUP3",
+   "customFormatScore": "12100",
+   "size": "7202805802",
+   "indexerFlags": "G_Halfleech, G_Internal"
+  },
+  "id": 94223
+ }
+]

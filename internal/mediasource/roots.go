@@ -99,7 +99,7 @@ func (s *Set) Inherit(prev *Set) {
 	}
 	for id, src := range s.byID {
 		old, ok := prev.byID[id]
-		if !ok || !sameOutsideSecrets(old, src) {
+		if !ok || compareEntry(src.schema, &old.cfg, &src.cfg) == EntryChanged {
 			continue
 		}
 		if last, ok := old.roots.load(); ok {
@@ -107,13 +107,6 @@ func (s *Set) Inherit(prev *Set) {
 		}
 		src.tags.inherit(&old.tags)
 	}
-}
-
-func sameOutsideSecrets(a, b *source) bool {
-	return a.cfg.Type == b.cfg.Type &&
-		slices.Equal(a.cfg.PathMappings, b.cfg.PathMappings) &&
-		slices.Equal(a.cfg.ExcludeTags, b.cfg.ExcludeTags) &&
-		!valuesDiffer(b.schema, a.cfg.Values, b.cfg.Values, func(f formschema.Field) bool { return f.Kind != formschema.Secret })
 }
 
 // valuesDiffer reports whether a and b differ in a field of schema that

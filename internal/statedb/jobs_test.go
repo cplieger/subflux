@@ -347,7 +347,7 @@ func TestJobRoundTrip(t *testing.T) {
 	j := status.Job{
 		ID: "00000000000000000000000000000abc", Started: jobAt, Ended: jobAt.Add(90 * time.Second),
 		Key:   &status.JobKey{Key: "idem", Fingerprint: sha256.Sum256([]byte("body"))},
-		Scope: "library", Phase: "fetch", Cause: "manual", Owner: 7, Done: 2, Total: 5, Rev: 4,
+		Scope: "library", Source: "sonarr", Phase: "fetch", Cause: "manual", Owner: 7, Done: 2, Total: 5, Rev: 4,
 		Kind: status.Download, State: status.Done, Outcome: status.Partial, Cancellable: true,
 	}
 	insertJob(t, s, j, small)

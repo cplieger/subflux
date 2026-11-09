@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -47,7 +48,7 @@ func rebuild(t *testing.T, s *script, src mediasource.Config) *mediasource.Set {
 	other := mediasource.Config{ID: "other", Type: "other"}
 	kinds := []mediasource.AdapterKind{scriptKind("script", s), scriptKind("other", &script{caps: allCaps})}
 	log, _ := capture.New()
-	set, err := mediasource.NewSet(kinds, []mediasource.Config{src, other}, mediasource.Deps{Logger: log})
+	set, err := mediasource.NewSet(kinds, []mediasource.Config{src, other}, mediasource.Deps{Logger: log}, sourcetest.OwnPlaces{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func TestMediaRootsFromMappingsAndFolders(t *testing.T) {
 		{ID: "a", Type: "mapped", PathMappings: []mediasource.PathMapping{{From: "/x", To: "/m2"}, {From: "/y", To: "/m1"}}},
 		{ID: "b", Type: "unmapped"},
 	}
-	set, err := mediasource.NewSet(kinds, cfgs, mediasource.Deps{})
+	set, err := mediasource.NewSet(kinds, cfgs, mediasource.Deps{}, sourcetest.OwnPlaces{})
 	if err != nil {
 		t.Fatal(err)
 	}

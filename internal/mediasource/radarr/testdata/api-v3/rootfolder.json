@@ -1,0 +1,16 @@
+[
+ {
+  "path": "/media/movies",
+  "accessible": true,
+  "freeSpace": 45280543113216,
+  "unmappedFolders": [],
+  "id": 6
+ },
+ {
+  "path": "/media/animemovies",
+  "accessible": true,
+  "freeSpace": 45280543113216,
+  "unmappedFolders": [],
+  "id": 9
+ }
+]

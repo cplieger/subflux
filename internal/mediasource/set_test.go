@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
 )
 
 func TestYieldErrorPassesThrough(t *testing.T) {
@@ -254,6 +255,34 @@ func TestAnswerTable(t *testing.T) {
 			t.Errorf("Items = %v unread %s, want 9 unread", err, joined(w.unread))
 		}
 	})
+
+	for name, tc := range map[string]struct {
+		order    mediasource.Order
+		want     media.Numbering
+		tvdb     uint64
+		absolute int
+	}{
+		"another order with no series id":   {order: mediasource.Order{Type: "dvd"}},
+		"the aired order with no series id": {order: mediasource.Order{Type: "official", Aired: true}, absolute: 5},
+		"another order joined":              {order: mediasource.Order{Type: "dvd"}, tvdb: 7, want: ok.SeriesNumbering, absolute: 5},
+	} {
+		t.Run("set by the Set: Numbering and Absolute, "+name, func(t *testing.T) {
+			it := ok
+			it.Numbering, it.Absolute = media.Numbering{Scheme: media.TVDB, Season: 9, Episode: 9}, 5
+			l := lib{{mediasource.Root{Native: series("A"), External: media.ExternalIDs{TVDB: tc.tvdb}, Order: tc.order}, []mediasource.Item{it}}}
+			set, _ := oneSet(t, &script{caps: allCaps, items: l.walk}, mediasource.Config{})
+			var got mediasource.Item
+			if err := set.Items(t.Context(), "src", func(_ mediasource.Root, items []mediasource.Item) error {
+				got = items[0]
+				return nil
+			}, (&walkLog{}).report); err != nil {
+				t.Fatal(err)
+			}
+			if got.Numbering != tc.want || got.Absolute != tc.absolute {
+				t.Errorf("yielded Numbering %+v Absolute %d, want %+v and %d", got.Numbering, got.Absolute, tc.want, tc.absolute)
+			}
+		})
+	}
 
 	identity := map[string]mediasource.NativeRef{
 		"root kind outside Kinds": {ID: "1", Kind: media.Movie},
@@ -513,11 +542,11 @@ func TestNewSetRefusesFailingNew(t *testing.T) {
 		"duplicate id": {{ID: "a", Type: "script"}, {ID: "a", Type: "script"}},
 	}
 	for name, cfgs := range cases {
-		if set, err := mediasource.NewSet([]mediasource.AdapterKind{failing, good}, cfgs, mediasource.Deps{}); err == nil || set != nil {
+		if set, err := mediasource.NewSet([]mediasource.AdapterKind{failing, good}, cfgs, mediasource.Deps{}, sourcetest.OwnPlaces{}); err == nil || set != nil {
 			t.Errorf("NewSet with %s = %v, %v; want an error", name, set, err)
 		}
 	}
-	set, err := mediasource.NewSet([]mediasource.AdapterKind{good}, []mediasource.Config{{ID: "b", Type: "script"}, {ID: "a", Type: "script"}}, mediasource.Deps{})
+	set, err := mediasource.NewSet([]mediasource.AdapterKind{good}, []mediasource.Config{{ID: "b", Type: "script"}, {ID: "a", Type: "script"}}, mediasource.Deps{}, sourcetest.OwnPlaces{})
 	if err != nil || joined(sourceIDs(set.Sources())) != "b,a" {
 		t.Errorf("NewSet = %v, sources %v; want b,a in entry order", err, set.Sources())
 	}

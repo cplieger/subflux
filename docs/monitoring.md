@@ -16,6 +16,8 @@ The `dev` branch is being rebuilt, so its image exports only the series below. T
 | `subflux_config_mode{mode}` | settings | 1 for the current state of `config.yaml` (`unconfigured`, `failed` or `active`), 0 for the others |
 | `subflux_alerts_active{kind,id}` | alerts | 1 for each problem subflux reports, labelled with its kind and id; a cleared problem's series goes away |
 | `subflux_build_info{version}` | build | always 1, labelled with the running version |
+| `subflux_scan_last_complete_timestamp_seconds{source}` | scan | when the media source's latest full scan completed, or when its scan loop started before one has; a removed source's series goes away |
+| `subflux_scan_whole_interval_seconds` | scan | the `scan.whole_interval` setting in force |
 
 The `go_*` and `process_*` series, such as `process_start_time_seconds`, describe the subflux process itself.
 
@@ -41,6 +43,7 @@ Load the rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus 
 | `SubfluxProviderUnusable` | a subtitle site's problem has stood for 65m, longer than one cooldown and the retry after it | warning |
 | `SubfluxMediaUnavailable` | a media root could not be read for 5m | warning |
 | `SubfluxSourceUnreachable` | a Sonarr or Radarr instance could not be reached for 15m | warning |
+| `SubfluxScanStalled` | a media source has gone two full scan intervals with no completed full scan, for 2h | warning |
 | `SubfluxStoreWriteFailing` | writes to the database have failed for 5m | critical |
 | `SubfluxConditionActive` | any other problem has stood for 15m | warning |
 
