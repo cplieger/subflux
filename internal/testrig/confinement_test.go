@@ -36,6 +36,7 @@ var importRules = []importRule{
 	dialhookRule(modulePath),
 	providertestRule(modulePath),
 	execRule(modulePath),
+	sysRule(modulePath),
 	{imported: "go.etcd.io/bbolt/...", allowed: []string{"go.etcd.io/bbolt/...", "github.com/cplieger/bolttable/..."}, everyPackage: true},
 	{imported: "github.com/cplieger/bolttable/...", allowed: []string{modulePath + "/internal/statedb/..."}},
 }
@@ -61,6 +62,12 @@ func providertestRule(module string) importRule {
 // their deadlines, output caps and stderr bound.
 func execRule(module string) importRule {
 	return importRule{imported: "os/exec", allowed: []string{module + "/internal/subsync/ffmpeg"}, production: true}
+}
+
+// sysRule keeps raw system calls in the one writer of files beside videos,
+// whose publish chain owns their errno fallbacks.
+func sysRule(module string) importRule {
+	return importRule{imported: "golang.org/x/sys/...", allowed: []string{module + "/internal/mediawrite"}, production: true}
 }
 
 // releaseRule keeps release.Parsed inside search's packages: rank, the
@@ -174,8 +181,8 @@ func TestConfinementChecker(t *testing.T) {
 			t.Errorf("every import: violations = %q, want f's and e's test import", got)
 		}
 	})
-	t.Run("dialhook, providertest and exec rows", func(t *testing.T) {
-		for _, rule := range []importRule{dialhookRule(fixture), providertestRule(fixture), execRule(fixture)} {
+	t.Run("dialhook, providertest, exec and x/sys rows", func(t *testing.T) {
+		for _, rule := range []importRule{dialhookRule(fixture), providertestRule(fixture), execRule(fixture), sysRule(fixture)} {
 			if !rule.production || rule.imported == "" {
 				t.Errorf("row %+v checks test imports or nothing", rule)
 			}
@@ -191,6 +198,12 @@ func TestConfinementChecker(t *testing.T) {
 		}
 		if got := execRule(fixture).violation(fixture+"/internal/subsync/ffmpeg", "os/exec"); got != "" {
 			t.Errorf("the runner may not run a child process: %s", got)
+		}
+		if sysRule(fixture).violation(fixture+"/internal/statedb", "golang.org/x/sys/unix") == "" {
+			t.Error("statedb may make a raw system call")
+		}
+		if got := sysRule(fixture).violation(fixture+"/internal/mediawrite", "golang.org/x/sys/unix"); got != "" {
+			t.Errorf("the writer may not make a raw system call: %s", got)
 		}
 	})
 	t.Run("raw client", func(t *testing.T) {
