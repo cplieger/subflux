@@ -3,10 +3,10 @@ module github.com/cplieger/subflux
 go 1.27.3
 
 require (
-	github.com/cplieger/access v1.0.0-dev.5
+	github.com/cplieger/access v1.0.0-dev.6
 	github.com/cplieger/animap/mapread v0.3.2
-	github.com/cplieger/arrapi/v3 v3.2.0-dev.9
-	github.com/cplieger/bolttable v1.0.0-dev.6
+	github.com/cplieger/arrapi/v3 v3.2.0-dev.10
+	github.com/cplieger/bolttable v1.1.0-dev.2
 	github.com/cplieger/go/filesafe v1.0.0
 	github.com/cplieger/go/health v1.0.0
 	github.com/cplieger/go/httpclient v1.0.0
@@ -24,8 +24,8 @@ require (
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/ulikunitz/xz v0.5.17
 	go.yaml.in/yaml/v4 v4.0.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/sys v0.50.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
@@ -46,5 +46,5 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.5.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/oauth2 v0.37.0 // indirect
+	golang.org/x/oauth2 v0.38.0 // indirect
 )
