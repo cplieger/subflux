@@ -42,7 +42,7 @@ func testSection(t *testing.T) (*formschema.Values, *int) {
 	got := formschema.Values{}
 	calls := 0
 	prev := sections
-	sections = append(slices.Clone(sections), section{key: "t", parse: func(n *yaml.Node, _ *Active) []formschema.FieldError {
+	sections = append(slices.Clone(sections), section{key: "t", parse: func(n *yaml.Node, _ Registries, _ *Active) []formschema.FieldError {
 		calls++
 		vals, errs := schema.Decode(n)
 		got = vals

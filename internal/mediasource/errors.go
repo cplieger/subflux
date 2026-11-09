@@ -71,6 +71,30 @@ func (e *SourceError) Error() string {
 // Unwrap returns Err, so errors.Is and httpclient.IsTransient see the cause.
 func (e *SourceError) Unwrap() error { return e.Err }
 
+// AliasedPathError is a reported path that lies under a mapping's To while
+// matching no From, so serving it would alias a mapped path. Its text
+// follows the path it names.
+type AliasedPathError struct{ Path, To string }
+
+func (e *AliasedPathError) Error() string {
+	return "lies under " + e.To + ", a mapping's to, while matching no from, so it would alias a mapped path"
+}
+
+// AiredOrderError is a series root whose aired order cannot be read; Err is
+// the join's error, which wraps ErrAiredOrderUnavailable and whose text is
+// the reason.
+type AiredOrderError struct {
+	Err   error
+	Title string
+}
+
+func (e *AiredOrderError) Error() string {
+	return "the aired order of " + e.Title + " cannot be read: " + e.Err.Error()
+}
+
+// Unwrap returns Err, so errors.Is sees ErrAiredOrderUnavailable.
+func (e *AiredOrderError) Unwrap() error { return e.Err }
+
 // ErrRescanOutcomeUnknown wraps a Rescan the source may have run; the caller
 // never sends it again.
 var ErrRescanOutcomeUnknown = errors.New("rescan outcome unknown")

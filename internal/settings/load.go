@@ -77,7 +77,7 @@ func rootFailure(msg string, f fileState) Snapshot {
 // failed without its parse running, so no owner walks an alias; a top-level
 // key with no text (a merge key or a collection key) fails every section,
 // the server one denying every Host. f is the file root was read from.
-func parse(root *yaml.Node, _ Registries, f fileState) Snapshot {
+func parse(root *yaml.Node, r Registries, f fileState) Snapshot {
 	mode, stored := ModeActive, root
 	if root == nil {
 		mode, root = Unconfigured, &yaml.Node{Kind: yaml.MappingNode, Tag: tagMap}
@@ -107,7 +107,7 @@ func parse(root *yaml.Node, _ Registries, f fileState) Snapshot {
 		}
 		values[name] = append(values[name], v)
 	}
-	active, failed, serrs := parseSections(names, values, tainted)
+	active, failed, serrs := parseSections(r, names, values, tainted)
 	errs = append(errs, serrs...)
 	s := &snapshot{mode: mode, active: active, server: active.Server, serverOK: true, file: f, revision: rand.Text()}
 	if stored != nil {

@@ -247,6 +247,24 @@ func TestShowTransientRetried(t *testing.T) {
 	})
 }
 
+func TestShowExhaustedLogsNoWarn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var logs bytes.Buffer
+		c := New(nil, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelWarn})))
+		f := &fakeSkyHook{answers: []answer{{code: http.StatusServiceUnavailable}}}
+		c.http.Transport = f
+		if _, _, err := c.Show(t.Context(), 78874, "eng", "official"); !httpclient.IsTransient(err) {
+			t.Fatalf("Show error = %v, want transient", err)
+		}
+		if n := len(f.requests()); n != maxAttempts {
+			t.Errorf("requests = %d, want %d", n, maxAttempts)
+		}
+		if logs.Len() != 0 {
+			t.Errorf("an exhausted Show logged at WARN or above: %s", logs.String())
+		}
+	})
+}
+
 func TestShowOtherStatusNotRetried(t *testing.T) {
 	for _, code := range []int{http.StatusNoContent, http.StatusPartialContent, http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusGone, 600} {
 		t.Run(strconv.Itoa(code), func(t *testing.T) {
@@ -283,7 +301,7 @@ func TestShowOverCapRefused(t *testing.T) {
 		}
 	})
 	t.Run("exactly the cap", func(t *testing.T) {
-		f := &fakeSkyHook{answers: []answer{ok(showOfSize(MaxBody))}}
+		f := &fakeSkyHook{answers: []answer{ok(showOfSize(maxBody))}}
 		if s, found, err := fakeClient(f).Show(t.Context(), 78874, "eng", "official"); !found || err != nil || len(s.Episodes) != 1 {
 			t.Errorf("Show = %v, %v, %d episodes; want the whole answer", found, err, len(s.Episodes))
 		}

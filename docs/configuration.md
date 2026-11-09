@@ -27,10 +27,15 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `sonarr.url`, `radarr.url` | required | The address subflux reaches Sonarr or Radarr at. Set at least one |
-| `sonarr.api_key`, `radarr.api_key` | required | The API key from the General page of that app's Settings |
-| `sonarr.enabled`, `radarr.enabled` | `true` in the first-start file | Turn one app off without deleting its settings |
-| `sonarr.public_url`, `radarr.public_url` | _(unset)_ | The address your browser opens the app at, for links on the web page. Falls back to `url` |
+| `sources[]` | _(none)_ | The Sonarr and Radarr instances subflux reads your library from, at most 16. A save checks each added entry, and each entry whose type, address or API key changed, against its instance, and is refused if one does not answer |
+| `sources[].id` | required | A name for the entry, unique in the list: 1 to 32 lowercase letters, digits and `-`. Alerts and metrics name the source by it |
+| `sources[].type` | required | `sonarr` or `radarr` |
+| `sources[].url` | required | The address subflux reaches the instance at |
+| `sources[].api_key` | required | The API key from the General page of that app's Settings |
+| `sources[].public_url` | _(unset)_ | The address your browser opens the instance at, for links on the web page |
+| `sources[].enabled` | `true` | Set `false` to stop reading from the instance while keeping its entry, which is still checked as written |
+| `sources[].path_mappings[]` | `[]` | Up to 32 `{from, to}` pairs, for media mounted at another path in subflux than in Sonarr or Radarr: a path the instance reports under `from` is read under `to` |
+| `sources[].exclude_tags[]` | `[no-subflux]` | Up to 32 tag labels, matched ignoring case. subflux skips the shows and movies that carry one. An empty list skips nothing |
 | `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
 | `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
 | `languages.close_varieties` | `false` | Download a close variety automatically when the exact one is missing, such as `pt-PT` or bare `pt` for a `pt-BR` target |
@@ -40,11 +45,10 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
 | `providers.<name>.priority` | per site | Breaks a tie between equal scores. Lower is more trusted |
 | `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |
-| `poll_interval` | `30s` | How often subflux checks Sonarr and Radarr for new imports |
-| `search.scan_interval` | `24h` | Time between the end of one full library scan and the start of the next |
+| `scan.change_interval` | `30s` | How often subflux checks each source for imports, renames and deletes, from `10s` to `1h` |
+| `scan.whole_interval` | `24h` | Time between the end of one full library scan and the start of the next, from `1h` to `720h` |
 | `search.upgrade_enabled` | `true` | Look for better subtitles during scans |
 | `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
-| `search.exclude_arr_tags` | `no-subflux` | Sonarr or Radarr tags whose shows and movies subflux skips |
 | `search.scan_delay` | `5s` | Pause after each scan item that asked a site. Minimum `5s` |
 | `search.provider_timeout` | `1h` | How long a site rests after repeated failures. Minimum `1h` |
 | `search.min_score` | `0` | The lowest score a result may have to be downloaded, from 0 to 100 |

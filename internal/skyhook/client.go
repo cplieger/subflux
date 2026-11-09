@@ -57,14 +57,16 @@ func New(base *http.Client, log *slog.Logger) *Client {
 // other is an error with nothing sent. A 404 answers (Show{}, false, nil). A
 // 408, 429, 5xx or transport failure, after the last attempt, is an
 // httpclient.IsTransient error, and no other failure is. An error's text is one
-// line naming the series and order, never the answer's body.
+// line naming the series and order, never the answer's body; the caller logs
+// the failure, which Show logs only at DEBUG.
 func (c *Client) Show(ctx context.Context, tvdbID int, lang, order string) (Show, bool, error) {
 	if err := checkSegments(tvdbID, lang, order); err != nil {
 		return Show{}, false, err
 	}
 	u := origin + "/v2/tvdb/shows/" + lang + "/" + strconv.Itoa(tvdbID) + "/" + order
 	body, err := httpclient.Do(ctx, func(ctx context.Context) ([]byte, error) { return c.get(ctx, u) },
-		httpclient.WithMaxAttempts(maxAttempts), httpclient.WithLogger(c.log), httpclient.WithLabel("skyhook"))
+		httpclient.WithMaxAttempts(maxAttempts), httpclient.WithLogger(c.log), httpclient.WithLabel("skyhook"),
+		httpclient.WithExhaustedLevel(slog.LevelDebug))
 	switch {
 	case errors.Is(err, errAbsent):
 		return Show{}, false, nil
@@ -90,7 +92,7 @@ func (c *Client) get(ctx context.Context, u string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
-		return httpclient.ReadLimitedBody(resp.Body, MaxBody)
+		return httpclient.ReadLimitedBody(resp.Body, maxBody)
 	}
 	httpclient.Drain(resp.Body)
 	if resp.StatusCode == http.StatusNotFound {
@@ -99,8 +101,9 @@ func (c *Client) get(ctx context.Context, u string) ([]byte, error) {
 	return nil, &statusError{code: resp.StatusCode, retryAfter: httpclient.ParseRetryAfter(resp.Header.Get("Retry-After"))}
 }
 
-// statusError is an answer other than 200 or 404; httpclient.Do retries a 408,
-// 429 or 5xx, after its capped Retry-After when it sent one.
+// statusError is an answer other than 200 or 404; httpclient.Do retries one
+// httpclient.IsRetryableStatus holds for, after its capped Retry-After when it
+// sent one.
 type statusError struct {
 	code       int
 	retryAfter time.Duration
@@ -108,11 +111,7 @@ type statusError struct {
 
 func (e *statusError) Error() string { return "HTTP " + strconv.Itoa(e.code) }
 
-// IsTransient caps httpclient.IsRetryableStatus at 599: it holds for any code
-// from 500 up.
-func (e *statusError) IsTransient() bool {
-	return e.code <= 599 && httpclient.IsRetryableStatus(e.code)
-}
+func (e *statusError) IsTransient() bool             { return httpclient.IsRetryableStatus(e.code) }
 func (e *statusError) RetryAfterHint() time.Duration { return e.retryAfter }
 
 func showError(tvdbID int, lang, order string, err error) error {

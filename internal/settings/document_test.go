@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/radarr"
+	"github.com/cplieger/subflux/internal/mediasource/sonarr"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -73,7 +76,7 @@ func filledExample(t *testing.T) string {
 	}
 	return text +
 		"t:\n  a: shown\n  s: lit-secret\n  sx: lit-misspelled\n" +
-		"sources:\n  - {kind: bogus, id: x, api_key: lit-kind}\n" +
+		"sources:\n  - {type: bogus, id: x, api_key: lit-kind}\n" +
 		"# api_key: 1f2e\n" // gitleaks:allow
 }
 
@@ -110,9 +113,9 @@ func TestDocumentRedacts(t *testing.T) {
 		}
 	})
 	t.Run("an unknown section's entry shows no id, so it cannot keep its secret", func(t *testing.T) {
-		snap := serve(fixture(t, "sources: [{id: x, kind: bogus, api_key: lit-kind}]\n"), nil, nil).Snapshot()
-		if _, errs := mergeDocument(snap.p.doc, snap.Document()); !slices.Equal(errPaths(errs), []string{"sources[0]"}) {
-			t.Errorf("merge errors %v, want one at sources[0]", errs)
+		snap := serve(fixture(t, "t9: [{id: x, kind: bogus, api_key: lit-kind}]\n"), nil, nil).Snapshot()
+		if _, errs := mergeDocument(snap.p.doc, snap.Document()); !slices.Equal(errPaths(errs), []string{"t9[0]"}) {
+			t.Errorf("merge errors %v, want one at t9[0]", errs)
 		}
 	})
 	t.Run("an absent file or one not a mapping has no document", func(t *testing.T) {
@@ -170,6 +173,16 @@ var sectionFixtures = map[string]struct {
 		text:    "server:\n  trusted_proxies: [10.0.0.0/8, 192.168.1.5]\n  allowed_hosts: [nas.lan, 'nas.lan:8374']\n  log_level: \"debug\"\n  log_format: text\n",
 		secrets: nil,
 	},
+	"sources": {
+		text: "sources:\n  - id: tv\n    type: sonarr\n    enabled: true\n    url: 'http://sonarr:8989'\n    api_key: k1\n" +
+			"    public_url: 'https://tv.example'\n    path_mappings:\n      - {from: /tv, to: /media/tv}\n    exclude_tags: [no-subs]\n" +
+			"  - id: films\n    type: radarr\n    enabled: false\n    url: 'http://radarr:7878'\n    api_key: k2\n    exclude_tags: []\n",
+		secrets: []string{"sources[0].api_key", "sources[1].api_key"},
+	},
+	"scan": {
+		text:    "scan:\n  change_interval: 45s\n  whole_interval: 12h\n",
+		secrets: nil,
+	},
 	"languages": {
 		text:    "languages:\n  close_varieties: true\n  default:\n    - tag: pt-BR\n      variants: [standard, forced]\n    - tag: en\n      variants: [hi]\n  rules:\n    - audio: ja\n      targets:\n        - tag: en\n    - audio: es\n      targets: []\n",
 		secrets: nil,
@@ -196,7 +209,8 @@ func TestDocumentRoundTrip(t *testing.T) {
 		}
 	}
 	path := fixture(t, text.String())
-	s := serve(path, nil, nil)
+	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}}
+	s := NewService(path, r, Load(path, r), nil, nil)
 	if m := s.Snapshot().Mode(); m != ModeActive {
 		failure, _ := s.Snapshot().Failure()
 		t.Fatalf("fixture mode %v (%v), want active", m, failure)
@@ -208,7 +222,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 	if _, errs, err := s.Save(t.Context(), doc, s.Snapshot().Revision()); err != nil || errs != nil {
 		t.Fatalf("Save(Document()) = %v, %v", errs, err)
 	}
-	if got, want := scalars(Load(path, Registries{}).p.doc, ""), scalars(node(t, text.String()), ""); !slices.Equal(got, want) {
+	if got, want := scalars(Load(path, r).p.doc, ""), scalars(node(t, text.String()), ""); !slices.Equal(got, want) {
 		t.Errorf("saved values %v, want %v", got, want)
 	}
 }

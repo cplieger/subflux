@@ -3,25 +3,37 @@ package settings
 import (
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/mediasource"
 	"go.yaml.in/yaml/v4"
 )
 
 // section is one row of the ordered section table: parse reads the section's
-// node, nil when absent, into its Active field and returns absolute paths. A
+// node, nil when absent, into its Active field with the registered adapter
+// kinds and returns absolute paths. A
 // landing adds its row beside its Active field; a row whose parse reads
 // another section's result follows that row.
 type section struct {
-	parse func(n *yaml.Node, a *Active) []formschema.FieldError
+	parse func(n *yaml.Node, r Registries, a *Active) []formschema.FieldError
 	key   string
 }
 
 var sections = []section{
-	{key: "server", parse: func(n *yaml.Node, a *Active) []formschema.FieldError {
+	{key: "server", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
 		var errs []formschema.FieldError
 		a.Server, errs = parseServer(n)
 		return errs
 	}},
-	{key: "languages", parse: func(n *yaml.Node, a *Active) []formschema.FieldError {
+	{key: "sources", parse: func(n *yaml.Node, r Registries, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Sources, errs = mediasource.ParseConfigs(n, r.Sources)
+		return errs
+	}},
+	{key: "scan", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Scan, errs = mediasource.ParseSchedule(n)
+		return errs
+	}},
+	{key: "languages", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
 		var errs []formschema.FieldError
 		a.Languages, errs = language.ParsePolicy(n)
 		return errs
@@ -36,7 +48,7 @@ var crossChecks []func(Active) []formschema.FieldError
 // tainted row without running it, refuses each name in names no row holds,
 // then runs the cross checks when nothing failed. failed names each row that
 // did not parse.
-func parseSections(names []string, values map[string][]*yaml.Node, tainted map[string]bool) (Active, map[string]bool, []formschema.FieldError) {
+func parseSections(r Registries, names []string, values map[string][]*yaml.Node, tainted map[string]bool) (Active, map[string]bool, []formschema.FieldError) {
 	var a Active
 	var errs []formschema.FieldError
 	failed := map[string]bool{}
@@ -51,7 +63,7 @@ func parseSections(names []string, values map[string][]*yaml.Node, tainted map[s
 		if v := values[s.key]; len(v) > 0 {
 			n = v[0]
 		}
-		if serrs := s.parse(n, &a); len(serrs) > 0 {
+		if serrs := s.parse(n, r, &a); len(serrs) > 0 {
 			failed[s.key] = true
 			errs = append(errs, serrs...)
 		}

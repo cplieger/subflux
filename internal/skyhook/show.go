@@ -8,8 +8,8 @@ import (
 	"github.com/cplieger/subflux/internal/media"
 )
 
-// MaxBody bounds one answer; a larger one is refused, never cut.
-const MaxBody = 16 << 20
+// maxBody bounds one answer; a larger one is refused, never cut.
+const maxBody = 16 << 20
 
 // Show is the decoded subset of one answer.
 type Show struct {

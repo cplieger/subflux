@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -45,7 +46,7 @@ func FuzzParseConfigs_paths(f *testing.F) {
 		if len(errs) > 0 {
 			return
 		}
-		set, err := mediasource.NewSet(arrKinds(&arrKind{}), cfgs, mediasource.Deps{})
+		set, err := mediasource.NewSet(arrKinds(&arrKind{}), cfgs, mediasource.Deps{}, sourcetest.OwnPlaces{})
 		if err != nil {
 			t.Fatal(err)
 		}

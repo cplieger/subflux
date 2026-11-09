@@ -103,7 +103,7 @@ var (
 	embeddedCodec    = rowCodec[embeddedRow, *embeddedRow]{version: taggedVersion(1)}
 	downloadCodec    = rowCodec[downloadRow, *downloadRow]{version: taggedVersion(1)}
 	workCodec        = rowCodec[workRow, *workRow]{version: 1}
-	jobCodec         = rowCodec[jobRow, *jobRow]{version: 1}
+	jobCodec         = rowCodec[jobRow, *jobRow]{version: 2}
 	credentialCodec  = rowCodec[credentialRow, *credentialRow]{version: 1}
 	noResultCodec    = rowCodec[noResultRow, *noResultRow]{version: 1}
 	evidenceCodec    = rowCodec[evidenceRow, *evidenceRow]{version: 1}

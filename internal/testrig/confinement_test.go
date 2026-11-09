@@ -39,6 +39,24 @@ var importRules = []importRule{
 	sysRule(modulePath),
 	{imported: "go.etcd.io/bbolt/...", allowed: []string{"go.etcd.io/bbolt/...", "github.com/cplieger/bolttable/..."}, everyPackage: true},
 	{imported: "github.com/cplieger/bolttable/...", allowed: []string{modulePath + "/internal/statedb/..."}},
+	arrapiRule(modulePath),
+	scheduleRule(modulePath),
+}
+
+// arrapiRule keeps every arrapi major behind the Sonarr and Radarr adapters,
+// so no other package depends on an arr's wire shapes.
+func arrapiRule(module string) importRule {
+	return importRule{
+		imported: "github.com/cplieger/arrapi/...",
+		allowed:  []string{module + "/internal/mediasource/arr/...", module + "/internal/mediasource/sonarr", module + "/internal/mediasource/radarr"},
+	}
+}
+
+// scheduleRule keeps scan out of settings, which holds the scan section's
+// Schedule from mediasource: scan imports status, so settings importing scan
+// would make a cycle once status is built over settings.
+func scheduleRule(module string) importRule {
+	return importRule{imported: module + "/internal/scan", forbidden: []string{module + "/internal/settings/..."}}
 }
 
 // dialhookRule keeps the test dial seam inside the provider boundary and its
@@ -83,18 +101,6 @@ func releaseRule(module string) importRule {
 // client or transport; the provider boundary owns the one client.
 var providerHTTPRoots = []string{"internal/provider"}
 
-// scheduleRule keeps scan out of settings, which holds the scan section's
-// Schedule from mediasource: scan imports status, so settings importing scan
-// would make a cycle once status is built over settings.
-var scheduleRule = importRule{imported: modulePath + "/internal/scan", forbidden: []string{modulePath + "/internal/settings/..."}}
-
-func TestScheduleLivesInMediasource(t *testing.T) {
-	pkgs := goList(t, absDir(t, moduleRoot), "./...")
-	for _, v := range importViolations(pkgs, modulePath, []importRule{scheduleRule}) {
-		t.Error(v)
-	}
-}
-
 func TestImportConfinement(t *testing.T) {
 	pkgs := goList(t, absDir(t, moduleRoot), "./...")
 	for _, v := range importViolations(pkgs, modulePath, importRules) {
@@ -116,7 +122,7 @@ func TestProviderHTTP(t *testing.T) {
 // TestConfinementRulesSetOneList: violation reads forbidden alone when it is
 // set, so a rule setting both lists would check only half of what it says.
 func TestConfinementRulesSetOneList(t *testing.T) {
-	for _, r := range append(slices.Clone(importRules), scheduleRule) {
+	for _, r := range importRules {
 		if len(r.allowed) > 0 && len(r.forbidden) > 0 {
 			t.Errorf("rule for %s sets both allowed and forbidden", r.imported)
 		}
@@ -204,6 +210,25 @@ func TestConfinementChecker(t *testing.T) {
 		}
 		if got := sysRule(fixture).violation(fixture+"/internal/mediawrite", "golang.org/x/sys/unix"); got != "" {
 			t.Errorf("the writer may not make a raw system call: %s", got)
+		}
+	})
+	t.Run("arrapi and schedule rows", func(t *testing.T) {
+		arr := arrapiRule(fixture)
+		for _, importer := range []string{fixture + "/internal/mediasource/arr", fixture + "/internal/mediasource/arr/arrtest", fixture + "/internal/mediasource/sonarr", fixture + "/internal/mediasource/radarr"} {
+			if got := arr.violation(importer, "github.com/cplieger/arrapi/v3"); got != "" {
+				t.Errorf("an adapter may not import arrapi: %s", got)
+			}
+		}
+		for _, importer := range []string{fixture + "/internal/scan", fixture + "/internal/mediasource", fixture + "/internal/app"} {
+			if !matchPath(arr.imported, "github.com/cplieger/arrapi/v4") || arr.violation(importer, "github.com/cplieger/arrapi/v4") == "" {
+				t.Errorf("%s may import arrapi", importer)
+			}
+		}
+		if scheduleRule(fixture).violation(fixture+"/internal/settings", fixture+"/internal/scan") == "" {
+			t.Error("settings may import scan")
+		}
+		if got := scheduleRule(fixture).violation(fixture+"/internal/app", fixture+"/internal/scan"); got != "" {
+			t.Errorf("app may not import scan: %s", got)
 		}
 	})
 	t.Run("raw client", func(t *testing.T) {

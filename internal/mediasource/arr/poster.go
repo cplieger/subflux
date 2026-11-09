@@ -14,8 +14,8 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
-// MaxPosterBytes bounds one poster; a larger one is refused, never cut.
-const MaxPosterBytes = 2 << 20
+// maxPosterBytes bounds one poster; a larger one is refused, never cut.
+const maxPosterBytes = 2 << 20
 
 // posterBudget bounds a Fetch whose context has no deadline, as arrapi's
 // WithTimeout bounds the adapters' undeadlined reads.
@@ -26,7 +26,7 @@ const posterBudget = 30 * time.Second
 const maxPosterHops = 5
 
 var (
-	errPosterTooLarge = fmt.Errorf("poster exceeds %d bytes", MaxPosterBytes)
+	errPosterTooLarge = fmt.Errorf("poster exceeds %d bytes", maxPosterBytes)
 	errPosterHops     = fmt.Errorf("poster redirects more than %d times", maxPosterHops)
 )
 
@@ -50,7 +50,7 @@ func NewPoster(arr *http.Client) *Poster {
 // Fetch reads the whole cover at url, sending apiKey only to url's origin,
 // before returning it with its content type, both legs inside ctx's deadline
 // or, when it has none, 30 s. A 404 answers false; a body over
-// MaxPosterBytes is Protocol.
+// maxPosterBytes is Protocol.
 func (p *Poster) Fetch(ctx context.Context, url, apiKey string) (body io.ReadCloser, contentType string, found bool, err error) {
 	ctx, cancel := httpclient.ContextWithDefaultTimeout(ctx, posterBudget)
 	defer cancel()
@@ -139,11 +139,11 @@ func readPoster(resp *http.Response) (body io.ReadCloser, contentType string, fo
 	case resp.StatusCode != http.StatusOK:
 		return nil, "", false, sourceError(statusCause(resp.StatusCode), fmt.Errorf("poster: HTTP %d", resp.StatusCode))
 	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, MaxPosterBytes+1))
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxPosterBytes+1))
 	switch {
 	case err != nil:
 		return nil, "", false, sourceError(mediasource.Unreachable, fmt.Errorf("poster read: %w", httpclient.LogSafeError(err)))
-	case len(b) > MaxPosterBytes:
+	case len(b) > maxPosterBytes:
 		return nil, "", false, sourceError(mediasource.Protocol, errPosterTooLarge)
 	}
 	return io.NopCloser(bytes.NewReader(b)), resp.Header.Get("Content-Type"), true, nil
@@ -158,6 +158,6 @@ func isRedirect(code int) bool {
 }
 
 func drain(resp *http.Response) {
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxPosterBytes))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxPosterBytes))
 	_ = resp.Body.Close()
 }

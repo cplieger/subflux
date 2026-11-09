@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/bolttable"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/status"
 )
 
@@ -234,7 +235,7 @@ func (s *Store) DeleteJobsEndedBefore(ctx context.Context, t time.Time) (int, er
 
 func jobRowOf(j *status.Job) jobRow {
 	r := jobRow{
-		Started: j.Started, Ended: j.Ended, Scope: j.Scope, Phase: j.Phase, Cause: j.Cause,
+		Started: j.Started, Ended: j.Ended, Scope: j.Scope, Source: string(j.Source), Phase: j.Phase, Cause: j.Cause,
 		Owner: j.Owner, Done: j.Done, Total: j.Total, Rev: j.Rev,
 		Kind: uint8(j.Kind), State: uint8(j.State), Outcome: uint8(j.Outcome), Cancellable: j.Cancellable,
 	}
@@ -246,7 +247,7 @@ func jobRowOf(j *status.Job) jobRow {
 
 func jobOf(id status.JobID, r *jobRow) status.Job {
 	j := status.Job{
-		ID: id, Started: r.Started, Ended: r.Ended, Scope: r.Scope, Phase: r.Phase, Cause: r.Cause,
+		ID: id, Started: r.Started, Ended: r.Ended, Scope: r.Scope, Source: media.SourceID(r.Source), Phase: r.Phase, Cause: r.Cause,
 		Owner: r.Owner, Done: r.Done, Total: r.Total, Rev: r.Rev,
 		Kind: status.Kind(r.Kind), State: status.State(r.State), Outcome: status.Outcome(r.Outcome), Cancellable: r.Cancellable,
 	}

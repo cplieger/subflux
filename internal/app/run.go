@@ -16,7 +16,9 @@ import (
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
 	"github.com/cplieger/go/slogx"
+	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/settings"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"
@@ -36,7 +38,6 @@ var DefaultPaths = Paths{Config: "/config/config.yaml", Store: "/config/subflux.
 
 // Config is what Run boots from. Every field but Paths is optional.
 type Config struct {
-	Registries settings.Registries
 	// Listener, when set, replaces binding the HTTP port (tests).
 	Listener net.Listener
 	// LogOutput is where the process logs; nil is stderr.
@@ -48,6 +49,13 @@ type Config struct {
 	Settings func(*settings.Service)
 	// Gather, when set, receives the metrics registry's Gather (tests).
 	Gather func(func(context.Context) ([]measure.Family, error))
+	// Status, when set, receives the status store once it is built (tests).
+	Status func(*status.Store)
+	// Scanner, when set, receives the media sources' Scanner once the first
+	// Active settings build it (tests).
+	Scanner func(*scan.Scanner)
+	// Orders, when set, replaces the aired order join over SkyHook (tests).
+	Orders mediasource.OrderJoin
 	Paths  Paths
 }
 
@@ -74,12 +82,11 @@ var (
 // activateFunc makes a parsed configuration live in the store.
 type activateFunc = func(context.Context, settings.Active) error
 
-// Test seams: what status persists through, the activate function boot and
-// every Save call, and a hook receiving the status store once built.
+// Test seams: what status persists through, and the activate function boot
+// and every Save call.
 var (
 	statusPersister = func(s *statedb.Store) status.Persister { return s }
 	wrapActivate    = func(f activateFunc) activateFunc { return f }
-	statusBuilt     = func(*status.Store) {}
 )
 
 // Run boots and serves until ctx ends or a component returns, then drains.
@@ -90,7 +97,7 @@ var (
 // overrun, for a request or job still on it. cmd/subflux exits 1 on any
 // error.
 func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam: callers build Config inline and Run reads it once
-	snap := settings.Load(cfg.Paths.Config, cfg.Registries)
+	snap := settings.Load(cfg.Paths.Config, registries)
 	level, format := setupLogging(snap, cfg.LogOutput)
 	logLoad(snap)
 	marker := health.NewMarker(cfg.Paths.Health)
@@ -131,23 +138,35 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		slog.Error("app: could not open the job records", "error", err)
 		return nil, fmt.Errorf("app: %w", err)
 	}
-	statusBuilt(st)
+	if cfg.Status != nil {
+		cfg.Status(st)
+	}
 	m := obs.New()
 	m.SetConfigMode(modeName(snap))
 	if cfg.Gather != nil {
 		cfg.Gather(m.Gather)
 	}
 	activate := wrapActivate(func(ctx context.Context, a settings.Active) error {
-		return store.Activate(ctx, statedb.Activation{Languages: a.Languages})
+		ids := sourceIDs(&a)
+		if aerr := store.Activate(ctx, statedb.Activation{Languages: a.Languages, Sources: ids}); aerr != nil {
+			return aerr
+		}
+		retainSources(st, ids)
+		return nil
 	})
-	svc := settings.NewService(cfg.Paths.Config, cfg.Registries, snap, activate, nil)
+	deps := sourceDeps(slog.Default())
+	svc := settings.NewService(cfg.Paths.Config, registries, snap, activate, saveCheck(deps))
 	if cfg.Settings != nil {
 		cfg.Settings(svc)
 	}
+	orders := cfg.Orders
+	if orders == nil {
+		orders = airedOrders(deps, store)
+	}
+	sources := newSourcesLoop(svc.Snapshot, deps, orders, store, st, m, cfg.Scanner)
 	if a, ok := snap.Active(); ok {
-		if err = activate(ctx, a); err != nil {
-			slog.Error("app: could not activate the loaded settings", "error", err)
-			return nil, fmt.Errorf("app: activate the loaded settings: %w", err)
+		if bootErr := activateLoaded(ctx, &a, activate, sources); bootErr != nil {
+			return nil, bootErr
 		}
 	}
 
@@ -165,12 +184,13 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		httpserver.WithMaxHeaderBytes(maxHeaderBytes),
 		httpserver.WithSlogErrorLog(slog.LevelWarn),
 	)
-	loop := &changeLoop{svc: svc, level: p.level, metrics: m, alerts: st, running: p.format}
+	loop := &changeLoop{svc: svc, level: p.level, metrics: m, alerts: st, applied: sources.signal, running: p.format}
 	slog.Info("HTTP server listening", "addr", ln.Addr().String())
 	return &supervision{
 		producers: []component{
 			httpProducer(srv, ln),
 			{name: "settings change loop", run: loop.run},
+			{name: "media sources", run: sources.run},
 			{name: "alert metrics", run: func(ctx context.Context) error { return alertMetrics(ctx, st, m) }},
 		},
 		sinks:            []component{{name: "job records", run: st.Run}},
@@ -179,6 +199,20 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		drainBudget:      drainBudget,
 		httpGrace:        httpGrace,
 	}, nil
+}
+
+// activateLoaded activates the loaded settings a and builds the media
+// sources over them, either failing boot.
+func activateLoaded(ctx context.Context, a *settings.Active, activate activateFunc, sources *sourcesLoop) error {
+	if err := activate(ctx, *a); err != nil {
+		slog.Error("app: could not activate the loaded settings", "error", err)
+		return fmt.Errorf("app: activate the loaded settings: %w", err)
+	}
+	if err := sources.apply(); err != nil {
+		slog.Error("app: could not build the media sources", "error", err)
+		return fmt.Errorf("app: build the media sources: %w", err)
+	}
+	return nil
 }
 
 // modeName is snap's mode as config_mode labels it.

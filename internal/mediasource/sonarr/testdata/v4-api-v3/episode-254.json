@@ -1,0 +1,341 @@
+[
+ {
+  "seriesId": 254,
+  "tvdbId": 8170671,
+  "episodeFileId": 406270,
+  "seasonNumber": 1,
+  "episodeNumber": 1,
+  "title": "First Era, Part 1",
+  "airDate": "1985-04-01",
+  "airDateUtc": "1985-04-01T05:00:00Z",
+  "lastSearchTime": "2026-01-08T20:08:46Z",
+  "runtime": 154,
+  "episodeFile": {
+   "seriesId": 254,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Shoah (1985) - S01E01-E02 - First Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "path": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E01-E02 - First Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "size": 25969893762,
+   "dateAdded": "2026-01-10T12:33:12Z",
+   "sceneName": "Shoah.1985.720p.BluRay.AAC1.0.x264-VietHD",
+   "releaseGroup": "VietHD",
+   "languages": [
+    {
+     "id": 2,
+     "name": "French"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 6,
+     "name": "Bluray-720p",
+     "source": "bluray",
+     "resolution": 720
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 0,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 1,
+    "audioCodec": "AAC",
+    "audioLanguages": "fre",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "x264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "986x720",
+    "runTime": "4:34:12",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng"
+   },
+   "qualityCutoffNotMet": true,
+   "id": 406270
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 21606
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 8170672,
+  "episodeFileId": 406270,
+  "seasonNumber": 1,
+  "episodeNumber": 2,
+  "title": "First Era, Part 2",
+  "airDate": "1985-04-01",
+  "airDateUtc": "1985-04-01T05:00:00Z",
+  "lastSearchTime": "2026-01-08T20:08:46Z",
+  "runtime": 121,
+  "episodeFile": {
+   "seriesId": 254,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Shoah (1985) - S01E01-E02 - First Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "path": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E01-E02 - First Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "size": 25969893762,
+   "dateAdded": "2026-01-10T12:33:12Z",
+   "sceneName": "Shoah.1985.720p.BluRay.AAC1.0.x264-VietHD",
+   "releaseGroup": "VietHD",
+   "languages": [
+    {
+     "id": 2,
+     "name": "French"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 6,
+     "name": "Bluray-720p",
+     "source": "bluray",
+     "resolution": 720
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 0,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 1,
+    "audioCodec": "AAC",
+    "audioLanguages": "fre",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "x264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "986x720",
+    "runTime": "4:34:12",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng"
+   },
+   "qualityCutoffNotMet": true,
+   "id": 406270
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 21607
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 8170673,
+  "episodeFileId": 406271,
+  "seasonNumber": 1,
+  "episodeNumber": 3,
+  "title": "Second Era, Part 1",
+  "airDate": "1985-04-01",
+  "airDateUtc": "1985-04-01T05:00:00Z",
+  "lastSearchTime": "2026-01-08T20:08:46Z",
+  "runtime": 146,
+  "episodeFile": {
+   "seriesId": 254,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Shoah (1985) - S01E03-E04 - Second Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "path": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E03-E04 - Second Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "size": 27740862322,
+   "dateAdded": "2026-01-10T12:33:14Z",
+   "sceneName": "Shoah.1985.720p.BluRay.AAC1.0.x264-VietHD",
+   "releaseGroup": "VietHD",
+   "languages": [
+    {
+     "id": 2,
+     "name": "French"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 6,
+     "name": "Bluray-720p",
+     "source": "bluray",
+     "resolution": 720
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 0,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 1,
+    "audioCodec": "AAC",
+    "audioLanguages": "fre",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "x264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "986x720",
+    "runTime": "4:52:58",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng"
+   },
+   "qualityCutoffNotMet": true,
+   "id": 406271
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 21608
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 8170674,
+  "episodeFileId": 406271,
+  "seasonNumber": 1,
+  "episodeNumber": 4,
+  "title": "Second Era, Part 2",
+  "airDate": "1985-04-01",
+  "airDateUtc": "1985-04-01T05:00:00Z",
+  "lastSearchTime": "2026-01-08T20:08:46Z",
+  "runtime": 147,
+  "finaleType": "series",
+  "episodeFile": {
+   "seriesId": 254,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Shoah (1985) - S01E03-E04 - Second Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "path": "/media/tv/Shoah (1985) {imdb-tt0090015}/Season 01/Shoah (1985) - S01E03-E04 - Second Era [Bluray-720p][AAC 1.0][x264]-VietHD.mkv",
+   "size": 27740862322,
+   "dateAdded": "2026-01-10T12:33:14Z",
+   "sceneName": "Shoah.1985.720p.BluRay.AAC1.0.x264-VietHD",
+   "releaseGroup": "VietHD",
+   "languages": [
+    {
+     "id": 2,
+     "name": "French"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 6,
+     "name": "Bluray-720p",
+     "source": "bluray",
+     "resolution": 720
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 0,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "audioBitrate": 0,
+    "audioChannels": 1,
+    "audioCodec": "AAC",
+    "audioLanguages": "fre",
+    "audioStreamCount": 1,
+    "videoBitDepth": 8,
+    "videoBitrate": 0,
+    "videoCodec": "x264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "986x720",
+    "runTime": "4:52:58",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng"
+   },
+   "qualityCutoffNotMet": true,
+   "id": 406271
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 21609
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 9859819,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 1,
+  "title": "TBA",
+  "airDate": "2013-06-25",
+  "airDateUtc": "2013-06-25T04:00:00Z",
+  "runtime": 60,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 49332
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 9859820,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 2,
+  "title": "TBA",
+  "airDate": "2013-06-25",
+  "airDateUtc": "2013-06-25T06:22:00Z",
+  "runtime": 13,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 49333
+ },
+ {
+  "seriesId": 254,
+  "tvdbId": 9859821,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 3,
+  "title": "TBA",
+  "airDate": "2013-06-25",
+  "airDateUtc": "2013-06-25T08:44:00Z",
+  "runtime": 33,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 49334
+ }
+]

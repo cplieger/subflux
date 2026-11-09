@@ -1,0 +1,615 @@
+[
+ {
+  "title": "My Neighbor Totoro",
+  "originalTitle": "となりのトトロ",
+  "originalLanguage": {
+   "id": 8,
+   "name": "Japanese"
+  },
+  "alternateTitles": [
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Tonari no Totoro",
+    "id": 2298
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Magiska äventyr med Totoro",
+    "id": 2299
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Totoro",
+    "id": 2300
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Näkymätön ystävä",
+    "id": 2301
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Totoro auzokidea",
+    "id": 2302
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Mon Voisin Totoro",
+    "id": 2303
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Komşum Totoro",
+    "id": 2304
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "龍貓",
+    "id": 11526
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "이웃집 토토로",
+    "id": 14387
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "My Neighbour Totoro",
+    "id": 16271
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Min nabo Totoro",
+    "id": 21393
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Qonşum Totoro",
+    "id": 25871
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "龙猫",
+    "id": 39322
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Η Γειτονιά του Δάσους: Οι Περιπέτειες του Τοτόρο",
+    "id": 55730
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Mening qo‘shnim Totoro",
+    "id": 63325
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Мой сосед Тоторо",
+    "id": 64580
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 145,
+    "title": "Meu Amigo Totoro",
+    "id": 70925
+   }
+  ],
+  "secondaryYear": 1989,
+  "secondaryYearSourceId": 0,
+  "sortTitle": "my neighbor totoro",
+  "sizeOnDisk": 13030786285,
+  "status": "released",
+  "inCinemas": "1988-04-16T00:00:00Z",
+  "physicalRelease": "1995-03-08T00:00:00Z",
+  "digitalRelease": "1995-06-06T00:00:00Z",
+  "releaseDate": "1988-04-16T00:00:00Z",
+  "images": [
+   {
+    "coverType": "poster",
+    "url": "/MediaCover/152/poster.jpg?h=5dd24b48dfac59220eda",
+    "remoteUrl": "https://image.tmdb.org/t/p/original/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg"
+   },
+   {
+    "coverType": "fanart",
+    "url": "/MediaCover/152/fanart.jpg?h=81c97c4c23e8d4eb4b34",
+    "remoteUrl": "https://image.tmdb.org/t/p/original/zkThiZAaAie8Lw7RAc5yPTOewBV.jpg"
+   }
+  ],
+  "website": "https://gkids.com/films/my-neighbor-totoro",
+  "year": 1988,
+  "youTubeTrailerId": "_nv94fL_IA8",
+  "studio": "Studio Ghibli",
+  "path": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}",
+  "qualityProfileId": 18,
+  "hasFile": true,
+  "movieFileId": 30311,
+  "monitored": false,
+  "minimumAvailability": "inCinemas",
+  "isAvailable": true,
+  "folderName": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}",
+  "runtime": 86,
+  "cleanTitle": "myneighbortotoro",
+  "imdbId": "tt0096283",
+  "tmdbId": 8392,
+  "titleSlug": "8392",
+  "rootFolderPath": "/media/animemovies",
+  "certification": "G",
+  "genres": [
+   "Fantasy",
+   "Animation",
+   "Family"
+  ],
+  "keywords": [
+   "anime",
+   "hospital",
+   "leave",
+   "magical creature",
+   "magical realism",
+   "mother",
+   "new home",
+   "new neighbor",
+   "rural area",
+   "sibling relationship",
+   "super power",
+   "village"
+  ],
+  "tags": [],
+  "added": "2022-08-16T22:05:52Z",
+  "ratings": {
+   "imdb": {
+    "votes": 442682,
+    "value": 8.1,
+    "type": "user"
+   },
+   "tmdb": {
+    "votes": 9224,
+    "value": 8.07,
+    "type": "user"
+   },
+   "metacritic": {
+    "votes": 0,
+    "value": 87,
+    "type": "user"
+   },
+   "rottenTomatoes": {
+    "votes": 0,
+    "value": 94,
+    "type": "user"
+   },
+   "trakt": {
+    "votes": 16511,
+    "value": 8.34038,
+    "type": "user"
+   }
+  },
+  "movieFile": {
+   "movieId": 152,
+   "relativePath": "My Neighbor Totoro (1988) {imdb-tt0096283} - [WEBDL-1080p][FLAC 2.0][x264]-REVO.mkv",
+   "path": "/media/animemovies/My Neighbor Totoro (1988) {imdb-tt0096283}/My Neighbor Totoro (1988) {imdb-tt0096283} - [WEBDL-1080p][FLAC 2.0][x264]-REVO.mkv",
+   "size": 13030786285,
+   "dateAdded": "2026-01-19T15:31:10Z",
+   "sceneName": "[REVO]My Neighbor Totoro[10bit,1080p,FLAC,FoxDUB] [ACEDE53E]",
+   "releaseGroup": "REVO",
+   "edition": "",
+   "languages": [
+    {
+     "id": 8,
+     "name": "Japanese"
+    },
+    {
+     "id": 1,
+     "name": "English"
+    },
+    {
+     "id": 2,
+     "name": "French"
+    },
+    {
+     "id": 4,
+     "name": "German"
+    },
+    {
+     "id": 5,
+     "name": "Italian"
+    },
+    {
+     "id": 21,
+     "name": "Korean"
+    },
+    {
+     "id": 10,
+     "name": "Chinese"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "webdl",
+     "resolution": 1080,
+     "modifier": "none"
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "indexerFlags": 384,
+   "mediaInfo": {
+    "audioBitrate": 1396335,
+    "audioChannels": 2,
+    "audioCodec": "FLAC",
+    "audioLanguages": "jpn/eng/eng/fre/ger/ita/kor/chi/chi",
+    "audioStreamCount": 9,
+    "videoBitDepth": 10,
+    "videoBitrate": 17073655,
+    "videoCodec": "x264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1038",
+    "runTime": "1:26:25",
+    "scanType": "Progressive",
+    "subtitles": "eng/fre/ger/ita/eng/kor/chi/chi"
+   },
+   "originalFilePath": "[REVO]My Neighbor Totoro[10bit,1080p,FLAC,FoxDUB] [ACEDE53E].mkv",
+   "qualityCutoffNotMet": true,
+   "id": 30311
+  },
+  "popularity": 23.2854,
+  "lastSearchTime": "2026-07-10T23:00:25Z",
+  "statistics": {
+   "movieFileCount": 1,
+   "sizeOnDisk": 13030786285,
+   "releaseGroups": [
+    "REVO"
+   ],
+   "movieFileQualities": [
+    {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "webdl",
+     "resolution": 1080,
+     "modifier": "none"
+    }
+   ]
+  },
+  "id": 152
+ },
+ {
+  "title": "Fast Forever",
+  "originalTitle": "Fast Forever",
+  "originalLanguage": {
+   "id": 1,
+   "name": "English"
+  },
+  "alternateTitles": [
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Fast & Furious 11",
+    "id": 26151
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Quá Nhanh Quá Nguy Hiểm 11",
+    "id": 26152
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "A todo gas 10 - Parte 2",
+    "id": 27550
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Velozes e Furiosos 10: Parte 2",
+    "id": 30358
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Hızlı ve Öfkeli 11",
+    "id": 77713
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Fast X: Part 2",
+    "id": 77714
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Velozes & Furiosos 11",
+    "id": 77716
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Velozes e Furiosos 11",
+    "id": 77717
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 2808,
+    "title": "Rapido X: Parte 2",
+    "id": 78503
+   }
+  ],
+  "secondaryYearSourceId": 0,
+  "sortTitle": "fast forever",
+  "sizeOnDisk": 0,
+  "status": "announced",
+  "inCinemas": "2028-03-15T00:00:00Z",
+  "releaseDate": "2028-03-15T00:00:00Z",
+  "images": [
+   {
+    "coverType": "poster",
+    "url": "/MediaCover/2807/poster.jpg?h=b0cd295c63cdf828cb89",
+    "remoteUrl": "https://image.tmdb.org/t/p/original/xaRzhQZ3zK5lN6vEetG8PD17KPF.jpg"
+   }
+  ],
+  "website": "https://www.universalpictures.com/movies/fast-forever",
+  "year": 2028,
+  "youTubeTrailerId": "",
+  "studio": "Universal Pictures",
+  "path": "/media/movies/Fast X Part 2 (2025) {imdb-tt27550022}",
+  "qualityProfileId": 21,
+  "hasFile": false,
+  "movieFileId": 0,
+  "monitored": true,
+  "minimumAvailability": "inCinemas",
+  "isAvailable": false,
+  "folderName": "/media/movies/Fast X Part 2 (2025) {imdb-tt27550022}",
+  "runtime": 0,
+  "cleanTitle": "fastforever",
+  "imdbId": "tt27550022",
+  "tmdbId": 755679,
+  "titleSlug": "755679",
+  "rootFolderPath": "/media/movies",
+  "genres": [
+   "Action",
+   "Crime",
+   "Thriller"
+  ],
+  "keywords": [
+   "cars",
+   "family",
+   "racing",
+   "sequel"
+  ],
+  "tags": [],
+  "added": "2023-11-10T01:02:33Z",
+  "ratings": {
+   "tmdb": {
+    "votes": 0,
+    "value": 0,
+    "type": "user"
+   }
+  },
+  "collection": {
+   "title": "The Fast and the Furious Collection",
+   "tmdbId": 9485
+  },
+  "popularity": 12.8734,
+  "statistics": {
+   "movieFileCount": 0,
+   "sizeOnDisk": 0,
+   "releaseGroups": [],
+   "movieFileQualities": []
+  },
+  "id": 2807
+ },
+ {
+  "title": "Scrapper",
+  "originalTitle": "Scrapper",
+  "originalLanguage": {
+   "id": 1,
+   "name": "English"
+  },
+  "alternateTitles": [
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 3244,
+    "title": "Nan",
+    "id": 27742
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 3244,
+    "title": "Yet To Be",
+    "id": 27743
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 3244,
+    "title": "A vadóc",
+    "id": 27744
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 3244,
+    "title": "Georgies Verden",
+    "id": 27745
+   },
+   {
+    "sourceType": "tmdb",
+    "movieMetadataId": 3244,
+    "title": "SCRAPPERスクラッパー",
+    "id": 57073
+   }
+  ],
+  "secondaryYearSourceId": 0,
+  "sortTitle": "scrapper",
+  "sizeOnDisk": 9455630394,
+  "status": "released",
+  "inCinemas": "2023-08-25T00:00:00Z",
+  "physicalRelease": "2023-11-07T00:00:00Z",
+  "digitalRelease": "2023-11-07T00:00:00Z",
+  "releaseDate": "2023-11-07T00:00:00Z",
+  "images": [
+   {
+    "coverType": "poster",
+    "url": "/MediaCover/3017/poster.jpg?h=237af298e8713f8e89f2",
+    "remoteUrl": "https://image.tmdb.org/t/p/original/fezRPcjrd4whodnVVcFRCgDpK11.jpg"
+   },
+   {
+    "coverType": "fanart",
+    "url": "/MediaCover/3017/fanart.jpg?h=4926ba081ba082bdc493",
+    "remoteUrl": "https://image.tmdb.org/t/p/original/8VwWeOAgVZDgWYzmOeLswRGqIcg.jpg"
+   }
+  ],
+  "website": "http://scrapper.film",
+  "year": 2023,
+  "youTubeTrailerId": "slyUJ1_eK4E",
+  "studio": "DMC Film",
+  "path": "/media/movies/Scrapper (2023) {imdb-tt8649252}",
+  "qualityProfileId": 21,
+  "hasFile": true,
+  "movieFileId": 30993,
+  "monitored": true,
+  "minimumAvailability": "released",
+  "isAvailable": true,
+  "folderName": "/media/movies/Scrapper (2023) {imdb-tt8649252}",
+  "runtime": 84,
+  "cleanTitle": "scrapper",
+  "imdbId": "tt8649252",
+  "tmdbId": 935906,
+  "titleSlug": "935906",
+  "rootFolderPath": "/media/movies",
+  "certification": "NR",
+  "genres": [
+   "Comedy",
+   "Drama"
+  ],
+  "keywords": [
+   "death of mother",
+   "father daughter relationship",
+   "grief",
+   "london, england",
+   "theft",
+   "woman director"
+  ],
+  "tags": [
+   5
+  ],
+  "added": "2024-01-08T13:13:42Z",
+  "ratings": {
+   "imdb": {
+    "votes": 8844,
+    "value": 6.9,
+    "type": "user"
+   },
+   "tmdb": {
+    "votes": 198,
+    "value": 6.7,
+    "type": "user"
+   },
+   "metacritic": {
+    "votes": 0,
+    "value": 74,
+    "type": "user"
+   },
+   "rottenTomatoes": {
+    "votes": 0,
+    "value": 94,
+    "type": "user"
+   },
+   "trakt": {
+    "votes": 486,
+    "value": 7.05967,
+    "type": "user"
+   }
+  },
+  "movieFile": {
+   "movieId": 3017,
+   "relativePath": "Scrapper (2023) {imdb-tt8649252} - [Bluray-1080p][EAC3 5.1][x264]-SbR.mkv",
+   "path": "/media/movies/Scrapper (2023) {imdb-tt8649252}/Scrapper (2023) {imdb-tt8649252} - [Bluray-1080p][EAC3 5.1][x264]-SbR.mkv",
+   "size": 9455630394,
+   "dateAdded": "2026-01-21T03:16:04Z",
+   "sceneName": "Scrapper.2023.1080p.BluRay.DD+5.1.x264-SbR",
+   "releaseGroup": "SbR",
+   "edition": "",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080,
+     "modifier": "none"
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "indexerFlags": 34,
+   "mediaInfo": {
+    "audioBitrate": 1024000,
+    "audioChannels": 5.1,
+    "audioCodec": "EAC3",
+    "audioLanguages": "eng/eng",
+    "audioStreamCount": 2,
+    "videoBitDepth": 8,
+    "videoBitrate": 13799502,
+    "videoCodec": "x264",
+    "videoFps": 24,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x804",
+    "runTime": "1:23:56",
+    "scanType": "Progressive",
+    "subtitles": "eng/eng"
+   },
+   "originalFilePath": "Scrapper.2023.1080p.BluRay.DD+5.1.x264-SbR.mkv",
+   "qualityCutoffNotMet": false,
+   "id": 30993
+  },
+  "popularity": 2.5662,
+  "lastSearchTime": "2026-01-21T02:42:23Z",
+  "statistics": {
+   "movieFileCount": 1,
+   "sizeOnDisk": 9455630394,
+   "releaseGroups": [
+    "SbR"
+   ],
+   "movieFileQualities": [
+    {
+     "id": 7,
+     "name": "Bluray-1080p",
+     "source": "bluray",
+     "resolution": 1080,
+     "modifier": "none"
+    }
+   ]
+  },
+  "id": 3017
+ }
+]

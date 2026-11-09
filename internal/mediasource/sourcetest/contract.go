@@ -1,6 +1,7 @@
 package sourcetest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -104,7 +105,7 @@ func checkSchema(t *testing.T, s formschema.Schema) {
 
 func contractSet(t *testing.T, kind mediasource.AdapterKind, cfg *mediasource.Config) *mediasource.Set {
 	t.Helper()
-	set, err := mediasource.NewSet([]mediasource.AdapterKind{kind}, []mediasource.Config{*cfg}, mediasource.Deps{Logger: slog.New(slog.DiscardHandler)})
+	set, err := mediasource.NewSet([]mediasource.AdapterKind{kind}, []mediasource.Config{*cfg}, mediasource.Deps{Logger: slog.New(slog.DiscardHandler)}, OwnPlaces{})
 	if err != nil {
 		t.Fatalf("NewSet = %v", err)
 	}
@@ -339,4 +340,18 @@ func cause(err error) mediasource.Cause {
 
 func sameRefs(a, b []mediasource.NativeRef) bool {
 	return len(a) == len(b) && !slices.ContainsFunc(a, func(r mediasource.NativeRef) bool { return !slices.Contains(b, r) })
+}
+
+// OwnPlaces is an OrderJoin answering every listed episode at its own place
+// with no evidence, as the aired order joins, so a Set over it keys what the
+// adapter lists.
+type OwnPlaces struct{}
+
+// Join answers q's episodes at their own places.
+func (OwnPlaces) Join(_ context.Context, q mediasource.JoinQuery) ([]mediasource.Joined, *mediasource.RootEvidence, error) { //nolint:gocritic // hugeParam: mediasource.OrderJoin passes the query by value
+	out := make([]mediasource.Joined, len(q.Episodes))
+	for i, e := range q.Episodes {
+		out[i] = mediasource.Joined{Season: e.Season, Episode: e.Episode, Absolute: e.Absolute, OK: true}
+	}
+	return out, nil, nil
 }

@@ -57,18 +57,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#SourceAlert",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until MS-2 (internal/status#SourceAlert): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#SourceOverlapAlert",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until MS-2 (internal/status#SourceOverlapAlert): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlert",
       "path": "internal/status/sources.go",
       "reason": "Retained until MS-3 (internal/status#MediaServerAlert): its first caller outside the package lands there."
@@ -135,21 +123,9 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#FromName",
-      "path": "internal/language/fromname.go",
-      "reason": "Retained until MS-2 (internal/language#FromName): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#Policy.Automatic",
       "path": "internal/language/grade.go",
       "reason": "Retained until SE-2 (internal/language#Policy.Automatic): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/language#ISO3",
-      "path": "internal/language/iso3.go",
-      "reason": "Retained until MS-2 (internal/language#ISO3): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -218,168 +194,6 @@
       "reason": "The cost counter TestWorstCaseAtTheClamp reads to pin the package doc's O(n²·m) bound; one increment per queue insertion, no production reader by design."
     },
     {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Schedule.Change",
-      "path": "internal/mediasource/schedule.go",
-      "reason": "Retained until MS-2 (internal/mediasource#Schedule.Change): scan's per-source loop, its first reader outside the tests, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Schedule.Whole",
-      "path": "internal/mediasource/schedule.go",
-      "reason": "Retained until MS-2 (internal/mediasource#Schedule.Whole): scan's per-source loop, its first reader outside the tests, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ScheduleSchema",
-      "path": "internal/mediasource/schedule.go",
-      "reason": "Retained until MS-2 (internal/mediasource#ScheduleSchema): the scan section's row in settings, its first caller outside the file, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#MaxPosterBytes",
-      "path": "internal/mediasource/arr/poster.go",
-      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first callers outside the package, land there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.APIKey",
-      "path": "internal/mediasource/arr/schema.go",
-      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/arr#Values.URL",
-      "path": "internal/mediasource/arr/schema.go",
-      "reason": "Retained until MS-2 (internal/mediasource/arr#*): the Sonarr and Radarr adapters, its first readers outside the tests, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Event",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Event.Seq",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.Remove",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.SetTags",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.SetFolders",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource/sourcetest#Library.Snapshot",
-      "path": "internal/mediasource/sourcetest/library.go",
-      "reason": "Retained until MS-2 (internal/mediasource/sourcetest#*): the Sonarr and Radarr adapter suites, its first users outside the package, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Client",
-      "path": "internal/skyhook/client.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#New",
-      "path": "internal/skyhook/client.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Client.Show",
-      "path": "internal/skyhook/client.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#MaxBody",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Show",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order.Type",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Order.Name",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.AirDate",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Title",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.ID",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Season",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Number",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/skyhook#Episode.Absolute",
-      "path": "internal/skyhook/show.go",
-      "reason": "Retained until MS-2 (internal/skyhook#*): seriesorder, its first caller, lands there."
-    },
-    {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.Encode",
       "path": "internal/subtitleenc/codec.go",
@@ -414,24 +228,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/media#ParseRootKey",
       "path": "internal/media/key.go",
       "reason": "Retained until AP-1 (internal/media#ParseRootKey): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Catalogue.Validate",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until MS-2 (internal/mediasource#Catalogue.Validate): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#TitleSet.Validate",
-      "path": "internal/mediasource/catalogue.go",
-      "reason": "Retained until MS-2 (internal/mediasource#TitleSet.Validate): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#Listed",
-      "path": "internal/mediasource/join.go",
-      "reason": "Retained until MS-2 (internal/mediasource#Listed): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -486,12 +282,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Backup",
       "path": "internal/statedb/backup.go",
       "reason": "Retained until PA-2 (internal/statedb#Store.Backup): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageCount",
-      "path": "internal/statedb/counts.go",
-      "reason": "Retained until AP-1b (internal/statedb#CoverageCount): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -561,12 +351,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RootEvidence",
-      "path": "internal/statedb/evidence.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.RootEvidence): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkHistory",
       "path": "internal/statedb/feed.go",
       "reason": "Retained until AP-1b (internal/statedb#MarkHistory): its first caller outside the package lands there."
@@ -624,12 +408,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ParseInstanceID",
       "path": "internal/statedb/ids.go",
       "reason": "Retained until AP-1b (internal/statedb#ParseInstanceID): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WorkCause",
-      "path": "internal/statedb/ids.go",
-      "reason": "Retained until SE-2 (internal/statedb#WorkCause): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -771,12 +549,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.SetLock",
-      "path": "internal/statedb/locks.go",
-      "reason": "Retained until AP-1b (internal/statedb#Store.SetLock): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.NoteRefusal",
       "path": "internal/statedb/locks.go",
       "reason": "Retained until SE-2 (internal/statedb#Store.NoteRefusal): its first caller outside the package lands there."
@@ -801,27 +573,9 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrSourceInactive",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#ErrSourceInactive): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrPassUnknown",
       "path": "internal/statedb/pass.go",
       "reason": "Retained until OW-6 (internal/statedb#ErrPassUnknown): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.SourceCursor",
-      "path": "internal/statedb/pass.go",
-      "reason": "Retained until MS-2 (internal/statedb#Store.SourceCursor): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootRow",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until AP-1b (internal/statedb#RootRow): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -927,21 +681,9 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Roots",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until AP-1b (internal/statedb#Store.Roots): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Root",
       "path": "internal/statedb/reads.go",
       "reason": "Retained until AP-1b (internal/statedb#Store.Root): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Items",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until AP-1b (internal/statedb#Store.Items): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -962,12 +704,6 @@
       "reason": "Retained until MR-1 (internal/statedb#Store.RootTargets): its first caller outside the package lands there."
     },
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Work",
-      "path": "internal/statedb/work.go",
-      "reason": "Retained until SE-2 (internal/statedb#Work): its first caller outside the package lands there."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Work.Cause",
       "path": "internal/statedb/work.go",
@@ -978,18 +714,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.EnqueueWork",
       "path": "internal/statedb/work.go",
       "reason": "Retained until SE-2 (internal/statedb#Store.EnqueueWork): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.NextWork",
-      "path": "internal/statedb/work.go",
-      "reason": "Retained until SE-2 (internal/statedb#Store.NextWork): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.AckWork",
-      "path": "internal/statedb/work.go",
-      "reason": "Retained until SE-2 (internal/statedb#Store.AckWork): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -1038,6 +762,12 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.WriteHealth",
       "path": "internal/statedb/write.go",
       "reason": "Retained until PA-2 (internal/statedb#Store.WriteHealth): its first caller outside the package lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrSourceInactive",
+      "path": "internal/statedb/pass.go",
+      "reason": "Retained until AP-1 (internal/statedb#ErrSourceInactive): api's error codes, its first reader outside the package, land there."
     },
     {
       "code": "DS1501",
@@ -1596,6 +1326,18 @@
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Inventory.Unwritable",
       "path": "internal/mediawrite/inventory.go",
       "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ScheduleSchema",
+      "path": "internal/mediasource/schedule.go",
+      "reason": "Retained until PA-2 (internal/mediasource#ScheduleSchema): the settings section schemas, its first reader outside the file, land there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/seriesorder#Service.Evidence",
+      "path": "internal/seriesorder/evidence.go",
+      "reason": "Retained until SE-2 (internal/seriesorder#Service.Evidence): search's engine, its first caller outside the package, lands there."
     }
   ]
 }

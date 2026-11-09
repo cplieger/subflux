@@ -1,0 +1,79 @@
+[
+ {
+  "file": "api.json",
+  "path": "/api",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "system-status.json",
+  "path": "/api/v3/system/status",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "series.json",
+  "path": "/api/v3/series",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "episode-133.json",
+  "path": "/api/v3/episode",
+  "query": "seriesId=133&includeEpisodeFile=true",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "episode-697.json",
+  "path": "/api/v3/episode",
+  "query": "seriesId=697&includeEpisodeFile=true",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "episode-254.json",
+  "path": "/api/v3/episode",
+  "query": "seriesId=254&includeEpisodeFile=true",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "series-133.json",
+  "path": "/api/v3/series/133",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "series-999999.404.json",
+  "path": "/api/v3/series/999999",
+  "query": "",
+  "status": 404,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "tag.json",
+  "path": "/api/v3/tag",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "rootfolder.json",
+  "path": "/api/v3/rootfolder",
+  "query": "",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ },
+ {
+  "file": "history-since.json",
+  "path": "/api/v3/history/since",
+  "query": "date=*",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+ }
+]

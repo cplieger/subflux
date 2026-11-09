@@ -10,6 +10,9 @@ type Cursor struct{ b []byte }
 // MarshalBinary returns a copy of the cursor's bytes, none for the zero Cursor.
 func (c Cursor) MarshalBinary() ([]byte, error) { return bytes.Clone(c.b), nil }
 
+// IsZero reports whether c is the zero Cursor, which names no position.
+func (c Cursor) IsZero() bool { return len(c.b) == 0 }
+
 // UnmarshalBinary keeps a copy of b, refusing nothing, so a stored cursor in
 // an unreadable format reaches the adapter's Expired rather than failing every
 // read of it. Empty b is the zero Cursor.

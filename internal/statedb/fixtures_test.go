@@ -115,7 +115,7 @@ func coreFixtures(t *testing.T) []fixture {
 			7, workRow{NotBefore: fixtureAt, FirstDeferral: fixtureAt, Gen: 3, Seq: 12, Cause: uint8(Import)}),
 		fix(t, "jobs", func(c *coreTables) *bolttable.Table[status.JobID, jobRow] { return c.jobs }, jobKeys, jobCodec,
 			"0123456789abcdef0123456789abcdef", jobRow{
-				Started: fixtureAt, Ended: fixtureAt.Add(time.Minute), Key: &jobKeyRow{Key: "k1", Fingerprint: sum32{7}}, Scope: "library",
+				Started: fixtureAt, Ended: fixtureAt.Add(time.Minute), Key: &jobKeyRow{Key: "k1", Fingerprint: sum32{7}}, Scope: "library", Source: "sonarr",
 				Phase: "done", Cause: "manual", Owner: 1, Done: 3, Total: 3, Rev: 4,
 				Kind: uint8(status.Scan), State: uint8(status.Done), Outcome: uint8(status.Succeeded),
 			}),

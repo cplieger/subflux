@@ -1,0 +1,33 @@
+[
+ {
+  "path": "/media/tv",
+  "accessible": true,
+  "freeSpace": 45280543113216,
+  "unmappedFolders": [
+   {
+    "name": "Unmapped Series 1",
+    "path": "/media/tv/Unmapped Series 1",
+    "relativePath": "Unmapped Series 1"
+   },
+   {
+    "name": "Unmapped Series 2",
+    "path": "/media/tv/Unmapped Series 2",
+    "relativePath": "Unmapped Series 2"
+   }
+  ],
+  "id": 6
+ },
+ {
+  "path": "/media/anime",
+  "accessible": true,
+  "freeSpace": 45280543113216,
+  "unmappedFolders": [
+   {
+    "name": "Unmapped Series 1",
+    "path": "/media/anime/Unmapped Series 1",
+    "relativePath": "Unmapped Series 1"
+   }
+  ],
+  "id": 8
+ }
+]

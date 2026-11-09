@@ -1,0 +1,3243 @@
+[
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 1,
+  "title": "Serenity",
+  "airDate": "2005-09-03",
+  "airDateUtc": "2005-09-03T04:00:00Z",
+  "runtime": 119,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 180636
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 2,
+  "title": "Done the Impossible",
+  "airDate": "2006-07-28",
+  "airDateUtc": "2006-07-28T04:00:00Z",
+  "runtime": 45,
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 180637
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 0,
+  "seasonNumber": 0,
+  "episodeNumber": 3,
+  "title": "Browncoats Unite",
+  "airDate": "2012-11-11",
+  "airDateUtc": "2012-11-11T05:00:00Z",
+  "runtime": 45,
+  "finaleType": "season",
+  "hasFile": false,
+  "monitored": false,
+  "unverifiedSceneNumbering": false,
+  "id": 180638
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451878,
+  "seasonNumber": 1,
+  "episodeNumber": 1,
+  "title": "Serenity",
+  "airDate": "2002-12-20",
+  "airDateUtc": "2002-12-20T05:00:00Z",
+  "runtime": 87,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E01 - Serenity [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 - Serenity [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 5190727203,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7721341,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "1:26:42",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451878
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180639
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451879,
+  "seasonNumber": 1,
+  "episodeNumber": 2,
+  "title": "The Train Job",
+  "airDate": "2002-09-20",
+  "airDateUtc": "2002-09-20T04:00:00Z",
+  "runtime": 44,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E02 - The Train Job [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E02 - The Train Job [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2557607861,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7604387,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "43:21",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451879
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180640
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451880,
+  "seasonNumber": 1,
+  "episodeNumber": 3,
+  "title": "Bushwhacked",
+  "airDate": "2002-09-27",
+  "airDateUtc": "2002-09-27T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E03 - Bushwhacked [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E03 - Bushwhacked [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2560724583,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7409658,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:30",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451880
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180641
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451881,
+  "seasonNumber": 1,
+  "episodeNumber": 4,
+  "title": "Shindig",
+  "airDate": "2002-11-01",
+  "airDateUtc": "2002-11-01T05:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E04 - Shindig [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E04 - Shindig [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2591894068,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7489385,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:35",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451881
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180642
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451882,
+  "seasonNumber": 1,
+  "episodeNumber": 5,
+  "title": "Safe",
+  "airDate": "2002-11-08",
+  "airDateUtc": "2002-11-08T05:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E05 - Safe [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E05 - Safe [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2713150198,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7855401,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:34",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451882
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180643
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451883,
+  "seasonNumber": 1,
+  "episodeNumber": 6,
+  "title": "Our Mrs. Reynolds",
+  "airDate": "2002-10-04",
+  "airDateUtc": "2002-10-04T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E06 - Our Mrs. Reynolds [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E06 - Our Mrs. Reynolds [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2651178736,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7669952,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:34",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451883
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180644
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451884,
+  "seasonNumber": 1,
+  "episodeNumber": 7,
+  "title": "Jaynestown",
+  "airDate": "2002-10-18",
+  "airDateUtc": "2002-10-18T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E07 - Jaynestown [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E07 - Jaynestown [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2711863367,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7854291,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451884
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180645
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451885,
+  "seasonNumber": 1,
+  "episodeNumber": 8,
+  "title": "Out of Gas",
+  "airDate": "2002-10-25",
+  "airDateUtc": "2002-10-25T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E08 - Out of Gas [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E08 - Out of Gas [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2760703391,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 8001943,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:32",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451885
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180646
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451886,
+  "seasonNumber": 1,
+  "episodeNumber": 9,
+  "title": "Ariel",
+  "airDate": "2002-11-15",
+  "airDateUtc": "2002-11-15T05:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E09 - Ariel [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E09 - Ariel [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2636578176,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7622090,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:35",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451886
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180647
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451887,
+  "seasonNumber": 1,
+  "episodeNumber": 10,
+  "title": "War Stories",
+  "airDate": "2002-12-06",
+  "airDateUtc": "2002-12-06T05:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E10 - War Stories [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E10 - War Stories [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2562672314,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7417142,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:30",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451887
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180648
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451888,
+  "seasonNumber": 1,
+  "episodeNumber": 11,
+  "title": "Trash",
+  "airDate": "2003-07-21",
+  "airDateUtc": "2003-07-21T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E11 - Trash [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E11 - Trash [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2733627193,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7918859,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451888
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180649
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451889,
+  "seasonNumber": 1,
+  "episodeNumber": 12,
+  "title": "The Message",
+  "airDate": "2003-07-28",
+  "airDateUtc": "2003-07-28T04:00:00Z",
+  "runtime": 45,
+  "finaleType": "series",
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E12 - The Message [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E12 - The Message [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2702266675,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7856488,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:22",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451889
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180650
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451890,
+  "seasonNumber": 1,
+  "episodeNumber": 13,
+  "title": "Heart of Gold",
+  "airDate": "2003-06-23",
+  "airDateUtc": "2003-06-23T04:00:00Z",
+  "runtime": 45,
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E13 - Heart of Gold [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E13 - Heart of Gold [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2724193509,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7890151,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:33",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451890
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180651
+ },
+ {
+  "seriesId": 2188,
+  "tvdbId": 0,
+  "episodeFileId": 451891,
+  "seasonNumber": 1,
+  "episodeNumber": 14,
+  "title": "Objects in Space",
+  "airDate": "2002-12-13",
+  "airDateUtc": "2002-12-13T05:00:00Z",
+  "runtime": 46,
+  "finaleType": "season",
+  "episodeFile": {
+   "seriesId": 2188,
+   "seasonNumber": 1,
+   "relativePath": "Season 01/Firefly (2002) - S01E14 - Objects in Space [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "path": "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E14 - Objects in Space [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv",
+   "size": 2641534513,
+   "dateAdded": "2026-10-16T09:40:23Z",
+   "releaseGroup": "FLUX",
+   "languages": [
+    {
+     "id": 1,
+     "name": "English"
+    }
+   ],
+   "quality": {
+    "quality": {
+     "id": 3,
+     "name": "WEBDL-1080p",
+     "source": "web",
+     "resolution": 1080
+    },
+    "revision": {
+     "version": 1,
+     "real": 0,
+     "isRepack": false
+    }
+   },
+   "customFormats": [
+    {
+     "id": 292,
+     "name": "DSNP"
+    },
+    {
+     "id": 389,
+     "name": "HD Streaming Boost"
+    },
+    {
+     "id": 276,
+     "name": "WEB Tier 01"
+    },
+    {
+     "id": 342,
+     "name": "WEBDL"
+    },
+    {
+     "id": 344,
+     "name": "x264"
+    }
+   ],
+   "customFormatScore": 1958,
+   "indexerFlags": 0,
+   "releaseType": "singleEpisode",
+   "mediaInfo": {
+    "videoBitDepth": 8,
+    "videoBitrate": 7594649,
+    "videoCodec": "h264",
+    "videoFps": 23.976,
+    "videoDynamicRange": "",
+    "videoDynamicRangeType": "",
+    "resolution": "1920x1080",
+    "runTime": "44:50",
+    "scanType": "Progressive",
+    "audioStreams": [
+     {
+      "codec": "EAC3",
+      "bitrate": 256000,
+      "channels": 5.1,
+      "channelPositions": "5.1(side)",
+      "language": "eng"
+     }
+    ],
+    "subtitleStreams": [
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "title": "SDH",
+      "forced": false,
+      "hearingImpaired": true,
+      "language": "eng"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "cze"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dan"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "ger"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "gre"
+     },
+     {
+      "format": "subrip",
+      "title": "Latin American",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "spa"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fin"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "fre"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "hun"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "jpn"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "kor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "dut"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "nor"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "pol"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "por"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "rum"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "swe"
+     },
+     {
+      "format": "subrip",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "tur"
+     },
+     {
+      "format": "subrip",
+      "title": "Simplified",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     },
+     {
+      "format": "subrip",
+      "title": "Traditional",
+      "forced": false,
+      "hearingImpaired": false,
+      "language": "chi"
+     }
+    ]
+   },
+   "qualityCutoffNotMet": false,
+   "id": 451891
+  },
+  "hasFile": true,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 180652
+ }
+]

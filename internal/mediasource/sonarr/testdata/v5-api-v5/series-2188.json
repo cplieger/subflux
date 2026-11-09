@@ -1,0 +1,298 @@
+{
+ "title": "Firefly",
+ "alternateTitles": [
+  {
+   "title": "Firefly - Der Aufbruch der Serenity",
+   "seasonNumber": -1
+  }
+ ],
+ "sortTitle": "firefly",
+ "status": "ended",
+ "ended": true,
+ "previousAiring": "2003-07-28T04:00:00Z",
+ "network": "FOX",
+ "images": [
+  {
+   "coverType": "banner",
+   "url": "/MediaCover/2188/banner.jpg?h=df163eef5eb614d88792",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/graphical/7097-g.jpg"
+  },
+  {
+   "coverType": "poster",
+   "url": "/MediaCover/2188/poster.jpg?h=a23db5b857911f994ea3",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/posters/78874-2.jpg"
+  },
+  {
+   "coverType": "fanart",
+   "url": "/MediaCover/2188/fanart.jpg?h=a885956ff5701d715eb8",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/fanart/original/78874-5.jpg"
+  },
+  {
+   "coverType": "clearlogo",
+   "url": "/MediaCover/2188/clearlogo.png?h=25fbadbed97745e78c9e",
+   "remoteUrl": "https://artworks.thetvdb.com/banners/v4/series/78874/clearlogo/611b6261b69a7.png"
+  }
+ ],
+ "language": {
+  "id": 1,
+  "name": "English"
+ },
+ "originalLanguage": {
+  "id": 1,
+  "name": "English"
+ },
+ "seasonType": "dvd",
+ "seasons": [
+  {
+   "seasonNumber": 0,
+   "monitored": false,
+   "statistics": {
+    "episodeFileCount": 0,
+    "episodeCount": 0,
+    "totalEpisodeCount": 3,
+    "monitoredEpisodeCount": 0,
+    "sizeOnDisk": 0,
+    "releaseGroups": [],
+    "releaseTypes": [],
+    "episodeFileQualities": [],
+    "percentOfEpisodes": 0
+   }
+  },
+  {
+   "seasonNumber": 1,
+   "monitored": true,
+   "statistics": {
+    "previousAiring": "2003-07-28T04:00:00Z",
+    "episodeFileCount": 14,
+    "episodeCount": 14,
+    "totalEpisodeCount": 14,
+    "monitoredEpisodeCount": 14,
+    "sizeOnDisk": 39738721787,
+    "releaseGroups": [
+     "FLUX"
+    ],
+    "releaseTypes": [
+     "singleEpisode"
+    ],
+    "episodeFileQualities": [
+     {
+      "id": 3,
+      "name": "WEBDL-1080p",
+      "source": "web",
+      "resolution": 1080
+     }
+    ],
+    "percentOfEpisodes": 100
+   }
+  }
+ ],
+ "seasonTypes": [
+  {
+   "name": "Aired Order",
+   "type": "official",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  },
+  {
+   "name": "DVD Order",
+   "type": "dvd",
+   "seasonNumbers": [
+    0,
+    1
+   ],
+   "episodeCount": 14
+  }
+ ],
+ "translations": [
+  {
+   "language": {
+    "id": 25,
+    "name": "Czech"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 4,
+    "name": "German"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 1,
+    "name": "English"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 2,
+    "name": "French"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 23,
+    "name": "Hebrew"
+   },
+   "title": "פיירפלי"
+  },
+  {
+   "language": {
+    "id": 22,
+    "name": "Hungarian"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 5,
+    "name": "Italian"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 21,
+    "name": "Korean"
+   },
+   "title": "파이어플라이"
+  },
+  {
+   "language": {
+    "id": 7,
+    "name": "Dutch"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 12,
+    "name": "Polish"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 18,
+    "name": "Portuguese"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 11,
+    "name": "Russian"
+   },
+   "title": "Светлячок"
+  },
+  {
+   "language": {
+    "id": 3,
+    "name": "Spanish"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 14,
+    "name": "Swedish"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 10,
+    "name": "Chinese"
+   },
+   "title": "萤火虫"
+  },
+  {
+   "language": {
+    "id": 39,
+    "name": "Croatian"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 18,
+    "name": "Portuguese"
+   },
+   "title": "Firefly"
+  },
+  {
+   "language": {
+    "id": 16,
+    "name": "Finnish"
+   },
+   "title": "Firefly"
+  }
+ ],
+ "year": 2002,
+ "path": "/media/tv/Firefly (2002) {imdb-tt0303461}",
+ "qualityProfileId": 10,
+ "seasonFolder": true,
+ "monitored": true,
+ "monitorNewItems": "all",
+ "useSceneNumbering": false,
+ "runtime": 48,
+ "tvdbId": 78874,
+ "tvRageId": 3548,
+ "tvMazeId": 180,
+ "tmdbId": 1437,
+ "malIds": [],
+ "aniListIds": [],
+ "firstAired": "2002-09-20T00:00:00Z",
+ "lastAired": "2003-07-28T00:00:00Z",
+ "seriesType": "standard",
+ "originalTitle": "Firefly",
+ "cleanTitle": "firefly",
+ "cleanOriginalTitle": "firefly",
+ "imdbId": "tt0303461",
+ "titleSlug": "firefly",
+ "rootFolderPath": "/media/tv",
+ "folders": [],
+ "certification": "TV-14",
+ "genres": [
+  "Adventure",
+  "Drama",
+  "Science Fiction"
+ ],
+ "originalCountry": "usa",
+ "tags": [],
+ "added": "2026-10-16T09:40:22Z",
+ "ratings": {
+  "votes": 305001,
+  "value": 8.9
+ },
+ "statistics": {
+  "seasonCount": 1,
+  "episodeFileCount": 14,
+  "episodeCount": 14,
+  "totalEpisodeCount": 17,
+  "monitoredEpisodeCount": 14,
+  "sizeOnDisk": 39738721787,
+  "releaseGroups": [
+   "FLUX"
+  ],
+  "releaseTypes": [
+   "singleEpisode"
+  ],
+  "episodeFileQualities": [
+   {
+    "id": 3,
+    "name": "WEBDL-1080p",
+    "source": "web",
+    "resolution": 1080
+   }
+  ],
+  "percentOfEpisodes": 100
+ },
+ "id": 2188
+}

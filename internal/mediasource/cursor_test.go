@@ -18,8 +18,17 @@ func TestCursorRoundTrip(t *testing.T) {
 			t.Fatalf("zero MarshalBinary = %x, %v; want no bytes", b, err)
 		}
 		c := Cursor{b: []byte{9}}
-		if err := c.UnmarshalBinary([]byte{}); err != nil || c.b != nil {
+		if err := c.UnmarshalBinary([]byte{}); err != nil || c.b != nil || !c.IsZero() {
 			t.Errorf("UnmarshalBinary(empty) = %v, holding %x; want the zero cursor", err, c.b)
+		}
+	})
+	t.Run("IsZero holds for no bytes alone", func(t *testing.T) {
+		if !(Cursor{}).IsZero() {
+			t.Error("the zero Cursor is not IsZero")
+		}
+		var c Cursor
+		if err := c.UnmarshalBinary([]byte{0}); err != nil || c.IsZero() {
+			t.Errorf("a one-byte cursor reads IsZero (%v)", err)
 		}
 	})
 	t.Run("bytes round-trip whatever their version byte", func(t *testing.T) {

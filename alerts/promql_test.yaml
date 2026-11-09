@@ -194,3 +194,57 @@ tests:
         exp_alerts:
           - exp_labels: {severity: warning, job: subflux, instance: a, kind: config}
             exp_annotations: {summary: subflux reports a problem of kind config, description: *condition}
+
+  # With whole_interval 24h, a source whose loop started at 0 and never
+  # completed (tv) and one whose last completion was at 0 (films) stay silent
+  # once the gap first passes two intervals, and fire 2h later. A source
+  # completing all along (anime) stays silent. Instance b's own 1h interval
+  # judges its source, which completes all along, so it stays silent too.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_scan_whole_interval_seconds{job="subflux",instance="a"}'
+        values: '86400x3010'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="a",source="tv"}'
+        values: '0x3010'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="a",source="films"}'
+        values: '0x3010'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="a",source="anime"}'
+        values: '0+60x3010'
+      - series: 'subflux_scan_whole_interval_seconds{job="subflux",instance="b"}'
+        values: '3600x3010'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="b",source="tv"}'
+        values: '0+60x3010'
+    alert_rule_test:
+      - eval_time: 48h1m
+        alertname: SubfluxScanStalled
+        exp_alerts: []
+      - eval_time: 50h1m
+        alertname: SubfluxScanStalled
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a, source: tv}
+            exp_annotations:
+              summary: subflux has not completed a full scan of tv
+              description: &stalled >
+                No full scan of this media source has completed in over two full
+                scan intervals. The source may be failing every scan, or a scan
+                may be stuck. The subflux log names the error.
+          - exp_labels: {severity: warning, job: subflux, instance: a, source: films}
+            exp_annotations: {summary: subflux has not completed a full scan of films, description: *stalled}
+
+  # Instance b's 1h interval, not a's 24h, judges b's stale source.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_scan_whole_interval_seconds{job="subflux",instance="a"}'
+        values: '86400x300'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="a",source="tv"}'
+        values: '0x300'
+      - series: 'subflux_scan_whole_interval_seconds{job="subflux",instance="b"}'
+        values: '3600x300'
+      - series: 'subflux_scan_last_complete_timestamp_seconds{job="subflux",instance="b",source="tv"}'
+        values: '0x300'
+    alert_rule_test:
+      - eval_time: 4h1m
+        alertname: SubfluxScanStalled
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: b, source: tv}
+            exp_annotations: {summary: subflux has not completed a full scan of tv, description: *stalled}

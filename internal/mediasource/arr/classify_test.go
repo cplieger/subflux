@@ -21,8 +21,8 @@ func TestClassify(t *testing.T) {
 	codes := map[mediasource.Cause][]int{
 		mediasource.Unauthorized: {401, 403},
 		mediasource.NotFound:     {404},
-		mediasource.Protocol:     {204, 206, 399, 400, 407, 409, 428, 430, 499, 600},
-		mediasource.Unreachable:  {408, 429, 500, 501, 502, 503, 504, 599},
+		mediasource.Protocol:     {204, 206, 399, 400, 407, 409, 428, 430, 499, 501, 505, 506, 508, 510, 511, 600},
+		mediasource.Unreachable:  {408, 429, 500, 502, 503, 504, 507, 599},
 	}
 	for want, list := range codes {
 		for _, code := range list {
@@ -156,5 +156,28 @@ func TestKeyRedactedInErrors(t *testing.T) {
 	got := classified(t, err)
 	if got.Cause != mediasource.Protocol || strings.Contains(got.Error(), testKey) {
 		t.Errorf("a 400 echoing the key: %v %q, want protocol with the key redacted", got.Cause, got.Error())
+	}
+}
+
+// TestClassifyDecodeFailureProtocol pins design 4.3's decode row: an
+// accepted answer arrapi cannot decode is the server answering outside its
+// API, while a source that never answered stays Unreachable.
+func TestClassifyDecodeFailureProtocol(t *testing.T) {
+	u := newUpstream(t)
+	u.on("/api/v5/series", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"not":"a list"}`)
+	})
+	_, err := sonarrClient(t, u.srv.URL).Series(t.Context())
+	if !errors.As(err, new(*arrapi.DecodeError)) {
+		t.Fatalf("Series = %v, want a *arrapi.DecodeError to classify", err)
+	}
+	if got := arr.Classify(err); got.Cause != mediasource.Protocol || !errors.Is(got, err) {
+		t.Errorf("a decode failure: %v, want protocol wrapping it", got.Cause)
+	}
+	gone := newUpstream(t)
+	gone.srv.Close()
+	_, err = sonarrClient(t, gone.srv.URL).Series(t.Context())
+	if got := classified(t, err); got.Cause != mediasource.Unreachable {
+		t.Errorf("a transport failure: %v (%v), want unreachable", got.Cause, err)
 	}
 }
