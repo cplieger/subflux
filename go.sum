@@ -4,8 +4,8 @@ github.com/cplieger/access v1.0.0-dev.7 h1:+4i5Pf+xn/llxhghqhxDYoNdCCFQml+5RnNDE
 github.com/cplieger/access v1.0.0-dev.7/go.mod h1:5Lu9EX6wD1auaEf49A0Aqc3QamQYQ9vcyiDYpGJnQSU=
 github.com/cplieger/animap/mapread v0.3.2 h1:oBS2esAwE3WSMWb9ypUGw2vAAV/lHWDKlObYZ8AWUQQ=
 github.com/cplieger/animap/mapread v0.3.2/go.mod h1:/KLtoKslemgqFHUACjfaCz7F78WQpd3FDjQJ4oY8lic=
-github.com/cplieger/arrapi/v3 v3.2.0-dev.10 h1:FB+xzYFPUFpRu1BPGSSlPOivx46WjmEmW4CRb/ZactE=
-github.com/cplieger/arrapi/v3 v3.2.0-dev.10/go.mod h1:PMkC+UXPfSJy6A3O7yH/FyPs3atkHjb01I38s47HGFQ=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.11 h1:shuSJrABBZK8t7+IH9m4mBpOk1T40vyK/NC9qn+q64M=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.11/go.mod h1:odIj/2YKkPZX6QhIkOTj2hhUe8newScnQPEJoZS0k6s=
 github.com/cplieger/bolttable v1.1.0 h1:3nXc5p+GoOB1lYsvMhjG+PBOsIdYgZgIiDClF0EiqN4=
 github.com/cplieger/bolttable v1.1.0/go.mod h1:d3lFiW0HhHdnV6CHfeXsPWQ2DfvXfPM6lKs1qWXim+A=
 github.com/cplieger/go/filesafe v1.0.0 h1:V63mC2Kc1PlbAKhiCXMA5WiellXJtWPtNJwTG2Q37us=
@@ -14,8 +14,8 @@ github.com/cplieger/go/health v1.0.0 h1:MK3skKEoRhmsrt64O/OSbpbL9Dib0drAeWLQLLhj
 github.com/cplieger/go/health v1.0.0/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
 github.com/cplieger/go/httpclient v1.1.0-dev.1 h1:UIU9dimhFtx/ru3O7AqhqsznJoRIje91FGa9YLCf5Fc=
 github.com/cplieger/go/httpclient v1.1.0-dev.1/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
-github.com/cplieger/go/httpserver v1.0.0 h1:TOfRsj8B/yjoD+sHIBa2f9Dy+ayY6ZrlvJ6tRDsoIys=
-github.com/cplieger/go/httpserver v1.0.0/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
+github.com/cplieger/go/httpserver v1.1.0-dev.1 h1:3ourAEJNrs4SduR/NyRRSzwKEbObVc+mbZJgh3pmEq0=
+github.com/cplieger/go/httpserver v1.1.0-dev.1/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
 github.com/cplieger/go/jsonx v1.0.0 h1:tk8DmKIHoMBVvNbFJ7a0IFNPo8vdLy4g9BOBj3HoE4Y=
 github.com/cplieger/go/jsonx v1.0.0/go.mod h1:ank2TTHUDI/GrTBZ/KAwU72ECOdrCCDDYqlRSuR/+BQ=
 github.com/cplieger/go/keyenc v1.2.0 h1:aXG4y6YasM/qkP0dEut/P/POtrRnksdvAqGmh0CNBxo=
