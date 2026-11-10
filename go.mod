@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/cplieger/access v1.0.0-dev.7
 	github.com/cplieger/animap/mapread v0.3.2
-	github.com/cplieger/arrapi/v3 v3.2.0-dev.11
+	github.com/cplieger/arrapi/v3 v3.2.0-dev.12
 	github.com/cplieger/bolttable v1.1.0
 	github.com/cplieger/go/filesafe v1.0.0
 	github.com/cplieger/go/health v1.0.0
@@ -14,9 +14,9 @@ require (
 	github.com/cplieger/go/jsonx v1.0.0
 	github.com/cplieger/go/keyenc v1.2.0
 	github.com/cplieger/go/keylock v1.0.0
-	github.com/cplieger/go/measure v1.0.0
+	github.com/cplieger/go/measure v1.1.0-dev.1
 	github.com/cplieger/go/slogx v1.0.0
-	github.com/cplieger/go/ssrf v1.1.0-dev.1
+	github.com/cplieger/go/ssrf v1.1.0-dev.2
 	github.com/cplieger/go/textsafe v1.0.0
 	github.com/cplieger/go/yamlenv v1.0.0
 	github.com/cplieger/langtag/v3 v3.2.0-dev.2
@@ -33,7 +33,7 @@ require (
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
-	github.com/cplieger/go/urlform v1.0.0 // indirect
+	github.com/cplieger/go/urlform v1.1.0-dev.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.9 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
