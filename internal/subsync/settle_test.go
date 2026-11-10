@@ -9,42 +9,106 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// cutCase is a candidate for another cut of video, and how it is placed.
+// cutCase is a candidate for another cut of video and, per candidate span
+// in order, the video time it stands for: noTruth where the video lacks it.
 type cutCase struct {
 	name       string
 	video, inc []Span
+	truth      []int64
+}
+
+const noTruth = -1
+
+// The research's fit (reference-sync-research.md section 6): a mapping
+// places a candidate when 90% of its truth-bearing spans land within
+// 600 ms.
+const (
+	placedTolMs = 600
+	placedShare = 0.9
+)
+
+// truthOf is f of each span's start.
+func truthOf(inc []Span, f func(int64) int64) []int64 {
+	out := make([]int64, len(inc))
+	for i, s := range inc {
+		out[i] = f(s.StartMs)
+	}
+	return out
+}
+
+// cutTruth is the truth of cut(video, at, lenMs).
+func cutTruth(at, lenMs int64) func(int64) int64 {
+	return func(ms int64) int64 {
+		if ms < at {
+			return ms
+		}
+		return ms + lenMs
+	}
+}
+
+// insertTruth is the truth of insert(video, at, lenMs, extra).
+func insertTruth(at, lenMs int64) func(int64) int64 {
+	return func(ms int64) int64 {
+		switch {
+		case ms < at:
+			return ms
+		case ms < at+lenMs:
+			return noTruth
+		}
+		return ms - lenMs
+	}
+}
+
+// placed reports whether tm places c's candidate.
+func placed(c cutCase, tm timing.Timing) bool {
+	n, ok := 0, 0
+	for i, s := range mapSpans(c.inc, tm) {
+		if c.truth[i] == noTruth {
+			continue
+		}
+		n++
+		if d := s.StartMs - c.truth[i]; s.StartMs != droppedOffset && d <= placedTolMs && d >= -placedTolMs {
+			ok++
+		}
+	}
+	return n > 0 && float64(ok) >= placedShare*float64(n)
 }
 
 // thinLevels are the global e2 the reference is thinned to: none, about
-// half, just under the gate, and at it.
-var thinLevels = []float64{0, 0.5, 0.59, 0.6}
+// half, and just under the gate.
+var thinLevels = []float64{0, 0.5, 0.59}
 
-// settleThinned aligns c's candidate to its video thinned to each level and
-// settles it unforced.
-func settleThinned(t *testing.T, c cutCase, upTo Model, check func(t *testing.T, level float64, r Result, tm timing.Timing, v timing.Verdict, err error)) {
+// guardCut settles c unforced at the full reference, where it must be
+// refused, or placed unless mustRefuse, and at the reference thinned to each
+// of thinLevels, where a Verified delivery must be placed and anything else
+// is refused or Identity, Unverified: a reference too weak to judge the
+// candidate, G4-23's residual.
+func guardCut(t *testing.T, c cutCase, mustRefuse bool) {
 	t.Helper()
-	whole, err := AlignReference(t.Context(), c.video, c.inc, upTo)
+	whole, err := AlignReference(t.Context(), c.video, c.inc, MaxModel)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tm, v, err := Settle(&whole, false, AtIdentity)
+	if !errors.Is(err, ErrDifferentCut) && (mustRefuse || !placed(c, tm)) {
+		t.Errorf("full reference: e2 %.3f shape %+v settled %#v %v %v, want ErrDifferentCut%s", whole.Confidence, whole.Shape, tm, v, err,
+			map[bool]string{false: " or the candidate placed", true: ""}[mustRefuse])
+	}
 	for _, level := range thinLevels {
-		ref := c.video
-		if level < 0.6 || whole.Confidence < 0.6 {
-			ref = thinned(c.video, c.inc, whole.Timing, level)
-		}
-		r, err := AlignReference(t.Context(), ref, c.inc, upTo)
+		r, err := AlignReference(t.Context(), thinned(c.video, c.inc, whole.Timing, level), c.inc, MaxModel)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tm, v, err := Settle(r, false)
-		t.Run(fmt.Sprintf("e2 %.2f", level), func(t *testing.T) { check(t, level, r, tm, v, err) })
-	}
-}
-
-func refused(t *testing.T, level float64, r Result, tm timing.Timing, v timing.Verdict, err error) {
-	t.Helper()
-	if !errors.Is(err, ErrDifferentCut) || tm != nil || v != 0 {
-		t.Errorf("thinned to %.2f: e2 %.3f shape %+v settled %#v %v %v, want ErrDifferentCut alone", level, r.Confidence, r.Shape, tm, v, err)
+		tm, v, err := Settle(&r, false, AtIdentity)
+		switch {
+		case errors.Is(err, ErrDifferentCut):
+		case err != nil:
+			t.Errorf("thinned to %.2f: %v", level, err)
+		case v == timing.Verified && !placed(c, tm):
+			t.Errorf("thinned to %.2f: e2 %.3f shape %+v Verified %#v, misplaced", level, r.Confidence, r.Shape, tm)
+		case v == timing.Unverified && tm != (timing.Identity{}):
+			t.Errorf("thinned to %.2f: Unverified at %#v, want Identity", level, tm)
+		}
 	}
 }
 
@@ -60,23 +124,29 @@ func TestCoverageGuardAtAnyConfidence(t *testing.T) {
 	var cases []cutCase
 	for kind, video := range dialogueKinds(t, 7, 260) {
 		cases = append(cases,
-			cutCase{kind + " missing a 90 s opening", video, cut(video, 0, 90_000)},
-			cutCase{kind + " missing a 90 s ending", video, cut(video, end(video)-90_000, 90_000)},
-			cutCase{kind + " missing a 90 s scene at 8 minutes", video, cut(video, 480_000, 90_000)},
+			cutOf(kind+" missing a 90 s opening", video, 0, 90_000),
+			cutOf(kind+" missing a 90 s ending", video, end(video)-90_000, 90_000),
+			cutOf(kind+" missing a 90 s scene at 8 minutes", video, 480_000, 90_000),
 		)
 		for _, l := range []int64{20_000, 60_000} {
 			for _, p := range []float64{0.08, 0.92} {
 				at := int64(p * float64(end(video)))
-				cases = append(cases, cutCase{fmt.Sprintf("%s missing %d s at %.0f%%", kind, l/1000, p*100), video, cut(video, at, l)})
+				cases = append(cases, cutOf(fmt.Sprintf("%s missing %d s at %.0f%%", kind, l/1000, p*100), video, at, l))
 			}
 		}
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			settleThinned(t, c, MaxModel, refused)
+			guardCut(t, c, false)
 		})
 	}
+}
+
+// cutOf is the case of a candidate for video without [at, at+lenMs).
+func cutOf(name string, video []Span, at, lenMs int64) cutCase {
+	inc := cut(video, at, lenMs)
+	return cutCase{name, video, inc, truthOf(inc, cutTruth(at, lenMs))}
 }
 
 func TestForcedSubtitleVerifiesAtItsShift(t *testing.T) {
@@ -92,16 +162,16 @@ func TestForcedSubtitleVerifiesAtItsShift(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tm, v, err := Settle(r, true)
+	tm, v, err := Settle(&r, true, AtIdentity)
 	if err != nil || tm != (timing.Shift{Ms: 4_200}) || v != timing.Verified {
 		t.Errorf("forced: %#v %v %v (shape %+v), want Shift{4200} Verified", tm, v, err, r.Shape)
 	}
-	if _, _, err := Settle(r, false); !errors.Is(err, ErrDifferentCut) {
+	if _, _, err := Settle(&r, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
 		t.Errorf("the same fit unforced: %v, want ErrDifferentCut (its gaps hold the other 90%%)", err)
 	}
 }
 
-func TestMirrorCasesRefused(t *testing.T) {
+func TestMirrorCasesGuarded(t *testing.T) {
 	t.Parallel()
 	var cases []cutCase
 	for kind, video := range dialogueKinds(t, 8, 260) {
@@ -109,7 +179,8 @@ func TestMirrorCasesRefused(t *testing.T) {
 		for _, l := range []int64{20_000, 60_000} {
 			for _, p := range []float64{0.08, 0.92} {
 				at := int64(p * float64(end(video)))
-				cases = append(cases, cutCase{fmt.Sprintf("%s holding %d s more at %.0f%%", kind, l/1000, p*100), video, insert(video, at, l, extra)})
+				inc := insert(video, at, l, extra)
+				cases = append(cases, cutCase{fmt.Sprintf("%s holding %d s more at %.0f%%", kind, l/1000, p*100), video, inc, truthOf(inc, insertTruth(at, l))})
 			}
 		}
 	}
@@ -119,37 +190,13 @@ func TestMirrorCasesRefused(t *testing.T) {
 	for i := len(late) - 32; i < len(late); i++ {
 		late[i] = Span{late[i].StartMs + 20_000, late[i].EndMs + 20_000}
 	}
-	cases = append(cases, cutCase{"32 sparse tail cues 20 s late", video, late})
+	cases = append(cases, cutCase{"32 sparse tail cues 20 s late", video, late, truthOf(video, func(ms int64) int64 { return ms })})
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			settleThinned(t, c, MaxModel, refused)
+			guardCut(t, c, false)
 		})
 	}
-	t.Run("32 tail lines 20 s late inside the video's dialogue", func(t *testing.T) {
-		t.Parallel()
-		video := episode(t, 15, 300)
-		// No line past the video's end and none far from dialogue: only the
-		// end fit sees it.
-		var inc []Span
-		tail := len(video) - 32
-		for i, s := range video {
-			switch {
-			case i < tail:
-				inc = append(inc, s)
-			case s.EndMs+20_000 <= end(video):
-				inc = append(inc, Span{s.StartMs + 20_000, s.EndMs + 20_000})
-			}
-		}
-		r, err := AlignReference(t.Context(), video, inc, MaxModel)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if r.Confidence < referenceGate || uncovered(r.Shape, false) {
-			t.Fatalf("fixture: e2 %.3f shape %+v, want the gate passed and the coverage guard clear", r.Confidence, r.Shape)
-		}
-		refused(t, r.Confidence, r, nil, 0, settleErr(r))
-	})
 }
 
 func TestAdvertisingLinesVerify(t *testing.T) {
@@ -161,31 +208,37 @@ func TestAdvertisingLinesVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tm, v, err := Settle(r, false); err != nil || tm != (timing.Shift{Ms: 1_700}) || v != timing.Verified {
+	if tm, v, err := Settle(&r, false, AtIdentity); err != nil || tm != (timing.Shift{Ms: 1_700}) || v != timing.Verified {
 		t.Errorf("advertising lines at 0:00:01 and after the last dialogue: %#v %v %v (shape %+v)", tm, v, err, r.Shape)
 	}
 }
 
-func TestBelowGateExtraMaterialRefused(t *testing.T) {
+func TestExtraMaterialGuarded(t *testing.T) {
 	t.Parallel()
 	video := dense(t, 10, 600)
 	extra := dense(t, 11, 60)
-	one := insert(video, end(video)/2, 60_000, extra)
-	two := insert(insert(video, end(video)*3/10, 60_000, extra), end(video)*7/10+60_000, 60_000, extra)
-	for name, inc := range map[string][]Span{"one 60 s stretch at 50%": one, "two at 30% and 70%": two} {
+	mid, early, late := end(video)/2, end(video)*3/10, end(video)*7/10+60_000
+	one := insert(video, mid, 60_000, extra)
+	two := insert(insert(video, early, 60_000, extra), late, 60_000, extra)
+	for name, c := range map[string]struct {
+		inc   []Span
+		truth func(int64) int64
+	}{
+		"one 60 s stretch at 50%": {one, insertTruth(mid, 60_000)},
+		"two at 30% and 70%": {two, func(ms int64) int64 {
+			if v := insertTruth(late, 60_000)(ms); v != noTruth {
+				return insertTruth(early, 60_000)(v)
+			}
+			return noTruth
+		}},
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			r, err := AlignReference(t.Context(), video, shiftSpans(inc, -2_000), MaxModel)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if r.Confidence < 0.1 || r.Confidence >= referenceGate {
-				t.Fatalf("fixture: global e2 %.3f, want a poor fit below the gate", r.Confidence)
-			}
-			refused(t, r.Confidence, r, nil, 0, settleErr(r))
+			inc := shiftSpans(c.inc, -2_000)
+			guardCut(t, cutCase{name, video, inc, truthOf(inc, func(ms int64) int64 { return c.truth(ms + 2_000) })}, false)
 		})
 	}
-	t.Run("a uniformly poor fit stays unverified", func(t *testing.T) {
+	t.Run("a uniformly poor fit under edgeGate is refused", func(t *testing.T) {
 		t.Parallel()
 		inc := shiftSpans(video, -2_000)
 		ref := thinned(video, inc, timing.Shift{Ms: 2_000}, 0.4)
@@ -193,15 +246,25 @@ func TestBelowGateExtraMaterialRefused(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tm, v, err := Settle(r, false); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
+		if tm, v, err := Settle(&r, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
+			t.Errorf("e2 %.3f shape %+v: %#v %v %v, want ErrDifferentCut", r.Confidence, r.Shape, tm, v, err)
+		}
+	})
+	t.Run("an aligned candidate between edgeGate and the gate stays unverified", func(t *testing.T) {
+		t.Parallel()
+		aligned := episode(t, 8, 260)
+		ref := thinned(aligned, aligned, timing.Identity{}, 0.56)
+		r, err := AlignReference(t.Context(), ref, aligned, MaxModel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Confidence < edgeGate || r.Confidence >= referenceGate || r.Shape.EdgeFit < edgeGate {
+			t.Fatalf("fixture: e2 %.3f shape %+v, want e2 and EdgeFit between edgeGate and the gate", r.Confidence, r.Shape)
+		}
+		if tm, v, err := Settle(&r, false, AtIdentity); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
 			t.Errorf("e2 %.3f shape %+v: %#v %v %v, want Identity/Unverified", r.Confidence, r.Shape, tm, v, err)
 		}
 	})
-}
-
-func settleErr(r Result) error {
-	_, _, err := Settle(r, false)
-	return err
 }
 
 func TestSettlePerGround(t *testing.T) {
@@ -209,58 +272,88 @@ func TestSettlePerGround(t *testing.T) {
 	clean := Shape{EdgeFit: 0.9}
 	over := map[string]Shape{
 		"InsertedMs":   {InsertedMs: maxRiseMs + 1, EdgeFit: 0.9},
-		"GapSpeechMs":  {GapSpeechMs: maxGapSpeechMs + 1, EdgeFit: 0.9},
 		"EdgeSpeechMs": {EdgeSpeechMs: maxEdgeSpeechMs + 1, EdgeFit: 0.9},
-		"ExtraLinesMs": {ExtraLinesMs: maxExtraLinesMs + 1, EdgeFit: 0.9},
+		"EdgeFit":      {EdgeFit: edgeGate - 0.01},
 	}
 	at := map[string]Shape{
 		"InsertedMs":   {InsertedMs: maxRiseMs, EdgeFit: 0.9},
-		"GapSpeechMs":  {GapSpeechMs: maxGapSpeechMs, EdgeFit: 0.9},
 		"EdgeSpeechMs": {EdgeSpeechMs: maxEdgeSpeechMs, EdgeFit: 0.9},
-		"ExtraLinesMs": {ExtraLinesMs: maxExtraLinesMs, EdgeFit: 0.9},
+		"EdgeFit":      {EdgeFit: edgeGate},
 	}
+	// fit is a measured reference fit whose two mappings both have sh.
 	fit := func(conf float64, sh Shape) Result {
-		return Result{Timing: timing.Shift{Ms: 500}, Method: timing.MethodReference, Confidence: conf, Shape: sh, Measured: true}
+		return Result{Timing: timing.Shift{Ms: 500}, Method: timing.MethodReference, Confidence: conf, Shape: sh, IdentityShape: sh, Measured: true}
 	}
 	for ground, sh := range over {
 		for _, conf := range []float64{0.2, referenceGate} {
 			t.Run(fmt.Sprintf("%s over at %.1f", ground, conf), func(t *testing.T) {
 				t.Parallel()
-				if _, _, err := Settle(fit(conf, sh), false); !errors.Is(err, ErrDifferentCut) {
+				if _, _, err := Settle(new(fit(conf, sh)), false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
 					t.Errorf("err = %v, want ErrDifferentCut", err)
 				}
-				_, _, err := Settle(fit(conf, sh), true)
-				if wantRefused := ground == "InsertedMs"; errors.Is(err, ErrDifferentCut) != wantRefused {
+				_, _, err := Settle(new(fit(conf, sh)), true, AtIdentity)
+				if wantRefused := ground != "EdgeSpeechMs"; errors.Is(err, ErrDifferentCut) != wantRefused {
 					t.Errorf("forced: err = %v, want refused %v", err, wantRefused)
 				}
 			})
 		}
 		t.Run(ground+" at its bound", func(t *testing.T) {
 			t.Parallel()
-			if tm, v, err := Settle(fit(referenceGate, at[ground]), false); err != nil || tm != (timing.Shift{Ms: 500}) || v != timing.Verified {
+			if tm, v, err := Settle(new(fit(referenceGate, at[ground])), false, AtIdentity); err != nil || tm != (timing.Shift{Ms: 500}) || v != timing.Verified {
 				t.Errorf("%#v %v %v, want the fit Verified", tm, v, err)
 			}
 		})
 	}
-	t.Run("EdgeFit below edgeGate refuses once the gate passes", func(t *testing.T) {
+	cut := Shape{EdgeSpeechMs: maxEdgeSpeechMs + 1, EdgeFit: 0.9}
+	t.Run("below the gate the guard judges the Identity it delivers", func(t *testing.T) {
 		t.Parallel()
-		low := Shape{EdgeFit: edgeGate - 0.01}
-		if _, _, err := Settle(fit(referenceGate, low), false); !errors.Is(err, ErrDifferentCut) {
-			t.Errorf("at the gate: err = %v, want ErrDifferentCut", err)
+		r := fit(referenceGate-0.01, clean)
+		r.IdentityShape = cut
+		if tm, v, err := Settle(&r, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
+			t.Errorf("Identity uncovering an ending: %#v %v %v, want ErrDifferentCut", tm, v, err)
 		}
-		if tm, v, err := Settle(fit(referenceGate-0.01, low), false); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
-			t.Errorf("below the gate: %#v %v %v, want Identity/Unverified", tm, v, err)
+		r.IdentityShape = Shape{EdgeFit: edgeGate - 0.01}
+		if tm, v, err := Settle(&r, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
+			t.Errorf("Identity fitting under edgeGate: %#v %v %v, want ErrDifferentCut", tm, v, err)
 		}
 	})
-	t.Run("below the gate is Identity and Unverified", func(t *testing.T) {
+	t.Run("below the gate the guard judges the fit too", func(t *testing.T) {
 		t.Parallel()
-		if tm, v, err := Settle(fit(referenceGate-0.01, clean), false); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
-			t.Errorf("%#v %v %v", tm, v, err)
+		r := fit(referenceGate-0.01, cut)
+		r.IdentityShape = clean
+		if tm, v, err := Settle(&r, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
+			t.Errorf("a fit uncovering an ending: %#v %v %v, want ErrDifferentCut", tm, v, err)
+		}
+	})
+	t.Run("between edgeGate and the gate a clean fit is Identity and Unverified", func(t *testing.T) {
+		t.Parallel()
+		if tm, v, err := Settle(new(fit(referenceGate-0.01, clean)), false, AtIdentity); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
+			t.Errorf("%#v %v %v, want Identity/Unverified", tm, v, err)
+		}
+	})
+	t.Run("AtFit offers the fit below the gate, judging it and not Identity", func(t *testing.T) {
+		t.Parallel()
+		r := fit(referenceGate-0.01, clean)
+		r.IdentityShape = cut
+		if tm, v, err := Settle(&r, false, AtFit); err != nil || tm != (timing.Shift{Ms: 500}) || v != timing.Unverified {
+			t.Errorf("%#v %v %v, want the fit's Shift Unverified", tm, v, err)
+		}
+		r.Shape = Shape{EdgeFit: edgeGate - 0.01}
+		if tm, v, err := Settle(&r, false, AtFit); !errors.Is(err, ErrDifferentCut) {
+			t.Errorf("a fit under edgeGate: %#v %v %v, want ErrDifferentCut", tm, v, err)
+		}
+	})
+	t.Run("at the gate the Identity it does not deliver is not judged", func(t *testing.T) {
+		t.Parallel()
+		r := fit(referenceGate, clean)
+		r.IdentityShape = cut
+		if tm, v, err := Settle(&r, false, AtIdentity); err != nil || tm != (timing.Shift{Ms: 500}) || v != timing.Verified {
+			t.Errorf("%#v %v %v, want the fit Verified", tm, v, err)
 		}
 	})
 	t.Run("ModelNone is Identity and Unverified", func(t *testing.T) {
 		t.Parallel()
-		if tm, v, err := Settle(noReference, false); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
+		if tm, v, err := Settle(new(noFit), false, AtIdentity); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
 			t.Errorf("%#v %v %v", tm, v, err)
 		}
 	})
@@ -268,26 +361,32 @@ func TestSettlePerGround(t *testing.T) {
 
 func TestAudioSettledAtItsGate(t *testing.T) {
 	t.Parallel()
+	// audio is a measured audio fit whose Identity is clean.
 	audio := func(conf float64, sh Shape) Result {
-		return Result{Timing: timing.Shift{Ms: 900}, Method: timing.Audio, Confidence: conf, Shape: sh, Measured: true}
+		return Result{Timing: timing.Shift{Ms: 900}, Method: timing.Audio, Confidence: conf, Shape: sh, IdentityShape: Shape{EdgeFit: 0.9}, Measured: true}
 	}
-	gap := Shape{GapSpeechMs: maxGapSpeechMs + 1, EdgeFit: 0.9}
-	if tm, v, err := Settle(audio(audioGate-0.01, gap), false); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
-		t.Errorf("below audioGate: %#v %v %v, want Identity/Unverified, the guard not read", tm, v, err)
+	gap := Shape{EdgeSpeechMs: maxEdgeSpeechMs + 1, EdgeFit: 0.9}
+	if tm, v, err := Settle(new(audio(audioGate-0.01, gap)), false, AtIdentity); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
+		t.Errorf("below audioGate: %#v %v %v, want Identity/Unverified, the shift not delivered", tm, v, err)
 	}
-	if _, _, err := Settle(audio(audioGate, gap), false); !errors.Is(err, ErrDifferentCut) {
+	below := audio(audioGate-0.01, Shape{EdgeFit: 0.9})
+	below.IdentityShape = gap
+	if _, _, err := Settle(&below, false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
+		t.Errorf("below audioGate with Identity uncovering a scene: %v, want ErrDifferentCut", err)
+	}
+	if _, _, err := Settle(new(audio(audioGate, gap)), false, AtIdentity); !errors.Is(err, ErrDifferentCut) {
 		t.Errorf("at audioGate with a gap: %v, want ErrDifferentCut", err)
 	}
-	if tm, v, err := Settle(audio(audioGate, Shape{EdgeFit: 0.9}), false); err != nil || tm != (timing.Shift{Ms: 900}) || v != timing.Verified {
+	if tm, v, err := Settle(new(audio(audioGate, Shape{EdgeFit: 0.9})), false, AtIdentity); err != nil || tm != (timing.Shift{Ms: 900}) || v != timing.Verified {
 		t.Errorf("at audioGate: %#v %v %v, want the shift Verified", tm, v, err)
 	}
 	unmeasured := Result{Timing: timing.Shift{Ms: 900}, Method: timing.Audio, Confidence: audioGate}
-	if tm, v, err := Settle(unmeasured, false); err != nil || tm != (timing.Shift{Ms: 900}) || v != timing.Verified {
+	if tm, v, err := Settle(&unmeasured, false, AtIdentity); err != nil || tm != (timing.Shift{Ms: 900}) || v != timing.Verified {
 		t.Errorf("no reference: %#v %v %v, want the shift Verified", tm, v, err)
 	}
 }
 
-func TestInteriorSceneRefused(t *testing.T) {
+func TestInteriorSceneGuarded(t *testing.T) {
 	t.Parallel()
 	for _, lenMs := range []int64{7_000, 4_000} {
 		t.Run(fmt.Sprintf("%d ms lines every 7 s", lenMs), func(t *testing.T) {
@@ -296,8 +395,7 @@ func TestInteriorSceneRefused(t *testing.T) {
 			for at := int64(700_000); at+lenMs <= 790_000; at += 7_000 {
 				video = append(video, Span{at, at + lenMs})
 			}
-			video = sortSpans(video)
-			settleThinned(t, cutCase{"interior", video, cut(video, 700_000, 90_000)}, MaxModel, refused)
+			guardCut(t, cutOf("interior", sortSpans(video), 700_000, 90_000), false)
 		})
 	}
 }
@@ -306,24 +404,28 @@ func TestInsertedSceneRefused(t *testing.T) {
 	t.Parallel()
 	base := episode(t, 13, 260)
 	// The video holds a 120 s scene at 10 minutes with under 30 s of dialogue
-	// that the subtitle's cut lacks.
+	// that the subtitle's cut lacks: placing it would insert time.
 	video := insert(base, 600_000, 120_000, []Span{{0, 4_000}, {30_000, 36_000}, {70_000, 78_000}, {100_000, 106_000}})
-	settleThinned(t, cutCase{"inserted", video, base}, MaxModel, refused)
+	guardCut(t, cutCase{"inserted", video, base, truthOf(base, cutTruth(600_000, 120_000))}, true)
 }
 
-func TestThreeBreaksRefusedAtMaxModel(t *testing.T) {
+func TestThreeBreaksGuarded(t *testing.T) {
 	t.Parallel()
 	video := episode(t, 14, 300)
 	inc := video
+	var ats []int64
 	for _, p := range []float64{0.25, 0.5, 0.75} {
-		inc = insert(inc, int64(p*float64(end(video))), 120_000, nil)
+		at := int64(p * float64(end(video)))
+		ats = append(ats, at)
+		inc = insert(inc, at, 120_000, nil)
 	}
-	r, err := AlignReference(t.Context(), video, inc, MaxModel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := r.Timing.(timing.Piecewise); ok {
-		t.Fatalf("MaxModel fit %#v", r.Timing)
-	}
-	refused(t, r.Confidence, r, nil, 0, settleErr(r))
+	guardCut(t, cutCase{"three breaks", video, inc, truthOf(inc, func(ms int64) int64 {
+		v := ms
+		for _, at := range ats {
+			if ms >= at+120_000 {
+				v -= 120_000
+			}
+		}
+		return v
+	})}, false)
 }

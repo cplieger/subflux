@@ -24,10 +24,9 @@ func ageMinValues(age, sv []int16) {
 // insertSorted places featureVal into the ascending 16-entry minimum list sv
 // (with parallel ages in age) at its sorted position, shifting the tail right
 // and dropping the largest value; values not smaller than every entry are not
-// inserted. The position search is a verbatim port of WebRtcVad_FindMinimum's
-// hand-unrolled binary-search tree, kept as an explicit decision tree rather
-// than a loop so the fixed-point port stays byte-for-byte faithful to the C
-// source.
+// inserted. The position search ports WebRtcVad_FindMinimum's hand-unrolled
+// binary-search tree as written, so the fixed-point port stays byte-for-byte
+// faithful to the C source.
 //
 //nolint:gocyclo,gocognit // verbatim unrolled binary-search tree from the WebRTC port; flattening to a loop would diverge from the reference
 func insertSorted(sv, age []int16, featureVal int16) {

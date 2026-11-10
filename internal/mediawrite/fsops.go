@@ -17,9 +17,9 @@ import (
 
 // fsOps is every filesystem call the writer makes, End, the store write
 // settling an intent, Instance, the store read mapping an instance to its
-// video, and Step, called at each boundary a crash can fall on. Tests
-// replace fields through export_test.go to inject faults; production never
-// branches on it.
+// video, Step, called at each boundary a crash can fall on, and Pause,
+// called where a test holds a pass. Tests replace fields through
+// export_test.go to inject faults; production never branches on it.
 type fsOps struct {
 	Stat            func(path string) (fs.FileInfo, error)
 	OpenRoot        func(path string) (*os.Root, error)
@@ -43,6 +43,7 @@ type fsOps struct {
 	End             func(ctx context.Context, op statedb.Op, inst statedb.InstanceID, name string, landed bool) error
 	Instance        func(ctx context.Context, inst statedb.InstanceID) (statedb.Instance, bool, error)
 	Step            func(step string)
+	Pause           func(point string)
 }
 
 func productionFS(log *slog.Logger, store *statedb.Store) fsOps {
@@ -69,6 +70,7 @@ func productionFS(log *slog.Logger, store *statedb.Store) fsOps {
 		End:             endOf(store),
 		Instance:        store.Instance,
 		Step:            func(string) {},
+		Pause:           func(string) {},
 	}
 }
 

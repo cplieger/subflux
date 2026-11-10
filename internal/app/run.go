@@ -147,11 +147,11 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		cfg.Gather(m.Gather)
 	}
 	activate := wrapActivate(func(ctx context.Context, a settings.Active) error {
-		ids := sourceIDs(&a)
-		if aerr := store.Activate(ctx, statedb.Activation{Languages: a.Languages, Sources: ids}); aerr != nil {
+		act := activationOf(&a)
+		if aerr := store.Activate(ctx, act); aerr != nil {
 			return aerr
 		}
-		retainSources(st, ids)
+		retainSources(st, act.Sources)
 		return nil
 	})
 	deps := sourceDeps(slog.Default())
@@ -197,6 +197,11 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		drainBudget:      drainBudget,
 		httpGrace:        httpGrace,
 	}, nil
+}
+
+// activationOf is the part of a the store keys coverage on.
+func activationOf(a *settings.Active) statedb.Activation {
+	return statedb.Activation{Languages: a.Languages, Sources: sourceIDs(a), IgnoredCodecs: a.Embedded.Ignored()}
 }
 
 // activateLoaded activates the loaded settings a and builds the media

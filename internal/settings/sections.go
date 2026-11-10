@@ -1,9 +1,12 @@
 package settings
 
 import (
+	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediawrite"
+	"github.com/cplieger/subflux/internal/timing"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -36,6 +39,21 @@ var sections = []section{
 	{key: "languages", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
 		var errs []formschema.FieldError
 		a.Languages, errs = language.ParsePolicy(n)
+		return errs
+	}},
+	{key: "post_processing", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Media, errs = mediawrite.ParseConfig(n)
+		return errs
+	}},
+	{key: "timing", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Timing, errs = timing.ParseConfig(n)
+		return errs
+	}},
+	{key: "embedded_subtitles", parse: func(n *yaml.Node, _ Registries, a *Active) []formschema.FieldError {
+		var errs []formschema.FieldError
+		a.Embedded, errs = embedded.ParseConfig(n)
 		return errs
 	}},
 }

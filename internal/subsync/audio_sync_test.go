@@ -83,8 +83,8 @@ func TestAudioOffsetBeyondLimit(t *testing.T) {
 		if modelOf(r) != c.want {
 			t.Errorf("shift %d: model %d (%+v), want %d", c.shift, modelOf(r), r.Timing, c.want)
 		}
-		if c.want == ModelNone && (r.Timing != timing.Identity{} || r.Confidence != 0) {
-			t.Errorf("shift %d: refused fit %+v, want Identity at 0", c.shift, r)
+		if c.want == ModelNone && r != noFit {
+			t.Errorf("shift %d: refused fit %+v, want the MethodNone no-fit result", c.shift, r)
 		}
 	}
 }
@@ -98,11 +98,32 @@ func TestAudioShapeMeasuredAgainstReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !r.Measured || r.Shape.GapSpeechMs < 30_000 {
-		t.Errorf("result %+v, want measured with the missing scene's dialogue", r)
+	if _, want := shapeOf(video, shiftSpans(inc, timing.OffsetMs(r.Timing))); !r.Measured || r.Shape != want {
+		t.Errorf("result %+v, want measured with the shift's shape %+v against the reference", r, want)
+	}
+	if _, want := shapeOf(video, inc); r.IdentityShape != want {
+		t.Errorf("IdentityShape %+v, want the candidate's own %+v", r.IdentityShape, want)
 	}
 	if r.Confidence < audioGate {
 		t.Errorf("confidence %v: the audio measure stays peak × 0.9, not e2", r.Confidence)
+	}
+}
+
+func TestAudioPlacingNothingIsNoFit(t *testing.T) {
+	t.Parallel()
+	video := episode(t, 5, 200)
+	dur := end(video) + 30_000
+	for name, c := range map[string]struct {
+		speech Speech
+		inc    []Span
+	}{
+		"no frames":            {Speech{}, video},
+		"an offset past limit": {speechOf(video, dur), unmap(video, 1, dur/10+20_000)},
+	} {
+		r, err := AlignAudio(t.Context(), c.speech, video, c.inc, dur)
+		if err != nil || r != noFit {
+			t.Errorf("%s against a guarded reference: %+v, %v, want the MethodNone no-fit result", name, r, err)
+		}
 	}
 }
 
@@ -118,8 +139,8 @@ func TestAudioTooLittleInput(t *testing.T) {
 		"no frames":  {Speech{}, video},
 	} {
 		r, err := AlignAudio(t.Context(), c.speech, nil, c.inc, dur)
-		if err != nil || modelOf(r) != ModelNone || r.Timing != (timing.Identity{}) {
-			t.Errorf("%s: %+v, %v, want ModelNone", name, r, err)
+		if err != nil || r != noFit {
+			t.Errorf("%s: %+v, %v, want the MethodNone no-fit result", name, r, err)
 		}
 	}
 	if _, err := AlignAudio(t.Context(), speechOf(video, dur), nil, video, 0); err == nil {

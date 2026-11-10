@@ -254,7 +254,7 @@ func (w *Writer) prepare(ctx context.Context, b *borrowed, d *Delivery, in *stat
 // timing; either over maxSubtitleBytes is ErrFormatUnsupported, since no
 // expectation read could open it.
 func (w *Writer) render(d *Delivery) (baseline timing.Cues, rendered []byte, err error) {
-	baseline, err = timing.Clean(d.Cues, w.cfg.Load().cleanOptions(), d.Tag)
+	baseline, err = timing.Clean(d.Cues, w.cfg.Load().Clean, d.Tag)
 	if err != nil {
 		return timing.Cues{}, nil, fmt.Errorf("mediawrite: clean the delivery: %w", err)
 	}

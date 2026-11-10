@@ -155,6 +155,13 @@ func TestClassifyStyles(t *testing.T) {
 			wantDlg:  []string{"aGB"},
 			wantSkip: []string{"ED-PT", "T-Logo"},
 		},
+		{
+			// A signs-and-songs track: its logo card is no dialogue.
+			name:     "logo style on a track without dialogue",
+			styles:   []string{"Logo", "Kara-OP-Jap", "Signs", "Kara-ED-Jap", "Preview"},
+			counts:   map[string]int{"Logo": 886, "Kara-OP-Jap": 1377, "Signs": 1362, "Kara-ED-Jap": 348, "Preview": 2},
+			wantSkip: []string{"Logo", "Kara-OP-Jap", "Signs", "Kara-ED-Jap"},
+		},
 	}
 
 	for _, tt := range tests {

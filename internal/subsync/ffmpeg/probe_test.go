@@ -13,7 +13,8 @@ func TestParseProbeOutput(t *testing.T) {
 		{"index":0,"codec_name":"h264","codec_type":"video","r_frame_rate":"24000/1001"},
 		{"index":1,"codec_name":"aac","codec_type":"audio","r_frame_rate":"0/0","tags":{"LANGUAGE":"jpn"}},
 		{"index":2,"codec_name":"subrip","codec_type":"subtitle","r_frame_rate":"25/1","tags":{"language":"eng","title":"English SDH"},"disposition":{"forced":0,"hearing_impaired":1}},
-		{"index":3,"codec_name":"ass","codec_type":"subtitle","tags":{"TITLE":"Signs"},"disposition":{"forced":1}}]}`)
+		{"index":3,"codec_name":"ass","codec_type":"subtitle","tags":{"TITLE":"Signs"},"disposition":{"forced":1}},
+		{"index":4,"codec_name":"mjpeg","codec_type":"video","r_frame_rate":"90000/1","disposition":{"attached_pic":1}}]}`)
 	got, err := parseProbeOutput(data)
 	if err != nil {
 		t.Fatal(err)
@@ -23,6 +24,7 @@ func TestParseProbeOutput(t *testing.T) {
 		{Index: 1, Type: "audio", Codec: "aac", Language: "jpn"},
 		{Index: 2, Type: "subtitle", Codec: "subrip", Language: "eng", Title: "English SDH", HearingImpaired: true},
 		{Index: 3, Type: "subtitle", Codec: "ass", Title: "Signs", Forced: true},
+		{Index: 4, Type: "video", Codec: "mjpeg"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d streams, want %d: %+v", len(got), len(want), got)

@@ -83,11 +83,26 @@ func (Schema) absent(f *Field, vals Values) []FieldError {
 		return nil
 	}
 	if f.Kind == StringList {
-		return []FieldError{{f.Key, "a string list takes no default"}}
+		return defaultList(f, vals)
 	}
 	val, msg := parseText(f, f.Default)
 	if msg != "" {
 		return []FieldError{{f.Key, "invalid default: " + msg}}
+	}
+	vals[f.Key] = val
+	return nil
+}
+
+// defaultList applies a StringList's default, a YAML sequence read by the
+// rules a written value meets.
+func defaultList(f *Field, vals Values) []FieldError {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(f.Default), &doc); err != nil || len(doc.Content) != 1 {
+		return []FieldError{{f.Key, "invalid default: must be a YAML sequence"}}
+	}
+	val, errs := decodeList(f, doc.Content[0])
+	if len(errs) > 0 {
+		return []FieldError{{f.Key, "invalid default: " + errs[0].Message}}
 	}
 	vals[f.Key] = val
 	return nil
@@ -116,6 +131,10 @@ func decodeList(f *Field, v *yaml.Node) (Value, []FieldError) {
 	for i, e := range v.Content {
 		if e.Kind != yaml.ScalarNode || IsNull(e) {
 			errs = append(errs, FieldError{fmt.Sprintf("%s[%d]", f.Key, i), "must be a single value"})
+			continue
+		}
+		if len(f.Enum) > 0 && !slices.Contains(f.Enum, scalarText(e)) {
+			errs = append(errs, FieldError{fmt.Sprintf("%s[%d]", f.Key, i), "must be one of " + strings.Join(f.Enum, ", ")})
 			continue
 		}
 		list = append(list, scalarText(e))

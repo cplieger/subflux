@@ -2,25 +2,17 @@ package subsync
 
 import "slices"
 
-// Shape is what Settle reads of one fit's mapping, in video time after its
-// scale.
+// Shape is what Settle reads of one mapping, in video time after its scale.
 type Shape struct {
-	// GapSpeechMs is the most reference dialogue inside one interior stretch
-	// the kept cues leave uncovered.
-	GapSpeechMs int64
 	// EdgeSpeechMs is the reference dialogue lying more than maxRiseMs before
 	// the first kept cue's start or after the last kept cue's end.
 	EdgeSpeechMs int64
-	// ExtraLinesMs is the longest span, from first start to last end, of
-	// consecutive kept cues none of which lies within maxRiseMs of reference
-	// dialogue, head, tail and interior: material the video lacks.
-	ExtraLinesMs int64
 	// InsertedMs is the most the mapping lengthens a kept-to-kept gap beyond
 	// Scale times its candidate gap; 0 for Shift and Linear.
 	InsertedMs int64
 	// EdgeFit is the lowest e2 of any run of at least edgeCues consecutive
 	// kept cues that starts at the first kept cue or ends at the last; the
-	// whole fit's e2 when fewer than 2 × edgeCues cues are kept.
+	// whole mapping's e2 when fewer than 2 × edgeCues cues are kept.
 	EdgeFit float64
 }
 
@@ -47,29 +39,14 @@ func measure(f fit, x refIndex) (float64, Shape) {
 	if len(kept) == 0 {
 		return conf, Shape{EdgeSpeechMs: x.speech(minTime, maxTime)}
 	}
-	var sh Shape
 	end := kept[0].EndMs
-	runStart, runEnd, inRun := int64(0), int64(0), false
-	for i, s := range kept {
-		if i > 0 {
-			sh.GapSpeechMs = max(sh.GapSpeechMs, x.speech(end, s.StartMs))
-			end = max(end, s.EndMs)
-		}
-		switch {
-		case x.near(s, maxRiseMs):
-			inRun = false
-		case !inRun:
-			runStart, runEnd, inRun = s.StartMs, s.EndMs, true
-		default:
-			runEnd = max(runEnd, s.EndMs)
-		}
-		if inRun {
-			sh.ExtraLinesMs = max(sh.ExtraLinesMs, runEnd-runStart)
-		}
+	for _, s := range kept[1:] {
+		end = max(end, s.EndMs)
 	}
-	sh.EdgeSpeechMs = x.speech(minTime, kept[0].StartMs-maxRiseMs) + x.speech(end+maxRiseMs, maxTime)
-	sh.EdgeFit = edgeFit(kept, overlap, conf, c)
-	return conf, sh
+	return conf, Shape{
+		EdgeSpeechMs: x.speech(minTime, kept[0].StartMs-maxRiseMs) + x.speech(end+maxRiseMs, maxTime),
+		EdgeFit:      edgeFit(kept, overlap, conf, c),
+	}
 }
 
 // The ends of the timeline EdgeSpeechMs reads to.

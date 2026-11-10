@@ -187,6 +187,19 @@ var sectionFixtures = map[string]struct {
 		text:    "languages:\n  close_varieties: true\n  default:\n    - tag: pt-BR\n      variants: [standard, forced]\n    - tag: en\n      variants: [hi]\n  rules:\n    - audio: ja\n      targets:\n        - tag: en\n    - audio: es\n      targets: []\n",
 		secrets: nil,
 	},
+	"post_processing": {
+		text: "post_processing:\n  strip_hi: true\n  strip_tags: false\n  normalize_utf8: false\n  normalize_line_endings: false\n" +
+			"  clean_whitespace: false\n  remove_empty: false\n",
+		secrets: nil,
+	},
+	"timing": {
+		text:    "timing:\n  sync: false\n  audio_fallback: true\n",
+		secrets: nil,
+	},
+	"embedded_subtitles": {
+		text:    "embedded_subtitles:\n  ignore_codecs: [pgs, dvbsub, teletext]\n",
+		secrets: nil,
+	},
 }
 
 // TestDocumentRoundTrip saves the Document of one file holding every

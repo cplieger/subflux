@@ -74,11 +74,6 @@ func (x refIndex) coverage() float64 {
 	return float64(x.before[n]+x.iv[n].EndMs-x.iv[n].StartMs) / float64(width)
 }
 
-// near reports whether reference dialogue lies within slack of s.
-func (x refIndex) near(s Span, slack int64) bool {
-	return x.speech(s.StartMs-slack, s.EndMs+slack) > 0
-}
-
 // e2 is the chance-corrected coverage clamp((s2 − c) / (1 − c), 0, 1), where
 // s2 is overlapMs over displayMs: the display time reference dialogue
 // overlaps over the display time of every scored cue.

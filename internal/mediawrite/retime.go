@@ -163,7 +163,7 @@ func retimed(t *target, tm timing.Timing, outcome *timing.Outcome) statedb.FileR
 	rec.Timing = tm
 	if rec.Provenance != nil {
 		p := *rec.Provenance
-		next := timing.Outcome{Method: timing.MethodNone, Verdict: timing.Verified, OffsetMs: offsetOf(tm)}
+		next := timing.Outcome{Method: timing.MethodNone, Verdict: timing.Verified, OffsetMs: timing.OffsetMs(tm)}
 		if outcome != nil {
 			next = *outcome
 		}
@@ -172,22 +172,4 @@ func retimed(t *target, tm timing.Timing, outcome *timing.Outcome) statedb.FileR
 		rec.Provenance = &p
 	}
 	return rec
-}
-
-// offsetOf is the offset tm applies to the start of the baseline: a
-// Piecewise's first kept segment's.
-func offsetOf(tm timing.Timing) int64 {
-	switch v := tm.(type) {
-	case timing.Shift:
-		return v.Ms
-	case timing.Linear:
-		return v.OffsetMs
-	case timing.Piecewise:
-		for _, s := range v.Segments {
-			if !s.Drop {
-				return s.OffsetMs
-			}
-		}
-	}
-	return 0
 }

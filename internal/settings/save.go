@@ -90,13 +90,13 @@ func (s *Service) Save(ctx context.Context, doc *yaml.Node, base string) (Snapsh
 			return cur, errs, nil
 		}
 	}
-	return s.commit(ctx, cur, next, active)
+	return s.commit(ctx, cur, next, &active)
 }
 
 // commit writes next's file, activates it and makes it live, on a context
 // only Shutdown cancels: a disconnect then cannot leave the file and the live
 // settings apart.
-func (s *Service) commit(ctx context.Context, cur, next Snapshot, active Active) (Snapshot, []formschema.FieldError, error) {
+func (s *Service) commit(ctx context.Context, cur, next Snapshot, active *Active) (Snapshot, []formschema.FieldError, error) {
 	sctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancel()
 	defer context.AfterFunc(s.stop, cancel)()
@@ -104,7 +104,7 @@ func (s *Service) commit(ctx context.Context, cur, next Snapshot, active Active)
 		return cur, nil, fmt.Errorf("settings: write config.yaml: %w", err)
 	}
 	if s.activate != nil {
-		if err := s.activate(sctx, active); err != nil {
+		if err := s.activate(sctx, *active); err != nil {
 			s.restore()
 			return cur, nil, fmt.Errorf("%w: %w", ErrActivation, err)
 		}

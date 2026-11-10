@@ -2,18 +2,6 @@
   "description": "Adjudications for subflux. An entry on a retained package's code reads \"Retained until <landing> (<pattern>)\", naming its row in internal/testrig/retained_test.go, and goes with that row.",
   "ignore": [
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Detector",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Detector.DetectTracks",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Jobs",
       "path": "internal/status/snapshot.go",
@@ -203,7 +191,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subtitleenc#Encoding.Encode",
       "path": "internal/subtitleenc/codec.go",
-      "reason": "Retained until TS-2 (internal/subtitleenc#Encoding.Encode): timing-sync's Writer, its first caller outside the package, lands there."
+      "reason": "Decode's inverse in subtitleenc's declared contract (CR-TS-7): no subflux path writes text back in a legacy encoding, since timing.Clean writes UTF-8 and Render keeps the document's bytes."
     },
     {
       "code": "DS1501",
@@ -330,36 +318,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrCursorInvalid",
       "path": "internal/statedb/cursor.go",
       "reason": "Retained until AP-1 (internal/statedb#ErrCursorInvalid): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#VideoStamp",
-      "path": "internal/statedb/embedded.go",
-      "reason": "Retained until TS-2 (internal/statedb#VideoStamp): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#EmbeddedTrack",
-      "path": "internal/statedb/embedded.go",
-      "reason": "Retained until TS-2 (internal/statedb#EmbeddedTrack): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#VideoProbe",
-      "path": "internal/statedb/embedded.go",
-      "reason": "Retained until TS-2 (internal/statedb#VideoProbe): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.PutEmbedded",
-      "path": "internal/statedb/embedded.go",
-      "reason": "Retained until TS-2 (internal/statedb#Store.PutEmbedded): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Embedded",
-      "path": "internal/statedb/embedded.go",
-      "reason": "Retained until TS-2 (internal/statedb#Store.Embedded): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -843,12 +801,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Track",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/episodematch#ReadName",
       "path": "internal/episodematch/name.go",
       "reason": "Retained until SE-2 (internal/episodematch#*): its first caller, the search engine, lands there."
@@ -1023,201 +975,21 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Span",
-      "path": "internal/subsync/dialogue.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#DialogueSpans",
-      "path": "internal/subsync/dialogue.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#MaxModel",
-      "path": "internal/subsync/constants.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#MaxAudioFrames",
-      "path": "internal/subsync/constants.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Model",
-      "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subsync#ModelNone",
       "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
+      "reason": "A value of the exported Model enum, whose ModelLinear and ModelPiecewise syncsched names: the enum is exported whole."
     },
     {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subsync#ModelShift",
       "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ModelLinear",
-      "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ModelPiecewise",
-      "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Result",
-      "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#AlignReference",
-      "path": "internal/subsync/reference.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Shape",
-      "path": "internal/subsync/shape.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#ErrDifferentCut",
-      "path": "internal/subsync/settle.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Settle",
-      "path": "internal/subsync/settle.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#Speech",
-      "path": "internal/subsync/audio_sync.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync#AlignAudio",
-      "path": "internal/subsync/audio_sync.go",
-      "reason": "Retained until TS-2 (internal/subsync#*): syncsched, its first importer, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#ErrUnavailable",
-      "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
+      "reason": "A value of the exported Model enum, whose ModelLinear and ModelPiecewise syncsched names: the enum is exported whole."
     },
     {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#ErrOutputCap",
       "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Runner",
-      "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Runner.ExtractSubtitle",
-      "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Runner.PCM",
-      "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Runner.Preview",
-      "path": "internal/subsync/ffmpeg/runner.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Runner.Probe",
-      "path": "internal/subsync/ffmpeg/probe.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober and syncsched, its first importers, land there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Stream.Index",
-      "path": "internal/subsync/ffmpeg/probe.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): syncsched's reference extraction, its first reader, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/ffmpeg#Stream.FrameRate",
-      "path": "internal/subsync/ffmpeg/probe.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): the embedded prober, which stores it, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/vad#FrameSamples",
-      "path": "internal/subsync/vad/vad.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): syncsched, which turns the runner's PCM into the audio path's ratios, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/vad#Detector",
-      "path": "internal/subsync/vad/vad.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): syncsched, which turns the runner's PCM into the audio path's ratios, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/vad#NewDetector",
-      "path": "internal/subsync/vad/vad.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): syncsched, which turns the runner's PCM into the audio path's ratios, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/subsync/vad#Detector.LLR",
-      "path": "internal/subsync/vad/vad.go",
-      "reason": "Retained until TS-2 (internal/subsync/*): syncsched, which turns the runner's PCM into the audio path's ratios, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Track.Codec",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Track.Lang",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Track.Forced",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Track.HearingImpaired",
-      "path": "internal/embedded/embedded.go",
-      "reason": "Retained until TS-2 (internal/embedded#*): its importers went with the old tree."
+      "reason": "One of Runner's failure sentinels, for errors.Is at a caller beside ErrUnavailable."
     },
     {
       "code": "DS1301",
@@ -1329,36 +1101,6 @@
     },
     {
       "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Outcome",
-      "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Tag",
-      "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Cues",
-      "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Flags",
-      "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Rigid",
-      "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Found.File",
       "path": "internal/mediawrite/inventory.go",
       "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
@@ -1410,6 +1152,66 @@
       "symbol": "go://github.com/cplieger/subflux/internal/seriesorder#Service.Evidence",
       "path": "internal/seriesorder/evidence.go",
       "reason": "Retained until SE-2 (internal/seriesorder#Service.Evidence): search's engine, its first caller outside the package, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Schema",
+      "path": "internal/embedded/section.go",
+      "reason": "Retained until PA-2 (internal/embedded#Schema): settings.SectionSchemas, its first caller outside the package, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Active.Media",
+      "path": "internal/settings/snapshot.go",
+      "reason": "Retained until MR-1 (internal/settings#Active.Media): the activation's Writer.SetConfig, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#Active.Timing",
+      "path": "internal/settings/snapshot.go",
+      "reason": "Retained until SE-2 (internal/settings#Active.Timing): search's timing.Plan, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Aligned.Timing",
+      "path": "internal/syncsched/align.go",
+      "reason": "Retained until SE-2 (internal/syncsched#Aligned*): search's delivery, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Aligned.Cues",
+      "path": "internal/syncsched/align.go",
+      "reason": "Retained until SE-2 (internal/syncsched#Aligned*): search's delivery, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Aligned.Outcome",
+      "path": "internal/syncsched/align.go",
+      "reason": "Retained until SE-2 (internal/syncsched#Aligned*): search's delivery, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Proposal.Timing",
+      "path": "internal/syncsched/propose.go",
+      "reason": "Retained until AP-1 (internal/syncsched#*): the api's proposal view, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Proposal.File",
+      "path": "internal/syncsched/propose.go",
+      "reason": "Retained until AP-1 (internal/syncsched#*): the api's proposal view, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Proposal.Outcome",
+      "path": "internal/syncsched/propose.go",
+      "reason": "Retained until AP-1 (internal/syncsched#*): the api's proposal view, its first reader, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/syncsched#Proposal.Expect",
+      "path": "internal/syncsched/propose.go",
+      "reason": "Retained until AP-1 (internal/syncsched#*): the api's proposal view, its first reader, lands there."
     }
   ]
 }

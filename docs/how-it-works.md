@@ -29,7 +29,7 @@ Searches run with the aired, scene and absolute episode numbers and merge the re
 
 ## Embedded subtitles
 
-Coverage counts the text and picture-based subtitle tracks already inside the video: SRT, ASS, PGS, VobSub and DVB. The `embedded_subtitles` section decides which codecs count as a usable subtitle. PGS and VobSub tracks are ignored by default, so a picture-based track does not stop the search for a text one. Ignored tracks still show in coverage.
+Coverage counts the text and picture-based subtitle tracks already inside the video: SRT, ASS, PGS, VobSub and DVB. `embedded_subtitles.ignore_codecs` decides which formats do not count as a usable subtitle. PGS and VobSub tracks are ignored by default, so a picture-based track does not stop the search for a text one. Ignored tracks still show in coverage.
 
 ## Backing off
 
@@ -41,17 +41,14 @@ A download you pick by hand is saved as a numbered file next to the automatic on
 
 ## Timing
 
-Downloaded subtitles rarely match your exact file, so subflux re-times each download before it reaches the disk. The engine is a Go port of [alass](https://github.com/kaegi/alass), with these additions:
+Downloaded subtitles rarely match your exact file, so subflux re-times each download before it reaches the disk. The alignment builds on [alass](https://github.com/kaegi/alass):
 
-- Alignment that handles splits and frame-rate differences.
-- Audio timing, which compares a voice-activity detector's output with the subtitle's dialogue. The detector is ported from WebRTC and re-tuned for film audio.
-- Cross-language matching, so a French subtitle can be timed against the English track inside the file.
+- It compares the download's dialogue with a text subtitle track inside the video, which may be in another language, and finds the offset and any frame-rate difference between them.
+- Audio timing compares a voice-activity detector's output with the subtitle's dialogue. The detector is ported from WebRTC and re-tuned for film audio. It runs only when `timing.audio_fallback` is on and the subtitle tracks cannot verify the timing.
 
-The methods run at the same time and vote. The winner is applied only above a confidence threshold, so a timing change subflux is not sure of is not made.
+A timing subflux is confident of is applied and marked verified. A download that fits the video's track too poorly to be the same cut is refused, and the search moves to the next result. One that fits a little better, but not well enough to verify, is saved as it arrived and marked "Timing unverified". The same happens when the video has no usable subtitle track and audio timing is off. Audio timing and manual offsets are always available from the timing dialog on the web page.
 
-Automatic downloads are timed against a subtitle track inside the video when the file has one. Timing against the audio when there is no such track is off by default (`post_processing.audio_sync_fallback`). Audio timing and manual offsets are always available from the timing dialog on the web page.
-
-Downloads matched by file hash or from the same release skip timing, because their timing is already right. Forced subtitles skip it too, because they have too few lines to align.
+Downloads matched by file hash or from the same release skip timing, because their timing is already right. Forced subtitles skip it too, because they have too few lines to align. `timing.sync` turns timing off for every download.
 
 ## Clean-up
 

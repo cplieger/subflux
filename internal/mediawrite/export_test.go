@@ -104,6 +104,14 @@ func RecoverNow(ctx context.Context, w *Writer, path string) bool {
 	return ok
 }
 
+// Outlived is how many intents a pass left pending that no count has yet
+// found settled.
+func Outlived(w *Writer) int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.outlived)
+}
+
 // StageName is the stage a delivery of the bytes hashing to sum at name
 // beside inst's video uses.
 func StageName(inst statedb.InstanceID, name string, sum [32]byte) string {

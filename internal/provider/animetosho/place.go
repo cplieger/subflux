@@ -234,7 +234,7 @@ func subtitle(at *attachment, release string, langs []language.Tag) (provider.Ca
 		Ref:     provider.NewRef(at.URL),
 		Lang:    refined,
 		Release: release,
-		Flags:   language.Flags{HI: provider.HearingImpaired(false, at.Info.Name), Forced: provider.Forced(at.Info.Forced, at.Info.Name)},
+		Flags:   provider.Flags(language.Flags{Forced: at.Info.Forced}, at.Info.Name),
 	}, true
 }
 

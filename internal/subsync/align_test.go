@@ -15,7 +15,7 @@ func bruteRating(ref, inc []Span, o int64) float64 {
 	var r float64
 	for _, a := range ref {
 		for _, b := range inc {
-			score := spanScore(a, b)
+			score := float64(spanScore(a, b))
 			if score == 0 {
 				continue
 			}
@@ -29,7 +29,7 @@ func bruteRating(ref, inc []Span, o int64) float64 {
 			}
 		}
 	}
-	return r
+	return r / scoreUnit
 }
 
 func sortedSpans(t *rapid.T, label string, n int, maxStart int64) []Span {
@@ -55,14 +55,25 @@ func TestSweepMatchesBruteForce(t *testing.T) {
 		var want int64
 		var wantRating float64
 		for o := -window; o <= window; o++ {
-			if r := bruteRating(ref, inc, o); r > wantRating+1e-9 {
+			if r := bruteRating(ref, inc, o); r > wantRating {
 				want, wantRating = o, r
 			}
 		}
-		if got != want || rating < wantRating-1e-6 || rating > wantRating+1e-6 {
+		if got != want || rating != wantRating {
 			t.Fatalf("best = %d (rating %v), brute force %d (rating %v)", got, rating, want, wantRating)
 		}
 	})
+}
+
+// A pair whose rating cancels to 0 inside the window ties every offset
+// that rates 0, so the lowest of them wins only if the sum is exact
+// (rapid seed 16430536590738507771).
+func TestSweepExactZeroTies(t *testing.T) {
+	t.Parallel()
+	got, rating, err := newSweeper(1).best(t.Context(), []Span{{55, 56}}, []Span{{57, 60}})
+	if err != nil || got != 0 || rating != 0 {
+		t.Errorf("best = %d (rating %v, %v), want 0 (rating 0)", got, rating, err)
+	}
 }
 
 func TestSweepRecoversShift(t *testing.T) {
@@ -117,11 +128,12 @@ func TestSpanScore(t *testing.T) {
 	tests := []struct {
 		name string
 		r, s Span
-		want float64
+		want int64
 	}{
-		{"equal length spans", Span{0, 2000}, Span{0, 2000}, 1.0},
-		{"ref shorter than inc", Span{0, 1000}, Span{0, 2000}, 0.5},
-		{"inc shorter than ref", Span{0, 4000}, Span{0, 1000}, 0.25},
+		{"equal length spans", Span{0, 2000}, Span{0, 2000}, scoreUnit},
+		{"ref shorter than inc", Span{0, 1000}, Span{0, 2000}, scoreUnit / 2},
+		{"inc shorter than ref", Span{0, 4000}, Span{0, 1000}, scoreUnit / 4},
+		{"a third rounds down", Span{0, 1000}, Span{0, 3000}, 21845},
 		{"zero-length ref", Span{500, 500}, Span{0, 1000}, 0},
 		{"zero-length inc", Span{0, 1000}, Span{500, 500}, 0},
 		{"inverted ref", Span{2000, 1000}, Span{0, 1000}, 0},

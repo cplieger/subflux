@@ -36,27 +36,6 @@ func (r Runner) Probe(ctx context.Context, video *os.File) ([]Stream, error) {
 	return parseProbeOutput(out)
 }
 
-// ProbeStreams opens path and returns its streams of type kind, every stream
-// when kind is "".
-func ProbeStreams(ctx context.Context, path, kind string) ([]Stream, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	streams, err := Runner{}.Probe(ctx, f)
-	if err != nil || kind == "" {
-		return streams, err
-	}
-	kept := streams[:0]
-	for _, s := range streams {
-		if s.Type == kind {
-			kept = append(kept, s)
-		}
-	}
-	return kept, nil
-}
-
 type probeOutput struct {
 	Streams []probeStream `json:"streams"`
 }
@@ -71,7 +50,7 @@ type probeStream struct {
 }
 
 // parseProbeOutput reads ffprobe's -show_streams JSON; a frame rate that is
-// not a finite positive number reads as 0.
+// not a finite positive number, or a cover picture's, reads as 0.
 func parseProbeOutput(data []byte) ([]Stream, error) {
 	if len(data) > maxProbeBytes {
 		return nil, fmt.Errorf("ffprobe output: %d bytes over %d: %w", len(data), maxProbeBytes, ErrOutputCap)
@@ -91,7 +70,7 @@ func parseProbeOutput(data []byte) ([]Stream, error) {
 			Forced:          s.Disposition["forced"] == 1,
 			HearingImpaired: s.Disposition["hearing_impaired"] == 1,
 		}
-		if s.CodecType == "video" {
+		if s.CodecType == "video" && s.Disposition["attached_pic"] != 1 {
 			st.FrameRate = parseFrameRate(s.RFrameRate)
 		}
 		streams = append(streams, st)

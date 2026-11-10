@@ -184,7 +184,7 @@ func TestSiblingStageSurvivesRecovery(t *testing.T) {
 	l := newLib(t, "E01.mkv", "E02.mkv")
 	fault := &failOnce{}
 	var sibling func()
-	settledE01 := make(chan struct{})
+	settledE01, publishedE02 := make(chan struct{}), make(chan struct{})
 	var once sync.Once
 	l.start(func(f *mediawrite.Faults) {
 		rename := f.RenameNoReplace
@@ -192,14 +192,27 @@ func TestSiblingStageSurvivesRecovery(t *testing.T) {
 			if to == ep1 && fault.take() {
 				return &os.LinkError{Op: "renameat2", Old: from, New: to, Err: syscall.EIO}
 			}
-			return rename(dir, from, to)
+			err := rename(dir, from, to)
+			if to == "E02.en.srt" {
+				close(publishedE02)
+			}
+			return err
 		}
 		step := f.Step
 		f.Step = func(s string) {
 			step(s)
 			switch {
 			case s == "recover-synced":
-				once.Do(func() { close(settledE01) })
+				// E02's publish falls between E01's directory fsync and its
+				// settle: the settle waits only for E01's own operations.
+				once.Do(func() {
+					close(settledE01)
+					select {
+					case <-publishedE02:
+					case <-time.After(10 * time.Second):
+						t.Error("E02 did not publish while E01's recovery waited to settle")
+					}
+				})
 			case s == "stage" && sibling != nil:
 				run := sibling
 				sibling = nil
@@ -448,6 +461,145 @@ func TestUnreadInstanceCountedOnce(t *testing.T) {
 		t.Errorf("%d intents once the instance reads again", n)
 	}
 	l.consistent()
+}
+
+// An intent kept while its instance could not be read stays counted once
+// the instance reads again, until its root's recovery settles it: the
+// orphan pass that now finds it under the root does not end its count.
+func TestAlertHoldsUntilTheOwningRootRecovers(t *testing.T) {
+	t.Parallel()
+	l := newLib(t, "E01.mkv")
+	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
+	beginDelete(t, l, &rec)
+	var down, hold atomic.Bool
+	down.Store(true)
+	held, release := make(chan struct{}), make(chan struct{})
+	orphansSettled := make(chan struct{}, 16)
+	l.start(func(f *mediawrite.Faults) {
+		instance, step := f.Instance, f.Step
+		f.Instance = func(ctx context.Context, inst statedb.InstanceID) (statedb.Instance, bool, error) {
+			if down.Load() {
+				return statedb.Instance{}, false, errCommit
+			}
+			return instance(ctx, inst)
+		}
+		f.Step = func(s string) {
+			step(s)
+			if s == "recover-snapshot" && hold.CompareAndSwap(true, false) {
+				close(held)
+				<-release
+			}
+		}
+		f.Pause = func(p string) {
+			if p == "orphans-settled" && !down.Load() {
+				orphansSettled <- struct{}{}
+			}
+		}
+	})
+	eventually(t, "the pending_writes alert", func() bool { _, on := l.pendingAlert(); return on })
+
+	hold.Store(true)
+	down.Store(false)
+	mediawrite.Reprobe(l.w)
+	for _, wait := range []struct {
+		ch   <-chan struct{}
+		what string
+	}{{held, "the root's recovery at its snapshot"}, {orphansSettled, "an orphan pass that reads the instance"}} {
+		select {
+		case <-wait.ch:
+		case <-time.After(10 * time.Second):
+			close(release)
+			t.Fatalf("timed out waiting for %s", wait.what)
+		}
+	}
+	text, on := l.pendingAlert()
+	close(release)
+	if !on || !strings.HasPrefix(text, "1 subtitle writes") || !strings.Contains(text, "1 under "+l.root) {
+		t.Errorf("pending_writes = %q (on %v) while the root's recovery has not run, want the write counted under its root", text, on)
+	}
+	eventually(t, "the alert to clear", func() bool { _, on := l.pendingAlert(); return !on })
+	if n := pendingCount(t, l.store); n != 0 {
+		t.Errorf("%d intents once the alert cleared", n)
+	}
+	l.consistent()
+}
+
+// An intent kept under an unavailable root stays counted when its instance
+// turns unreadable: the root's next recovery skips it, and only a count
+// that no longer finds it stored ends its count.
+func TestAlertHoldsWhenTheInstanceTurnsUnreadable(t *testing.T) {
+	t.Parallel()
+	l := newLib(t, "E01.mkv")
+	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
+	beginDelete(t, l, &rec)
+	var rootDown, instDown atomic.Bool
+	rootDown.Store(true)
+	l.start(func(f *mediawrite.Faults) {
+		statFault(l.root, &rootDown)(f)
+		instance := f.Instance
+		f.Instance = func(ctx context.Context, inst statedb.InstanceID) (statedb.Instance, bool, error) {
+			if instDown.Load() {
+				return statedb.Instance{}, false, errCommit
+			}
+			return instance(ctx, inst)
+		}
+	})
+	eventually(t, "the write counted under its root", func() bool {
+		text, on := l.pendingAlert()
+		return on && strings.Contains(text, "1 under "+l.root)
+	})
+
+	instDown.Store(true)
+	if !mediawrite.RecoverNow(t.Context(), l.w, l.root) {
+		t.Fatal("a recovery attempt was already running")
+	}
+	if text, on := l.pendingAlert(); !on || !strings.HasPrefix(text, "1 subtitle writes") || !strings.Contains(text, "1 whose video cannot be looked up") {
+		t.Errorf("pending_writes = %q (on %v) after a recovery that cannot read the instance, want the write still counted once", text, on)
+	}
+	if n := pendingCount(t, l.store); n != 1 {
+		t.Errorf("%d intents, want the delete still pending", n)
+	}
+}
+
+// A count that read the pending writes before an intent existed leaves the
+// intent another pass kept meanwhile to that pass's own count.
+func TestCountKeepsAnIntentKeptAfterItsRead(t *testing.T) {
+	t.Parallel()
+	l := newLib(t, "E01.mkv")
+	var rootDown, hold atomic.Bool
+	rootDown.Store(true)
+	held, release := make(chan struct{}), make(chan struct{})
+	l.start(func(f *mediawrite.Faults) {
+		statFault(l.root, &rootDown)(f)
+		f.Pause = func(p string) {
+			if p == "pending-read" && hold.CompareAndSwap(true, false) {
+				close(held)
+				<-release
+			}
+		}
+	})
+
+	hold.Store(true)
+	mediawrite.Reprobe(l.w)
+	select {
+	case <-held:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no count read the pending writes")
+	}
+	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
+	beginDelete(t, l, &rec)
+	mediawrite.Reprobe(l.w)
+	for deadline := time.Now().Add(10 * time.Second); mediawrite.Outlived(l.w) != 1; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			close(release)
+			t.Fatal("no recovery kept the delete under its unavailable root")
+		}
+	}
+	close(release)
+	eventually(t, "the delete counted under its root", func() bool {
+		text, on := l.pendingAlert()
+		return on && strings.Contains(text, "1 under "+l.root)
+	})
 }
 
 // gate holds the next recovery at its snapshot until release closes.

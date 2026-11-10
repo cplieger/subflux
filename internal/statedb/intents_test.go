@@ -563,16 +563,16 @@ func TestPendingDeliverRoundTrip(t *testing.T) {
 	if len(got.Attempts) != 2 || got.Attempts[1].Refusal != "different_cut" || !slices.Equal(got.Attempts[0].Items, []media.Key{k}) {
 		t.Errorf("attempts %+v", got.Attempts)
 	}
-	if !slices.Equal(got.Removes, d.Removes) || got.Baseline.Len() != d.Baseline.Len() {
-		t.Errorf("removes %v, baseline of %d events", got.Removes, got.Baseline.Len())
+	if !slices.Equal(got.Removes, d.Removes) || len(got.Baseline.Events()) != len(d.Baseline.Events()) {
+		t.Errorf("removes %v, baseline of %d events", got.Removes, len(got.Baseline.Events()))
 	}
 	ws, _ := s.PendingWrites(t.Context())
 	if len(ws) != 1 || ws[0] != (Intent{Op: Deliver, Inst: inst, Name: managedName, SHA256: [32]byte{1}}) {
 		t.Errorf("PendingWrites = %+v", ws)
 	}
 	endDeliver(t, s, inst, managedName, true)
-	if b, found, err := s.Baseline(t.Context(), inst, managedName); err != nil || !found || b.Len() != 1 {
-		t.Errorf("Baseline = %d events, %v, %v", b.Len(), found, err)
+	if b, found, err := s.Baseline(t.Context(), inst, managedName); err != nil || !found || len(b.Events()) != 1 {
+		t.Errorf("Baseline = %d events, %v, %v", len(b.Events()), found, err)
 	}
 }
 

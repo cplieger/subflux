@@ -61,33 +61,39 @@ func (w *Writer) recoverRoot(ctx context.Context, rs *rootState) {
 		h.borrows++
 	}
 	w.mu.Unlock()
-	kept, err := -1, error(nil)
+	var kept []statedb.Intent
+	read := false
 	// Deferred so a recovery ended mid-attempt still frees rs's slot and
 	// its borrow.
-	defer func() { w.finishRecovery(rs, h, kept, err) }()
-	kept, err = w.recoverIntents(ctx, rs, h)
+	defer func() {
+		w.finishRecovery(rs, h, kept, read)
+		w.countPending(ctx)
+	}()
+	kept, err := w.recoverIntents(ctx, rs, h)
 	if err != nil {
 		w.log.Warn("mediawrite: reading the pending writes for recovery failed", "root", rs.path, "err", err)
+		return
 	}
+	read = true
 }
 
 // finishRecovery records an attempt of rs through h that left kept intents
-// pending, or failed with err, and asks for the next one a probe wanted.
-func (w *Writer) finishRecovery(rs *rootState, h *rootHandle, kept int, err error) {
+// pending, when it read the pending writes, and asks for the next one a
+// probe wanted.
+func (w *Writer) finishRecovery(rs *rootState, h *rootHandle, kept []statedb.Intent, read bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if h != nil {
 		h.releaseLocked()
 	}
 	rs.recovering = false
-	if err == nil && kept >= 0 {
-		rs.kept = kept
+	if read {
+		w.outliveLocked(kept)
 		rs.recovered = rs.recovered || h != nil && rs.cur == h
 	}
 	if !rs.gone {
 		rs.markReadyLocked()
 	}
-	w.reconcilePendingLocked()
 	if rs.wantRecovery {
 		select {
 		case w.recoverReq <- struct{}{}:
@@ -98,26 +104,26 @@ func (w *Writer) finishRecovery(rs *rootState, h *rootHandle, kept int, err erro
 
 // recoverIntents settles each intent of a snapshot of the pending writes
 // whose video lies under rs, through h; with h nil it only counts them. It
-// returns how many stay pending.
-func (w *Writer) recoverIntents(ctx context.Context, rs *rootState, h *rootHandle) (int, error) {
+// returns the intents that stay pending.
+func (w *Writer) recoverIntents(ctx context.Context, rs *rootState, h *rootHandle) ([]statedb.Intent, error) {
 	intents, err := w.store.PendingWrites(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	w.fs.Step("recover-snapshot")
-	kept := 0
+	var kept []statedb.Intent
 	for i := range intents {
 		it := &intents[i]
 		owner, rel, err := w.rootOf(ctx, it.Inst)
 		switch {
 		case err != nil, owner != rs:
-			continue // settleOrphans counts an intent whose instance cannot be read
+			continue // settleOrphans keeps an intent whose instance cannot be read
 		case h == nil:
-			kept++
+			kept = append(kept, *it)
 			continue
 		}
 		if !w.recoverIntent(ctx, &borrowed{w: w, state: rs, h: h, rel: rel}, it) {
-			kept++
+			kept = append(kept, *it)
 		}
 	}
 	return kept, nil
@@ -364,27 +370,27 @@ func (w *Writer) startOrphansLocked(ctx context.Context) {
 	}
 	w.orphaning = true
 	w.recoveries.Go(func() {
-		kept, unread, ok := w.settleOrphans(ctx)
+		kept, ok := w.settleOrphans(ctx)
 		w.mu.Lock()
-		defer w.mu.Unlock()
 		w.orphaning = false
 		if ok {
-			w.orphanKept, w.unreadKept = kept, unread
+			w.outliveLocked(kept)
 		}
-		w.reconcilePendingLocked()
+		w.mu.Unlock()
+		w.countPending(ctx)
+		w.fs.Pause("orphans-settled")
 	})
 }
 
 // settleOrphans settles not landed, touching no file, every pending intent
-// whose video lies under no configured root. It returns how many of those
-// stay pending and how many intents stay because their instance cannot be
-// read, which no root's recovery counts; false when the pending writes
-// cannot be read.
-func (w *Writer) settleOrphans(ctx context.Context) (kept, unread int, ok bool) {
+// whose video lies under no configured root. It returns those that stay
+// pending and those whose instance cannot be read, which no root's
+// recovery can claim; false when the pending writes cannot be read.
+func (w *Writer) settleOrphans(ctx context.Context) (kept []statedb.Intent, ok bool) {
 	intents, err := w.store.PendingWrites(ctx)
 	if err != nil {
 		w.log.Warn("mediawrite: reading the pending writes failed", "err", err)
-		return 0, 0, false
+		return nil, false
 	}
 	for i := range intents {
 		it := &intents[i]
@@ -392,12 +398,12 @@ func (w *Writer) settleOrphans(ctx context.Context) (kept, unread int, ok bool) 
 		switch {
 		case err != nil:
 			w.log.Warn("mediawrite: a pending write's instance cannot be read; it stays pending", "instance", it.Inst, "name", it.Name, "err", err)
-			unread++
+			kept = append(kept, *it)
 		case owner == nil && !w.settleOrphan(ctx, it):
-			kept++
+			kept = append(kept, *it)
 		}
 	}
-	return kept, unread, true
+	return kept, true
 }
 
 func (w *Writer) settleOrphan(ctx context.Context, it *statedb.Intent) bool {
@@ -418,28 +424,96 @@ func (w *Writer) settleOrphan(ctx context.Context, it *statedb.Intent) bool {
 	return true
 }
 
-// reconcilePendingLocked raises pending_writes while any intent outlived a
-// recovery attempt, naming the count under each root.
-func (w *Writer) reconcilePendingLocked() {
-	total := w.orphanKept + w.unreadKept
-	var parts []string
-	if w.orphanKept > 0 {
-		parts = append(parts, fmt.Sprintf("%d under a removed media root", w.orphanKept))
+// outliveLocked records kept, the intents a pass left pending, for
+// countPending.
+func (w *Writer) outliveLocked(kept []statedb.Intent) {
+	for _, it := range kept {
+		w.outlived[it] = struct{}{}
 	}
-	if w.unreadKept > 0 {
-		parts = append(parts, fmt.Sprintf("%d whose video cannot be looked up", w.unreadKept))
+}
+
+// countPending raises pending_writes while any intent a pass left pending
+// is still stored, naming where each waits by a fresh read of its
+// instance. Every pass that records kept intents counts after it.
+// An intent leaves the count only once a count's own read of the pending
+// writes lacks it: a pass that cannot claim an intent another pass kept
+// (an orphan pass for one under a configured root, a root's recovery for
+// one whose instance turned unreadable) must not end its count, or the
+// alert clears while the write still waits.
+func (w *Writer) countPending(ctx context.Context) {
+	w.countMu.Lock()
+	defer w.countMu.Unlock()
+	// Copied before the read: an intent kept after it may be newer than the
+	// read, and the pass that kept it counts it next.
+	w.mu.Lock()
+	before := maps.Clone(w.outlived)
+	w.mu.Unlock()
+	intents, err := w.store.PendingWrites(ctx)
+	if err != nil {
+		w.log.Warn("mediawrite: reading the pending writes to count them failed", "err", err)
+		return
 	}
-	for _, p := range slices.Sorted(maps.Keys(w.paths)) {
-		if n := w.paths[p].kept; n > 0 {
-			total += n
-			parts = append(parts, fmt.Sprintf("%d under %s", n, p))
+	w.fs.Pause("pending-read")
+	stored := make(map[statedb.Intent]bool, len(intents))
+	for _, it := range intents {
+		stored[it] = true
+	}
+	c := pendingCount{under: map[string]int{}}
+	for it := range before {
+		if !stored[it] {
+			continue
+		}
+		switch owner, _, err := w.rootOf(ctx, it.Inst); {
+		case err != nil:
+			c.unread++
+		case owner == nil:
+			c.removed++
+		default:
+			c.under[owner.path]++
 		}
 	}
-	text := ""
-	if total > 0 {
-		text = fmt.Sprintf("%d subtitle writes wait for their media folders: %s", total, strings.Join(parts, ", "))
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for it := range before {
+		if !stored[it] {
+			delete(w.outlived, it)
+		}
 	}
-	w.alerts.Reconcile(status.AlertPendingWrites, total > 0, text)
+	w.alerts.Reconcile(status.AlertPendingWrites, c.total() > 0, c.text())
+}
+
+// pendingCount is where the intents of one count wait: under a removed
+// media root, with an instance that cannot be read, or under each
+// configured root by path.
+type pendingCount struct {
+	under           map[string]int
+	removed, unread int
+}
+
+func (c *pendingCount) total() int {
+	n := c.removed + c.unread
+	for _, k := range c.under {
+		n += k
+	}
+	return n
+}
+
+func (c *pendingCount) text() string {
+	total := c.total()
+	if total == 0 {
+		return ""
+	}
+	var parts []string
+	if c.removed > 0 {
+		parts = append(parts, fmt.Sprintf("%d under a removed media root", c.removed))
+	}
+	if c.unread > 0 {
+		parts = append(parts, fmt.Sprintf("%d whose video cannot be looked up", c.unread))
+	}
+	for _, p := range slices.Sorted(maps.Keys(c.under)) {
+		parts = append(parts, fmt.Sprintf("%d under %s", c.under[p], p))
+	}
+	return fmt.Sprintf("%d subtitle writes wait for their media folders: %s", total, strings.Join(parts, ", "))
 }
 
 func opText(op statedb.Op) string {

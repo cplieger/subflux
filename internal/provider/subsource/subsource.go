@@ -342,13 +342,10 @@ func candidates(items []item, tag language.Tag) []provider.Candidate {
 		}
 		for _, rel := range releases {
 			out = append(out, provider.Candidate{
-				Ref:     provider.NewRef(strconv.Itoa(it.SubtitleID)),
-				Lang:    tag,
-				Release: rel,
-				Flags: language.Flags{
-					HI:     provider.HearingImpaired(it.HearingImpaired, it.Commentary, rel),
-					Forced: provider.Forced(it.ForeignParts, it.Commentary, rel),
-				},
+				Ref:       provider.NewRef(strconv.Itoa(it.SubtitleID)),
+				Lang:      tag,
+				Release:   rel,
+				Flags:     provider.Flags(language.Flags{HI: it.HearingImpaired, Forced: it.ForeignParts}, it.Commentary, rel),
 				MatchedBy: rank.ID,
 			})
 		}

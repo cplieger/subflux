@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediawrite"
+	"github.com/cplieger/subflux/internal/timing"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -59,7 +62,10 @@ type Active struct {
 	Languages language.Policy
 	Server    Server
 	Sources   []mediasource.Config
+	Embedded  embedded.Config
 	Scan      mediasource.Schedule
+	Media     mediawrite.Config
+	Timing    timing.Config
 }
 
 // Snapshot is one immutable reading of the file. Only Load and Service.Save

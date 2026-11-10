@@ -20,7 +20,6 @@ type rootState struct {
 	ready        chan struct{} // closed once the first probe and its recovery settle, or the root leaves
 	check        chan struct{} // FolderState's slot: one check outstanding
 	path         string
-	kept         int // intents the last recovery attempt left pending
 	isReady      bool
 	gone         bool // left the configuration
 	recovered    bool // the handle in cur has had its recovery; calls wait or fail until then

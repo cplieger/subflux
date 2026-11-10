@@ -24,10 +24,11 @@ const (
 // AlignAudio returns a Shift with Confidence peak × 0.9 from correlating the
 // safe and precise speech decisions with inc's dialogue, the precise one
 // when the two offsets agree within audioAgreementMs. Fewer than minSpans
-// spans, no frames, or an offset past the duration's limit is ModelNone.
-// With a non-empty ref (one that passed AlignReference's guard) it measures
-// the shift's Shape against it, so Settle guards the audio fit as it guards
-// a reference one. durationMs is the video's duration.
+// spans, no frames, or an offset past the duration's limit places nothing:
+// the MethodNone result AlignReference's guard returns. With a non-empty ref
+// (one that passed AlignReference's guard) it measures the shift's Shape and
+// IdentityShape against it, so Settle guards the audio fit as it guards a
+// reference one. durationMs is the video's duration.
 func AlignAudio(ctx context.Context, speech Speech, ref, inc []Span, durationMs int64) (Result, error) {
 	if durationMs <= 0 {
 		return Result{}, fmt.Errorf("subsync: AlignAudio over a %d ms video", durationMs)
@@ -35,10 +36,9 @@ func AlignAudio(ctx context.Context, speech Speech, ref, inc []Span, durationMs 
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
-	none := Result{Timing: timing.Identity{}, Method: timing.Audio}
 	llr := speech.LLR[:min(len(speech.LLR), MaxAudioFrames)]
 	if len(inc) < minSpans || len(llr) == 0 {
-		return none, nil
+		return noFit, nil
 	}
 	safe, precise := make([]float64, len(llr)), make([]float64, len(llr))
 	ds, dp := vad.NewDecider(safeThreshold, safeOverhang), vad.NewDecider(preciseThreshold, preciseOverhang)
@@ -56,16 +56,13 @@ func AlignAudio(ctx context.Context, speech Speech, ref, inc []Span, durationMs 
 	}
 	limit := min(max(durationMs*audioOffsetPct/100, minAudioOffsetMs), maxAudioOffsetMs)
 	if corr.OffsetMs > limit || corr.OffsetMs < -limit {
-		return none, nil
+		return noFit, nil
 	}
-	r := Result{
-		Timing:     timing.Canonical(timing.Shift{Ms: corr.OffsetMs}),
-		Method:     timing.Audio,
-		Confidence: corr.Peak * audioPeakWeight,
-	}
+	r := Result{Timing: timing.Canonical(timing.Shift{Ms: corr.OffsetMs}), Confidence: corr.Peak * audioPeakWeight, Method: timing.Audio}
 	if len(ref) > 0 {
-		_, r.Shape = measure(fit{kept: shiftSpans(inc, corr.OffsetMs), displayMs: displayMs(inc)}, newRefIndex(ref))
-		r.Measured = true
+		x := newRefIndex(ref)
+		_, r.Shape = measure(fit{kept: shiftSpans(inc, corr.OffsetMs), displayMs: displayMs(inc)}, x)
+		r.IdentityShape, r.Measured = identityShape(inc, x), true
 	}
 	return r, nil
 }

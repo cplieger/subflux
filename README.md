@@ -80,7 +80,7 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | `scan.whole_interval` | `24h` | Time between the end of one full library scan and the start of the next |
 | `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
 | `sources[].exclude_tags[]` | `[no-subflux]` | Tags whose shows and movies subflux skips |
-| `post_processing.audio_sync_fallback` | `false` | Re-time against the audio when the video has no subtitle track to compare with |
+| `timing.audio_fallback` | `false` | Also try the video's speech when its subtitle tracks cannot verify a download's timing |
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
 | `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |
 | `trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited |

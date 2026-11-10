@@ -338,32 +338,6 @@ func TestProbe(t *testing.T) {
 	}
 }
 
-func TestProbeStreamsFiltersByType(t *testing.T) {
-	ffmpegtest.Use(t, `probe:{"streams":[{"index":0,"codec_type":"video"},{"index":1,"codec_type":"subtitle"},{"index":2,"codec_type":"audio"},{"index":3,"codec_type":"subtitle"}]}`)
-	t.Setenv("PATH", fakePath(t))
-	path := filepath.Join(t.TempDir(), "video.mkv")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got, err := ProbeStreams(bounded(t, time.Minute), path, "subtitle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 || got[0].Index != 1 || got[1].Index != 3 {
-		t.Errorf("ProbeStreams = %+v, want streams 1 and 3", got)
-	}
-}
-
-// fakePath is a PATH whose ffprobe is this test binary.
-func fakePath(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.Symlink(ffmpegtest.Path(), filepath.Join(dir, "ffprobe")); err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
-
 func TestCallArguments(t *testing.T) {
 	r := fake(t, "args")
 	ctx := bounded(t, time.Minute)
