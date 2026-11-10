@@ -742,7 +742,8 @@ func TestOversizeRefusedBeforeIntent(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			l := newLibrary(t, enOnly, mediawrite.Deps{Config: c.cfg}, nil)
+			l := newLibrary(t, enOnly, mediawrite.Deps{}, nil)
+			l.w.SetConfig(c.cfg)
 			doc, tag := c.build()
 			cues, err := timing.ParseCues([]byte(doc))
 			if err != nil {

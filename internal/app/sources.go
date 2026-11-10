@@ -11,9 +11,11 @@ import (
 
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/mediarefresh"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/radarr"
 	"github.com/cplieger/subflux/internal/mediasource/sonarr"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/seriesorder"
@@ -74,21 +76,59 @@ func retainSources(st *status.Store, ids []media.SourceID) {
 	st.RetainAlerts(overlapAlertKind, overlaps)
 }
 
-// mediaSources is the live Set and the Scanner over it. A sources edit
-// publishes a rebuilt Set whole, so a reader holding the old one keeps a
-// consistent view until its next Load.
+// liveSources is the source Set in force, from boot: the writer's media
+// roots and the refresher's sources. A build or rebuild publishes a Set
+// whole, so a reader holding the old one keeps a consistent view until its
+// next load. Before the first Active it holds none and lists no root.
+type liveSources struct {
+	refresh *mediarefresh.Refresher
+	writer  *mediawrite.Writer
+	set     atomic.Pointer[mediasource.Set]
+}
+
+// newLiveSources holds no Set yet and builds the writer over d with itself
+// as Roots.
+func newLiveSources(refresh *mediarefresh.Refresher, d mediawrite.Deps) *liveSources {
+	l := &liveSources{refresh: refresh}
+	d.Roots = l
+	l.writer = mediawrite.New(d)
+	return l
+}
+
+// publish makes set live, then hands it to the refresher and has the writer
+// probe its roots.
+func (l *liveSources) publish(set *mediasource.Set) {
+	l.set.Store(set)
+	l.refresh.ReloadSources(set)
+	l.writer.RootsChanged()
+}
+
+func (l *liveSources) load() *mediasource.Set { return l.set.Load() }
+
+// MediaRoots is the live Set's media roots; none before the first Set.
+func (l *liveSources) MediaRoots(ctx context.Context) []string {
+	set := l.load()
+	if set == nil {
+		return nil
+	}
+	return set.MediaRoots(ctx)
+}
+
+// mediaSources builds and rebuilds the Set it publishes to live, and runs
+// the Scanner over it.
 type mediaSources struct {
 	orders mediasource.OrderJoin
 	scan   *scan.Scanner
 	log    *slog.Logger
-	set    atomic.Pointer[mediasource.Set]
+	live   *liveSources
 	deps   mediasource.Deps
 	kinds  []mediasource.AdapterKind
 }
 
-// newMediaSources builds the Set over a's sources and the Scanner over it
-// with a's schedule; d's Schedule is ignored. The Scanner is not running.
-func newMediaSources(a *settings.Active, kinds []mediasource.AdapterKind, deps mediasource.Deps, orders mediasource.OrderJoin, d scan.Deps) (*mediaSources, error) {
+// newMediaSources builds the Set over a's sources, publishes it to live and
+// builds the Scanner over it with a's schedule; d's Schedule is ignored.
+// The Scanner is not running.
+func newMediaSources(a *settings.Active, kinds []mediasource.AdapterKind, deps mediasource.Deps, orders mediasource.OrderJoin, d scan.Deps, live *liveSources) (*mediaSources, error) {
 	set, err := mediasource.NewSet(kinds, a.Sources, deps, orders)
 	if err != nil {
 		return nil, err
@@ -98,8 +138,8 @@ func newMediaSources(a *settings.Active, kinds []mediasource.AdapterKind, deps m
 		log = slog.Default()
 	}
 	d.Schedule = a.Scan
-	m := &mediaSources{orders: orders, scan: scan.New(d, set), log: log, deps: deps, kinds: kinds}
-	m.set.Store(set)
+	m := &mediaSources{orders: orders, scan: scan.New(d, set), log: log, live: live, deps: deps, kinds: kinds}
+	live.publish(set)
 	return m, nil
 }
 
@@ -117,8 +157,8 @@ func (m *mediaSources) reloadSources(old, cur *settings.Active) {
 		m.log.Error("media sources: the rebuilt set was refused; the previous one stays live", "err", err)
 		return
 	}
-	set.Inherit(m.set.Load())
-	m.set.Store(set)
+	set.Inherit(m.live.load())
+	m.live.publish(set)
 	changed, rekeyed := changedSources(m.kinds, old.Sources, cur.Sources)
 	m.scan.Reload(set, changed, rekeyed)
 }
@@ -163,9 +203,10 @@ type sourcesLoop struct {
 	build    func(*settings.Active) (*mediaSources, error)
 	// wake is signalled after each settings commit; wakes coalesce, since
 	// apply reads the latest snapshot.
-	wake chan struct{}
-	cur  *mediaSources
-	prev settings.Active
+	wake        chan struct{}
+	beforeApply func(context.Context)
+	cur         *mediaSources
+	prev        settings.Active
 }
 
 // airedOrders is the Set's aired order join: SkyHook's orders over deps'
@@ -174,23 +215,39 @@ func airedOrders(deps mediasource.Deps, store *statedb.Store) *seriesorder.Servi
 	return seriesorder.New(skyhook.New(deps.HTTP, deps.Logger), store, deps.Logger)
 }
 
-// newSourcesLoop wires the loop's builds: the Set over deps and orders, the
-// Scanner over store and st with its series registered in m, and built,
-// when set, handed the Scanner.
-func newSourcesLoop(snapshot func() settings.Snapshot, deps mediasource.Deps, orders mediasource.OrderJoin, store *statedb.Store, st *status.Store, m *obs.Metrics, built func(*scan.Scanner)) *sourcesLoop {
+// sourcesWiring is what the sources loop builds over and feeds. built, when
+// set, is handed each Scanner the loop builds; beforeApply, when set, runs
+// before each apply of a wake.
+type sourcesWiring struct {
+	orders      mediasource.OrderJoin
+	snapshot    func() settings.Snapshot
+	store       *statedb.Store
+	status      *status.Store
+	metrics     *obs.Metrics
+	live        *liveSources
+	built       func(*scan.Scanner)
+	beforeApply func(context.Context)
+	deps        mediasource.Deps
+}
+
+// newSourcesLoop wires the loop's builds: the Set over w's deps and orders
+// published to w.live, the Scanner over w's store and status with its
+// series registered in w's metrics.
+func newSourcesLoop(w *sourcesWiring) *sourcesLoop {
 	return &sourcesLoop{
-		snapshot: snapshot,
-		wake:     make(chan struct{}, 1),
+		snapshot:    w.snapshot,
+		wake:        make(chan struct{}, 1),
+		beforeApply: w.beforeApply,
 		build: func(a *settings.Active) (*mediaSources, error) {
-			ms, err := newMediaSources(a, sourceKinds, deps, orders, scan.Deps{Store: store, Status: st, Logger: deps.Logger})
+			ms, err := newMediaSources(a, sourceKinds, w.deps, w.orders, scan.Deps{Store: w.store, Status: w.status, Logger: w.deps.Logger}, w.live)
 			if err != nil {
 				return nil, err
 			}
-			if err := m.Register(ms.scan.Collectors()...); err != nil {
+			if err := w.metrics.Register(ms.scan.Collectors()...); err != nil {
 				return nil, err
 			}
-			if built != nil {
-				built(ms.scan)
+			if w.built != nil {
+				w.built(ms.scan)
 			}
 			return ms, nil
 		},
@@ -246,6 +303,9 @@ func (l *sourcesLoop) run(ctx context.Context) error {
 		case err := <-scanned:
 			return err
 		case <-l.wake:
+			if l.beforeApply != nil {
+				l.beforeApply(ctx)
+			}
 			if err := l.apply(); err != nil {
 				return err
 			}

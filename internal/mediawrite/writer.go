@@ -44,16 +44,14 @@ type Alerts interface {
 
 var _ Alerts = (*status.Store)(nil)
 
-// Deps is what New needs; every field but Logger is required. Config is
-// the post_processing section until SetConfig replaces it; Policy reads the
-// language policy in force, which judges which supersedes are safe.
+// Deps is what New needs; every field but Logger is required. Policy reads
+// the language policy in force, which judges which supersedes are safe.
 type Deps struct {
 	Store  *statedb.Store
 	Roots  Roots
 	Alerts Alerts
 	Policy func() language.Policy
 	Logger *slog.Logger
-	Config Config
 }
 
 // Writer serializes every write to the files beside each video and keeps
@@ -82,7 +80,8 @@ type Writer struct {
 	orphaning  bool // an orphan pass is running; guarded by mu
 }
 
-// New returns a Writer over d. It panics on a missing required dependency.
+// New returns a Writer over d, whose post_processing section is the zero
+// Config until SetConfig. It panics on a missing required dependency.
 func New(d Deps) *Writer {
 	if d.Store == nil || d.Roots == nil || d.Alerts == nil || d.Policy == nil {
 		panic("mediawrite: New needs Store, Roots, Alerts and Policy")
@@ -107,12 +106,12 @@ func New(d Deps) *Writer {
 		paths:      map[string]*rootState{},
 		outlived:   map[statedb.Intent]struct{}{},
 	}
-	w.cfg.Store(&d.Config)
+	w.cfg.Store(&Config{})
 	return w
 }
 
 // Run reads the root set and probes every root at once, then every 5
-// minutes and after each reprobe request, until ctx ends; it returns nil
+// minutes and after each RootsChanged, until ctx ends; it returns nil
 // once the recovery attempts it started have returned. Each probe runs in
 // its own goroutine, one outstanding per root: a probe stuck in a hung
 // mount's syscall outlives Run and is discarded when it returns. After
@@ -138,9 +137,10 @@ func (w *Writer) Run(ctx context.Context) error {
 	}
 }
 
-// reprobe asks Run for a probe pass now; requests made while one is pending
-// coalesce.
-func (w *Writer) reprobe() {
+// RootsChanged asks Run for a probe pass now, which re-reads Roots; the
+// caller changing what MediaRoots answers calls it after each change.
+// Requests made while one is pending coalesce.
+func (w *Writer) RootsChanged() {
 	select {
 	case w.kick <- struct{}{}:
 	default:

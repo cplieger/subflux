@@ -61,8 +61,5 @@ func ParseConfig(n *yaml.Node) (Config, []formschema.FieldError) {
 }
 
 // SetConfig replaces the post_processing section, which applies from the
-// next delivery, and asks Run for a probe pass, which re-reads the roots.
-func (w *Writer) SetConfig(c Config) {
-	w.cfg.Store(&c)
-	w.reprobe()
-}
+// next Deliver.
+func (w *Writer) SetConfig(c Config) { w.cfg.Store(&c) }

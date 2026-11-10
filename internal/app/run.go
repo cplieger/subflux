@@ -16,7 +16,9 @@ import (
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
 	"github.com/cplieger/go/slogx"
+	"github.com/cplieger/subflux/internal/mediarefresh"
 	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/settings"
@@ -56,7 +58,15 @@ type Config struct {
 	Scanner func(*scan.Scanner)
 	// Orders, when set, replaces the aired order join over SkyHook (tests).
 	Orders mediasource.OrderJoin
-	Paths  Paths
+	// Store, when set, receives the open state store (tests).
+	Store func(*statedb.Store)
+	// Writer, when set, receives the media writer once it is built (tests).
+	Writer func(*mediawrite.Writer)
+	// SourcesApply, when set, runs before the media sources apply each
+	// settings commit after boot, and that apply waits for it to return
+	// (tests).
+	SourcesApply func(context.Context)
+	Paths        Paths
 }
 
 // The HTTP server's bounds; a streaming route clears its own write deadline
@@ -146,12 +156,23 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 	if cfg.Gather != nil {
 		cfg.Gather(m.Gather)
 	}
+	if cfg.Store != nil {
+		cfg.Store(store)
+	}
+	refresher := mediarefresh.New(mediarefresh.Deps{Store: store, Logger: slog.Default()})
+	live := newLiveSources(refresher, mediawrite.Deps{Store: store, Alerts: st, Policy: store.Policy, Logger: slog.Default()})
+	writer := live.writer
+	if cfg.Writer != nil {
+		cfg.Writer(writer)
+	}
 	activate := wrapActivate(func(ctx context.Context, a settings.Active) error {
 		act := activationOf(&a)
 		if aerr := store.Activate(ctx, act); aerr != nil {
 			return aerr
 		}
 		retainSources(st, act.Sources)
+		// Last, so a refused activation leaves the writer's section as it was.
+		writer.SetConfig(a.Media)
 		return nil
 	})
 	deps := sourceDeps(slog.Default())
@@ -163,7 +184,10 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 	if orders == nil {
 		orders = airedOrders(deps, store)
 	}
-	sources := newSourcesLoop(svc.Snapshot, deps, orders, store, st, m, cfg.Scanner)
+	sources := newSourcesLoop(&sourcesWiring{
+		snapshot: svc.Snapshot, deps: deps, orders: orders, store: store, status: st, metrics: m,
+		live: live, built: cfg.Scanner, beforeApply: cfg.SourcesApply,
+	})
 	if a, ok := snap.Active(); ok {
 		if bootErr := activateLoaded(ctx, &a, activate, sources); bootErr != nil {
 			return nil, bootErr
@@ -189,9 +213,10 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 			httpProducer(srv, ln),
 			{name: "settings change loop", run: loop.run},
 			{name: "media sources", run: sources.run},
+			{name: "media refresh", run: refresher.Run},
 			{name: "alert metrics", run: func(ctx context.Context) error { return alertMetrics(ctx, st, m) }},
 		},
-		sinks:            []component{{name: "job records", run: st.Run}},
+		sinks:            []component{{name: "job records", run: st.Run}, {name: "media writer", run: writer.Run}},
 		shutdownSettings: svc.Shutdown,
 		closeStore:       store.Close,
 		drainBudget:      drainBudget,

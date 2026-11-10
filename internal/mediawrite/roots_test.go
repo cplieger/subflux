@@ -327,11 +327,11 @@ func TestLateProbeAcrossRemoveReAdd(t *testing.T) {
 		time.Sleep(mediawrite.RootProbeTimeout)
 		synctest.Wait()
 		roots.set()
-		mediawrite.Reprobe(w)
+		w.RootsChanged()
 		synctest.Wait()
 		h.hang.Store(false)
 		roots.set(a)
-		mediawrite.Reprobe(w)
+		w.RootsChanged()
 		synctest.Wait()
 		current, release, err := mediawrite.Borrow(t.Context(), w, filepath.Join(a, "x.mkv"))
 		if err != nil {

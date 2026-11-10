@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -15,11 +16,13 @@ import (
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/mediarefresh"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/arr/arrtest"
 	"github.com/cplieger/subflux/internal/mediasource/radarr"
 	"github.com/cplieger/subflux/internal/mediasource/sonarr"
 	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/settings"
 	"github.com/cplieger/subflux/internal/statedb"
@@ -114,7 +117,8 @@ func newSourcesRig(t *testing.T) *sourcesRig {
 	r.a = settings.Active{Sources: sourcesOf(t, kinds, "[{id: a, type: fake, url: 'http://a', token: t1}, {id: b, type: fake, url: 'http://b', token: t2}]"), Scan: rigSchedule}
 	var log *slog.Logger
 	log, r.logs = capture.New()
-	if r.m, err = newMediaSources(&r.a, kinds, mediasource.Deps{Logger: log}, sourcetest.OwnPlaces{}, scan.Deps{Store: db, Status: jobs, Logger: log}); err != nil {
+	live := newLiveSources(mediarefresh.New(mediarefresh.Deps{Store: db, Logger: log}), mediawrite.Deps{Store: db, Alerts: jobs, Policy: db.Policy, Logger: log})
+	if r.m, err = newMediaSources(&r.a, kinds, mediasource.Deps{Logger: log}, sourcetest.OwnPlaces{}, scan.Deps{Store: db, Status: jobs, Logger: log}, live); err != nil {
 		t.Fatal(err)
 	}
 	r.reg.MustRegister(r.m.scan.Collectors()...)
@@ -182,11 +186,11 @@ const (
 func TestScanChangeCallsSetScheduleOnly(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newSourcesRig(t)
-		set, before := r.m.set.Load(), r.series(t)[lastComplete]
+		set, before := r.m.live.load(), r.series(t)[lastComplete]
 		time.Sleep(10 * time.Second)
 		r.apply(t, r.edit(t, "", mediasource.Schedule{Change: 2 * time.Minute, Whole: 12 * time.Hour}))
 		got := r.series(t)
-		if r.m.set.Load() != set {
+		if r.m.live.load() != set {
 			t.Error("a scan-only edit published a new Set")
 		}
 		if !maps.Equal(got[lastComplete], before) {
@@ -201,11 +205,11 @@ func TestScanChangeCallsSetScheduleOnly(t *testing.T) {
 func TestReloadSourcesRestartsChangedOnly(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newSourcesRig(t)
-		set, before := r.m.set.Load(), r.series(t)[lastComplete]
+		set, before := r.m.live.load(), r.series(t)[lastComplete]
 		time.Sleep(10 * time.Second)
 		r.apply(t, r.edit(t, "[{id: a, type: fake, url: 'http://a2', token: t1}, {id: b, type: fake, url: 'http://b', token: t9}]", rigSchedule))
 		got := r.series(t)
-		if r.m.set.Load() == set {
+		if r.m.live.load() == set {
 			t.Error("a sources edit kept the old Set")
 		}
 		if got[lastComplete]["a"] <= before["a"] {
@@ -223,13 +227,48 @@ func TestReloadSourcesRestartsChangedOnly(t *testing.T) {
 func TestReloadSourcesInheritsRoots(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newSourcesRig(t)
-		if got := r.m.set.Load().MediaRoots(t.Context()); !slices.Equal(got, []string{"/media"}) {
+		if got := r.m.live.load().MediaRoots(t.Context()); !slices.Equal(got, []string{"/media"}) {
 			t.Fatalf("MediaRoots = %v, want [/media]", got)
 		}
 		r.fake.Fail("RootFolders", &mediasource.SourceError{Cause: mediasource.Unreachable})
 		r.apply(t, r.edit(t, "[{id: a, type: fake, url: 'http://a', token: t1}, {id: b, type: fake, url: 'http://b', token: t9}]", rigSchedule))
-		if got := r.m.set.Load().MediaRoots(t.Context()); !slices.Equal(got, []string{"/media"}) {
+		if got := r.m.live.load().MediaRoots(t.Context()); !slices.Equal(got, []string{"/media"}) {
 			t.Errorf("MediaRoots after a key-only edit with the source down = %v, want the cached [/media]", got)
+		}
+	})
+}
+
+func TestReloadProbesNewRoots(t *testing.T) {
+	dir := t.TempDir()
+	show := filepath.Join(dir, "show")
+	if err := os.Mkdir(show, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newSourcesRig(t)
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- r.m.live.writer.Run(ctx) }()
+		t.Cleanup(func() {
+			cancel()
+			if err := <-done; err != nil {
+				t.Errorf("Writer.Run = %v", err)
+			}
+		})
+		synctest.Wait()
+		state := func() string {
+			b, err := r.m.live.writer.FolderState(t.Context(), show).MarshalText()
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(b)
+		}
+		if got := state(); got != "outside" {
+			t.Fatalf("before the edit %s is %s, want outside every root", show, got)
+		}
+		r.apply(t, r.edit(t, "[{id: a, type: fake, url: 'http://a', token: t1, path_mappings: [{from: /media, to: '"+dir+"'}]}, {id: b, type: fake, url: 'http://b', token: t2}]", rigSchedule))
+		if got := state(); got != "found" {
+			t.Errorf("after an edit mapping a to %s, %s is %s; want its root probed at once, not at the next interval", dir, show, got)
 		}
 	})
 }
@@ -237,14 +276,14 @@ func TestReloadSourcesInheritsRoots(t *testing.T) {
 func TestReloadSourcesKeepsSetOnRefusal(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newSourcesRig(t)
-		set := r.m.set.Load()
+		set := r.m.live.load()
 		next := r.a
 		next.Sources = append(slices.Clone(next.Sources), mediasource.Config{ID: "c", Type: "unregistered"})
 		r.apply(t, next)
-		if r.m.set.Load() != set {
+		if r.m.live.load() != set {
 			t.Fatal("a refused rebuild replaced the live Set")
 		}
-		if got := r.m.set.Load().Sources(); !slices.Equal(got, []media.SourceID{"a", "b"}) {
+		if got := r.m.live.load().Sources(); !slices.Equal(got, []media.SourceID{"a", "b"}) {
 			t.Errorf("live sources %v, want [a b]", got)
 		}
 		recs := slices.DeleteFunc(r.logs.Records(), func(rec slog.Record) bool {

@@ -79,9 +79,11 @@ func (a *fakeAlerts) activeCount() int {
 	return len(a.active)
 }
 
-// fakeRoots is a configured root set a test may change.
+// fakeRoots is a configured root set a test may change; it counts its
+// reads.
 type fakeRoots struct {
 	paths []string
+	read  int
 	mu    sync.Mutex
 }
 
@@ -90,7 +92,14 @@ func rootsOf(paths ...string) *fakeRoots { return &fakeRoots{paths: paths} }
 func (r *fakeRoots) MediaRoots(context.Context) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.read++
 	return slices.Clone(r.paths)
+}
+
+func (r *fakeRoots) reads() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.read
 }
 
 func (r *fakeRoots) set(paths ...string) {

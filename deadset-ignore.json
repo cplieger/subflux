@@ -399,36 +399,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta",
-      "path": "internal/statedb/feed.go",
-      "reason": "Retained until MR-1 (internal/statedb#Delta): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta.Rev",
-      "path": "internal/statedb/feed.go",
-      "reason": "Retained until MR-1 (internal/statedb#Delta.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Delta.Full",
-      "path": "internal/statedb/feed.go",
-      "reason": "Retained until MR-1 (internal/statedb#Delta.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Since",
-      "path": "internal/statedb/feed.go",
-      "reason": "Retained until MR-1 (internal/statedb#Store.Since): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Changed",
-      "path": "internal/statedb/feed.go",
-      "reason": "Retained until MR-1 (internal/statedb#Store.Changed): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootHistory",
       "path": "internal/statedb/history.go",
       "reason": "Retained until AP-1 (internal/statedb#RootHistory): its first caller outside the package lands there."
@@ -705,12 +675,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#RootTarget",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until MR-1 (internal/statedb#RootTarget): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Root",
       "path": "internal/statedb/reads.go",
       "reason": "Retained until AP-1b (internal/statedb#Store.Root): its first caller outside the package lands there."
@@ -726,12 +690,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Unidentified",
       "path": "internal/statedb/reads.go",
       "reason": "Retained until AP-1b (internal/statedb#Store.Unidentified): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.RootTargets",
-      "path": "internal/statedb/reads.go",
-      "reason": "Retained until MR-1 (internal/statedb#Store.RootTargets): its first caller outside the package lands there."
     },
     {
       "code": "DS1301",
@@ -1097,49 +1055,49 @@
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Timing",
       "path": "internal/mediawrite/current.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until AP-1 (internal/mediawrite#Timed.Timing): api's file view, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Found.File",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Found.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Found.Expect",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Found.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Found.Ordinal",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Found.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Found.Managed",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Found.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Inventory.Files",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Inventory.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Inventory.Unparsed",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Inventory.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Inventory.Unwritable",
       "path": "internal/mediawrite/inventory.go",
-      "reason": "Retained until MR-1 (internal/mediawrite#*): its first reader lands there."
+      "reason": "Retained until SE-2 (internal/mediawrite#Inventory.*): search's inventory read, its first reader, lands there."
     },
     {
       "code": "DS1501",
@@ -1158,12 +1116,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/embedded#Schema",
       "path": "internal/embedded/section.go",
       "reason": "Retained until PA-2 (internal/embedded#Schema): settings.SectionSchemas, its first caller outside the package, lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Active.Media",
-      "path": "internal/settings/snapshot.go",
-      "reason": "Retained until MR-1 (internal/settings#Active.Media): the activation's Writer.SetConfig, its first reader, lands there."
     },
     {
       "code": "DS1301",
