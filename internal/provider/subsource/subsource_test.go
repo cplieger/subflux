@@ -1,10 +1,13 @@
 package subsource_test
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -109,9 +112,8 @@ func TestSearchRecorded(t *testing.T) {
 }
 
 // TestProviderMaps checks the map against the recorded answers and the
-// recorded language probe: every label an answer carried maps, but
-// big_5_code, since zh-Hant asks chinese_traditional; and no label the
-// filter answered nothing for, and no answer carried, is sent.
+// recorded language probe: every label an answer carried maps, and no label
+// the filter answered nothing for, and no answer carried, is sent.
 func TestProviderMaps(t *testing.T) {
 	m := subsource.NewEntry().Languages
 	for _, file := range []string{"testdata/subtitles-46839-english.json", "testdata/subtitles-46839-french.json"} {
@@ -145,7 +147,7 @@ func TestProviderMaps(t *testing.T) {
 		t.Fatal(err)
 	}
 	for label := range probe.Answered {
-		if _, ok := m.Tag(label); !ok && label != "big_5_code" {
+		if _, ok := m.Tag(label); !ok {
 			t.Errorf("answered label %q maps to no tag", label)
 		}
 	}
@@ -158,14 +160,12 @@ func TestProviderMaps(t *testing.T) {
 			t.Errorf("the map sends %q, which filtered nothing and no answer carried", wire)
 		}
 	}
-	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-	}
-	for tg, want := range map[string]string{"pt-BR": "brazilian_portuguese", "zh-Hant": "chinese_traditional", "es-419": "spanish_latin_america"} {
-		if w, _ := m.Wire(tag(t, tg)); w != want {
+	for tg, want := range map[string][]string{
+		"pt-BR":   {"brazilian_portuguese"},
+		"zh-Hant": {"chinese_traditional", "big_5_code"},
+		"es-419":  {"spanish_latin_america"},
+	} {
+		if w := m.Wires(tag(t, tg)); !slices.Equal(w, want) {
 			t.Errorf("%s asks %q, want %q", tg, w, want)
 		}
 	}
@@ -368,5 +368,51 @@ func TestFetch(t *testing.T) {
 		if f, ok := errors.AsType[*provider.Failure](err); !ok || f.Kind != provider.Permanent {
 			t.Errorf("token %q: %v, want Permanent", tok, err)
 		}
+	}
+}
+
+// TestSubSourceAsksEveryTraditionalLabel: SubSource files Traditional
+// Chinese under two labels, so a zh-Hant search asks each once, and a file
+// listed under both is one candidate.
+func TestSubSourceAsksEveryTraditionalLabel(t *testing.T) {
+	var mu sync.Mutex
+	asked := map[string]int{}
+	lists := map[string]string{
+		"chinese_traditional": `{"success":true,"data":[{"subtitleId":7,"releaseInfo":["Inception.2010.BluRay"]},{"subtitleId":8,"releaseInfo":["Inception.2010.WEB"]}]}`,
+		"big_5_code":          `{"success":true,"data":[{"subtitleId":7,"releaseInfo":["Inception.2010.BluRay"]},{"subtitleId":9,"releaseInfo":["Inception.2010.HDTV"]}]}`,
+	}
+	h := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/api/v1/movies/search" {
+			b, err := os.ReadFile("testdata/search-imdb-tt1375666.json")
+			if err != nil {
+				http.NotFound(w, req)
+				return
+			}
+			_, _ = w.Write(b)
+			return
+		}
+		label := req.URL.Query().Get("language")
+		mu.Lock()
+		asked[label]++
+		mu.Unlock()
+		_, _ = w.Write([]byte(cmp.Or(lists[label], `{"success":true,"data":[]}`)))
+	})
+	ctx := providertest.Serve(t, t.Context(), h, host)
+	got, err := providertest.Build(t, subsource.NewEntry(), values).Search(ctx, movie(t, "zh-Hant"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := map[string]int{"chinese_traditional": 1, "big_5_code": 1}; !maps.Equal(asked, want) {
+		t.Errorf("subtitle lists asked %v, want %v", asked, want)
+	}
+	var ids []string
+	for _, c := range got {
+		ids = append(ids, c.Ref.Token())
+		if c.Lang != tag(t, "zh-Hant") {
+			t.Errorf("candidate %s has language %v, want zh-Hant", c.Ref.Token(), c.Lang)
+		}
+	}
+	if want := []string{"7", "8", "9"}; !slices.Equal(ids, want) {
+		t.Errorf("candidates %q, want %q: one per file", ids, want)
 	}
 }

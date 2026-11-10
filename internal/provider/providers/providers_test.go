@@ -71,8 +71,8 @@ func TestEntries(t *testing.T) {
 }
 
 // TestQueryUnion asks each production map through an automatic query, as
-// the engine does: a target reaches the provider's own label for the tag it
-// lists, a bare language every listed variety of it, and nb a map holding
+// the engine does: a target reaches every label the provider files its tag
+// under, a bare language every listed variety of it, and nb a map holding
 // only no.
 func TestQueryUnion(t *testing.T) {
 	wires := func(id provider.ProviderID, needing ...string) []string {
@@ -83,11 +83,11 @@ func TestQueryUnion(t *testing.T) {
 		}
 		var out []string
 		for _, tg := range (language.Policy{}).AutoQuery(need, m.Tags()) {
-			w, ok := m.Wire(tg)
-			if !ok {
+			w := m.Wires(tg)
+			if len(w) == 0 {
 				t.Fatalf("%s: AutoQuery returned %v, which the map does not list", id, tg)
 			}
-			out = append(out, w)
+			out = append(out, w...)
 		}
 		slices.Sort(out)
 		return out
@@ -99,7 +99,7 @@ func TestQueryUnion(t *testing.T) {
 	}{
 		{"opensubtitles", []string{"zh-Hant"}, []string{"zh-tw"}},
 		{"opensubtitles", []string{"pt"}, []string{"pt-br", "pt-pt"}},
-		{"subsource", []string{"zh-Hant"}, []string{"chinese_traditional"}},
+		{"subsource", []string{"zh-Hant"}, []string{"big_5_code", "chinese_traditional"}},
 		{"subsource", []string{"pt-BR"}, []string{"brazilian_portuguese"}},
 		{"subdl", []string{"nb"}, []string{"NO"}},
 		{"gestdown", []string{"pt-BR"}, []string{"pt-BR"}},

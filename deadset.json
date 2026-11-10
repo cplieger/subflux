@@ -48,7 +48,7 @@
       "go://github.com/cplieger/subflux/internal/language#Policy.ManualQuery",
       "go://github.com/cplieger/subflux/internal/language#ProviderMap.Tag",
       "go://github.com/cplieger/subflux/internal/language#ProviderMap.Tags",
-      "go://github.com/cplieger/subflux/internal/language#ProviderMap.Wire",
+      "go://github.com/cplieger/subflux/internal/language#ProviderMap.Wires",
       "go://github.com/cplieger/subflux/internal/language#Tag.MarshalText",
       "go://github.com/cplieger/subflux/internal/language#Tag.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/language#Variant.Flags",

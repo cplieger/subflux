@@ -22,19 +22,18 @@ type ProviderMap struct{ m *providerMap }
 
 type providerMap struct {
 	byWire map[string]Tag
-	byTag  map[Tag]string
+	byTag  map[Tag][]string
 	tags   []Tag
 }
 
 // NewProviderMap builds a map from pairs, refusing an empty, over-64-byte or
-// invalid UTF-8 label, a zero tag, and a label or tag listed twice; the error
-// names the first bad pair.
+// invalid UTF-8 label, a zero tag, and a label listed twice; the error names
+// the first bad pair. A tag may carry several labels, kept in pair order.
 func NewProviderMap(pairs []WirePair) (ProviderMap, error) {
-	m := &providerMap{byWire: map[string]Tag{}, byTag: map[Tag]string{}, tags: make([]Tag, 0, len(pairs))}
+	m := &providerMap{byWire: map[string]Tag{}, byTag: map[Tag][]string{}, tags: make([]Tag, 0, len(pairs))}
 	for i, p := range pairs {
 		var problem string
 		_, wireSeen := m.byWire[p.Wire]
-		_, tagSeen := m.byTag[p.Tag]
 		switch {
 		case p.Wire == "" || len(p.Wire) > maxWireBytes || !utf8.ValidString(p.Wire):
 			problem = fmt.Sprintf("label must be 1 to %d bytes of UTF-8", maxWireBytes)
@@ -42,14 +41,15 @@ func NewProviderMap(pairs []WirePair) (ProviderMap, error) {
 			problem = "tag is the zero tag"
 		case wireSeen:
 			problem = "label is listed twice"
-		case tagSeen:
-			problem = "tag is listed twice"
 		}
 		if problem != "" {
 			return ProviderMap{}, fmt.Errorf("language: provider map pair %d (%q, %q): %s", i, p.Wire, p.Tag, problem)
 		}
-		m.byWire[p.Wire], m.byTag[p.Tag] = p.Tag, p.Wire
-		m.tags = append(m.tags, p.Tag)
+		if _, tagSeen := m.byTag[p.Tag]; !tagSeen {
+			m.tags = append(m.tags, p.Tag)
+		}
+		m.byWire[p.Wire] = p.Tag
+		m.byTag[p.Tag] = append(m.byTag[p.Tag], p.Wire)
 	}
 	return ProviderMap{m}, nil
 }
@@ -64,13 +64,13 @@ func MustProviderMap(pairs []WirePair) ProviderMap {
 	return m
 }
 
-// Wire is the provider's label for t.
-func (m ProviderMap) Wire(t Tag) (string, bool) {
+// Wires is every label the provider files t under, in pair order, in a
+// slice the caller owns; nil when t is not mapped.
+func (m ProviderMap) Wires(t Tag) []string {
 	if m.m == nil {
-		return "", false
+		return nil
 	}
-	w, ok := m.m.byTag[t]
-	return w, ok
+	return slices.Clone(m.m.byTag[t])
 }
 
 // Tag is the tag the provider means by wire.
@@ -82,7 +82,8 @@ func (m ProviderMap) Tag(wire string) (Tag, bool) {
 	return t, ok
 }
 
-// Tags is every mapped tag in pair order, in a slice the caller owns.
+// Tags is every mapped tag once, in first-pair order, in a slice the caller
+// owns.
 func (m ProviderMap) Tags() []Tag {
 	if m.m == nil {
 		return nil

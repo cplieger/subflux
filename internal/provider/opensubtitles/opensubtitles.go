@@ -144,11 +144,9 @@ type adapter struct {
 }
 
 func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
-	var wires []string
+	wires := make([]string, 0, len(q.Langs))
 	for _, t := range q.Langs {
-		if w, ok := languages.Wire(t); ok {
-			wires = append(wires, w)
-		}
+		wires = append(wires, languages.Wires(t)...)
 	}
 	if len(wires) == 0 {
 		return nil, nil
