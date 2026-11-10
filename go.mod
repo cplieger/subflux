@@ -1,6 +1,6 @@
 module github.com/cplieger/subflux
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/cplieger/access v1.0.0-dev.7
