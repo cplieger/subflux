@@ -54,7 +54,7 @@ Downloads matched by file hash or from the same release skip timing, because the
 
 Every saved file has HTML tags and extra whitespace removed and gets standard line endings. A file is converted to UTF-8 from the encoding subflux detects, with the subtitle's language as a hint, and a byte order mark is dropped. A file in an encoding subflux cannot name keeps its bytes unchanged. Hearing-impaired annotations are removed only when `post_processing.strip_hi` is on. The `post_processing` section in [Configuration](configuration.md) turns each step on or off.
 
-After subflux saves or removes subtitle files for a series or movie, it asks the Sonarr or Radarr instance that owns it to rescan that series or movie, so the instance lists the new files. A rescan that cannot reach the instance is sent once the instance answers again.
+When subflux saves or removes a series' or movie's subtitle files, it asks its Sonarr or Radarr instance to rescan it. The instance then shows the current files. When the instance cannot be reached, subflux sends the rescan once it answers again.
 
 ## The web page
 
