@@ -100,10 +100,10 @@ func readFlagText(text string) (hi, forced mention) {
 }
 
 func (p flagPhrase) at(words []string, i int, greeting bool) mention {
-	end := i + len(p.words)
-	if end > len(words) || !slices.Equal(words[i:end], p.words) {
+	if !slices.Equal(words[i:min(i+len(p.words), len(words))], p.words) {
 		return 0
 	}
+	end := i + len(p.words)
 	if p.says != named {
 		return p.says
 	}
