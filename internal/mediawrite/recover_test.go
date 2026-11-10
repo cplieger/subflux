@@ -95,7 +95,7 @@ func TestNestedMountDownAtRecovery(t *testing.T) {
 	}
 
 	down.Store(false)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	eventually(t, "the intents to settle", func() bool { return pendingCount(t, l.store) == 0 })
 	eventually(t, "the alert to clear", func() bool { _, on := l.pendingAlert(); return !on })
 	l.consistent()
@@ -305,7 +305,7 @@ func TestRootUnmountedDuringDeliver(t *testing.T) {
 	eventually(t, "the pending_writes alert", func() bool { _, on := l.pendingAlert(); return on })
 
 	down.Store(false)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	eventually(t, "the intent to settle", func() bool { return pendingCount(t, l.store) == 0 })
 	l.consistent()
 	if _, found := l.record(l.insts[0], ep1); !found {
@@ -417,7 +417,7 @@ func TestPendingWritesAlert(t *testing.T) {
 	}
 
 	down.Store(false)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	eventually(t, "the alert to clear", func() bool { _, on := l.pendingAlert(); return !on })
 	if n := pendingCount(t, l.store); n != 0 {
 		t.Errorf("%d intents after the root returned", n)
@@ -455,7 +455,7 @@ func TestUnreadInstanceCountedOnce(t *testing.T) {
 	}
 
 	down.Store(false)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	eventually(t, "the alert to clear", func() bool { _, on := l.pendingAlert(); return !on })
 	if n := pendingCount(t, l.store); n != 0 {
 		t.Errorf("%d intents once the instance reads again", n)
@@ -500,7 +500,7 @@ func TestAlertHoldsUntilTheOwningRootRecovers(t *testing.T) {
 
 	hold.Store(true)
 	down.Store(false)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	for _, wait := range []struct {
 		ch   <-chan struct{}
 		what string
@@ -580,7 +580,7 @@ func TestCountKeepsAnIntentKeptAfterItsRead(t *testing.T) {
 	})
 
 	hold.Store(true)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	select {
 	case <-held:
 	case <-time.After(10 * time.Second):
@@ -588,7 +588,7 @@ func TestCountKeepsAnIntentKeptAfterItsRead(t *testing.T) {
 	}
 	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
 	beginDelete(t, l, &rec)
-	mediawrite.Reprobe(l.w)
+	l.w.RootsChanged()
 	for deadline := time.Now().Add(10 * time.Second); mediawrite.Outlived(l.w) != 1; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			close(release)
@@ -666,12 +666,12 @@ func TestCallsWaitForRecovery(t *testing.T) {
 	})
 	t.Run("under a returned root a call fails until recovered", func(t *testing.T) {
 		down.Store(true)
-		mediawrite.Reprobe(l.w)
+		l.w.RootsChanged()
 		eventually(t, "the root to go", func() bool { return !mediawrite.Available(l.w, l.root) })
 		back := newGate()
 		next.Store(back)
 		down.Store(false)
-		mediawrite.Reprobe(l.w)
+		l.w.RootsChanged()
 		eventually(t, "the root to return", func() bool { return mediawrite.Available(l.w, l.root) })
 		back.await(t)
 		if err := list(t.Context()); !errors.Is(err, mediawrite.ErrRootUnavailable) {

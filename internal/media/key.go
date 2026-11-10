@@ -7,16 +7,17 @@ import (
 	"strings"
 )
 
-// RootKey names a movie or a series. Only Choose, ParseRootKey and Key.Root
-// build one, so every non-zero RootKey is valid.
+// RootKey names a movie or a series. Only Choose, ParseRootKey,
+// RootKeyFromBytes and Key.Root build one, so every non-zero RootKey is valid.
 type RootKey struct {
 	kind   Kind
 	scheme Scheme
 	id     uint64
 }
 
-// Key names a movie or one episode of a series. Only Choose and ParseKey build
-// one, so every non-zero Key is valid; a movie's season and episode are zero.
+// Key names a movie or one episode of a series. Only Choose, ParseKey and
+// KeyFromBytes build one, so every non-zero Key is valid; a movie's season and
+// episode are zero.
 type Key struct {
 	root            RootKey
 	season, episode uint16

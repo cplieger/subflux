@@ -1,9 +1,13 @@
 package testrig
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -12,17 +16,22 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/cplieger/subflux/internal/app"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/arr/arrtest"
 	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
+	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"
+	"github.com/cplieger/subflux/internal/timing"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -404,5 +413,303 @@ func TestRigSaveRefusesBadKey(t *testing.T) {
 	}
 	if b, err := os.ReadFile(r.Paths.Config); err != nil || string(b) != before {
 		t.Errorf("config.yaml = %q, %v; want it unchanged", b, err)
+	}
+}
+
+// fireflyVideo is the recorded Firefly S01E01's file, as Sonarr reports it.
+const fireflyVideo = "/media/tv/Firefly (2002) {imdb-tt0303461}/Season 01/Firefly (2002) - S01E01 - Serenity [DSNP][WEBDL-1080p][EAC3 5.1][h264]-FLUX.mkv"
+
+// mediaRig is a rig whose Sonarr source, tv, maps /media/tv to a temp media
+// root holding Firefly S01E01's video, with the parts of the app the media
+// cases drive.
+type mediaRig struct {
+	*Rig
+	scanners chan *scan.Scanner
+	scanned  *scan.Scanner
+	status   *status.Store
+	store    *statedb.Store
+	writer   *mediawrite.Writer
+	// root is the local media root; video the local Firefly S01E01.
+	root, video string
+}
+
+const mediaLanguages = "languages:\n  default: [{tag: en}]\n"
+
+// sourceSection is a sources section naming tv at url, /media/tv mapped to
+// root.
+func sourceSection(url, root string) string {
+	return "sources:\n  - {id: tv, type: sonarr, url: '" + url + "', api_key: " + arrtest.Key + ", path_mappings: [{from: /media/tv, to: '" + root + "'}]}\n"
+}
+
+// newMediaRig boots the rig with tv at url configured when withSource is
+// set, else with languages alone.
+func newMediaRig(t *testing.T, url string, withSource bool) *mediaRig {
+	t.Helper()
+	return startMediaRig(t, url, withSource, nil)
+}
+
+// startMediaRig is newMediaRig with mutate, when set, applied to the
+// Config after the rig's own hooks.
+func startMediaRig(t *testing.T, url string, withSource bool, mutate func(*app.Config)) *mediaRig {
+	t.Helper()
+	m := &mediaRig{root: filepath.Join(t.TempDir(), "tv"), scanners: make(chan *scan.Scanner, 1)}
+	m.video = filepath.Join(m.root, strings.TrimPrefix(fireflyVideo, "/media/tv/"))
+	if err := os.MkdirAll(filepath.Dir(m.video), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(m.video, []byte("video"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := mediaLanguages
+	if withSource {
+		cfg += sourceSection(url, m.root)
+	}
+	stores, statuses, writers := make(chan *statedb.Store, 1), make(chan *status.Store, 1), make(chan *mediawrite.Writer, 1)
+	m.Rig = Start(t, Options{
+		Config: []byte(cfg),
+		Mutate: func(c *app.Config) {
+			c.Scanner = func(s *scan.Scanner) { m.scanners <- s }
+			c.Status = func(s *status.Store) { statuses <- s }
+			c.Store = func(s *statedb.Store) { stores <- s }
+			c.Writer = func(w *mediawrite.Writer) { writers <- w }
+			c.Orders = sourcetest.OwnPlaces{}
+			if mutate != nil {
+				mutate(c)
+			}
+		},
+	})
+	m.store, m.status, m.writer = <-stores, <-statuses, <-writers
+	return m
+}
+
+// firefly runs a whole pass of tv and answers Firefly S01E01's instance.
+func (m *mediaRig) firefly(t *testing.T) statedb.InstanceID {
+	t.Helper()
+	if m.scanned == nil {
+		select {
+		case m.scanned = <-m.scanners:
+		case <-time.After(readyBudget):
+			t.Fatal("no Active settings built a Scanner")
+		}
+	}
+	m.scanned.PassNow()
+	if o := endedJob(t, m.status, status.Scan, readyBudget); o != status.Succeeded {
+		t.Fatalf("the whole pass ended %v", o)
+	}
+	k, ok := media.Choose(media.Episode, media.ExternalIDs{TVDB: 78874}, media.Numbering{Scheme: media.TVDB, Season: 1, Episode: 1})
+	if !ok {
+		t.Fatal("no key for Firefly S01E01")
+	}
+	row, found, err := m.store.ItemRow(t.Context(), k)
+	if err != nil || !found || row.Inst == 0 {
+		t.Fatalf("ItemRow(%s) = %v, %v, %v; want Firefly S01E01's instance", k, row.Inst, found, err)
+	}
+	return row.Inst
+}
+
+// deliver delivers an English SRT saying text for inst through the writer.
+func (m *mediaRig) deliver(t *testing.T, inst statedb.InstanceID, text string) statedb.FileRecord {
+	t.Helper()
+	cues, err := timing.ParseCues([]byte("1\n00:00:01,000 --> 00:00:02,000\n" + text + "\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	en, _ := language.Parse("en")
+	ctx, cancel := context.WithTimeout(t.Context(), readyBudget)
+	defer cancel()
+	rec, err := m.writer.Deliver(ctx, mediawrite.Delivery{
+		Inst: inst, Tag: en, Target: en, Variant: language.Standard, Cues: cues, Timing: timing.Identity{},
+		Provenance: statedb.Provenance{Provider: "opensubtitles", Release: "Firefly.S01E01"},
+		Run:        statedb.RunID{1}, Attempt: 1, Candidate: sha256.Sum256([]byte(text)),
+	})
+	if err != nil {
+		t.Fatalf("Deliver = %v", err)
+	}
+	return rec
+}
+
+// rescans counts the RescanSeries commands srv receives per series, each
+// answered by answer when set, else accepted.
+type rescans struct {
+	answer func(w http.ResponseWriter, r *http.Request)
+	got    map[int]int
+	mu     sync.Mutex
+}
+
+func countRescans(srv *arrtest.Server, answer func(http.ResponseWriter, *http.Request)) *rescans {
+	c := &rescans{got: map[int]int{}, answer: answer}
+	srv.Handle("/api/v5/command", func(w http.ResponseWriter, r *http.Request) {
+		var cmd struct {
+			Name     string `json:"name"`
+			SeriesID int    `json:"seriesId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&cmd); err == nil && cmd.Name == "RescanSeries" {
+			c.mu.Lock()
+			c.got[cmd.SeriesID]++
+			c.mu.Unlock()
+		}
+		if c.answer != nil {
+			c.answer(w, r)
+			return
+		}
+		srv.Write(w, http.StatusCreated, []byte(`{"id":7}`))
+	})
+	return c
+}
+
+func (c *rescans) of(series int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.got[series]
+}
+
+func TestRigDeliveryRescansSource(t *testing.T) {
+	srv := arrtest.Load(t, sonarrRecording)
+	sent := countRescans(srv, nil)
+	m := newMediaRig(t, srv.Start(t), true)
+	m.deliver(t, m.firefly(t), "Hello")
+	if !eventually(func() bool { return sent.of(2188) > 0 }) {
+		t.Fatal("Sonarr received no RescanSeries for Firefly after the delivery")
+	}
+	// A duplicate could only come from a later batch, after mediarefresh's
+	// 5 s debounce.
+	time.Sleep(7 * time.Second)
+	if n := sent.of(2188); n != 1 {
+		t.Errorf("Sonarr received %d RescanSeries for Firefly, want 1", n)
+	}
+}
+
+func TestRigWriteNeverWaitsOnSink(t *testing.T) {
+	srv := arrtest.Load(t, sonarrRecording)
+	hung := make(chan struct{}, 1)
+	sent := countRescans(srv, func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case hung <- struct{}{}:
+		default:
+		}
+		<-r.Context().Done()
+	})
+	m := newMediaRig(t, srv.Start(t), true)
+	inst := m.firefly(t)
+	m.deliver(t, inst, "Hello")
+	select {
+	case <-hung:
+	case <-time.After(readyBudget):
+		t.Fatal("the rescan never reached the hung Sonarr")
+	}
+	start := time.Now()
+	m.deliver(t, inst, "Hello again")
+	if d := time.Since(start); d > 2*time.Second || sent.of(2188) != 1 {
+		t.Errorf("a delivery with the rescan hung took %v with %d rescans sent, want it at once beside the one", d, sent.of(2188))
+	}
+}
+
+// agrees fails t unless rec's file, rec and its baseline agree: the file
+// holds rec's bytes, and they are the baseline rendered under rec's timing,
+// want.
+func (m *mediaRig) agrees(t *testing.T, rec statedb.FileRecord, want timing.Timing, text string) {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(m.video), rec.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sha256.Sum256(b) != rec.Identity.SHA256 || int64(len(b)) != rec.Identity.Size {
+		t.Errorf("%s holds %d bytes the record (%d bytes) does not name", rec.Name, len(b), rec.Identity.Size)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), readyBudget)
+	defer cancel()
+	cur, err := m.writer.Current(ctx, mediawrite.RefOf(rec), mediawrite.Expectation{Generation: rec.Generation, SHA256: rec.Identity.SHA256})
+	if err != nil {
+		t.Fatalf("Current = %v", err)
+	}
+	if cur.Timing != want || rec.Timing != want {
+		t.Errorf("timing: record %v, Current %v; want %v", rec.Timing, cur.Timing, want)
+	}
+	if ev := cur.Cues.Events(); len(ev) != 1 || ev[0].Text != text || ev[0].StartMs != 1000 {
+		t.Errorf("baseline events = %+v, want the delivered cue %q at 1000 ms", ev, text)
+	}
+	if rendered, err := timing.Render(cur.Cues, cur.Timing); err != nil || !bytes.Equal(rendered, b) {
+		t.Errorf("the baseline under %v renders %q, %v; the file holds %q", cur.Timing, rendered, err, b)
+	}
+}
+
+func TestRigWriteJourney(t *testing.T) {
+	srv := arrtest.Load(t, sonarrRecording)
+	countRescans(srv, nil)
+	m := newMediaRig(t, srv.Start(t), true)
+	inst := m.firefly(t)
+	rec := m.deliver(t, inst, "Hello")
+	m.agrees(t, rec, timing.Identity{}, "Hello")
+
+	shift := timing.Shift{Ms: 500}
+	ctx, cancel := context.WithTimeout(t.Context(), readyBudget)
+	defer cancel()
+	retimed, err := m.writer.Retime(ctx, mediawrite.RefOf(rec), mediawrite.Expectation{Generation: rec.Generation, SHA256: rec.Identity.SHA256}, shift, nil)
+	if err != nil {
+		t.Fatalf("Retime = %v", err)
+	}
+	m.agrees(t, retimed, shift, "Hello")
+
+	if err := m.writer.Delete(ctx, mediawrite.RefOf(retimed), mediawrite.Expectation{Generation: retimed.Generation, SHA256: retimed.Identity.SHA256}); err != nil {
+		t.Fatalf("Delete = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(m.video), retimed.Name)); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("after Delete, stat %s = %v; want it gone", retimed.Name, err)
+	}
+	if files, err := m.store.Files(ctx, inst); err != nil || len(files) != 0 {
+		t.Errorf("after Delete the store holds %+v, %v; want no record", files, err)
+	}
+}
+
+func TestRigSaveAddsWritableRoot(t *testing.T) {
+	srv := arrtest.Load(t, sonarrRecording)
+	countRescans(srv, nil)
+	url := srv.Start(t)
+	m := newMediaRig(t, url, false)
+	save(t, m.Rig, mediaLanguages+sourceSection(url, m.root))
+	inst := m.firefly(t)
+	m.deliver(t, inst, "Hello")
+}
+
+func TestRigSaveAppliesToNextDelivery(t *testing.T) {
+	srv := arrtest.Load(t, sonarrRecording)
+	countRescans(srv, nil)
+	url := srv.Start(t)
+	// Every apply after boot is held until the test returns, so the delivery
+	// below can see the saved section only through the settings commit.
+	held, release := make(chan struct{}, 1), make(chan struct{})
+	defer close(release)
+	m := startMediaRig(t, url, true, func(c *app.Config) {
+		c.SourcesApply = func(ctx context.Context) {
+			select {
+			case held <- struct{}{}:
+			default:
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+		}
+	})
+	inst := m.firefly(t)
+	read := func(rec statedb.FileRecord) string {
+		t.Helper()
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(m.video), rec.Name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	if got := read(m.deliver(t, inst, "<i>Hello</i>")); strings.Contains(got, "<i>") || !strings.Contains(got, "Hello") {
+		t.Errorf("under the default section the delivery reads %q, want its tags stripped", got)
+	}
+	save(t, m.Rig, mediaLanguages+sourceSection(url, m.root)+"post_processing:\n  strip_tags: false\n")
+	select {
+	case <-held:
+	case <-time.After(readyBudget):
+		t.Fatal("the save woke no media sources apply")
+	}
+	if got := read(m.deliver(t, inst, "<i>Hello again</i>")); !strings.Contains(got, "<i>Hello again</i>") {
+		t.Errorf("the delivery right after a strip_tags: false save, its sources apply held, reads %q, want its tags kept", got)
 	}
 }

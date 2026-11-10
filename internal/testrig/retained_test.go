@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"ST-2b", "MR-1", "SE-2", "SE-2p",
+	"ST-2b", "SE-2", "SE-2p",
 	"PA-2", "AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
@@ -65,14 +65,20 @@ var retained = []struct{ pattern, until string }{
 	{"internal/media#Scheme.MarshalText", "AP-1"},
 	{"internal/mediaserver#*", "AP-1"},
 	{"internal/mediasource#Capabilities.Posters", "AP-1"},
-	{"internal/mediasource#Capabilities.Rescan", "MR-1"},
 	{"internal/mediasource#ScheduleSchema", "PA-2"},
 	{"internal/mediasource#Set.LocalPath", "AP-1"},
-	{"internal/mediasource#Set.MediaRoots", "MR-1"},
 	{"internal/mediasource#Set.Ping", "AP-1"},
 	{"internal/mediasource#Set.Poster", "AP-1"},
-	{"internal/mediasource#Set.Rescan", "MR-1"},
-	{"internal/mediawrite#*", "MR-1"},
+	{"internal/mediawrite#DecodeRef", "AP-1"},
+	{"internal/mediawrite#FolderState.*", "AP-1"},
+	{"internal/mediawrite#Found.*", "SE-2"},
+	{"internal/mediawrite#Inventory.*", "SE-2"},
+	{"internal/mediawrite#RefOf", "SE-2"},
+	{"internal/mediawrite#Timed.Timing", "AP-1"},
+	{"internal/mediawrite#Writer.Delete", "AP-1"},
+	{"internal/mediawrite#Writer.Deliver", "SE-2"},
+	{"internal/mediawrite#Writer.FolderState", "AP-1"},
+	{"internal/mediawrite#Writer.List", "SE-2"},
 	{"internal/obs#Metrics.Register", "AP-1"},
 	{"internal/provider#*", "SE-2"},
 	{"internal/provider/*", "SE-2"},
@@ -113,7 +119,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/scan#Scanner.PassNow", "AP-1"},
 	{"internal/scan#Scanner.Start", "AP-1"},
 	{"internal/seriesorder#Service.Evidence", "SE-2"},
-	{"internal/settings#Active.Media", "MR-1"},
 	{"internal/settings#Active.Timing", "SE-2"},
 	{"internal/settings#Codes", "AP-1"},
 	{"internal/settings#Mode.UnmarshalText", "AP-1"},
@@ -135,8 +140,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#CoverageCount.*", "AP-1b"},
 	{"internal/statedb#CoverageRow", "SE-2"},
 	{"internal/statedb#CoverageRow.*", "SE-2"},
-	{"internal/statedb#Delta", "MR-1"},
-	{"internal/statedb#Delta.*", "MR-1"},
 	{"internal/statedb#ErrCursorInvalid", "AP-1"},
 	{"internal/statedb#ErrNotLockable", "AP-1"},
 	{"internal/statedb#ErrPassUnknown", "AP-1"},
@@ -165,13 +168,11 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#RootHistory", "AP-1"},
 	{"internal/statedb#RootRow", "AP-1b"},
 	{"internal/statedb#RootRow.*", "AP-1b"},
-	{"internal/statedb#RootTarget", "MR-1"},
 	{"internal/statedb#Store.Accounts", "PA-2"},
 	{"internal/statedb#Store.AckWork", "SE-2"},
 	{"internal/statedb#Store.ActivateAuth", "PA-2"},
 	{"internal/statedb#Store.AuthSecrets", "PA-2"},
 	{"internal/statedb#Store.Backup", "PA-2"},
-	{"internal/statedb#Store.Changed", "MR-1"},
 	{"internal/statedb#Store.Coverage", "SE-2"},
 	{"internal/statedb#Store.DeferWork", "SE-2"},
 	{"internal/statedb#Store.EnqueueWork", "SE-2"},
@@ -186,10 +187,8 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#Store.PutExternal", "SE-2"},
 	{"internal/statedb#Store.PutNoResults", "SE-2"},
 	{"internal/statedb#Store.Root", "AP-1b"},
-	{"internal/statedb#Store.RootTargets", "MR-1"},
 	{"internal/statedb#Store.Roots", "AP-1b"},
 	{"internal/statedb#Store.SetLock", "AP-1b"},
-	{"internal/statedb#Store.Since", "MR-1"},
 	{"internal/statedb#Store.Unidentified", "AP-1b"},
 	{"internal/statedb#Store.WorkReady", "SE-2"},
 	{"internal/statedb#Store.WriteHealth", "PA-2"},
@@ -310,14 +309,14 @@ func rowFor(rows []struct{ pattern, until string }, ref string) (pattern, until 
 
 func TestRowForPrefersTheNarrowestPattern(t *testing.T) {
 	rows := []struct{ pattern, until string }{
-		{"internal/a#*", "MR-1"},
+		{"internal/a#*", "MS-3"},
 		{"internal/a#T.*", "SE-2"},
 		{"internal/a#T.M", "AP-1"},
 	}
 	for _, c := range []struct{ name, ref, pattern, until string }{
 		{"its own row over its type's and package's", "internal/a#T.M", "internal/a#T.M", "AP-1"},
 		{"its type's row over its package's", "internal/a#T.N", "internal/a#T.*", "SE-2"},
-		{"its package's row alone", "internal/a#U", "internal/a#*", "MR-1"},
+		{"its package's row alone", "internal/a#U", "internal/a#*", "MS-3"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if pattern, until, ok := rowFor(rows, c.ref); !ok || pattern != c.pattern || until != c.until {

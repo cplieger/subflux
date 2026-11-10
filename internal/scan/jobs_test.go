@@ -155,8 +155,20 @@ func TestRequestPassCancelRules(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			r := booted(t, movieCaps, daily, 1)
 			started := r.ad.blockWalk()
+			// a's poke wakes the loop, and a pass started before b is queued
+			// carries a alone (TestWholeRequestDuringPassRunsNext): the probe
+			// holds the tick until both wait.
+			probing, queued := make(chan struct{}), make(chan struct{})
+			r.ad.setFolders(func(ctx context.Context) ([]string, error) {
+				close(probing)
+				<-queued
+				return r.ad.Fake.RootFolders(ctx)
+			})
 			a, _ := r.scanner.Start(t.Context(), scan.Request{Owner: 1, Source: src})
+			<-probing
 			b, _ := r.scanner.Start(t.Context(), scan.Request{Owner: 2, Source: src})
+			r.ad.setFolders(nil)
+			close(queued)
 			synctest.Wait()
 			walkStarted(t, started)
 			if err := r.jobs.Cancel(a.ID); err != nil {

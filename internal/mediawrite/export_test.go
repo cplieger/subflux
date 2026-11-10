@@ -20,8 +20,6 @@ type Faults = fsOps
 // Inject hands edit w's current calls to replace; call it before Run.
 func Inject(w *Writer, edit func(*Faults)) { edit(&w.fs) }
 
-func Reprobe(w *Writer) { w.reprobe() }
-
 // Settled waits for Run's first reading of the roots and for every
 // configured root's first probe.
 func Settled(ctx context.Context, w *Writer) error {

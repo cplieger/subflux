@@ -128,7 +128,8 @@ func TestNormalizeFalseThroughDeliverAndRetime(t *testing.T) {
 	if errs != nil {
 		t.Fatal(errs)
 	}
-	l := newLibrary(t, "default:\n  - tag: fr\n", mediawrite.Deps{Config: cfg}, nil)
+	l := newLibrary(t, "default:\n  - tag: fr\n", mediawrite.Deps{}, nil)
+	l.w.SetConfig(cfg)
 	// windows-1252 French; its \x92 quote is what tells it from ISO-8859-1.
 	doc := "1\r\n00:00:01,000 --> 00:00:03,000\r\nO\xf9 \xeates-vous all\xe9s hier soir ?\r\n\r\n" +
 		"2\r\n00:00:04,000 --> 00:00:06,000\r\n\xc0 la f\xeate, c\x92\xe9tait d\xe9j\xe0 fini.\r\n"
@@ -155,7 +156,7 @@ func TestNormalizeFalseThroughDeliverAndRetime(t *testing.T) {
 	}
 }
 
-func TestSetConfigReprobes(t *testing.T) {
+func TestRootsChangedProbesNewRoots(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a, b := filepath.Join(dir, "a"), filepath.Join(dir, "b")
@@ -169,8 +170,17 @@ func TestSetConfigReprobes(t *testing.T) {
 		roots.set(a, b)
 		w.SetConfig(mediawrite.Config{})
 		synctest.Wait()
+		before := roots.reads()
+		if mediawrite.Available(w, b) {
+			t.Error("SetConfig probed the roots; a section save leaves them to RootsChanged")
+		}
+		w.RootsChanged()
+		synctest.Wait()
 		if !mediawrite.Available(w, b) {
-			t.Error("a root added before a save is not probed until the next interval")
+			t.Error("a root added before RootsChanged is not probed until the next interval")
+		}
+		if n := roots.reads() - before; n != 1 {
+			t.Errorf("RootsChanged read the roots %d times, want one probe pass", n)
 		}
 	})
 }
