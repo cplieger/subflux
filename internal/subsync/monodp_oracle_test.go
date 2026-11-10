@@ -2,15 +2,14 @@ package subsync
 
 import (
 	"math"
-	"slices"
 	"sort"
 )
 
-// The cut study's monoDP and refGapSpeech (cut-study/zz_cut_mono_test.go,
-// lines 40 and 403), ported from the study's cue type to Span: the oracle the
-// production DP must equal. monoDP indexes drop runs by absolute end time,
-// so its memory grows with cue time; its 10 ms refinement and reorder count
-// are left out, since the production DP's own refinement is tested apart.
+// The cut study's monoDP (cut-study/zz_cut_mono_test.go, line 40), ported
+// from the study's cue type to Span: the oracle the production DP must
+// equal. monoDP indexes drop runs by absolute end time, so its memory grows
+// with cue time; its 10 ms refinement and reorder count are left out, since
+// the production DP's own refinement is tested apart.
 
 type monoParams struct {
 	Step      int64
@@ -241,30 +240,4 @@ func (f *maxFenwick) prefix(i int) (float64, int) {
 		}
 	}
 	return best, at
-}
-
-// refGapSpeech is the largest amount of reference speech inside one gap
-// between consecutive kept cues.
-func refGapSpeech(ref, kept []Span) int64 {
-	cs := slices.Clone(kept)
-	if len(cs) < 2 {
-		return 0
-	}
-	slices.SortFunc(cs, func(a, b Span) int { return int(a.StartMs - b.StartMs) })
-	var maxMs int64
-	end := cs[0].EndMs
-	for i := 1; i < len(cs); i++ {
-		gs, ge := end, cs[i].StartMs
-		if ge > gs {
-			var sp int64
-			for _, r := range ref {
-				if s, e := max(r.StartMs, gs), min(r.EndMs, ge); e > s {
-					sp += e - s
-				}
-			}
-			maxMs = max(maxMs, sp)
-		}
-		end = max(end, cs[i].EndMs)
-	}
-	return maxMs
 }

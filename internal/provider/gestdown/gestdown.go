@@ -238,7 +238,7 @@ func candidates(eps []seasonEpisode, episode int, tag language.Tag) []provider.C
 				Ref:       provider.NewRef(s.SubtitleID),
 				Lang:      tag,
 				Release:   release,
-				Flags:     language.Flags{HI: provider.HearingImpaired(s.HearingImpaired, release)},
+				Flags:     provider.Flags(language.Flags{HI: s.HearingImpaired}, release),
 				MatchedBy: rank.ID,
 			})
 		}

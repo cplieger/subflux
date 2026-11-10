@@ -2,6 +2,7 @@ package mediawrite_test
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -24,17 +25,53 @@ func sectionNode(t *testing.T, text string) *yaml.Node {
 
 func TestSectionDefaults(t *testing.T) {
 	t.Parallel()
-	want := mediawrite.Config{StripTags: true, NormalizeUTF8: true, CleanWhitespace: true, NormalizeLineEndings: true, RemoveEmpty: true}
+	want := mediawrite.Config{Clean: timing.CleanOptions{StripTags: true, NormalizeUTF8: true, CleanWhitespace: true, NormalizeLineEndings: true, RemoveEmpty: true}}
 	if got, errs := mediawrite.ParseConfig(nil); got != want || errs != nil {
 		t.Errorf("absent section: %+v %v, want %+v", got, errs, want)
 	}
 	if got, errs := mediawrite.ParseConfig(sectionNode(t, "{}")); got != want || errs != nil {
 		t.Errorf("empty section: %+v %v, want %+v", got, errs, want)
 	}
-	flipped := mediawrite.Config{StripHI: true}
+	flipped := mediawrite.Config{Clean: timing.CleanOptions{StripHI: true}}
 	text := "strip_hi: true\nstrip_tags: false\nnormalize_utf8: false\nnormalize_line_endings: false\nclean_whitespace: false\nremove_empty: false\n"
 	if got, errs := mediawrite.ParseConfig(sectionNode(t, text)); got != flipped || errs != nil {
 		t.Errorf("every key flipped: %+v %v, want %+v", got, errs, flipped)
+	}
+}
+
+// Each CleanOptions field is set by exactly one post_processing key, and
+// each key sets exactly one field.
+func TestConfigCarriesEveryCleanOption(t *testing.T) {
+	t.Parallel()
+	base, errs := mediawrite.ParseConfig(nil)
+	if errs != nil {
+		t.Fatal(errs)
+	}
+	opts := reflect.TypeFor[timing.CleanOptions]()
+	reached := map[string][]string{}
+	for _, f := range mediawrite.Schema.Fields {
+		flip := map[string]string{"true": "false", "false": "true"}[f.Default]
+		got, errs := mediawrite.ParseConfig(sectionNode(t, f.Key+": "+flip+"\n"))
+		if errs != nil {
+			t.Fatalf("%s: %v", f.Key, errs)
+		}
+		var changed []string
+		for field := range opts.Fields() {
+			if reflect.ValueOf(got.Clean).FieldByIndex(field.Index).Bool() != reflect.ValueOf(base.Clean).FieldByIndex(field.Index).Bool() {
+				changed = append(changed, field.Name)
+			}
+		}
+		if len(changed) != 1 {
+			t.Errorf("%s flips %q, want exactly one CleanOptions field", f.Key, changed)
+		}
+		for _, name := range changed {
+			reached[name] = append(reached[name], f.Key)
+		}
+	}
+	for field := range opts.Fields() {
+		if len(reached[field.Name]) != 1 {
+			t.Errorf("CleanOptions.%s is set by %q, want exactly one post_processing key", field.Name, reached[field.Name])
+		}
 	}
 }
 
@@ -70,7 +107,7 @@ func TestSaveAppliesToNextDelivery(t *testing.T) {
 	if got := readFile(t, l.path(rec.Name)); !strings.Contains(got, "[music]") {
 		t.Fatalf("the first delivery reads %q; strip_hi was off", got)
 	}
-	l.w.SetConfig(mediawrite.Config{StripHI: true})
+	l.w.SetConfig(mediawrite.Config{Clean: timing.CleanOptions{StripHI: true}})
 	second := delivery(t, l.inst, "[music] hello")
 	second.Numbered = true
 	again, err := l.w.Deliver(t.Context(), second)

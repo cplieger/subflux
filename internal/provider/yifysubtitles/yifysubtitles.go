@@ -171,7 +171,7 @@ func parseResults(page string, langs []language.Tag) []provider.Candidate {
 			Ref:       provider.NewRef(link[1]),
 			Lang:      tag,
 			Release:   release,
-			Flags:     language.Flags{HI: provider.HearingImpaired(hiRe.MatchString(tds[3][1]), release)},
+			Flags:     provider.Flags(language.Flags{HI: hiRe.MatchString(tds[3][1])}, release),
 			MatchedBy: rank.ID,
 		})
 	}

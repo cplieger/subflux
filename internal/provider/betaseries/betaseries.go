@@ -198,7 +198,7 @@ func candidates(entries []entry, langs []language.Tag) []provider.Candidate {
 			Ref:       provider.NewRef(id),
 			Lang:      tag,
 			Release:   e.File,
-			Flags:     language.Flags{HI: provider.HearingImpaired(false, e.File)},
+			Flags:     provider.Flags(language.Flags{}, e.File),
 			MatchedBy: rank.ID,
 		})
 	}

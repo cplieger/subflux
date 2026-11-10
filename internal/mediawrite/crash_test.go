@@ -65,7 +65,7 @@ func newLibIn(t *testing.T, sub string, videos ...string) *lib {
 	l := &lib{t: t, root: filepath.Join(tmp, "media"), storePath: filepath.Join(tmp, "subflux.bolt"), alerts: &fakeAlerts{}, logs: &logRecords{}}
 	l.dir = filepath.Join(l.root, sub)
 	l.roots = rootsOf(l.root)
-	l.j = &journal{t: t, dir: l.dir}
+	l.j = &journal{t: t, l: l, dir: l.dir}
 	paths := make([]string, 0, len(videos))
 	for _, v := range videos {
 		paths = append(paths, filepath.Join(l.dir, v))
@@ -249,6 +249,7 @@ func eventually(t *testing.T, what string, cond func() bool) {
 // goexit ends a recovery's goroutine instead.
 type journal struct {
 	t       *testing.T
+	l       *lib
 	ops     []dirOp
 	points  []string
 	crashAt string
@@ -258,9 +259,11 @@ type journal struct {
 	goexit  bool
 }
 
+// dirOp is one directory operation: names are the entries it changed.
 type dirOp struct {
-	undo func() error
-	what string
+	undo  func() error
+	what  string
+	names []string
 }
 
 func (j *journal) reset() {
@@ -288,10 +291,51 @@ func (j *journal) unsynced() int {
 	return len(j.ops)
 }
 
-func (j *journal) add(what string, undo func() error) {
+// unsyncedOf counts the unsynced operations that changed one of names.
+func (j *journal) unsyncedOf(names []string) int {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.ops = append(j.ops, dirOp{what: what, undo: undo})
+	n := 0
+	for _, op := range j.ops {
+		if slices.ContainsFunc(op.names, func(name string) bool { return slices.Contains(names, name) }) {
+			n++
+		}
+	}
+	return n
+}
+
+func (j *journal) add(what string, undo func() error, names ...string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.ops = append(j.ops, dirOp{what: what, undo: undo, names: names})
+}
+
+// entriesOf are the entries the pending intent of name beside inst's video
+// changes: name, its stage and the names a delivery supersedes. A sibling
+// write's operations in the same directory are not this intent's.
+func (j *journal) entriesOf(ctx context.Context, inst statedb.InstanceID, name string) []string {
+	intents, err := j.l.store.PendingWrites(ctx)
+	if err != nil {
+		j.t.Errorf("the pending writes: %v", err)
+	}
+	names := []string{name}
+	for _, it := range intents {
+		if it.Inst != inst || it.Name != name {
+			continue
+		}
+		names = append(names, mediawrite.StageName(inst, name, it.SHA256))
+		if it.Op != statedb.Deliver {
+			break
+		}
+		d, found, err := j.l.store.PendingDeliverOf(ctx, inst, name)
+		if err != nil || !found {
+			j.t.Errorf("the pending delivery of %s: found %v, %v", name, found, err)
+		}
+		for _, r := range d.Removes {
+			names = append(names, r.Name)
+		}
+	}
+	return names
 }
 
 func (j *journal) at(point string) {
@@ -366,21 +410,21 @@ func (j *journal) wrap(f *mediawrite.Faults) {
 	f.CreateStage = func(dir *os.Root, name string) (*os.File, error) {
 		file, err := createStage(dir, name)
 		if err == nil {
-			j.add("create "+name, func() error { return os.Remove(j.path(name)) })
+			j.add("create "+name, func() error { return os.Remove(j.path(name)) }, name)
 		}
 		return file, err
 	}
 	f.RenameNoReplace = func(dir *os.File, from, to string) error {
 		err := renameNoReplace(dir, from, to)
 		if err == nil {
-			j.add("rename "+from+" to "+to, func() error { return os.Rename(j.path(to), j.path(from)) })
+			j.add("rename "+from+" to "+to, func() error { return os.Rename(j.path(to), j.path(from)) }, from, to)
 		}
 		return err
 	}
 	f.Link = func(dir *os.Root, from, to string) error {
 		err := link(dir, from, to)
 		if err == nil {
-			j.add("link "+from+" to "+to, func() error { return os.Remove(j.path(to)) })
+			j.add("link "+from+" to "+to, func() error { return os.Remove(j.path(to)) }, to)
 		}
 		return err
 	}
@@ -393,7 +437,7 @@ func (j *journal) wrap(f *mediawrite.Faults) {
 					return err
 				}
 				return restore()
-			})
+			}, from, to)
 		}
 		return err
 	}
@@ -401,7 +445,7 @@ func (j *journal) wrap(f *mediawrite.Faults) {
 		restore := j.saved(name)
 		err := remove(dir, name)
 		if err == nil {
-			j.add("remove "+name, restore)
+			j.add("remove "+name, restore, name)
 		}
 		return err
 	}
@@ -424,8 +468,8 @@ func (j *journal) wrap(f *mediawrite.Faults) {
 		step(s)
 	}
 	f.End = func(ctx context.Context, op statedb.Op, inst statedb.InstanceID, name string, landed bool) error {
-		if n := j.unsynced(); n > 0 {
-			j.t.Errorf("the intent of %s settled with %d directory operations unsynced", name, n)
+		if n := j.unsyncedOf(j.entriesOf(ctx, inst, name)); n > 0 {
+			j.t.Errorf("the intent of %s settled with %d of its directory operations unsynced", name, n)
 		}
 		return end(ctx, op, inst, name, landed)
 	}
@@ -681,7 +725,7 @@ func keepsOne(l *lib) {
 		l.t.Fatalf("both the old and the new file are lost: %v", err)
 	}
 	cues, err := timing.ParseCues(b)
-	if s := string(b); err != nil || cues.Len() != 1 || !strings.Contains(s, "old") && !strings.Contains(s, "new") {
+	if s := string(b); err != nil || len(cues.Events()) != 1 || !strings.Contains(s, "old") && !strings.Contains(s, "new") {
 		l.t.Errorf("%s holds %q (%v), neither the old file nor the new one", ep1, s, err)
 	}
 }

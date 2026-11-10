@@ -121,10 +121,10 @@ func (w *Writer) land(ctx context.Context, b *borrowed, p *prepared) error {
 
 // stage creates s's stage with O_EXCL and makes it and its modification
 // time durable before the directory entry, so no power loss keeps a later
-// unlink but loses the stage. A file already at the stage name is the
-// leftover of a settled write of these bytes (one settled while its root
-// was unconfigured): it is removed and the creation retried once. A
-// refusal of the creation itself is what marks the directory unwritable.
+// unlink but loses the stage. A file already at the stage name is removed
+// and the creation retried once; stageName owns why the name is this
+// write's. A refusal of the creation itself is what marks the directory
+// unwritable.
 func (w *Writer) stage(ctx context.Context, b *borrowed, s *staged) (string, error) {
 	stage := s.stageName()
 	key := dirKey{root: b.state.path, dir: s.l.dirRel}

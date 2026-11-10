@@ -89,6 +89,37 @@ func TestDecodeAppliesDefaults(t *testing.T) {
 	}
 }
 
+func TestDecodeStringListDefaultAndEnum(t *testing.T) {
+	s := Schema{Fields: []Field{{Key: "codecs", Kind: StringList, Enum: []string{"a", "b", "c"}, Default: "[a, b]"}}}
+	tests := []struct {
+		name, doc string
+		want      []string
+		errPaths  []string
+	}{
+		{name: "absent takes the default", doc: "{}\n", want: []string{"a", "b"}},
+		{name: "a written list replaces it", doc: "codecs: [c]\n", want: []string{"c"}},
+		{name: "an empty list is kept", doc: "codecs: []\n", want: []string{}},
+		{name: "an element outside the enum", doc: "codecs: [a, d, e]\n", errPaths: []string{"codecs[1]", "codecs[2]"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vals, errs := s.Decode(section(t, tt.doc))
+			if !slices.Equal(errPaths(errs), tt.errPaths) {
+				t.Fatalf("errors %v, want paths %v", errs, tt.errPaths)
+			}
+			if tt.errPaths == nil && !slices.Equal(vals.StringList("codecs"), tt.want) {
+				t.Errorf("codecs = %q, want %q", vals.StringList("codecs"), tt.want)
+			}
+		})
+	}
+	for _, def := range []string{"a", "[a, d]", "{a: b}", "[a, [b]]", "[a"} {
+		bad := Schema{Fields: []Field{{Key: "codecs", Kind: StringList, Enum: []string{"a", "b"}, Default: def}}}
+		if _, errs := bad.Decode(nil); !slices.Equal(errPaths(errs), []string{"codecs"}) {
+			t.Errorf("default %q: errors %v, want one at codecs", def, errs)
+		}
+	}
+}
+
 func TestDecodeRequired(t *testing.T) {
 	s := Schema{Fields: []Field{{Key: "url", Kind: String, Required: true}, {Key: "hosts", Kind: StringList, Required: true}}}
 	_, errs := s.Decode(section(t, "url: ''\nhosts: []\n"))

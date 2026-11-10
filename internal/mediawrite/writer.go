@@ -70,14 +70,14 @@ type Writer struct {
 	hashes     *hashCache
 	unwritable *unwritableDirs
 	cfg        atomic.Pointer[Config]
-	started    chan struct{}         // closed once Run has read the root set
-	kick       chan struct{}         // a pending request for a probe pass
-	recoverReq chan struct{}         // a pending request to start recovery attempts
-	paths      map[string]*rootState // by configured path; guarded by mu
+	started    chan struct{}               // closed once Run has read the root set
+	kick       chan struct{}               // a pending request for a probe pass
+	recoverReq chan struct{}               // a pending request to start recovery attempts
+	paths      map[string]*rootState       // by configured path; guarded by mu
+	outlived   map[statedb.Intent]struct{} // intents a pass left pending, until a count finds them settled; guarded by mu
 	modes      publishModes
 	recoveries sync.WaitGroup
-	orphanKept int // intents of unconfigured roots the last orphan pass left; guarded by mu
-	unreadKept int // intents whose instance the last orphan pass could not read; guarded by mu
+	countMu    sync.Mutex // serializes countPending
 	mu         sync.Mutex
 	orphaning  bool // an orphan pass is running; guarded by mu
 }
@@ -105,6 +105,7 @@ func New(d Deps) *Writer {
 		kick:       make(chan struct{}, 1),
 		recoverReq: make(chan struct{}, 1),
 		paths:      map[string]*rootState{},
+		outlived:   map[statedb.Intent]struct{}{},
 	}
 	w.cfg.Store(&d.Config)
 	return w

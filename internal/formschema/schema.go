@@ -54,9 +54,11 @@ type Schema struct{ Fields []Field }
 type Field struct {
 	Key, Label, Help string
 	// Default is the value Decode applies when the key is absent, in the
-	// key's own YAML spelling; "" means no default.
+	// key's own YAML spelling, a flow sequence such as "[a, b]" for a
+	// StringList; "" means no default.
 	Default string
-	// Enum lists an Enum field's accepted values.
+	// Enum lists an Enum field's accepted values, or a StringList's accepted
+	// elements; an empty Enum leaves a StringList's elements open.
 	Enum []string
 	// Min and Max bound an Int, or a DurationMs in milliseconds, inclusively.
 	// Set both, with Min <= Max, or neither: both zero leave it unbounded,

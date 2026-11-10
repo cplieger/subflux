@@ -1,6 +1,8 @@
 package opensubtitles
 
 import (
+	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/rank"
 )
 
 func TestNumberings(t *testing.T) {
@@ -55,6 +58,35 @@ func TestIDParams(t *testing.T) {
 		p, ok := a.idParams(&tc.q, []string{en}, tc.n)
 		if got := p.Encode(); ok != (tc.want != "") || got != tc.want {
 			t.Errorf("%s: %q %v, want %q", tc.name, got, ok, tc.want)
+		}
+	}
+}
+
+// The answer's hearing_impaired and foreign_parts_only flags are independent:
+// languages design 3.2 makes every combination of HI and Forced valid.
+func TestCandidateFlags(t *testing.T) {
+	en := mustTag(t, "en")
+	for _, tc := range []struct {
+		name  string
+		hi    bool
+		parts bool
+		want  language.Flags
+	}{
+		{"neither", false, false, language.Flags{}},
+		{"hearing impaired", true, false, language.Flags{HI: true}},
+		{"foreign parts only", false, true, language.Flags{Forced: true}},
+		{"both", true, true, language.Flags{HI: true, Forced: true}},
+	} {
+		raw := fmt.Sprintf(`{"language": "en", "release": "Inception.2010.1080p.BluRay.x264",
+			"files": [{"file_id": 1, "file_name": "Inception.2010.1080p.BluRay.x264.srt"}],
+			"hearing_impaired": %t, "foreign_parts_only": %t}`, tc.hi, tc.parts)
+		var at attributes
+		if err := json.Unmarshal([]byte(raw), &at); err != nil {
+			t.Fatal(err)
+		}
+		c, ok := (&adapter{}).candidate(&at, []language.Tag{en}, rank.ID)
+		if !ok || c.Flags != tc.want {
+			t.Errorf("%s: %+v %v, want flags %+v", tc.name, c.Flags, ok, tc.want)
 		}
 	}
 }

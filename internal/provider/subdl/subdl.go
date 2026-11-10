@@ -274,13 +274,10 @@ func candidates(items []item, episode bool, by rank.MatchedBy) []provider.Candid
 		}
 		for _, release := range releases {
 			out = append(out, provider.Candidate{
-				Ref:     provider.NewRef(path),
-				Lang:    tag,
-				Release: release,
-				Flags: language.Flags{
-					HI:     provider.HearingImpaired(it.HI, it.Comment, it.Name, release),
-					Forced: provider.Forced(false, it.Comment, it.Name, release),
-				},
+				Ref:       provider.NewRef(path),
+				Lang:      tag,
+				Release:   release,
+				Flags:     provider.Flags(language.Flags{HI: it.HI}, it.Comment, it.Name, release),
 				MatchedBy: by,
 			})
 		}

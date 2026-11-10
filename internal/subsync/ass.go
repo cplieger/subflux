@@ -19,7 +19,7 @@ var nonDialogueStylePatterns = []string{
 	`romaji|romanji|kanji`,
 	`karaoke|\bkara\b|lyric`,
 	// signs, typesetting, songs
-	`sign|\btitle|credit|\bnote\b|\bcaption\b`,
+	`sign|\btitle|credit|\bnote\b|\bcaption\b|\blogos?\b`,
 	`typeset|\bts\b`,
 	`song|\binsert\b`,
 	// karaoke

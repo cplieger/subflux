@@ -147,7 +147,7 @@ func (r Runner) Preview(ctx context.Context, video *os.File, from time.Duration)
 		"-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn",
 		"-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-vf", "scale=-2:360",
 		"-pix_fmt", "yuv420p", "-profile:v", "baseline", "-level", "3.0",
-		"-c:a", "aac", "-ac", "2", "-b:a", "96k",
+		"-c:a", "aac", "-ac", "2", "-b:a", "64k",
 		"-movflags", "frag_keyframe+empty_moov+default_base_moof", "-f", "mp4", "pipe:1")
 	if err != nil {
 		return nil, err

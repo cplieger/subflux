@@ -19,19 +19,23 @@ const (
 	ModelPiecewise
 )
 
-// Result is one fit. Shape is measured against the reference whenever one
-// passed the guard, for an audio fit too; Measured is false when none did.
+// Result is one fit. Shape (Timing's mapping) and IdentityShape (the
+// candidate as it is, which Settle delivers below the gate) are measured
+// against the reference for any fit made beside one that passed the guard,
+// an audio fit too; Measured is false otherwise, and always for the
+// MethodNone result.
 type Result struct {
-	Timing     timing.Timing // canonical form
-	Shape      Shape
-	Confidence float64 // e2, held out for piecewise; peak × 0.9 for audio
-	Method     timing.Method
-	Measured   bool
+	Timing        timing.Timing // canonical form
+	Shape         Shape
+	IdentityShape Shape
+	Confidence    float64 // e2, held out for piecewise; peak × 0.9 for audio
+	Method        timing.Method
+	Measured      bool
 }
 
-// noReference is the result when the guard refuses: the reference counts
-// as absent.
-var noReference = Result{Timing: timing.Identity{}, Method: timing.MethodNone}
+// noFit is a stage's result when it places nothing, so a caller tells it
+// apart from a fit by its Method alone.
+var noFit = Result{Timing: timing.Identity{}, Method: timing.MethodNone}
 
 // AlignReference is shift, then linear, then (upTo ModelPiecewise only)
 // piecewise with a drop state on the selected global model's scale; every
@@ -48,20 +52,28 @@ func AlignReference(ctx context.Context, ref, inc []Span, upTo Model) (Result, e
 	}
 	x := newRefIndex(ref)
 	if !guard(len(ref)) || !guard(len(inc)) {
-		return noReference, nil
+		return noFit, nil
 	}
 	if c := x.coverage(); c <= 0.05 || c >= 0.95 {
-		return noReference, nil
+		return noFit, nil
 	}
 	incS := sortSpans(inc)
 	global, pw, err := stages(ctx, sortSpans(ref), incS, x, upTo)
 	if err != nil {
 		return Result{}, err
 	}
+	r := global
 	if pw.accepted() {
-		return pw.result(incS, x), nil
+		r = pw.result(incS, x)
 	}
-	return global, nil
+	r.IdentityShape = identityShape(incS, x)
+	return r, nil
+}
+
+// identityShape is inc's Shape against x where it lies.
+func identityShape(inc []Span, x refIndex) Shape {
+	_, sh := measure(fit{kept: inc, displayMs: displayMs(inc)}, x)
+	return sh
 }
 
 // stages runs the global stages and, up to ModelPiecewise, the piecewise
@@ -73,12 +85,12 @@ func stages(ctx context.Context, ref, inc []Span, x refIndex, upTo Model) (Resul
 		return Result{}, pwFit{}, err
 	}
 	scaled := scaleSpans(inc, scale)
-	conf, sh := measure(fit{kept: shiftSpans(scaled, offsetOf(t)), displayMs: displayMs(scaled)}, x)
+	conf, sh := measure(fit{kept: shiftSpans(scaled, timing.OffsetMs(t)), displayMs: displayMs(scaled)}, x)
 	global := Result{Timing: timing.Canonical(t), Method: timing.MethodReference, Confidence: conf, Shape: sh, Measured: true}
 	if upTo < ModelPiecewise {
 		return global, pwFit{}, nil
 	}
-	pw, err := piecewiseStage(ctx, newDP(productionGrid, ref), inc, scale, offsetOf(t), x)
+	pw, err := piecewiseStage(ctx, newDP(productionGrid, ref), inc, scale, timing.OffsetMs(t), x)
 	if err == nil {
 		err = ctx.Err()
 	}
@@ -121,16 +133,6 @@ func sortSpans(spans []Span) []Span {
 	out := slices.Clone(spans)
 	slices.SortStableFunc(out, func(a, b Span) int { return byStart(a, b.StartMs) })
 	return out
-}
-
-func offsetOf(t timing.Timing) int64 {
-	switch t := t.(type) {
-	case timing.Shift:
-		return t.Ms
-	case timing.Linear:
-		return t.OffsetMs
-	}
-	return 0
 }
 
 func displayMs(spans []Span) int64 {

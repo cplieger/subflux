@@ -84,8 +84,8 @@ func TestFormatFromBytesNotName(t *testing.T) {
 			if got := c.Format(); got != tc.format {
 				t.Errorf("Format() = %v, want %v", got, tc.format)
 			}
-			if got := c.Len(); got != tc.events {
-				t.Errorf("Len() = %d, want %d", got, tc.events)
+			if got := len(c.Events()); got != tc.events {
+				t.Errorf("%d events, want %d", got, tc.events)
 			}
 		})
 	}
@@ -392,8 +392,8 @@ func TestLimitsAccepted(t *testing.T) {
 	})
 	t.Run("exactly 100,000 events", func(t *testing.T) {
 		t.Parallel()
-		if got := mustParse(t, srtOf(100_000)).Len(); got != 100_000 {
-			t.Errorf("Len() = %d, want 100000", got)
+		if got := len(mustParse(t, srtOf(100_000)).Events()); got != 100_000 {
+			t.Errorf("%d events, want 100000", got)
 		}
 	})
 }
@@ -525,8 +525,8 @@ func TestWebVTTNearCapConverts(t *testing.T) {
 	}
 	doc := []byte(b.String())
 	c := mustParse(t, doc)
-	if c.Len() != cues {
-		t.Fatalf("Len() = %d, want %d", c.Len(), cues)
+	if n := len(c.Events()); n != cues {
+		t.Fatalf("%d events, want %d", n, cues)
 	}
 	if n := storedDocLen(t, c); n <= 16<<20 {
 		t.Fatalf("conversion is %d bytes; the case needs one over 16 MiB", n)

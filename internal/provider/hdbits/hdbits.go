@@ -252,13 +252,10 @@ func (a *adapter) list(ctx context.Context, pace *rate.Limiter, torrent int, wan
 			release = strings.TrimSuffix(s.Filename, path.Ext(s.Filename))
 		}
 		out = append(out, provider.Candidate{
-			Ref:     provider.NewRef(token(s)),
-			Lang:    tag,
-			Release: release,
-			Flags: language.Flags{
-				HI:     provider.HearingImpaired(false, s.Title, s.Filename),
-				Forced: provider.Forced(false, s.Title, s.Filename),
-			},
+			Ref:       provider.NewRef(token(s)),
+			Lang:      tag,
+			Release:   release,
+			Flags:     provider.Flags(language.Flags{}, s.Title, s.Filename),
 			MatchedBy: rank.ID,
 		})
 	}

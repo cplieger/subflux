@@ -461,12 +461,13 @@ func refine(offs []int64, inc, ref []Span, step int64) {
 }
 
 // bestNear is the offset in [off-step, min(off+step, ceiling)], on a
-// refineMs grid, at which spans rate best against ref; the lowest on a tie.
+// refineMs grid, at which spans rate best against ref; the lowest on a tie,
+// where ratings within ratingTie of each other tie.
 // ceiling is at least off-step.
 func bestNear(ref []Span, maxRef int64, spans []Span, off, step, ceiling int64) int64 {
 	best, bestRating := off, -1.0
 	for d := off - step; d <= min(off+step, ceiling); d += refineMs {
-		if r := appliedRating(ref, maxRef, spans, d); r > bestRating {
+		if r := appliedRating(ref, maxRef, spans, d); r > bestRating*(1+ratingTie) {
 			best, bestRating = d, r
 		}
 	}

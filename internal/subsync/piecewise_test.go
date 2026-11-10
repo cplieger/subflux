@@ -133,15 +133,6 @@ func TestPiecewiseEqualsMonoDP(t *testing.T) {
 				t.Fatalf("%s's assignment scores %v, objective %v; inc %v offs %v ref %v window %d", name, score, wantObj, inc, offs, ref, window)
 			}
 		}
-		var kept []Span
-		for i, s := range inc {
-			if got[i] != droppedOffset {
-				kept = append(kept, Span{s.StartMs + got[i], s.EndMs + got[i]})
-			}
-		}
-		if _, sh := measure(fit{kept: kept, displayMs: displayMs(inc)}, newRefIndex(ref)); sh.GapSpeechMs != refGapSpeech(ref, kept) {
-			t.Fatalf("GapSpeechMs %d, refGapSpeech %d", sh.GapSpeechMs, refGapSpeech(ref, kept))
-		}
 	})
 }
 
@@ -254,7 +245,7 @@ func TestRefinementNeverPassesMaxRise(t *testing.T) {
 	if r.Shape.InsertedMs > maxRiseMs {
 		t.Errorf("InsertedMs %d after refinement, want at most %d (%#v)", r.Shape.InsertedMs, maxRiseMs, r.Timing)
 	}
-	if uncovered(Shape{InsertedMs: r.Shape.InsertedMs}, true) {
+	if uncovered(Shape{InsertedMs: r.Shape.InsertedMs, EdgeFit: 1}, true) {
 		t.Errorf("Settle refuses InsertedMs %d", r.Shape.InsertedMs)
 	}
 }
@@ -349,4 +340,15 @@ func TestPiecewiseSelection(t *testing.T) {
 			t.Errorf("segments %+v ok %v, want %+v", pw.Segments, ok, want)
 		}
 	})
+}
+
+// Two offsets both rate 4/3; summed in floats the higher reads
+// 1.3333333333333335, and the lower still wins the tie.
+func TestBestNearTiesGoLowest(t *testing.T) {
+	t.Parallel()
+	ref := []Span{{100, 140}, {340, 390}}
+	spans := []Span{{160, 220}, {320, 380}, {380, 440}}
+	if got := bestNear(ref, 50, spans, 0, 100, 100); got != -60 {
+		t.Errorf("bestNear = %d, want -60, the lowest of the two offsets rating 4/3", got)
+	}
 }

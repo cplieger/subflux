@@ -730,7 +730,7 @@ func TestOversizeRefusedBeforeIntent(t *testing.T) {
 		cfg   mediawrite.Config
 		tm    timing.Timing
 	}{
-		{name: "expanded by normalize_utf8", cfg: mediawrite.Config{NormalizeUTF8: true}, tm: timing.Identity{}, build: func() (string, language.Tag) {
+		{name: "expanded by normalize_utf8", cfg: mediawrite.Config{Clean: timing.CleanOptions{NormalizeUTF8: true}}, tm: timing.Identity{}, build: func() (string, language.Tag) {
 			// windows-1252 French: each é is one byte that UTF-8 spells in two.
 			line := strings.ReplaceAll(strings.Repeat("Le café était fermé l'été dernier. ", 28), "é", "\xe9")
 			return padded(capBytes-100, "00:00:01,000 --> 00:00:02,000", line), mustTag("fr")

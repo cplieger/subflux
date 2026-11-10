@@ -315,12 +315,11 @@ func (a *adapter) candidate(at *attributes, want []language.Tag, by rank.Matched
 	if !ok || !slices.Contains(want, tag) {
 		return provider.Candidate{}, false
 	}
-	hi := provider.HearingImpaired(at.HearingImpaired, at.Release, at.Files[0].FileName)
 	c := provider.Candidate{
 		Ref:               provider.NewRef(strconv.Itoa(at.Files[0].FileID)),
 		Lang:              tag,
 		Release:           at.Release,
-		Flags:             language.Flags{HI: hi, Forced: !hi && provider.Forced(at.ForeignPartsOnly, at.Release)},
+		Flags:             provider.Flags(language.Flags{HI: at.HearingImpaired, Forced: at.ForeignPartsOnly}, at.Release, at.Files[0].FileName),
 		MatchedBy:         by,
 		MachineTranslated: at.AITranslated || at.MachineTranslated,
 		FPS:               at.FPS,

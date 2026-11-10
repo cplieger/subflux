@@ -39,6 +39,24 @@ func (Shift) isTiming()     {}
 func (Linear) isTiming()    {}
 func (Piecewise) isTiming() {}
 
+// OffsetMs is the offset t applies at the start of the baseline: a Shift's,
+// a Linear's, a Piecewise's first kept segment's; 0 for Identity.
+func OffsetMs(t Timing) int64 {
+	switch v := t.(type) {
+	case Shift:
+		return v.Ms
+	case Linear:
+		return v.OffsetMs
+	case Piecewise:
+		for _, s := range v.Segments {
+			if !s.Drop {
+				return s.OffsetMs
+			}
+		}
+	}
+	return 0
+}
+
 // Canonical returns t in its canonical form: a Piecewise with no Drop and
 // one OffsetMs is Linear, a Linear with Scale 1 is Shift, Shift{0} is
 // Identity. Every producer canonicalizes before Validate, which refuses any

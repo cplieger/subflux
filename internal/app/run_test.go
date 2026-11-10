@@ -24,6 +24,11 @@ import (
 
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/slogx"
+	"github.com/cplieger/subflux/internal/embedded"
+	"github.com/cplieger/subflux/internal/language"
+	"github.com/cplieger/subflux/internal/media"
+	"github.com/cplieger/subflux/internal/mediasource"
+	"github.com/cplieger/subflux/internal/mediasource/sourcetest"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
 	"github.com/cplieger/subflux/internal/statedb"
@@ -752,4 +757,34 @@ func settingsChangedReaders(t *testing.T) []string {
 		}
 	}
 	return readers
+}
+
+// TestActivationOfSettings: the store keys coverage on the sources, the
+// language policy and the embedded formats the settings ignore.
+func TestActivationOfSettings(t *testing.T) {
+	fake := sourcetest.NewFake(&sourcetest.Library{}, mediasource.Capabilities{Kinds: []media.Kind{media.Movie}})
+	kinds := []mediasource.AdapterKind{sourcetest.FakeKind("fake", fake)}
+	policy, errs := language.ParsePolicy(parseNode(t, "default: [{tag: pt-BR}]"))
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	emb, errs := embedded.ParseConfig(parseNode(t, "ignore_codecs: [srt, dvbsub, srt]"))
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	a := settings.Active{
+		Languages: policy,
+		Sources:   sourcesOf(t, kinds, "[{id: tv, type: fake, url: 'http://a', token: t1}, {id: films, type: fake, url: 'http://b', token: t2}]"),
+		Embedded:  emb,
+	}
+	got := activationOf(&a)
+	if got.Languages.Digest() != policy.Digest() {
+		t.Error("Languages is not the languages section's policy")
+	}
+	if want := []media.SourceID{"tv", "films"}; !slices.Equal(got.Sources, want) {
+		t.Errorf("Sources = %v, want %v", got.Sources, want)
+	}
+	if want := []string{"dvbsub", "srt"}; !slices.Equal(got.IgnoredCodecs, want) {
+		t.Errorf("IgnoredCodecs = %v, want %v", got.IgnoredCodecs, want)
+	}
 }

@@ -2,6 +2,7 @@ package mediawrite
 
 import (
 	"github.com/cplieger/subflux/internal/formschema"
+	"github.com/cplieger/subflux/internal/timing"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -26,7 +27,7 @@ var Schema = formschema.Schema{Fields: []formschema.Field{
 	},
 	{
 		Key: fieldStripTags, Label: "Strip formatting tags", Kind: formschema.Bool, Default: on,
-		Help: "Remove <i>, <b>, <u> and <font> tags.",
+		Help: "Remove <i>, <b>, <u>, <s> and <font> tags.",
 	},
 	{
 		Key: fieldNormalizeUTF8, Label: "Convert to UTF-8", Kind: formschema.Bool, Default: on,
@@ -53,10 +54,10 @@ func ParseConfig(n *yaml.Node) (Config, []formschema.FieldError) {
 	if len(errs) > 0 {
 		return Config{}, formschema.Prefix("post_processing", errs)
 	}
-	return Config{
+	return Config{Clean: timing.CleanOptions{
 		StripHI: vals.Bool(fieldStripHI), StripTags: vals.Bool(fieldStripTags), NormalizeUTF8: vals.Bool(fieldNormalizeUTF8),
 		CleanWhitespace: vals.Bool(fieldCleanWhitespace), NormalizeLineEndings: vals.Bool(fieldNormalizeLineEndings), RemoveEmpty: vals.Bool(fieldRemoveEmpty),
-	}, nil
+	}}, nil
 }
 
 // SetConfig replaces the post_processing section, which applies from the

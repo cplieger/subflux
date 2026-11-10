@@ -69,9 +69,6 @@ type Event struct {
 // Format is the one answer to the document's format.
 func (c Cues) Format() Format { return c.format }
 
-// Len is the number of timed events.
-func (c Cues) Len() int { return len(c.events) }
-
 // Events returns every timed event in document order.
 func (c Cues) Events() []Event {
 	out := make([]Event, len(c.events))
