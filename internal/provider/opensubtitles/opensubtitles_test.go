@@ -652,12 +652,6 @@ func TestProviderMaps(t *testing.T) {
 			}
 		}
 	}
-	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-	}
 	for wire, want := range map[string]string{"zh-cn": "zh-Hans", "zh-tw": "zh-Hant", "pt-pt": "pt-PT", "pt-br": "pt-BR", "ea": "es-419", "az-az": "az"} {
 		if got, _ := m.Tag(wire); got != tag(t, want) {
 			t.Errorf("%q maps to %v, want %s", wire, got, want)

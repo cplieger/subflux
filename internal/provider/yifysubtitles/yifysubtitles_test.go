@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -140,13 +141,7 @@ func TestProviderMaps(t *testing.T) {
 			t.Errorf("label %q maps to no tag", l[1])
 		}
 	}
-	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-	}
-	if w, _ := m.Wire(tag(t, "zh-Hant")); w != "Big 5 code" {
+	if w := m.Wires(tag(t, "zh-Hant")); !slices.Equal(w, []string{"Big 5 code"}) {
 		t.Errorf("zh-Hant asks %q", w)
 	}
 }

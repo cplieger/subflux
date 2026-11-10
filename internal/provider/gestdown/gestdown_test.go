@@ -3,6 +3,7 @@ package gestdown_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"slices"
@@ -119,6 +120,53 @@ func TestSearchRecorded(t *testing.T) {
 	})
 }
 
+func TestSearchTakesFirstShowWithEpisode(t *testing.T) {
+	season := func(episode int, id string) string {
+		return fmt.Sprintf(`{"episodes":[{"number":%d,"subtitles":[{"subtitleId":%q,"version":"WEB","downloadUri":"/subtitles/download/%s","completed":true}]}]}`, episode, id, id)
+	}
+	for _, tc := range []struct {
+		name      string
+		firstEp   int
+		wantRef   string
+		wantPaths []string
+	}{
+		{"the first show lists it", 1, "a1", []string{"/shows/external/tvdb/81189", "/shows/A/1/en"}},
+		{"only the second show lists it", 2, "b1", []string{"/shows/external/tvdb/81189", "/shows/A/1/en", "/shows/B/1/en"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var paths []string
+			ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				paths = append(paths, r.URL.EscapedPath())
+				mu.Unlock()
+				body, ok := map[string]string{
+					"/shows/external/tvdb/81189": `{"shows":[{"id":"A"},{"id":"B"}]}`,
+					"/shows/A/1/en":              season(tc.firstEp, "a1"),
+					"/shows/B/1/en":              season(1, "b1"),
+				}[r.URL.EscapedPath()]
+				if !ok {
+					http.NotFound(w, r)
+					return
+				}
+				_, _ = w.Write([]byte(body))
+			}), host)
+			got, err := providertest.Build(t, gestdown.NewEntry(), "").Search(ctx, episode(t, "en"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got[0].Ref.Token() != tc.wantRef {
+				t.Errorf("candidates %+v, want only %s", got, tc.wantRef)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if !slices.Equal(paths, tc.wantPaths) {
+				t.Errorf("requests %q, want %q", paths, tc.wantPaths)
+			}
+		})
+	}
+}
+
 func TestSearchSkips(t *testing.T) {
 	f := &fake{}
 	ctx := providertest.Serve(t, t.Context(), f, host)
@@ -204,12 +252,10 @@ func TestProviderMaps(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-		if probe.Status[w] != http.StatusOK {
-			t.Errorf("%v sends %q, which the probe saw answer %d", tg, w, probe.Status[w])
+		for _, w := range m.Wires(tg) {
+			if probe.Status[w] != http.StatusOK {
+				t.Errorf("%v sends %q, which the probe saw answer %d", tg, w, probe.Status[w])
+			}
 		}
 	}
 	// The probe also accepted nb and pt-PT, the languages no and pt already

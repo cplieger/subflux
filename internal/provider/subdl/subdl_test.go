@@ -287,13 +287,7 @@ func TestProviderMaps(t *testing.T) {
 			}
 		}
 	}
-	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-	}
-	if w, _ := m.Wire(tags(t, "pt-BR")[0]); w != "BR_PT" {
+	if w := m.Wires(tags(t, "pt-BR")[0]); !slices.Equal(w, []string{"BR_PT"}) {
 		t.Errorf("pt-BR asks %q, want BR_PT", w)
 	}
 }

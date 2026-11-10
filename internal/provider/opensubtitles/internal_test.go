@@ -36,7 +36,7 @@ func TestNumberings(t *testing.T) {
 }
 
 func TestIDParams(t *testing.T) {
-	en, _ := languages.Wire(mustTag(t, "en"))
+	en := languages.Wires(mustTag(t, "en"))[0]
 	for _, tc := range []struct {
 		name    string
 		q       provider.Query

@@ -18,7 +18,6 @@ func TestNewProviderMapRefusals(t *testing.T) {
 		{"invalid UTF-8", []WirePair{{"\xff", en}}, "label must be 1 to 64 bytes of UTF-8"},
 		{"zero tag", []WirePair{{"xx", Tag{}}}, `pair 0 ("xx", ""): tag is the zero tag`},
 		{"repeated label", []WirePair{{"en", en}, {"de", de}, {"en", de}}, `pair 2 ("en", "de"): label is listed twice`},
-		{"repeated tag", []WirePair{{"en", en}, {"eng", en}}, `pair 1 ("eng", "en"): tag is listed twice`},
 		{"first bad pair named", []WirePair{{"", Tag{}}, {"en", en}, {"en", en}}, "pair 0"},
 	} {
 		t.Run(r.name, func(t *testing.T) {
@@ -38,14 +37,47 @@ func TestNewProviderMapRefusals(t *testing.T) {
 	})
 }
 
-func TestProviderMapLookups(t *testing.T) {
-	m := MustProviderMap([]WirePair{{"pob", mustParse(t, "pt-BR")}, {"por", mustParse(t, "pt-PT")}, {"no", mustParse(t, "no")}})
-	t.Run("Wire", func(t *testing.T) {
-		if w, ok := m.Wire(mustParse(t, "pt-BR")); !ok || w != "pob" {
-			t.Errorf("Wire(pt-BR) = %q, %v", w, ok)
+func TestProviderMapTagWithTwoLabels(t *testing.T) {
+	hant := mustParse(t, "zh-Hant")
+	m, err := NewProviderMap([]WirePair{{"chinese_traditional", hant}, {"big_5_code", hant}})
+	if err != nil {
+		t.Fatalf("NewProviderMap = %v; a tag may carry two labels", err)
+	}
+	want := []string{"chinese_traditional", "big_5_code"}
+	got := m.Wires(hant)
+	if !slices.Equal(got, want) {
+		t.Fatalf("Wires(zh-Hant) = %q; want %q in pair order", got, want)
+	}
+	got[0] = "changed"
+	if again := m.Wires(hant); !slices.Equal(again, want) {
+		t.Errorf("changing an answer changed the next: Wires(zh-Hant) = %q", again)
+	}
+	for _, w := range want {
+		if tg, ok := m.Tag(w); !ok || tg != hant {
+			t.Errorf("Tag(%q) = %q, %v; want zh-Hant", w, tg, ok)
 		}
-		if w, ok := m.Wire(mustParse(t, "nb")); ok {
-			t.Errorf("Wire(nb) = %q; a lookup is exact", w)
+	}
+	if tags := texts(m.Tags()); !slices.Equal(tags, []string{"zh-Hant"}) {
+		t.Errorf("Tags() = %v; want zh-Hant once", tags)
+	}
+	var z ProviderMap
+	if w := z.Wires(hant); w != nil {
+		t.Errorf("zero map Wires = %q; want nil", w)
+	}
+	if _, err := NewProviderMap([]WirePair{{"big_5_code", hant}, {"big_5_code", mustParse(t, "zh-Hans")}}); err == nil ||
+		!strings.Contains(err.Error(), `pair 1 ("big_5_code", "zh-Hans"): label is listed twice`) {
+		t.Errorf("a repeated label: NewProviderMap = %v; want the pair named", err)
+	}
+}
+
+func TestProviderMapLookups(t *testing.T) {
+	m := MustProviderMap([]WirePair{{"pob", mustParse(t, "pt-BR")}, {"por", mustParse(t, "pt-PT")}, {"no", mustParse(t, "no")}, {"pb", mustParse(t, "pt-BR")}})
+	t.Run("Wires", func(t *testing.T) {
+		if w := m.Wires(mustParse(t, "pt-BR")); !slices.Equal(w, []string{"pob", "pb"}) {
+			t.Errorf("Wires(pt-BR) = %q; want [pob pb]", w)
+		}
+		if w := m.Wires(mustParse(t, "nb")); w != nil {
+			t.Errorf("Wires(nb) = %q; a lookup is exact", w)
 		}
 	})
 	t.Run("Tag", func(t *testing.T) {
@@ -56,7 +88,7 @@ func TestProviderMapLookups(t *testing.T) {
 			t.Errorf("Tag(POR) = %q; a lookup is exact", tag)
 		}
 	})
-	t.Run("Tags in pair order, a copy", func(t *testing.T) {
+	t.Run("Tags once each in first-pair order, a copy", func(t *testing.T) {
 		got := m.Tags()
 		if want := []string{"pt-BR", "pt-PT", "no"}; !slices.Equal(texts(got), want) {
 			t.Errorf("Tags() = %v; want %v", texts(got), want)
@@ -68,8 +100,8 @@ func TestProviderMapLookups(t *testing.T) {
 	})
 	t.Run("zero map", func(t *testing.T) {
 		var z ProviderMap
-		if _, ok := z.Wire(mustParse(t, "en")); ok {
-			t.Error("zero map Wire found")
+		if w := z.Wires(mustParse(t, "en")); w != nil {
+			t.Errorf("zero map Wires = %q", w)
 		}
 		if _, ok := z.Tag("en"); ok {
 			t.Error("zero map Tag found")

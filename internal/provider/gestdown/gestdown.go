@@ -111,25 +111,30 @@ func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Cand
 	}
 	var out []provider.Candidate
 	for _, tag := range q.Langs {
-		wire, ok := languages.Wire(tag)
-		if !ok {
-			continue
-		}
-		for _, show := range shows {
-			eps, err := a.seasons.GetOrFetch(ctx, keyenc.Join("season", show, strconv.Itoa(q.Numbering.Season), wire), func(ctx context.Context) ([]seasonEpisode, error) {
-				return a.season(ctx, show, q.Numbering.Season, wire)
-			})
+		for _, wire := range languages.Wires(tag) {
+			found, err := a.firstShowWith(ctx, shows, &q, wire, tag)
+			out = append(out, found...)
 			if err != nil {
 				return out, err
-			}
-			found := candidates(eps, q.Numbering.Episode, tag)
-			out = append(out, found...)
-			if len(found) > 0 {
-				break
 			}
 		}
 	}
 	return out, nil
+}
+
+func (a *adapter) firstShowWith(ctx context.Context, shows []string, q *provider.Query, wire string, tag language.Tag) ([]provider.Candidate, error) {
+	for _, show := range shows {
+		eps, err := a.seasons.GetOrFetch(ctx, keyenc.Join("season", show, strconv.Itoa(q.Numbering.Season), wire), func(ctx context.Context) ([]seasonEpisode, error) {
+			return a.season(ctx, show, q.Numbering.Season, wire)
+		})
+		if err != nil {
+			return nil, err
+		}
+		if found := candidates(eps, q.Numbering.Episode, tag); len(found) > 0 {
+			return found, nil
+		}
+	}
+	return nil, nil
 }
 
 func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {

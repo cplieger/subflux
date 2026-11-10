@@ -52,7 +52,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/language#Policy.ManualQuery", "SE-2"},
 	{"internal/language#ProviderMap.Tag", "SE-2"},
 	{"internal/language#ProviderMap.Tags", "SE-2"},
-	{"internal/language#ProviderMap.Wire", "SE-2"},
+	{"internal/language#ProviderMap.Wires", "SE-2"},
 	{"internal/language#Tag.MarshalText", "AP-1"},
 	{"internal/language#Tag.UnmarshalText", "AP-1"},
 	{"internal/language#Variant.Flags", "SE-2"},

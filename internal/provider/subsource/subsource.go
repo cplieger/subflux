@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -58,7 +59,8 @@ var languages = language.MustProviderMap(provider.WirePairs(
 	"azerbaijani", "az", "basque", "eu", "belarusian", "be", "bengali", "bn",
 	"bosnian", "bs", "brazilian_portuguese", "pt-BR", "breton", "br",
 	"bulgarian", "bg", "burmese", "my", "catalan", "ca",
-	"chinese_bg_code", "zh", "chinese_traditional", "zh-Hant", "chinese_cantonese", "yue",
+	"chinese_bg_code", "zh", "chinese_traditional", "zh-Hant", "big_5_code", "zh-Hant",
+	"chinese_cantonese", "yue",
 	"croatian", "hr", "czech", "cs", "danish", "da", "dutch", "nl",
 	"english", "en", "espranto", "eo", "estonian", "et", "farsi_persian", "fa",
 	"finnish", "fi", "french", "fr", "french_france", "fr-FR", "french_canada", "fr-CA",
@@ -112,15 +114,19 @@ func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Cand
 	}
 	var out []provider.Candidate
 	for _, tag := range q.Langs {
-		wire, ok := languages.Wire(tag)
-		if !ok {
-			continue
+		seen := map[int]bool{}
+		for _, wire := range languages.Wires(tag) {
+			items, err := a.subtitles(ctx, movieID, wire, &q)
+			if err != nil {
+				return out, err
+			}
+			items = slices.DeleteFunc(items, func(it item) bool {
+				dup := seen[it.SubtitleID]
+				seen[it.SubtitleID] = true
+				return dup
+			})
+			out = append(out, candidates(items, tag)...)
 		}
-		items, err := a.subtitles(ctx, movieID, wire, &q)
-		if err != nil {
-			return out, err
-		}
-		out = append(out, candidates(items, tag)...)
 	}
 	return out, nil
 }

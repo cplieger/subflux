@@ -214,10 +214,4 @@ func TestProviderMaps(t *testing.T) {
 			t.Errorf("label %q maps to no tag", s.Language)
 		}
 	}
-	for _, tg := range m.Tags() {
-		w, ok := m.Wire(tg)
-		if back, _ := m.Tag(w); !ok || back != tg {
-			t.Errorf("%v does not round-trip through %q", tg, w)
-		}
-	}
 }
