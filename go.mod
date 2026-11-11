@@ -16,7 +16,7 @@ require (
 	github.com/cplieger/go/keylock v1.1.0
 	github.com/cplieger/go/measure v1.2.0
 	github.com/cplieger/go/slogx v1.1.0
-	github.com/cplieger/go/ssrf v1.1.0-dev.7
+	github.com/cplieger/go/ssrf v1.1.0
 	github.com/cplieger/go/textsafe v1.1.0
 	github.com/cplieger/go/yamlenv v1.1.0
 	github.com/cplieger/langtag/v3 v3.2.0-dev.3
