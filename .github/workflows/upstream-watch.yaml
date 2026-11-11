@@ -43,7 +43,7 @@ jobs:
       actions: read
       contents: read
       issues: write
-    uses: cplieger/ci/.github/workflows/notify-failure.yaml@bc8cf8788db4b5f8b5edd3d9ff8cdcec54e52f4e # v3
+    uses: cplieger/ci/.github/workflows/notify-failure.yaml@b5aba8a4125923da9d365b5eebb435a047bb7e77 # v3
     with:
       workflow: ${{ github.workflow }}
       run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
