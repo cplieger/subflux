@@ -4,68 +4,34 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"log/slog"
-
-	"github.com/ulikunitz/xz"
 )
 
-// Decompress detects compressed data by magic bytes and decompresses it (xz,
-// gzip). Passes through plain data unchanged. Output is capped at 5 MB.
-func Decompress(data []byte) []byte {
-	if isXZ(data) {
+// Decompress unwraps gzip or one xz stream, found by magic, and returns any
+// other bytes as they are. Output past maxMember is a refusal, never a
+// truncation, and so is a stream that does not decode.
+func Decompress(data []byte) ([]byte, error) {
+	switch {
+	case bytes.HasPrefix(data, xzMagic):
 		return decompressXZ(data)
+	case bytes.HasPrefix(data, gzipMagic):
+		gr, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, refuse(err, "gzip")
+		}
+		return readCapped("gzip", gr)
 	}
-	if isGzip(data) {
-		return decompressGzip(data)
-	}
-	return data
+	return data, nil
 }
 
-// isXZ checks for the xz magic number: FD 37 7A 58 5A 00.
-func isXZ(data []byte) bool {
-	return len(data) > 6 &&
-		data[0] == 0xFD && data[1] == 0x37 && data[2] == 0x7A &&
-		data[3] == 0x58 && data[4] == 0x5A && data[5] == 0x00
-}
+var gzipMagic = []byte{0x1f, 0x8b}
 
-// isGzip checks for the gzip magic number: 1F 8B.
-func isGzip(data []byte) bool {
-	return len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b
-}
-
-func decompressXZ(data []byte) []byte {
-	r, err := xz.NewReader(bytes.NewReader(data))
-	if err != nil {
-		slog.Debug("archive: xz header invalid, "+
-			"returning raw data", "error", err, "bytes", len(data))
-		return data
+func readCapped(format string, r io.Reader) ([]byte, error) {
+	out, err := io.ReadAll(io.LimitReader(r, maxMember+1))
+	switch {
+	case err != nil:
+		return nil, refuse(err, "%s", format)
+	case len(out) > maxMember:
+		return nil, refuse(nil, "%s output is above the %d-byte cap", format, maxMember)
 	}
-	decompressed, err := io.ReadAll(
-		io.LimitReader(r, maxExtractSize),
-	)
-	if err != nil {
-		slog.Debug("archive: xz decompression failed, "+
-			"returning raw data", "error", err, "bytes", len(data))
-		return data
-	}
-	return decompressed
-}
-
-func decompressGzip(data []byte) []byte {
-	gr, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		slog.Debug("archive: gzip header invalid, "+
-			"returning raw data", "error", err, "bytes", len(data))
-		return data
-	}
-	defer gr.Close()
-	decompressed, err := io.ReadAll(
-		io.LimitReader(gr, maxExtractSize),
-	)
-	if err != nil {
-		slog.Debug("archive: gzip decompression failed, "+
-			"returning raw data", "error", err, "bytes", len(data))
-		return data
-	}
-	return decompressed
+	return out, nil
 }

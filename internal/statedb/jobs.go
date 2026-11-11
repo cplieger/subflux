@@ -173,7 +173,7 @@ func (s *Store) jobByKey(r *bolttable.ReadTx, owner int64, key string) (status.J
 	case err != nil:
 		return status.Job{}, false, err
 	case !found:
-		return status.Job{}, false, fmt.Errorf("%w: the key index names job %s, which is gone", bolttable.ErrCorrupt, id)
+		return status.Job{}, false, fmt.Errorf("%w: the key index names job %s, which is gone", ErrCorrupt, id)
 	}
 	return jobOf(id, &row), true, nil
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewProviderMapRefusals(t *testing.T) {
+func TestProviderMapRefusals(t *testing.T) {
 	en, de := mustParse(t, "en"), mustParse(t, "de")
 	for _, r := range []struct {
 		name  string
@@ -21,9 +21,9 @@ func TestNewProviderMapRefusals(t *testing.T) {
 		{"first bad pair named", []WirePair{{"", Tag{}}, {"en", en}, {"en", en}}, "pair 0"},
 	} {
 		t.Run(r.name, func(t *testing.T) {
-			m, err := NewProviderMap(r.pairs)
+			m, err := newProviderMap(r.pairs)
 			if err == nil || !strings.Contains(err.Error(), r.want) {
-				t.Errorf("NewProviderMap = %v; want an error containing %q", err, r.want)
+				t.Errorf("newProviderMap = %v; want an error containing %q", err, r.want)
 			}
 			if len(m.Tags()) != 0 {
 				t.Errorf("a refused map holds %v", texts(m.Tags()))
@@ -31,7 +31,7 @@ func TestNewProviderMapRefusals(t *testing.T) {
 		})
 	}
 	t.Run("a 64-byte label", func(t *testing.T) {
-		if _, err := NewProviderMap([]WirePair{{strings.Repeat("é", 32), en}}); err != nil {
+		if _, err := newProviderMap([]WirePair{{strings.Repeat("é", 32), en}}); err != nil {
 			t.Error(err)
 		}
 	})
@@ -39,9 +39,9 @@ func TestNewProviderMapRefusals(t *testing.T) {
 
 func TestProviderMapTagWithTwoLabels(t *testing.T) {
 	hant := mustParse(t, "zh-Hant")
-	m, err := NewProviderMap([]WirePair{{"chinese_traditional", hant}, {"big_5_code", hant}})
+	m, err := newProviderMap([]WirePair{{"chinese_traditional", hant}, {"big_5_code", hant}})
 	if err != nil {
-		t.Fatalf("NewProviderMap = %v; a tag may carry two labels", err)
+		t.Fatalf("newProviderMap = %v; a tag may carry two labels", err)
 	}
 	want := []string{"chinese_traditional", "big_5_code"}
 	got := m.Wires(hant)
@@ -64,9 +64,9 @@ func TestProviderMapTagWithTwoLabels(t *testing.T) {
 	if w := z.Wires(hant); w != nil {
 		t.Errorf("zero map Wires = %q; want nil", w)
 	}
-	if _, err := NewProviderMap([]WirePair{{"big_5_code", hant}, {"big_5_code", mustParse(t, "zh-Hans")}}); err == nil ||
+	if _, err := newProviderMap([]WirePair{{"big_5_code", hant}, {"big_5_code", mustParse(t, "zh-Hans")}}); err == nil ||
 		!strings.Contains(err.Error(), `pair 1 ("big_5_code", "zh-Hans"): label is listed twice`) {
-		t.Errorf("a repeated label: NewProviderMap = %v; want the pair named", err)
+		t.Errorf("a repeated label: newProviderMap = %v; want the pair named", err)
 	}
 }
 

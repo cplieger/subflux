@@ -1,6 +1,6 @@
 // Package settings loads, holds and saves subflux's one configuration file:
 // each section parsed by its owner, the result a Snapshot that is
-// Unconfigured, Failed or Active, never a configuration beside a flag.
+// unconfigured, Failed or Active, never a configuration beside a flag.
 package settings
 
 import (
@@ -13,6 +13,8 @@ import (
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediawrite"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/timing"
 	"go.yaml.in/yaml/v4"
 )
@@ -54,7 +56,8 @@ func (m *Mode) UnmarshalText(b []byte) error {
 
 // Registries lists the adapter kinds each hand-walked section accepts.
 type Registries struct {
-	Sources []mediasource.AdapterKind
+	Sources   []mediasource.AdapterKind
+	Providers []provider.Entry
 }
 
 // Active is a configuration that parsed, one field per section.
@@ -62,7 +65,9 @@ type Active struct {
 	Languages language.Policy
 	Server    Server
 	Sources   []mediasource.Config
+	Providers []provider.Config
 	Embedded  embedded.Config
+	Search    search.Config
 	Scan      mediasource.Schedule
 	Media     mediawrite.Config
 	Timing    timing.Config
@@ -112,7 +117,7 @@ func (s Snapshot) Failure() ([]formschema.FieldError, bool) {
 	return slices.Clone(s.p.failure), s.p.mode == Failed
 }
 
-// Server is the server section in force: Active's, Unconfigured's defaults,
+// Server is the server section in force: Active's, unconfigured's defaults,
 // or in Failed the section when its own parse succeeded; false only in Failed
 // when it did not. A false Server is still the fail-closed value with no
 // trusted proxy; failClosedServer and denyAllServer own its host policy.

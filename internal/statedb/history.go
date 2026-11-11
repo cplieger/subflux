@@ -88,7 +88,7 @@ func (s *Store) scopedPage(r *bolttable.ReadTx, scope HistoryScope, last []byte,
 			return false, err
 		}
 		if !found {
-			return false, fmt.Errorf("%w: a history entry names download %d, which is gone", bolttable.ErrCorrupt, seq)
+			return false, fmt.Errorf("%w: a history entry names download %d, which is gone", ErrCorrupt, seq)
 		}
 		p.add(v.download(), ikey)
 		return true, nil

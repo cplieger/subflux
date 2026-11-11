@@ -141,24 +141,24 @@ func (a *adapter) Test(ctx context.Context) error {
 	return err
 }
 
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	id, err := strconv.ParseUint(ref.Token(), 10, 63)
 	if err != nil {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "the subtitle id is not a number")
+		return nil, provider.Fail(provider.Permanent, "the subtitle id is not a number")
 	}
 	resp, err := a.get(ctx, fmt.Sprintf("/subtitles/%d/download", id), url.Values{})
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, maxDownloadBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	if len(b) == 0 {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "SubSource answered an empty download")
+		return nil, provider.Fail(provider.Permanent, "SubSource answered an empty download")
 	}
-	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+	return b, nil
 }
 
 // get GETs path under the API with params and the key.

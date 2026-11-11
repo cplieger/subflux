@@ -71,7 +71,7 @@ func Compare(video release.Parsed, videoFPS float64, sub release.Parsed, subFPS 
 		Source:     sourceFact(vf, sf),
 		Group:      textFact(video.Group(), sub.Group()),
 		Cut:        cutFact(video.Cut(), sub.Cut()),
-		Rate:       rateFact(RateFamilyOf(videoFPS), RateFamilyOf(subFPS)),
+		Rate:       rateFact(rateFamilyOf(videoFPS), rateFamilyOf(subFPS)),
 		PreRelease: (vf == release.PreRelease) != (sf == release.PreRelease),
 		SeasonPack: sub.SeasonPack(),
 	}
@@ -100,8 +100,8 @@ func textFact(a, b string) Tri {
 	return same(strings.EqualFold(a, b))
 }
 
-func rateFact(a, b RateFamily) Tri {
-	if a == RateUnknown || b == RateUnknown {
+func rateFact(a, b rateFamily) Tri {
+	if a == rateUnknown || b == rateUnknown {
 		return Unknown
 	}
 	return same(a == b)

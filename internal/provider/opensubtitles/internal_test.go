@@ -50,8 +50,8 @@ func TestIDParams(t *testing.T) {
 		{"episode without IMDb has no id", provider.Query{Kind: media.Episode, External: media.ExternalIDs{TMDB: 1396, TVDB: 81189}}, false, numbering{1, 2}, ""},
 		{"no ids", provider.Query{Kind: media.Movie}, true, numbering{}, ""},
 		{"zero season and episode left out", provider.Query{Kind: media.Episode, External: media.ExternalIDs{IMDb: 1}}, false, numbering{}, "ai_translated=exclude&languages=en&parent_imdb_id=1"},
-		{"hash when on", provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1}, Hash: provider.VideoHash{OSHash: 0x8e245d9679d31e12}}, true, numbering{}, "ai_translated=exclude&imdb_id=1&languages=en&moviehash=8e245d9679d31e12"},
-		{"no hash when off", provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1}, Hash: provider.VideoHash{OSHash: 1}}, false, numbering{}, "ai_translated=exclude&imdb_id=1&languages=en"},
+		{"hash when on", provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1}, OSHash: 0x8e245d9679d31e12}, true, numbering{}, "ai_translated=exclude&imdb_id=1&languages=en&moviehash=8e245d9679d31e12"},
+		{"no hash when off", provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1}, OSHash: 1}, false, numbering{}, "ai_translated=exclude&imdb_id=1&languages=en"},
 		{"no hash when unknown", provider.Query{Kind: media.Movie, External: media.ExternalIDs{IMDb: 1}}, true, numbering{}, "ai_translated=exclude&imdb_id=1&languages=en"},
 	} {
 		a := &adapter{useHash: tc.useHash}

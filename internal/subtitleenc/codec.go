@@ -31,8 +31,7 @@ type codec interface {
 }
 
 // codecs holds every named Encoding's codec. The UTF-16 ones ignore a BOM:
-// Decode strips one only when it matches the byte order, and Encode writes
-// it.
+// Decode strips one only when it matches the byte order.
 var codecs = [...]codec{
 	UTF8:        utf8Codec{},
 	UTF16LE:     xtext{unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)},
@@ -87,16 +86,16 @@ func (e Encoding) codec() (codec, bool) {
 	return codecs[e], true
 }
 
-// Decode returns b as UTF-8 in a new slice, without a BOM. Unknown, and
-// bytes the encoding's encoder would not write back from the text (read),
-// give ErrUndecodable.
+// Decode returns b as UTF-8 in a new slice, without a BOM. It refuses
+// Unknown, and bytes the encoding's encoder would not write back from the
+// text (read), with an error.
 func (e Encoding) Decode(b []byte) ([]byte, error) {
 	if _, ok := e.codec(); !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUndecodable, e)
+		return nil, fmt.Errorf("%w: %s", errUndecodable, e)
 	}
 	text, ok := e.read(e.trimBOM(b))
 	if !ok {
-		return nil, fmt.Errorf("%w: %s does not write these bytes back", ErrUndecodable, e)
+		return nil, fmt.Errorf("%w: %s does not write these bytes back", errUndecodable, e)
 	}
 	return text, nil
 }
@@ -126,40 +125,6 @@ func (e Encoding) read(b []byte) ([]byte, bool) {
 		return text, ok && bytes.Equal(again, text)
 	}
 	return text, bytes.Equal(back, b)
-}
-
-// Encode writes valid UTF-8 text in the encoding, UTF-16 behind its BOM so
-// Detect names it again, as bytes Decode reads back as the same text.
-// Unknown, invalid UTF-8, a character the encoding has no code for, and text
-// Decode would read back otherwise (GB18030's U+E000) give ErrUndecodable.
-func (e Encoding) Encode(text []byte) ([]byte, error) {
-	c, ok := e.codec()
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUndecodable, e)
-	}
-	if !utf8.Valid(text) {
-		return nil, fmt.Errorf("%w: invalid UTF-8", ErrUndecodable)
-	}
-	out, ok := c.encode(text)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s has no code for a character of the text", ErrUndecodable, e)
-	}
-	switch e {
-	case UTF16LE:
-		out = append(slices.Clip(bomUTF16LE), out...)
-	case UTF16BE:
-		out = append(slices.Clip(bomUTF16BE), out...)
-	case UTF8:
-		// Decode strips one BOM, so a text opening with U+FEFF keeps it
-		// only behind a written one.
-		if bytes.HasPrefix(out, bomUTF8) {
-			out = append(slices.Clip(bomUTF8), out...)
-		}
-	}
-	if back, err := e.Decode(out); err != nil || !bytes.Equal(back, text) {
-		return nil, fmt.Errorf("%w: %s does not read the written text back", ErrUndecodable, e)
-	}
-	return out, nil
 }
 
 // ASCIITransparent is false for UTF-16 and ISO-2022-JP: in every other, a

@@ -192,7 +192,6 @@ func corpusNames(t *testing.T) []string {
 
 type fixtureFile struct {
 	Upstream string
-	Path     string
 	Methods  []struct {
 		Name  string
 		Body  []string

@@ -74,9 +74,9 @@ func exceptionAdapter(t *testing.T, paths ...string) provider.Adapter {
 			}
 			return nil, nil
 		},
-		fetch: func(ctx context.Context, c provider.Client, r provider.Ref) (provider.Payload, error) {
+		fetch: func(ctx context.Context, c provider.Client, r provider.Ref) ([]byte, error) {
 			_, err := get(t, ctx, c, "https://"+host+r.Token())
-			return provider.Payload{}, err
+			return nil, err
 		},
 	}
 	e := entry(s, []string{host}, keyField)

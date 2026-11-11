@@ -240,8 +240,10 @@ func (s *Store) takeIntent(tx *bolttable.Tx, op string, want Op, fk fileKey) (in
 	return ir, true, nil
 }
 
-// unlanded records a delivery's staged attempts undelivered; a retime or
-// removal that did not land leaves nothing.
+// unlanded records a delivery's staged attempts undelivered, the one it
+// would have delivered refused write_failed, search's spelling the attempt
+// memory ignores, so a later run may fetch it again; a retime or removal
+// that did not land leaves nothing.
 func (s *Store) unlanded(tx *bolttable.Tx, op Op, ir *intentRow) error {
 	if op != Deliver {
 		return nil
@@ -249,8 +251,15 @@ func (s *Store) unlanded(tx *bolttable.Tx, op Op, ir *intentRow) error {
 	for i := range ir.Attempts {
 		ir.Attempts[i].Delivered = false
 	}
+	if first := &ir.Attempts[0]; first.Refusal == "" {
+		first.Refusal = refusalWriteFailed
+	}
 	return s.appendDownloads(tx, ir.Attempts)
 }
+
+// refusalWriteFailed is search.RefusalWriteFailed, which statedb cannot
+// import.
+const refusalWriteFailed = "write_failed"
 
 func (s *Store) landDeliver(tx *bolttable.Tx, _ *activation, fk fileKey, ir *intentRow) error {
 	if err := s.putRecord(tx, fk, ir); err != nil {
@@ -411,7 +420,7 @@ func (s *Store) PendingDeliverOf(ctx context.Context, inst InstanceID, name stri
 		return PendingDeliver{}, false, err
 	}
 	if d.Baseline, err = timing.DecodeCues(ir.Baseline); err != nil {
-		return PendingDeliver{}, false, fmt.Errorf("%w: intent baseline of %q: %w", bolttable.ErrCorrupt, name, err)
+		return PendingDeliver{}, false, fmt.Errorf("%w: intent baseline of %q: %w", ErrCorrupt, name, err)
 	}
 	for i := range ir.Attempts {
 		d.Attempts = append(d.Attempts, ir.Attempts[i].download())
@@ -435,7 +444,7 @@ func (s *Store) Baseline(ctx context.Context, inst InstanceID, name string) (tim
 	}
 	c, err := timing.DecodeCues(row.Cues)
 	if err != nil {
-		return timing.Cues{}, false, fmt.Errorf("%w: baseline of %q: %w", bolttable.ErrCorrupt, name, err)
+		return timing.Cues{}, false, fmt.Errorf("%w: baseline of %q: %w", ErrCorrupt, name, err)
 	}
 	return c, true, nil
 }
@@ -480,7 +489,7 @@ func fileRowOf(rec *FileRecord) (fileRow, error) {
 func (r *fileRow) record(fk fileKey) (FileRecord, error) {
 	t, err := timing.DecodeTiming(r.Timing)
 	if err != nil {
-		return FileRecord{}, fmt.Errorf("%w: record %q of instance %d: %w", bolttable.ErrCorrupt, fk.Name, fk.Inst, err)
+		return FileRecord{}, fmt.Errorf("%w: record %q of instance %d: %w", ErrCorrupt, fk.Name, fk.Inst, err)
 	}
 	rec := FileRecord{
 		Timing: t, Name: fk.Name, Tag: r.Tag.t, Ordinal: r.Ordinal, Inst: fk.Inst, Generation: r.Generation, Flags: flagsOf(r.Flags), Locked: r.Locked,

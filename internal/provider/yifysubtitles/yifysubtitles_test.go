@@ -116,9 +116,9 @@ func TestFetchReadsTheDownloadButton(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Name != "inception-2010-english-yify-244676.zip" || string(p.Bytes) != "PK\x03\x04" ||
+	if string(p) != "PK\x03\x04" ||
 		referer != "https://"+host+"/subtitles/inception-2010-english-yify-244676" || !strings.HasPrefix(ua, "Mozilla/5.0") {
-		t.Errorf("payload %q, referer %q, agent %q", p.Name, referer, ua)
+		t.Errorf("payload %q, referer %q, agent %q", p, referer, ua)
 	}
 	_, err = a.Fetch(ctx, provider.NewRef("/subtitles/gone"))
 	if f, ok := errors.AsType[*provider.Failure](err); !ok || f.Kind != provider.NotFound {

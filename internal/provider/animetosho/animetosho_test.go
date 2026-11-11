@@ -1,6 +1,7 @@
 package animetosho_test
 
 import (
+	"bytes"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/animemap"
 	"github.com/cplieger/subflux/internal/provider/animetosho"
+	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/provider/providertest"
 	"github.com/cplieger/subflux/internal/rank"
 )
@@ -139,8 +141,10 @@ func TestFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if p.Name != "Show - 05_track3.eng.ass" || !strings.Contains(string(p.Bytes), "attachment /attachments/002ad/92f.xz") {
-			t.Errorf("payload %q: %q", p.Name, p.Bytes)
+		text, err := archive.Decompress(p)
+		if !bytes.HasPrefix(p, []byte("\xFD7zXZ\x00")) || err != nil ||
+			!strings.Contains(string(text), "attachment /attachments/002ad/92f.xz") {
+			t.Errorf("payload % x, decompressed %q, %v", p[:min(len(p), 8)], text, err)
 		}
 		for _, tok := range []string{"", "x", "http://" + storageHost + "/a.xz", "https://feed.animetosho.net/a.xz", "https://u:p@" + storageHost + "/a.xz"} {
 			if _, err := r.a.Fetch(r.ctx, provider.NewRef(tok)); err == nil {

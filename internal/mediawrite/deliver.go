@@ -152,13 +152,16 @@ func (d *Delivery) attempts(items []media.Key, at time.Time) []statedb.Download 
 
 // unbegun records d's attempts undelivered for a failure before its intent
 // and returns cause; a delivery whose rows cannot be stored records nothing.
+// The attempt it would have delivered is refused format_unsupported for a
+// document no file can hold, else write_failed, which the attempt memory
+// ignores (search.RefusalWriteFailed; mediawrite cannot import search).
 func (w *Writer) unbegun(ctx context.Context, d *Delivery, in *statedb.Instance, cause error) error {
 	cause = w.refused(d.Inst, cause)
 	if !d.rowsValid() || len(in.Items) == 0 {
 		return cause
 	}
 	rows := d.attempts(in.Items, time.Now())
-	rows[0].Delivered = false
+	rows[0].Delivered, rows[0].Refusal = false, "write_failed"
 	if errors.Is(cause, timing.ErrFormatUnsupported) {
 		rows[0].Refusal = "format_unsupported"
 	}

@@ -66,6 +66,7 @@ Each problem subflux reports is one `subflux_alerts_active` series. Its `kind` d
 | `admin_socket` | the admin socket could not be opened | `SubfluxConditionActive` |
 | `pending_writes` | subtitle changes wait to be written | `SubfluxConditionActive`, unless `media_root` is active on the same instance |
 | `provider` | a subtitle site rejected its credentials or cannot be reached | `SubfluxProviderUnusable` |
+| `provider_data` | data a subtitle site needs, such as AnimeTosho's anime map, could not be refreshed | `SubfluxConditionActive` |
 | `source` | a Sonarr or Radarr instance cannot be reached | `SubfluxSourceUnreachable` |
 | `source_overlap` | a media source's folders overlap another source's | `SubfluxConditionActive` |
 | `media_server` | a media server cannot be reached or refuses subflux | `SubfluxConditionActive` |

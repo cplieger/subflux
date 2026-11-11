@@ -12,6 +12,7 @@ var constructors = []struct {
 	kind string
 }{
 	{ProviderAlert, "provider"},
+	{ProviderDataAlert, "provider_data"},
 	{SourceAlert, "source"},
 	{SourceOverlapAlert, "source_overlap"},
 	{MediaServerAlert, "media_server"},

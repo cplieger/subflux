@@ -529,11 +529,11 @@ func seasonEpisodes(season, first, last int) []epmarker.Marker {
 func TestClaims_a_fifty_episode_span_reaches_its_last_episode(t *testing.T) {
 	t.Parallel()
 	const name = "Show S01E01-E51.srt"
-	if !epmarker.For(epmarker.Marker{Season: 1, Episode: 51}).Matches(name) {
-		t.Errorf("For(S01E51).Matches(%q) = false, want true", name)
+	if !slices.Contains(epmarker.Claims(name), epmarker.Marker{Season: 1, Episode: 51}) {
+		t.Errorf("Claims(%q) lacks S01E51", name)
 	}
-	if epmarker.For(epmarker.Marker{Season: 1, Episode: 52}).Matches("Show S01E01-E52.srt") {
-		t.Errorf("For(S01E52).Matches(%q) = true, want false: a 51-episode span is not a range", "Show S01E01-E52.srt")
+	if slices.Contains(epmarker.Claims("Show S01E01-E52.srt"), epmarker.Marker{Season: 1, Episode: 52}) {
+		t.Errorf("Claims(%q) holds S01E52: a 51-episode span is not a range", "Show S01E01-E52.srt")
 	}
 }
 
@@ -603,77 +603,6 @@ func TestMarker_String_zero_pads_single_digits_only(t *testing.T) {
 			t.Errorf("%#v.String() = %q, want %q", tt.m, got, tt.want)
 		}
 	}
-}
-
-// --- Target ---
-
-func TestTarget(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Any matches every name", func(t *testing.T) {
-		t.Parallel()
-		for _, name := range []string{
-			"Show.S01E05.srt", "Show - 01x05.srt", "whatever.srt", "",
-		} {
-			if !epmarker.Any().Matches(name) {
-				t.Errorf("Any().Matches(%q) = false, want true", name)
-			}
-		}
-	})
-
-	// A zero on either half is how the wire says "no episode to disambiguate",
-	// so For must collapse it rather than looking for episode zero of season one.
-	t.Run("For collapses an absent half to Any", func(t *testing.T) {
-		t.Parallel()
-		for _, m := range []epmarker.Marker{
-			{Season: 0, Episode: 0},
-			{Season: 1, Episode: 0},
-			{Season: 0, Episode: 5},
-			{Season: -1, Episode: 5},
-		} {
-			got := epmarker.For(m)
-			if !got.Matches("anything.srt") {
-				t.Errorf("For(%+v) should match any name", m)
-			}
-		}
-	})
-
-	t.Run("a fixed target matches only its own episode", func(t *testing.T) {
-		t.Parallel()
-		target := epmarker.For(epmarker.Marker{Season: 1, Episode: 8})
-		for _, name := range []string{
-			"Black.Sails.S01E08.BDRip.srt",
-			"Black Sails - 01x08 - VIII..srt",
-			"Show S01E07-E09.srt",
-		} {
-			if !target.Matches(name) {
-				t.Errorf("For(S01E08).Matches(%q) = false, want true", name)
-			}
-		}
-		for _, name := range []string{
-			"Black.Sails.S01E07.BDRip.srt",
-			"Black Sails - 02x08 - VIII..srt",
-			"Show S01E01-E04.srt",
-			"no marker here.srt",
-		} {
-			if target.Matches(name) {
-				t.Errorf("For(S01E08).Matches(%q) = true, want false", name)
-			}
-		}
-	})
-
-	t.Run("renders for a diagnostic", func(t *testing.T) {
-		t.Parallel()
-		if got, want := epmarker.For(epmarker.Marker{Season: 1, Episode: 8}).String(), "S01E08"; got != want {
-			t.Errorf("For(S01E08).String() = %q, want %q", got, want)
-		}
-		if got, want := epmarker.Any().String(), "any episode"; got != want {
-			t.Errorf("Any().String() = %q, want %q", got, want)
-		}
-		if got, want := (epmarker.Marker{Season: 12, Episode: 100}).String(), "S12E100"; got != want {
-			t.Errorf("Marker{12,100}.String() = %q, want %q", got, want)
-		}
-	})
 }
 
 // TestSeparatedMarker pins the S## E## form and the tokens that must not become
@@ -972,29 +901,4 @@ func TestBareEpisode(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTarget_MatchesBareEpisode(t *testing.T) {
-	t.Parallel()
-
-	t.Run("matches its own episode", func(t *testing.T) {
-		t.Parallel()
-		target := epmarker.For(epmarker.Marker{Season: 1, Episode: 6})
-		if !target.MatchesBareEpisode("6 - A Golden Crown..srt") {
-			t.Error(`For(S01E06).MatchesBareEpisode("6 - …") = false, want true`)
-		}
-		if target.MatchesBareEpisode("7 - You Win Or You Die..srt") {
-			t.Error(`For(S01E06).MatchesBareEpisode("7 - …") = true, want false`)
-		}
-	})
-
-	// An Any target has no episode to compare against, so it must never claim a
-	// bare number matches: that would make the reading apply to movie downloads,
-	// where no season is known at all.
-	t.Run("an Any target never matches", func(t *testing.T) {
-		t.Parallel()
-		if epmarker.Any().MatchesBareEpisode("6 - A Golden Crown..srt") {
-			t.Error("Any().MatchesBareEpisode() = true, want false")
-		}
-	})
 }

@@ -360,8 +360,8 @@ func TestFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/api/v1/subtitles/10215904/download" || gotKey != key || p.Name != "inception-2010_english_10215904-[SubSource].zip" {
-		t.Errorf("asked %s with key %q, payload %q", path, gotKey, p.Name)
+	if path != "/api/v1/subtitles/10215904/download" || gotKey != key || len(p) == 0 {
+		t.Errorf("asked %s with key %q, payload of %d bytes", path, gotKey, len(p))
 	}
 	for _, tok := range []string{"https://elsewhere.example/x", "../x", "-1", ""} {
 		_, err := a.Fetch(ctx, provider.NewRef(tok))

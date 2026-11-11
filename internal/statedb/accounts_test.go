@@ -668,8 +668,8 @@ func TestCorruptTokenRowHidesHash(t *testing.T) {
 	rec := capture.Default(t)
 	s = mustOpen(t, path, productionConfig())
 	_, _, err := s.Accounts().OneTimeTokenByHash(t.Context(), access.NewHash(hash))
-	if !errors.Is(err, bolttable.ErrCorrupt) {
-		t.Fatalf("read of the corrupt row: %v, want ErrCorrupt", err)
+	if !errors.Is(err, ErrCorrupt) {
+		t.Fatalf("read of the corrupt row: %v, want statedb's ErrCorrupt", err)
 	}
 	for e := err; e != nil; e = errors.Unwrap(e) {
 		if strings.Contains(e.Error(), hash) {

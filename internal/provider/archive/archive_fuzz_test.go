@@ -1,117 +1,78 @@
 package archive
 
 import (
-	"archive/zip"
 	"bytes"
+	"errors"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/epmarker"
+	"github.com/cplieger/go/httpclient"
 )
 
-func FuzzExtract(f *testing.F) {
-	// Seed: valid SRT
-	f.Add([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"), 1, 5)
-	// Seed: RAR magic prefix + garbage
-	f.Add([]byte{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00, 0xFF, 0xFE}, 1, 1)
-	// Seed: raw SRT content
-	f.Add([]byte("1\n00:00:00,000 --> 00:00:01,000\nTest\n"), 0, 0)
-	// Seed: empty
-	f.Add([]byte{}, 1, 1)
-	// Seed: all zeros
-	f.Add(make([]byte, 16), 1, 1)
-	// Seed: ZIP magic + truncated
-	f.Add([]byte{'P', 'K', 3, 4, 0, 0}, 1, 1)
-	// Seed: RAR magic + truncated
-	f.Add([]byte{'R', 'a', 'r', '!', 0x1a, 0x07}, 2, 3)
-	// Seed: valid subtitle with BOM
-	f.Add(append([]byte{0xEF, 0xBB, 0xBF}, []byte("WEBVTT\n\n00:00.000 --> 00:01.000\nHi\n")...), 1, 1)
-	// Seed: minimal valid ZIP with SRT inside
-	f.Add(makeMinimalZipSRT(), 1, 5)
+// FuzzExtract_bounded: any bytes and any choice give a member of at most
+// maxMember bytes, ErrNotArchive unmarked, or a permanent refusal, and
+// choose is called at most once with names it may index.
+func FuzzExtract_bounded(f *testing.F) {
+	for _, n := range []string{"test.rar", "test_hidden.rar", "test_with_dir.rar"} {
+		f.Add(readFixture(f, n), uint8(0))
+	}
+	f.Add(makeZip(f, zipEntry{name: "a.srt", content: []byte(srt)}, zipEntry{name: "b.srt", content: []byte(srt)}), uint8(1))
+	f.Add(rar5(false, rarFile{name: "a.srt", content: []byte(srt)}), uint8(0))
+	f.Add(append(bytes.Repeat([]byte{0x90}, 64), makeZip(f, zipEntry{name: "a.srt", content: []byte(srt)})...), uint8(0))
+	f.Add(lyingZipCount()[len(lyingZipCount())-zipEndLen-zipDirRecordLen*3:], uint8(0))
+	f.Add([]byte(srt), uint8(0))
+	f.Fuzz(func(t *testing.T, data []byte, pick uint8) {
+		calls := 0
+		got, err := Extract(data, func(names []string) (int, error) {
+			calls++
+			if len(names) == 0 {
+				t.Fatal("choose called with no names")
+			}
+			return int(pick) % (len(names) + 1), nil
+		})
+		if calls > 1 {
+			t.Fatalf("choose called %d times", calls)
+		}
+		switch {
+		case err == nil:
+			if len(got) == 0 || len(got) > maxMember {
+				t.Fatalf("Extract gave %d bytes", len(got))
+			}
+		case errors.Is(err, ErrNotArchive):
+			if got != nil || httpclient.IsPermanent(err) || calls != 0 {
+				t.Fatalf("ErrNotArchive with %d bytes, permanent %v, %d calls", len(got), httpclient.IsPermanent(err), calls)
+			}
+		case !httpclient.IsPermanent(err) || got != nil:
+			t.Fatalf("refusal %v with %d bytes is not permanent", err, len(got))
+		}
+	})
+}
 
-	f.Fuzz(func(t *testing.T, data []byte, season, episode int) {
-		result, err := Extract(data, epmarker.For(epmarker.Marker{Season: season, Episode: episode}))
+// FuzzDecompress_bounded: any bytes decompress to at most maxMember bytes or
+// refuse permanently, and bytes with no gzip or xz magic come back as they
+// were.
+func FuzzDecompress_bounded(f *testing.F) {
+	for _, n := range []string{"sample-crc32.srt.xz", "sample-blocks.srt.xz", "sample-delta.srt.xz"} {
+		f.Add(readFixture(f, n))
+	}
+	f.Add(gzipped(f, []byte(srt)))
+	f.Add(xzBuild(f, nil, xzBlockSpec{text: []byte(srt), props: xzDict8MiB, withSizes: true}))
+	f.Add([]byte(srt))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		got, err := Decompress(data)
 		if err != nil {
-			if result != nil {
-				t.Errorf("Extract returned %d bytes alongside error %v, want nil content",
-					len(result), err)
+			if got != nil || !httpclient.IsPermanent(err) {
+				t.Fatalf("refusal %v with %d bytes is not permanent", err, len(got))
 			}
 			return
 		}
-		if result == nil {
-			t.Error("Extract returned nil content with a nil error")
+		if !bytes.HasPrefix(data, xzMagic) && !bytes.HasPrefix(data, gzipMagic) {
+			if !bytes.Equal(got, data) {
+				t.Fatal("plain bytes changed")
+			}
 			return
 		}
-		if !looksLikeSubtitle(result) {
-			t.Errorf("Extract returned non-subtitle content")
-		}
-		if len(result) > maxExtractSize {
-			t.Errorf("Extract returned %d bytes, exceeds maxExtractSize", len(result))
-		}
-	})
-}
-
-func makeMinimalZipSRT() []byte {
-	var buf bytes.Buffer
-	w := zip.NewWriter(&buf)
-	f, _ := w.Create("Show.S01E05.srt")
-	_, _ = f.Write([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"))
-	_ = w.Close()
-	return buf.Bytes()
-}
-
-// FuzzHasSignature checks the reported signature against the known
-// archive magic bytes in both directions (an oracle property): data beginning
-// with the ZIP (PK\x03\x04) or RAR (Rar!\x1a\x07) magic must be reported true,
-// and anything reported true must begin with one of those magic sequences.
-func FuzzHasSignature(f *testing.F) {
-	f.Add([]byte{})
-	f.Add([]byte("PK\x03\x04some zip content"))
-	f.Add([]byte("Rar!\x1a\x07\x00"))
-	f.Add([]byte("Rar!\x1a\x07\x01\x00"))
-	f.Add([]byte("not an archive"))
-	f.Add([]byte{0x1f, 0x8b}) // gzip magic — not an archive
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		result := hasSignature(data)
-
-		isZIP := len(data) >= 4 &&
-			data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4
-		isRAR := len(data) >= 6 &&
-			data[0] == 'R' && data[1] == 'a' && data[2] == 'r' &&
-			data[3] == '!' && data[4] == 0x1a && data[5] == 0x07
-
-		if (isZIP || isRAR) && !result {
-			t.Errorf("HasSignature = false for data with archive magic (zip=%v, rar=%v, len=%d)",
-				isZIP, isRAR, len(data))
-		}
-		if result && !isZIP && !isRAR {
-			t.Errorf("HasSignature = true but data has no archive magic (len=%d, prefix=%x)",
-				len(data), data[:min(8, len(data))])
-		}
-	})
-}
-
-// FuzzLooksLikeSubtitle checks BOM-insensitivity (a metamorphic property):
-// prepending a UTF-8 BOM to data that does not already start with one must not
-// change the verdict, because LooksLikeSubtitle strips a single leading BOM
-// before probing.
-func FuzzLooksLikeSubtitle(f *testing.F) {
-	f.Add([]byte{})
-	f.Add([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"))
-	f.Add([]byte("[Script Info]\nTitle: Test"))
-	f.Add([]byte("WEBVTT\n\n00:00.000 --> 00:01.000\nHi"))
-	f.Add([]byte("plain text without any signature"))
-	f.Add(make([]byte, 4096))
-
-	bom := []byte{0xEF, 0xBB, 0xBF}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		got := looksLikeSubtitle(data)
-
-		if !bytes.HasPrefix(data, bom) {
-			withBOM := append(append([]byte{}, bom...), data...)
-			if looksLikeSubtitle(withBOM) != got {
-				t.Errorf("LooksLikeSubtitle BOM-insensitivity violated for %q", data)
-			}
+		if len(got) > maxMember {
+			t.Fatalf("Decompress gave %d bytes", len(got))
 		}
 	})
 }

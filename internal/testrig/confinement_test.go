@@ -41,6 +41,20 @@ var importRules = []importRule{
 	{imported: "github.com/cplieger/bolttable/...", allowed: []string{modulePath + "/internal/statedb/..."}},
 	arrapiRule(modulePath),
 	scheduleRule(modulePath),
+	langtagRule(modulePath),
+	xtextLanguageRule(),
+}
+
+// langtagRule keeps every langtag major behind internal/language, the one
+// canonicalizer, so no other package grades or parses a tag its own way.
+func langtagRule(module string) importRule {
+	return importRule{imported: "github.com/cplieger/langtag/...", allowed: []string{module + "/internal/language"}}
+}
+
+// xtextLanguageRule keeps x/text's tags out of the module: they reach it
+// only through langtag, whose tables are CLDR 48's and not x/text's.
+func xtextLanguageRule() importRule {
+	return importRule{imported: "golang.org/x/text/language/..."}
 }
 
 // arrapiRule keeps every arrapi major behind the Sonarr and Radarr adapters,
@@ -229,6 +243,29 @@ func TestConfinementChecker(t *testing.T) {
 		}
 		if got := scheduleRule(fixture).violation(fixture+"/internal/app", fixture+"/internal/scan"); got != "" {
 			t.Errorf("app may not import scan: %s", got)
+		}
+	})
+	t.Run("langtag and x/text rows", func(t *testing.T) {
+		lt := langtagRule(fixture)
+		if got := lt.violation(fixture+"/internal/language", "github.com/cplieger/langtag/v3/names"); got != "" {
+			t.Errorf("language may not import langtag: %s", got)
+		}
+		for _, imp := range []string{"github.com/cplieger/langtag/v3", "github.com/cplieger/langtag/v4", "github.com/cplieger/langtag"} {
+			if !matchPath(lt.imported, imp) || lt.violation(fixture+"/internal/search", imp) == "" {
+				t.Errorf("search may import %s", imp)
+			}
+		}
+		xt := xtextLanguageRule()
+		for _, importer := range []string{fixture + "/internal/language", fixture + "/internal/subtitleenc"} {
+			if !matchPath(xt.imported, "golang.org/x/text/language") || xt.violation(importer, "golang.org/x/text/language") == "" {
+				t.Errorf("%s may import x/text/language", importer)
+			}
+		}
+		if matchPath(xt.imported, "golang.org/x/text/unicode/norm") || matchPath(xt.imported, "golang.org/x/text/encoding") {
+			t.Error("the x/text row refuses packages other than x/text/language")
+		}
+		if lt.production || xt.production {
+			t.Error("a language row skips test imports")
 		}
 	})
 	t.Run("raw client", func(t *testing.T) {

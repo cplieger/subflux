@@ -140,11 +140,11 @@ func addOnce[T any](seen map[string]struct{}, list []T, key string, v T) []T {
 
 func parseRootSubject(sub bolttable.Subject) (byte, media.RootKey, error) {
 	if len(sub) < 2 || sub[0] != bolttable.SyntheticPrefix || (sub[1] != subjectRoot && sub[1] != subjectWritten) {
-		return 0, media.RootKey{}, fmt.Errorf("%w: change subject %x", bolttable.ErrCorrupt, []byte(sub))
+		return 0, media.RootKey{}, fmt.Errorf("%w: change subject %x", ErrCorrupt, []byte(sub))
 	}
 	root, err := media.RootKeyFromBytes(sub[2:])
 	if err != nil {
-		return 0, media.RootKey{}, fmt.Errorf("%w: change subject %x: %w", bolttable.ErrCorrupt, []byte(sub), err)
+		return 0, media.RootKey{}, fmt.Errorf("%w: change subject %x: %w", ErrCorrupt, []byte(sub), err)
 	}
 	return sub[1], root, nil
 }

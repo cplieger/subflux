@@ -60,6 +60,11 @@ func productionConfig() config {
 // ErrLocked is Open's failure while another process holds the store.
 var ErrLocked = errors.New("statedb: the store is held by another process")
 
+// ErrCorrupt is matched by every corrupt-store error statedb returns: a row
+// or key that does not decode, or a reference between tables to a row that
+// is gone. It is bolttable's own sentinel, so the library's reports match.
+var ErrCorrupt = bolttable.ErrCorrupt
+
 // Open opens or creates the store at path, holding path.lock until Close. A
 // format change resets the changed namespaces after keeping the whole file
 // as path.<8 hex>.<stamp>.old; another holder of the lock fails it with

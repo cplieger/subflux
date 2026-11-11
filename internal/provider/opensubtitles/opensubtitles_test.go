@@ -301,7 +301,7 @@ func TestSearchHash(t *testing.T) {
 			}}
 			ctx := providertest.Serve(t, t.Context(), rec, hosts...)
 			q := movie(t, "en")
-			q.Hash = provider.VideoHash{Size: 1 << 30, OSHash: 0xff}
+			q.OSHash = 0xff
 			got, err := providertest.Build(t, opensubtitles.NewEntry(), tc.values).Search(ctx, q)
 			if err != nil || len(got) != 2 {
 				t.Fatalf("%d candidates, %v", len(got), err)
@@ -529,8 +529,8 @@ func TestFetchRecorded(t *testing.T) {
 			t.Fatal(err)
 		}
 		want, _ := os.ReadFile(srtFile)
-		if p.Name != "Inception.2010.1080p.WEB-DLx264.fr.srt" || string(p.Bytes) != string(want) {
-			t.Errorf("payload %q, %d bytes", p.Name, len(p.Bytes))
+		if string(p) != string(want) {
+			t.Errorf("payload of %d bytes, want %d", len(p), len(want))
 		}
 		if string(body) != `{"sub_format":"srt","file_id":12835077}` {
 			t.Errorf("download body %s", body)

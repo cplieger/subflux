@@ -15,7 +15,7 @@ import (
 // maxFileBytes bounds the file Load reads and Save writes.
 const maxFileBytes = 1 << 20
 
-// Load reads the file at path, an absolute path: absent is Unconfigured, and
+// Load reads the file at path, an absolute path: absent is unconfigured, and
 // a file that does not parse is Failed. It never writes.
 func Load(path string, r Registries) Snapshot {
 	data, err := filesafe.ReadBounded(context.Background(), path, maxFileBytes)
@@ -113,7 +113,7 @@ func parse(root *yaml.Node, r Registries, f fileState) Snapshot {
 	if stored != nil {
 		s.doc, s.view = stored, view(stored, doc)
 	}
-	// With no file there is nothing to refuse: Unconfigured runs each section
+	// With no file there is nothing to refuse: unconfigured runs each section
 	// at its owner's defaults even where the owner refuses an absent section,
 	// as languages does.
 	if len(errs) == 0 || mode == Unconfigured {

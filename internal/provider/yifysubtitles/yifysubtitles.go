@@ -91,26 +91,26 @@ func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Cand
 
 // Fetch reads the subtitle's page for its download link, then GETs the file
 // with the page as Referer, as a browser does.
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	pageURL := siteURL + ref.Token()
 	page, err := a.page(ctx, pageURL, siteURL)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	link := downloadLink(page)
 	if link == "" {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "the subtitle page has no download link")
+		return nil, provider.Fail(provider.Permanent, "the subtitle page has no download link")
 	}
 	resp, err := a.get(ctx, siteURL+link, pageURL)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, maxDownloadBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
-	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+	return b, nil
 }
 
 func (a *adapter) get(ctx context.Context, u, referer string) (*http.Response, error) {

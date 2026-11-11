@@ -24,7 +24,20 @@ subflux gets subtitles in your languages onto your whole library:
 
 subflux is built for people who run Sonarr, Radarr or both on a Docker host and want subtitles without picking them by hand. It picks languages from each file's audio track and can fetch forced and hearing-impaired versions. A 52,000-episode library runs in 1 GB of memory.
 
-You need a Sonarr or Radarr instance with its API key, and your media mounted writable at the paths they use. subflux searches eight sites. Gestdown, AnimeTosho and YIFY Subtitles need no account. OpenSubtitles, SubDL, SubSource, BetaSeries and HDBits need an account or an API key.
+You need a Sonarr or Radarr instance with its API key, and your media mounted writable at the paths they use. subflux searches eight subtitle sites:
+
+| Site | What it finds | What it needs |
+| --- | --- | --- |
+| OpenSubtitles | Movie and TV subtitles | An account and an API key |
+| Gestdown | TV subtitles from Addic7ed | No account |
+| SubSource | Movie and TV subtitles | An API key |
+| SubDL | Movie and TV subtitles | An API key |
+| BetaSeries | English and French TV subtitles | An API key |
+| AnimeTosho | Anime subtitles from the releases it indexes | No account |
+| YIFY Subtitles | Movie subtitles | No account |
+| HDBits | Subtitles of HDBits.org torrents | An account and its passkey |
+
+Anime episode mapping comes from [animap](https://github.com/cplieger/animap), where you can report wrong or missing anime subtitles caused by a mapping.
 
 Consider [Bazarr](https://github.com/morpheus65535/bazarr) if you want a native install on Windows, macOS or a Raspberry Pi, or a site such as Titlovi or Napiprojekt. It supports 184 subtitle languages and Whisper speech-to-text.
 
@@ -73,12 +86,12 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | Key | Default | Description |
 | --- | --- | --- |
 | `sources[]` | _(none)_ | The Sonarr and Radarr instances to read, at most 16, each with an `id`, a `type` (`sonarr` or `radarr`), its `url` and its `api_key` |
-| `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
 | `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
-| `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
+| `providers.<name>` | _(none)_ | The subtitle sites to search, with their account settings. Until a site is listed, subflux searches none |
 | `scan.change_interval` | `30s` | How often subflux checks each source for new imports |
 | `scan.whole_interval` | `24h` | Time between the end of one full library scan and the start of the next |
-| `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
+| `search.min_fit` | `other` | The lowest fit class downloaded automatically: `other`, `same_source`, `same_release` or `exact` |
+| `search.upgrade_window_days` | `7` | For how many days after a download a better fitting subtitle replaces it. `0` turns these upgrades off |
 | `sources[].exclude_tags[]` | `[no-subflux]` | Tags whose shows and movies subflux skips |
 | `timing.audio_fallback` | `false` | Also try the video's speech when its subtitle tracks cannot verify a download's timing |
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
@@ -92,8 +105,6 @@ Every other setting, the command line and environment references in `config.yaml
 | Variable | Description | Default |
 | --- | --- | --- |
 | `PUID`, `PGID` | The user and group the container runs as, read by `compose.yaml` | `1000` |
-| `SUBFLUX_URL` | The server address the `subflux` command line talks to | `http://127.0.0.1:8374` |
-| `SUBFLUX_API_KEY` | An API key for the command line, created on the web page | _(unset)_ |
 
 | Mount | Description |
 | --- | --- |
@@ -108,7 +119,7 @@ Every other setting, the command line and environment references in `config.yaml
 
 Create the admin account right after the first start. Until one exists, the first visitor to the page creates it. Keep port 8374 on your own network, or put a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md) with HTTPS in front of it and set `trusted_proxies` and `allowed_hosts`. `/metrics` and `/api/health` answer without a login.
 
-Logins use passwords, passkeys or OIDC, and an admin can create API keys for the command line. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
+Logins use passwords, passkeys or OIDC, and an admin can create API keys for scripts. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
 The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
 
@@ -117,7 +128,7 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`.
 
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
-- Full scans do not start. A folder in `media_roots` is missing or not writable. Fix it or remove it from the list.
+- An alert says a media root is unavailable. The folder is missing, empty or cannot be opened. Mount it, or fix the root folder in Sonarr or Radarr or the source's `path_mappings`.
 - An alert says a subtitle site was disabled. The site rejected your credentials three times. Save new ones or press the site's **Test** button.
 - A share is unmounted. subflux keeps its records, shows an alert naming the path and holds new imports there until the share returns.
 
@@ -130,7 +141,7 @@ subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Prometheus
 ## Documentation
 
 - [Configuration](docs/configuration.md) lists every setting and command, for anyone writing `config.yaml` by hand.
-- [How subflux works](docs/how-it-works.md) covers scoring, timing, credential handling and the limits.
+- [How subflux works](docs/how-it-works.md) covers fit classes, timing, credential handling and the limits.
 - [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
 - [Monitoring and alerts](docs/monitoring.md) lists the metrics, the alert rules and the kinds of problem each rule pages for.
 - [Database maintenance](docs/database-maintenance.md) covers format resets, a database that cannot be opened and compaction.

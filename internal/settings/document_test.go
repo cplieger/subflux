@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediasource/radarr"
 	"github.com/cplieger/subflux/internal/mediasource/sonarr"
+	"github.com/cplieger/subflux/internal/provider/providers"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -196,6 +197,15 @@ var sectionFixtures = map[string]struct {
 		text:    "timing:\n  sync: false\n  audio_fallback: true\n",
 		secrets: nil,
 	},
+	"providers": {
+		text: "providers:\n  subdl:\n    priority: 2\n    settings:\n      api_key: k3\n  gestdown:\n    enabled: true\n" +
+			"  hdbits:\n    enabled: false\n    priority: 7\n    settings:\n      username: someone\n",
+		secrets: []string{"providers.subdl.settings.api_key"},
+	},
+	"search": {
+		text:    "search:\n  min_fit: same_source\n  min_fit_by_target:\n    pt-BR: exact\n  upgrade_window_days: 30\n  scan_delay: 10s\n",
+		secrets: nil,
+	},
 	"embedded_subtitles": {
 		text:    "embedded_subtitles:\n  ignore_codecs: [pgs, dvbsub, teletext]\n",
 		secrets: nil,
@@ -222,7 +232,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 		}
 	}
 	path := fixture(t, text.String())
-	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}}
+	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}, Providers: providers.Entries()}
 	s := NewService(path, r, Load(path, r), nil, nil)
 	if m := s.Snapshot().Mode(); m != ModeActive {
 		failure, _ := s.Snapshot().Failure()

@@ -231,8 +231,8 @@ func TestFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.URL.Path != "/subtitle/2812133-2714566.zip" || got.URL.Query().Get("api_key") != key || p.Name != "SUBDL::inception-2714566.zip" || string(p.Bytes) != "PK\x03\x04" {
-		t.Errorf("request %s, payload %q %q", got.URL, p.Name, p.Bytes)
+	if got.URL.Path != "/subtitle/2812133-2714566.zip" || got.URL.Query().Get("api_key") != key || string(p) != "PK\x03\x04" {
+		t.Errorf("request %s, payload %q", got.URL, p)
 	}
 	if _, err := a.Fetch(ctx, provider.NewRef("//elsewhere.example/x")); err != nil {
 		t.Fatalf("a token naming another host left dl.subdl.com: %v", err)

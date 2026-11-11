@@ -26,7 +26,7 @@ type Name struct {
 // ReadPack reads every member name of one pack by its base name. season is
 // the pack's season, the one its search asked for: a name with no claim
 // states its bare leading number under it, marked Bare, but only when no
-// member claims a marker (epmarker.Target.MatchesBareEpisode's precondition)
+// member claims a marker (epmarker.BareEpisode's precondition)
 // and season is 0 or more.
 func ReadPack(names []string, season int) []Name {
 	out := make([]Name, len(names))

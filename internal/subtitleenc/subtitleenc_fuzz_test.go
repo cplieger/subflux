@@ -2,15 +2,35 @@ package subtitleenc
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/language"
 )
 
+// writeBack writes text in e as a file announcing it would: UTF-16 behind its
+// BOM, UTF-8 behind one only before a U+FEFF, which Decode strips.
+func writeBack(t *testing.T, e Encoding, text []byte) []byte {
+	t.Helper()
+	out, ok := codecs[e].encode(text)
+	if !ok {
+		t.Fatalf("%s decodes to %q and cannot write it back", e, text)
+	}
+	switch {
+	case e == UTF16LE:
+		return append(slices.Clip(bomUTF16LE), out...)
+	case e == UTF16BE:
+		return append(slices.Clip(bomUTF16BE), out...)
+	case e == UTF8 && bytes.HasPrefix(out, bomUTF8):
+		return append(slices.Clip(bomUTF8), out...)
+	}
+	return out
+}
+
 // FuzzDetect_idempotent: a named answer decodes the bytes, and its text,
 // written back in it, reads as the same text again under the same hint,
 // through the same answer or one decoding it alike (ISO-2022-JP text with no
-// escape left is ASCII, so UTF8); Unknown stays Unknown. Encode writes a
+// escape left is ASCII, so UTF8); Unknown stays Unknown. writeBack writes a
 // UTF-8 BOM only before a U+FEFF and no ISO-2022-JP escape before ASCII, so
 // the text written from one of those may announce a form Detect tries
 // earlier, whose answer stands.
@@ -67,10 +87,7 @@ func FuzzDetect_idempotent(f *testing.F) {
 		if err != nil {
 			t.Fatalf("Detect names %s for %q, which its Decode refuses: %v", enc, data, err)
 		}
-		written, err := enc.Encode(text)
-		if err != nil {
-			t.Fatalf("%s decodes %q to %q and cannot write it back: %v", enc, data, text, err)
-		}
+		written := writeBack(t, enc, text)
 		again := Detect(written, tag)
 		if again == enc {
 			return

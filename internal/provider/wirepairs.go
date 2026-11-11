@@ -2,33 +2,9 @@ package provider
 
 import (
 	"fmt"
-	"mime"
-	"net/http"
-	"path"
-	"strings"
 
-	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/language"
 )
-
-// PayloadName is the file name an answer gives its body: the
-// Content-Disposition filename, else the last segment of the answered URL's
-// path, as one line of at most MaxText bytes with no directory part.
-func PayloadName(resp *http.Response) string {
-	name := ""
-	if _, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition")); err == nil {
-		name = params["filename"]
-	}
-	if name == "" && resp.Request != nil {
-		name = path.Base(resp.Request.URL.Path)
-	}
-	name = name[strings.LastIndexAny(name, `/\`)+1:]
-	if name == "." || name == ".." {
-		return ""
-	}
-	name, _ = textsafe.SanitizeSingleLineCapped(name, MaxText, "")
-	return name
-}
 
 // WirePairs builds an adapter's language table from alternating labels and
 // tags ("English", "en", ...), for language.MustProviderMap; it panics on an

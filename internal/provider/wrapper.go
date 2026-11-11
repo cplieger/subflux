@@ -86,11 +86,11 @@ func (w *wrapped) Search(ctx context.Context, q Query) ([]Candidate, error) { //
 	return w.bound(cands), w.fail(ctx, err, sent)
 }
 
-func (w *wrapped) Fetch(ctx context.Context, ref Ref) (Payload, error) {
+func (w *wrapped) Fetch(ctx context.Context, ref Ref) ([]byte, error) {
 	ctx, sent := counting(ctx)
 	p, err := w.inner.Fetch(ctx, ref)
 	if err != nil {
-		return Payload{}, w.fail(ctx, err, sent)
+		return nil, w.fail(ctx, err, sent)
 	}
 	return p, nil
 }
@@ -144,8 +144,8 @@ func (w *wrapped) bound(cands []Candidate) []Candidate {
 			continue
 		}
 		var cr, ct bool
-		c.Release, cr = textsafe.SanitizeSingleLineCapped(c.Release, MaxText, "")
-		c.Title, ct = textsafe.SanitizeSingleLineCapped(c.Title, MaxText, "")
+		c.Release, cr = BoundText(c.Release)
+		c.Title, ct = BoundText(c.Title)
 		if cr || ct {
 			cut++
 		}

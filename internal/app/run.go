@@ -165,16 +165,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 	if cfg.Writer != nil {
 		cfg.Writer(writer)
 	}
-	activate := wrapActivate(func(ctx context.Context, a settings.Active) error {
-		act := activationOf(&a)
-		if aerr := store.Activate(ctx, act); aerr != nil {
-			return aerr
-		}
-		retainSources(st, act.Sources)
-		// Last, so a refused activation leaves the writer's section as it was.
-		writer.SetConfig(a.Media)
-		return nil
-	})
+	activate := wrapActivate(newActivate(store, st, writer))
 	deps := sourceDeps(slog.Default())
 	svc := settings.NewService(cfg.Paths.Config, registries, snap, activate, saveCheck(deps))
 	if cfg.Settings != nil {
@@ -222,11 +213,6 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		drainBudget:      drainBudget,
 		httpGrace:        httpGrace,
 	}, nil
-}
-
-// activationOf is the part of a the store keys coverage on.
-func activationOf(a *settings.Active) statedb.Activation {
-	return statedb.Activation{Languages: a.Languages, Sources: sourceIDs(a), IgnoredCodecs: a.Embedded.Ignored()}
 }
 
 // activateLoaded activates the loaded settings a and builds the media

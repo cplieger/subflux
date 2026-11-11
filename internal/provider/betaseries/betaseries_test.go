@@ -178,8 +178,8 @@ func TestFetchFollowsSrtLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hops) != 2 || hops[0] != siteHost+"/srt/748977" || hops[1] != subHost+file || p.Name != "breaking.bad.s01.e01.pilot.(2008).eng.1cd.(7580711).zip" {
-		t.Errorf("hops %q, payload %q", hops, p.Name)
+	if len(hops) != 2 || hops[0] != siteHost+"/srt/748977" || hops[1] != subHost+file || len(p) == 0 {
+		t.Errorf("hops %q, payload of %d bytes", hops, len(p))
 	}
 	t.Run("a redirect off the recorded hosts is refused", func(t *testing.T) {
 		ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

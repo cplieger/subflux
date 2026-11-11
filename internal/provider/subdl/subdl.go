@@ -127,22 +127,22 @@ func (a *adapter) Test(ctx context.Context) error {
 
 // Fetch GETs the download path on dl.subdl.com with the key, as SubDL's
 // answer links it.
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	u := url.URL{Scheme: "https", Host: dlHost, Path: ref.Token(), RawQuery: url.Values{keyAPIKey: {a.key}}.Encode()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	resp, err := a.c.Do(req)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, maxDownloadBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
-	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+	return b, nil
 }
 
 func (a *adapter) getJSON(ctx context.Context, u string, v any) error {
