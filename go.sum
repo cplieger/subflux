@@ -1,7 +1,7 @@
 github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBqoWM=
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/access v1.0.0-dev.8 h1:SkroTjZbH+M22dv4QRpXmb72rFsvoAoy6YPZBEMz1Oo=
-github.com/cplieger/access v1.0.0-dev.8/go.mod h1:XE12NdH76jjpS7gQmD4qYR/9wzx/scbH236mu3elAuI=
+github.com/cplieger/access v1.0.0-dev.9 h1:1aqJc5O3QkUEDtzyFfQAAySf7ovN0J9h/rtbFM/74Og=
+github.com/cplieger/access v1.0.0-dev.9/go.mod h1:xYyhwhkl/KdaaCjIoNaT8QaB2UfpbURnxZ86x+6gOto=
 github.com/cplieger/animap/mapread v0.3.2 h1:oBS2esAwE3WSMWb9ypUGw2vAAV/lHWDKlObYZ8AWUQQ=
 github.com/cplieger/animap/mapread v0.3.2/go.mod h1:/KLtoKslemgqFHUACjfaCz7F78WQpd3FDjQJ4oY8lic=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.16 h1:UfKM+Br/UQx4Los1dDtwuwa2Q9W7kbKY8pop9vGh960=
@@ -14,8 +14,8 @@ github.com/cplieger/go/health v1.1.0 h1:vG4wM0JVBXvDXxGm9fnhyn8yA0BuiyB99LE3CPul
 github.com/cplieger/go/health v1.1.0/go.mod h1:7eOprE7L510iSRZBJabPD4V06TftKymjdtLnLTZPTiY=
 github.com/cplieger/go/httpclient v1.2.0 h1:E+lbIpiNkUkcq3fxdMDYn116cwx6tU1XWmn4mDdBGU0=
 github.com/cplieger/go/httpclient v1.2.0/go.mod h1:couTQSCNdgNwOotbaQREGcM4CjUKZJ4Bdb7FSkNwL8U=
-github.com/cplieger/go/httpserver v1.3.0-dev.1 h1:DfCaY3QRT/4YXmvpQhI5s9JxP5Sj/+OsL6kGZMt9A4E=
-github.com/cplieger/go/httpserver v1.3.0-dev.1/go.mod h1:MuZxKRRjQG6DAJBO88cTGhVdhSCmBu2PMeA/DWRbiTQ=
+github.com/cplieger/go/httpserver v1.3.0 h1:bZEeBZ6Xe49Pu+PAJ5jFVyaeEDooU1DBCmL11uW0rfY=
+github.com/cplieger/go/httpserver v1.3.0/go.mod h1:MuZxKRRjQG6DAJBO88cTGhVdhSCmBu2PMeA/DWRbiTQ=
 github.com/cplieger/go/jsonx v1.1.0 h1:/XBHr3vJVqKYVDteO8cZEMAdTgmT3Df/SeyNw1pdak8=
 github.com/cplieger/go/jsonx v1.1.0/go.mod h1:ry6co0JYAadIhjHtkktBSK3to4YdtEak1P7mdmQlr7U=
 github.com/cplieger/go/keyenc v1.3.0 h1:v0zvHSY4ZOZapGNYGAkghEXPz1SeifT/Trg0b9A8IBU=
