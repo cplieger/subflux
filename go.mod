@@ -8,7 +8,7 @@ require (
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.15
 	github.com/cplieger/bolttable v1.2.0-dev.1
 	github.com/cplieger/go/filesafe v1.1.0-dev.1
-	github.com/cplieger/go/health v1.1.0-dev.2
+	github.com/cplieger/go/health v1.1.0-dev.3
 	github.com/cplieger/go/httpclient v1.2.0-dev.1
 	github.com/cplieger/go/httpserver v1.2.0-dev.1
 	github.com/cplieger/go/jsonx v1.1.0-dev.1
