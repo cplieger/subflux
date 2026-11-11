@@ -26,8 +26,8 @@ github.com/cplieger/go/measure v1.2.0 h1:z1XR86jCx65RPQX+p6IRghfS41PdpidYaH+oGIN
 github.com/cplieger/go/measure v1.2.0/go.mod h1:oH0qxNStRZYbEn3iHpXv/7jKcrjg/EzsxrhLhBK6BC0=
 github.com/cplieger/go/slogx v1.1.0 h1:whWmZcNmLuWGFM33SYFR+alUTfEodzBjKju44DHNgPY=
 github.com/cplieger/go/slogx v1.1.0/go.mod h1:N88y5LJZ1aVp++cLFqzEV4WsalaX5YKXoRtXT29Ngkw=
-github.com/cplieger/go/ssrf v1.1.0-dev.5 h1:lQkGcbD3hos5B7FyIXvRwPg4HyTo1m5s8ZBmUV508MY=
-github.com/cplieger/go/ssrf v1.1.0-dev.5/go.mod h1:5dfQr9A00dt0RZVj7ie4U+qk111sQ9TRQjBEp2s31ZM=
+github.com/cplieger/go/ssrf v1.1.0-dev.7 h1:WPA38xF8hugaV/viT4mXdA1uoz1H2jZU1nNca2dtn1g=
+github.com/cplieger/go/ssrf v1.1.0-dev.7/go.mod h1:95hUJ04+tP4FHFyd9Vp+egJpNDuf8d+jtgvcxzf7Mkw=
 github.com/cplieger/go/textsafe v1.1.0 h1:D+p7ZDBQmABv/empI2TNMZfvhMXNlfii8E2e5V+dUWE=
 github.com/cplieger/go/textsafe v1.1.0/go.mod h1:x29RmZpMO2yjPt1zRbjtcXWVdkekukl+jA5FN1wXUlI=
 github.com/cplieger/go/urlform v1.2.0 h1:AQkwiRasHq1e57dzpFyrSRZWgp503XNPJ0DikXQLt1E=
