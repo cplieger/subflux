@@ -72,11 +72,11 @@ func admits(s Server, host string) bool {
 }
 
 func TestLoadModes(t *testing.T) {
-	t.Run("absent file is Unconfigured and writes nothing", func(t *testing.T) {
+	t.Run("absent file is unconfigured and writes nothing", func(t *testing.T) {
 		dir := t.TempDir()
 		s := Load(filepath.Join(dir, "config.yaml"), Registries{})
 		if s.Mode() != Unconfigured {
-			t.Errorf("mode %v, want Unconfigured", s.Mode())
+			t.Errorf("mode %v, want unconfigured", s.Mode())
 		}
 		if srv, ok := s.Server(); !ok || srv.Hosts().Active() || srv.LogFormat() != "json" {
 			t.Errorf("Server() = %+v, %v; want defaults", srv, ok)

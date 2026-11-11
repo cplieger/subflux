@@ -4,7 +4,7 @@ This page covers logins, reverse proxies, passkeys and what the subflux image co
 
 ## Logins and exposure
 
-Login is on by default. On the first start, the first visitor to the page creates the admin account, so do that right after you start the container. After that, users sign in with a password, a passkey or OIDC single sign-on, and an admin can create API keys for the command line. Failed logins are rate-limited per client address.
+Login is on by default. On the first start, the first visitor to the page creates the admin account, so do that right after you start the container. After that, users sign in with a password, a passkey or OIDC single sign-on, and an admin can create API keys for scripts. Failed logins are rate-limited per client address.
 
 `/metrics` and `/api/health` answer without a login, for Prometheus and for load balancers. Keep port 8374 on your own network, or put a reverse proxy with HTTPS in front of it.
 

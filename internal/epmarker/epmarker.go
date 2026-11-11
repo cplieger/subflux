@@ -3,8 +3,8 @@
 // runs of ASCII letters and digits, and every view classifies those tokens;
 // every notation is case-insensitive.
 //
-//   - Find: S##E## markers (S## E## too, across up to three of " ._-") and
-//     ##x## tokens. Claims: the episodes stated under a season, ranges expanded.
+//   - Claims: S##E## markers (S## E## too, across up to three of " ._-") and
+//     ##x## tokens, then the episodes stated under a season, ranges expanded.
 //   - FirstIndex, Present: where a marker-shaped token starts, unreadable
 //     digits included, so such a name still reaches no fallback.
 //   - Season: the first S##E## or S## token, else "Season N", else ##x##.
@@ -64,71 +64,6 @@ func pad2(n int) string {
 	return strconv.Itoa(n)
 }
 
-// Target is what a lookup is looking for. The zero Target matches any name,
-// which is what a movie download and a provider that reports no numbering both
-// arrive with, so a caller selecting from candidates needs one loop rather than
-// one per case.
-type Target struct {
-	want  Marker
-	fixed bool
-}
-
-// Any returns the Target that matches every name.
-func Any() Target { return Target{} }
-
-// For returns the Target that matches only m, or Any when either half of m is
-// absent. A zero season or episode is how the wire says "this download has no
-// episode to disambiguate", so a caller can hand over a subtitle's fields
-// without deciding what that means.
-func For(m Marker) Target {
-	if m.Season <= 0 || m.Episode <= 0 {
-		return Any()
-	}
-	return Target{want: m, fixed: true}
-}
-
-// Matches reports whether name claims the episode t is looking for. An Any
-// target matches every name.
-func (t Target) Matches(name string) bool {
-	if !t.fixed {
-		return true
-	}
-	return slices.Contains(Claims(name), t.want)
-}
-
-// MatchesBareEpisode reports whether name states t's episode as a bare leading
-// number, with no season anywhere in the name. The name does not carry the
-// season, so a caller uses it only when both conditions hold, neither checkable
-// here: t's season is known reliably from outside the name (a provider result's
-// season is stamped from the seasonNumber its search sent), and no member of the
-// same archive claims a readable marker, so this reading never outvotes a
-// notation that parses.
-func (t Target) MatchesBareEpisode(name string) bool {
-	if !t.fixed {
-		return false
-	}
-	ep, ok := BareEpisode(name)
-	return ok && ep == t.want.Episode
-}
-
-// String renders t for a diagnostic: the episode in canonical form, or "any"
-// when nothing narrows the lookup.
-func (t Target) String() string {
-	if !t.fixed {
-		return "any episode"
-	}
-	return t.want.String()
-}
-
-// Find returns every well-formed single marker in name, in order of appearance,
-// across both notations. Callers that care about precedence pick from the
-// returned order themselves. A marker-shaped token whose season or episode does
-// not fit an int is skipped here but still reported by Present.
-func Find(name string) []Marker {
-	r := read(name)
-	return r.markers()
-}
-
 // Claims returns every episode name claims, ordered, deduplicated, nil when it
 // claims none: its markers, and each episode StatesEpisode reads under its
 // marker's season, else the latest season statement before it; a range longer
@@ -184,7 +119,7 @@ func FirstIndex(name string) int {
 func Present(name string) bool { return FirstIndex(name) >= 0 }
 
 // Season returns the season of name's first S## token, a marker's S## included,
-// else of "Season N", else of the cross form, so Season never contradicts Find
+// else of "Season N", else of the cross form, so Season never contradicts Claims
 // ("Black Sails - 01x08" is season 1). ok is false when name carries no season
 // token or its digits do not fit an int.
 func Season(name string) (season int, ok bool) {
@@ -272,10 +207,9 @@ func Absolute(name string) (episode int, ok bool) {
 // "6 - A Golden Crown..srt" states episode 6. The number is the name's first
 // token, one to three digits, followed by one of " ._-", so a resolution
 // ("1080p") or a year ("2011 - ") is none. A name with a readable marker
-// returns false.
-//
-// A bare number names no season, so this reading is kept apart from Find and
-// Claims; Target.MatchesBareEpisode states what a caller must know to use it.
+// returns false. A bare number names no season: a caller reads it only
+// under a season known from outside the name, where no other name it reads
+// alongside claims a marker.
 func BareEpisode(name string) (episode int, ok bool) {
 	end := digitEnd(name, 0)
 	if end == 0 || end > 3 || end == len(name) || !strings.ContainsRune(" ._-", rune(name[end])) {
@@ -779,11 +713,5 @@ func isDigit(b byte) bool { return b >= '0' && b <= '9' }
 
 func isLetter(b byte) bool { return isAlnum(b) && !isDigit(b) }
 
-// Compile-time proof that both diagnostic renderings satisfy fmt.Stringer, per
-// the shared rule that a well-known interface method is paired with an assertion
-// at the implementation site. Both have production call sites in the archive
-// extractor's refusal messages.
-var (
-	_ fmt.Stringer = Marker{}
-	_ fmt.Stringer = Target{}
-)
+// No call site names String: a Marker reaches it as a log attribute.
+var _ fmt.Stringer = Marker{}

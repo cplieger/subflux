@@ -394,19 +394,22 @@ func TestDownloadGETRetried(t *testing.T) {
 		path    string
 		answers map[string]string
 		ref     string
+		// post is the quota-spending request the GET follows, sent once
+		// however often the GET is retried; "" for none.
+		post string
 	}{
 		{"opensubtitles", "/download/x.srt", map[string]string{
 			"/api/v1/login":    `{"token":"t-1","base_url":"api.opensubtitles.com","user":{"vip":false}}`,
 			"/api/v1/download": `{"link":"https://www.opensubtitles.com/download/x.srt","requests":1,"remaining":9}`,
-		}, "1"},
-		{"hdbits", "/getdox.php", nil, "551609.ass"},
+		}, "1", "/api/v1/download"},
+		{"hdbits", "/getdox.php", nil, "551609", ""},
 	}
 	for _, c := range cases {
 		t.Run(string(c.id), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				e := entry(t, c.id)
 				var mu sync.Mutex
-				n := 0
+				n, posts := 0, 0
 				ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.URL.Path == c.path {
 						mu.Lock()
@@ -414,6 +417,13 @@ func TestDownloadGETRetried(t *testing.T) {
 						mu.Unlock()
 						w.WriteHeader(http.StatusServiceUnavailable)
 						return
+					}
+					if r.URL.Path == c.post {
+						mu.Lock()
+						if r.Method == http.MethodPost {
+							posts++
+						}
+						mu.Unlock()
 					}
 					if a, ok := c.answers[r.URL.Path]; ok {
 						_, _ = w.Write([]byte(a))
@@ -431,6 +441,9 @@ func TestDownloadGETRetried(t *testing.T) {
 				defer mu.Unlock()
 				if n != 3 {
 					t.Errorf("the GET was sent %d times, want 3", n)
+				}
+				if c.post != "" && posts != 1 {
+					t.Errorf("POST %s was sent %d times, want once while the GET is retried", c.post, posts)
 				}
 				// httpclient.Do waits about 2 s, then about 4 s, each with equal jitter.
 				if d := time.Since(start); d < 3*time.Second {

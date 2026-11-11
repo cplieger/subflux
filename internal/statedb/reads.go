@@ -337,7 +337,7 @@ func (s *Store) Unidentified(ctx context.Context, c ListCursor, limit int) ([]Un
 func (s *Store) unidentifiedRow(r *bolttable.ReadTx, ref itemRef) (UnidentifiedRow, error) {
 	sg, found, err := s.t.sightings.Get(r, ref)
 	if err == nil && !found {
-		err = fmt.Errorf("%w: the unidentified index names %s's sighting %s, which is gone", bolttable.ErrCorrupt, ref.Source, ref.Item)
+		err = fmt.Errorf("%w: the unidentified index names %s's sighting %s, which is gone", ErrCorrupt, ref.Source, ref.Item)
 	}
 	if err != nil {
 		return UnidentifiedRow{}, err

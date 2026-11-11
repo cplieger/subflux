@@ -41,12 +41,14 @@ func TestCodesCoverFailureTable(t *testing.T) {
 	}
 
 	sentineltest.Placed(t, Codes, map[string]error{
+		"ErrCorrupt":        ErrCorrupt,
 		"ErrCursorInvalid":  ErrCursorInvalid,
 		"ErrNotLockable":    ErrNotLockable,
 		"ErrLocked":         ErrLocked,
 		"ErrPassUnknown":    ErrPassUnknown,
 		"ErrSourceInactive": ErrSourceInactive,
 	}, map[string]string{
+		"ErrCorrupt":        "a store that does not decode is subflux's own failure, never a client's code",
 		"ErrLocked":         "only Open returns it",
 		"ErrPassUnknown":    "only BeginPass, ObserveItems and FinishPass return it, and no endpoint calls them",
 		"ErrSourceInactive": "only BeginPass, ObserveItems and FinishPass return it, and no endpoint calls them",

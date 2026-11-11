@@ -137,21 +137,21 @@ func (a *adapter) firstShowWith(ctx context.Context, shows []string, q *provider
 	return nil, nil
 }
 
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/subtitles/download/"+url.PathEscape(ref.Token()), http.NoBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	resp, err := a.c.Do(req)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, maxSubtitleBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
-	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+	return b, nil
 }
 
 // getJSON decodes a GET's answer into v; a 404 leaves v untouched.

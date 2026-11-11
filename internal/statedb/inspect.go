@@ -66,7 +66,7 @@ const (
 // owned item's coverage under the activation in force and recounts every
 // root; with Repair it rewrites the index entries, counters, coverage and
 // counts rows that differ, never another row. A row a recompute reads that
-// does not decode fails Inspect with bolttable.ErrCorrupt naming its table.
+// does not decode fails Inspect with ErrCorrupt naming its table.
 // Verify before the first Activate is an error.
 func (s *Store) Inspect(ctx context.Context, o InspectOptions) (Inspection, error) {
 	var in Inspection

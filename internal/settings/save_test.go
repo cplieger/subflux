@@ -137,7 +137,7 @@ func TestSaveSurvivesRequestCancel(t *testing.T) {
 			t.Errorf("stat after a failed first save: %v, want not exist", err)
 		}
 		if m := Load(path, Registries{}).Mode(); m != Unconfigured {
-			t.Errorf("reload mode %v, want Unconfigured", m)
+			t.Errorf("reload mode %v, want unconfigured", m)
 		}
 	})
 	t.Run("a slow activate serialises a concurrent save", func(t *testing.T) {
@@ -375,7 +375,7 @@ func TestSaveCheckRefuses(t *testing.T) {
 			t.Errorf("check ran %d times", calls)
 		}
 	})
-	t.Run("from Unconfigured prev is the zero Active", func(t *testing.T) {
+	t.Run("from unconfigured prev is the zero Active", func(t *testing.T) {
 		called := false
 		s := serve(fixture(t, ""), nil, func(_ context.Context, p, _ Active) []formschema.FieldError {
 			called = true

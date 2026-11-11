@@ -125,8 +125,8 @@ func TestFailureRedactedAtWrapper(t *testing.T) {
 					search: func(ctx context.Context, c provider.Client, _ provider.Query) ([]provider.Candidate, error) {
 						return nil, tc.do(ctx, c)
 					},
-					fetch: func(ctx context.Context, c provider.Client, _ provider.Ref) (provider.Payload, error) {
-						return provider.Payload{}, tc.do(ctx, c)
+					fetch: func(ctx context.Context, c provider.Client, _ provider.Ref) ([]byte, error) {
+						return nil, tc.do(ctx, c)
 					},
 				}
 				a := providertest.Build(t, entry(s, []string{host}, keyField), "api_key: "+key)

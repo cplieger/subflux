@@ -115,7 +115,7 @@ func jisByte(c byte) bool { return 0x21 <= c && c <= 0x7E }
 
 // encode is the standard's encoder, except that a character it writes as
 // another one (U+2212 as U+FF0D, halfwidth katakana as fullwidth) has no
-// code here, so Encode never changes the text.
+// code here, so read refuses bytes decoding to one.
 func (iso2022jp) encode(text []byte) ([]byte, bool) {
 	codes := jisIndex().codes
 	out := make([]byte, 0, len(text)+6)

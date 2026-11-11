@@ -6,12 +6,13 @@ import (
 	"testing"
 )
 
-// mustEncode writes text in e, failing the test when e cannot carry it.
+// mustEncode writes text in e through the codec read checks against,
+// failing the test when e cannot carry it.
 func mustEncode(t *testing.T, e Encoding, text string) []byte {
 	t.Helper()
-	b, err := e.Encode([]byte(text))
-	if err != nil {
-		t.Fatalf("%s.Encode(%q): %v", e, text, err)
+	b, ok := codecs[e].encode([]byte(text))
+	if !ok {
+		t.Fatalf("%s has no code for a character of %q", e, text)
 	}
 	return b
 }
@@ -86,11 +87,8 @@ func TestValid(t *testing.T) {
 func TestUnknownNeverDecoded(t *testing.T) {
 	t.Parallel()
 	for _, e := range []Encoding{Unknown, Encoding(24), Encoding(255)} {
-		if out, err := e.Decode([]byte("plain text")); !errors.Is(err, ErrUndecodable) || out != nil {
-			t.Errorf("%s.Decode = %q, %v; want nil, ErrUndecodable", e, out, err)
-		}
-		if out, err := e.Encode([]byte("plain text")); !errors.Is(err, ErrUndecodable) || out != nil {
-			t.Errorf("%s.Encode = %q, %v; want nil, ErrUndecodable", e, out, err)
+		if out, err := e.Decode([]byte("plain text")); !errors.Is(err, errUndecodable) || out != nil {
+			t.Errorf("%s.Decode = %q, %v; want nil, errUndecodable", e, out, err)
 		}
 	}
 }
@@ -119,7 +117,7 @@ func TestDecode(t *testing.T) {
 		name string
 		e    Encoding
 		in   []byte
-		want string // "" with fail set: ErrUndecodable
+		want string // "" with fail set: errUndecodable
 		fail bool
 	}{
 		{name: "utf8_bom_stripped", e: UTF8, in: []byte("\xef\xbb\xbfHi"), want: "Hi"},
@@ -127,6 +125,8 @@ func TestDecode(t *testing.T) {
 		{name: "utf16le_bom_stripped", e: UTF16LE, in: []byte{0xFF, 0xFE, 'H', 0, 'i', 0}, want: "Hi"},
 		{name: "utf16le_no_bom", e: UTF16LE, in: []byte{'H', 0, 'i', 0}, want: "Hi"},
 		{name: "utf16be_bom_stripped", e: UTF16BE, in: []byte{0xFE, 0xFF, 0, 'H', 0, 'i'}, want: "Hi"},
+		{name: "utf8_leading_bom_character_behind_a_bom", e: UTF8, in: []byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, 'a'}, want: "\uFEFFa"},
+		{name: "utf16le_leading_bom_character_behind_a_bom", e: UTF16LE, in: []byte{0xFF, 0xFE, 0xFF, 0xFE, 'a', 0}, want: "\uFEFFa"},
 		{name: "utf16le_surrogate_pair", e: UTF16LE, in: []byte{0x3D, 0xD8, 0x00, 0xDE}, want: "😀"},
 		{name: "utf16le_literal_replacement_char", e: UTF16LE, in: []byte{0xFD, 0xFF, 'a', 0}, want: "\uFFFDa"},
 		{name: "utf16le_odd_length", e: UTF16LE, in: []byte{'H', 0, 'i'}, fail: true},
@@ -170,8 +170,8 @@ func TestDecode(t *testing.T) {
 			in := bytes.Clone(tt.in)
 			out, err := tt.e.Decode(in)
 			if tt.fail {
-				if !errors.Is(err, ErrUndecodable) || out != nil {
-					t.Errorf("Decode = %q, %v; want nil, ErrUndecodable", out, err)
+				if !errors.Is(err, errUndecodable) || out != nil {
+					t.Errorf("Decode = %q, %v; want nil, errUndecodable", out, err)
 				}
 				return
 			}
@@ -186,82 +186,4 @@ func TestDecode(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestEncode(t *testing.T) {
-	t.Parallel()
-	carried := map[Encoding]string{
-		UTF8: "Grüße, 世界", UTF16LE: "Grüße, 😀", UTF16BE: "Grüße, 😀", ISO2022JP: "あの日",
-		Windows1250: "Mąż i Žluťoučký", Windows1251: "Привет", Windows1252: "“Café” – ok…",
-		Windows1253: "Άκου", Windows1254: "Öylece çekip", Windows1255: "שָׁלוֹם", Windows1256: "مرحبا",
-		ISO8859_2: "Mąż", ISO8859_5: "Привет", ISO8859_6: "مرحبا", ISO8859_7: "Άκου", ISO8859_8: "שלום ‗",
-		KOI8R: "Привет", KOI8U: "Ґанок і є", ShiftJIS: "妹に何が", EUCJP: "妹に何が", GB18030: "我不知道😀",
-		Big5: "我不知道", EUCKR: "여동생에게",
-	}
-	for e := UTF8; int(e) < len(encodingNames); e++ {
-		t.Run(e.String(), func(t *testing.T) {
-			t.Parallel()
-			text, ok := carried[e]
-			if !ok {
-				t.Fatalf("no sample text for %s", e)
-			}
-			b := mustEncode(t, e, text)
-			if back, err := e.Decode(b); err != nil || string(back) != text {
-				t.Errorf("Decode(Encode(%q)) = %q, %v", text, back, err)
-			}
-			if _, err := e.Encode([]byte("a\xffb")); !errors.Is(err, ErrUndecodable) {
-				t.Errorf("Encode(invalid UTF-8) error %v, want ErrUndecodable", err)
-			}
-		})
-	}
-	t.Run("bom_written_for_utf16_not_utf8", func(t *testing.T) {
-		t.Parallel()
-		if b := mustEncode(t, UTF8, "Hi"); !bytes.Equal(b, []byte("Hi")) {
-			t.Errorf("UTF8.Encode = % x, want no BOM", b)
-		}
-		if b := mustEncode(t, UTF16LE, "Hi"); !bytes.Equal(b, []byte{0xFF, 0xFE, 'H', 0, 'i', 0}) {
-			t.Errorf("UTF16LE.Encode = % x", b)
-		}
-		if b := mustEncode(t, UTF16BE, "Hi"); !bytes.Equal(b, []byte{0xFE, 0xFF, 0, 'H', 0, 'i'}) {
-			t.Errorf("UTF16BE.Encode = % x", b)
-		}
-	})
-	for _, tt := range []struct {
-		name string
-		enc  Encoding
-		text string
-	}{
-		{"gb18030_private_use_reads_back_otherwise", GB18030, "\uE000"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if out, err := tt.enc.Encode([]byte(tt.text)); !errors.Is(err, ErrUndecodable) || out != nil {
-				t.Errorf("%s.Encode(%q) = % X, %v; want nil, ErrUndecodable", tt.enc, tt.text, out, err)
-			}
-		})
-	}
-	for _, tt := range []struct {
-		name string
-		enc  Encoding
-		want []byte
-	}{
-		{"utf8_leading_bom_character_behind_a_bom", UTF8, []byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, 'a'}},
-		{"utf16_leading_bom_character_behind_a_bom", UTF16LE, []byte{0xFF, 0xFE, 0xFF, 0xFE, 'a', 0}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if b := mustEncode(t, tt.enc, "\uFEFFa"); !bytes.Equal(b, tt.want) {
-				t.Errorf("%s.Encode(%q) = % X; want % X", tt.enc, "\uFEFFa", b, tt.want)
-			}
-			if back, err := tt.enc.Decode(tt.want); err != nil || string(back) != "\uFEFFa" {
-				t.Errorf("%s.Decode(% X) = %q, %v; want %q", tt.enc, tt.want, back, err, "\uFEFFa")
-			}
-		})
-	}
-	t.Run("missing_character", func(t *testing.T) {
-		t.Parallel()
-		if out, err := Windows1252.Encode([]byte("Mąż")); !errors.Is(err, ErrUndecodable) || out != nil {
-			t.Errorf("Windows1252.Encode(Mąż) = %q, %v; want nil, ErrUndecodable", out, err)
-		}
-	})
 }

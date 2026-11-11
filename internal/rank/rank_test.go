@@ -196,29 +196,29 @@ func TestHashVoidedByCutOrSource(t *testing.T) {
 func TestRateFamilies(t *testing.T) {
 	for _, c := range []struct {
 		fps  float64
-		want RateFamily
+		want rateFamily
 	}{
-		{25, PAL},
-		{50, PAL},
-		{25.02, PAL},
-		{24000.0 / 1001, Film},
-		{23.976, Film},
-		{24, Film},
-		{30000.0 / 1001, Film},
-		{30, Film},
-		{48000.0 / 1001, Film},
-		{48, Film},
-		{60000.0 / 1001, Film},
-		{60, Film},
-		{0, RateUnknown},
-		{-25, RateUnknown},
-		{12.5, RateUnknown},
-		{25.05, RateUnknown},
-		{25.1, RateUnknown},
-		{100, RateUnknown},
+		{25, pal},
+		{50, pal},
+		{25.02, pal},
+		{24000.0 / 1001, film},
+		{23.976, film},
+		{24, film},
+		{30000.0 / 1001, film},
+		{30, film},
+		{48000.0 / 1001, film},
+		{48, film},
+		{60000.0 / 1001, film},
+		{60, film},
+		{0, rateUnknown},
+		{-25, rateUnknown},
+		{12.5, rateUnknown},
+		{25.05, rateUnknown},
+		{25.1, rateUnknown},
+		{100, rateUnknown},
 	} {
-		if got := RateFamilyOf(c.fps); got != c.want {
-			t.Errorf("RateFamilyOf(%v) = %v, want %v", c.fps, got, c.want)
+		if got := rateFamilyOf(c.fps); got != c.want {
+			t.Errorf("rateFamilyOf(%v) = %v, want %v", c.fps, got, c.want)
 		}
 	}
 	bluray := movie("Movie.2010.1080p.BluRay.x264-GRP")
@@ -362,8 +362,8 @@ func TestTextCodecs(t *testing.T) {
 	})
 }
 
-// TestNoNumericScore: the package exports no number but RateTolerance; its
-// enums are named types.
+// TestNoNumericScore: the package exports no number; its enums are named
+// types.
 func TestNoNumericScore(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -401,8 +401,8 @@ func TestNoNumericScore(t *testing.T) {
 			}
 		}
 	}
-	if !slices.Equal(found, []string{"RateTolerance"}) {
-		t.Errorf("exported numbers: %v, want only RateTolerance", found)
+	if len(found) != 0 {
+		t.Errorf("exported numbers: %v, want none", found)
 	}
 }
 

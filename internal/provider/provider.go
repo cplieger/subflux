@@ -10,11 +10,11 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/rank"
-	"github.com/cplieger/subflux/internal/release"
 )
 
 // ProviderID names one provider in settings, state and the wire.
@@ -63,7 +63,7 @@ type Config struct {
 // answer.
 type Adapter interface {
 	Search(ctx context.Context, q Query) ([]Candidate, error)
-	Fetch(ctx context.Context, ref Ref) (Payload, error)
+	Fetch(ctx context.Context, ref Ref) ([]byte, error)
 }
 
 // Tester is implemented by a credentialed adapter: the cheapest call that
@@ -72,21 +72,15 @@ type Tester interface {
 	Test(ctx context.Context) error
 }
 
-// VideoHash is the OpenSubtitles hash of the video; zero is unknown.
-type VideoHash struct {
-	Size   int64
-	OSHash uint64
-}
-
 // Query is built once per run. For an episode External holds the series'
 // ids; Year is the root's (0 unknown); Titles are the root's title then its
-// alternative titles; Langs are this provider's tags from the query union.
+// alternative titles; Langs are this provider's tags from the query union;
+// OSHash is the video's OpenSubtitles hash, zero when unknown.
 type Query struct {
-	Release   release.Parsed
 	Titles    []string
 	Langs     []language.Tag
 	External  media.ExternalIDs
-	Hash      VideoHash
+	OSHash    uint64
 	Numbering media.Numbering
 	Year      int
 	Absolute  int
@@ -116,12 +110,6 @@ type Candidate struct {
 	MachineTranslated bool
 }
 
-// Payload is one fetched subtitle or archive.
-type Payload struct {
-	Name  string
-	Bytes []byte
-}
-
 // Ref is the adapter's own token for one download. It is held server-side
 // and resolves only on the adapter's Hosts.
 type Ref struct{ token string }
@@ -145,6 +133,12 @@ const (
 	MaxText     = 512
 	MaxCovers   = 64
 )
+
+// BoundText is s as the answer bounds keep a Release or Title: one line of
+// at most MaxText bytes; cut reports that s changed.
+func BoundText(s string) (text string, cut bool) {
+	return textsafe.SanitizeSingleLineCapped(s, MaxText, "")
+}
 
 // maxSkipCause bounds a Skipped's Cause.
 const maxSkipCause = 120

@@ -225,8 +225,8 @@ func TestFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/subtitles/download/3Df15bUM1njyzL2GHv0PaX" || p.Name != "Breaking.Bad.S01E01.0tv.en.srt" || len(p.Bytes) == 0 {
-		t.Errorf("path %q, payload %q %d bytes", path, p.Name, len(p.Bytes))
+	if path != "/subtitles/download/3Df15bUM1njyzL2GHv0PaX" || len(p) == 0 {
+		t.Errorf("path %q, payload of %d bytes", path, len(p))
 	}
 	if _, err := a.Fetch(ctx, provider.NewRef("../../shows/x")); err != nil {
 		t.Fatal(err)

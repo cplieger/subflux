@@ -189,7 +189,7 @@ func appendWorkProjection(dst []byte, v *workRow) []byte {
 
 func parseWorkProjection(b []byte) (workProjection, error) {
 	if len(b) != workProjectionLen {
-		return workProjection{}, fmt.Errorf("%w: work projection of %d bytes", bolttable.ErrCorrupt, len(b))
+		return workProjection{}, fmt.Errorf("%w: work projection of %d bytes", ErrCorrupt, len(b))
 	}
 	return workProjection{
 		cause:     WorkCause(b[0]),

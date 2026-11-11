@@ -23,7 +23,7 @@ var (
 // SaveCheck is app's save-time check: Save runs it after the parse and before
 // the write, under the Save's context, and Load never does. A non-empty
 // answer refuses the Save as a parse error does, writing nothing. From a
-// Failed or Unconfigured snapshot prev is the zero Active.
+// Failed or unconfigured snapshot prev is the zero Active.
 type SaveCheck func(ctx context.Context, prev, next Active) []formschema.FieldError
 
 // Service holds the live snapshot and saves the file.

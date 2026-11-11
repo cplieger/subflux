@@ -2,7 +2,6 @@ package hdbits
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 )
 
@@ -30,17 +29,6 @@ func TestKeep(t *testing.T) {
 	}
 }
 
-func TestToken(t *testing.T) {
-	for file, want := range map[string]string{
-		"x.srt": "7.srt", "x.ASS": "7.ass", "x.tar.gz": "7.gz", "x": "7", "x.": "7",
-		"x.sub-title": "7", "x.verylongext": "7", "x.smi": "7.smi",
-	} {
-		if got := token(subtitle{ID: 7, Filename: file}); got != want {
-			t.Errorf("token(%q) = %q, want %q", file, got, want)
-		}
-	}
-}
-
 func TestSubtitleID(t *testing.T) {
 	for in, want := range map[string]subtitleID{`551609`: 551609, `"551609"`: 551609} {
 		var got subtitleID
@@ -54,18 +42,4 @@ func TestSubtitleID(t *testing.T) {
 			t.Errorf("%s: %d, %v; want an error and 0", in, got, err)
 		}
 	}
-}
-
-// FuzzToken: whatever the listed file name, the token is the id or the id
-// and a plain extension, the two forms Fetch reads.
-func FuzzToken(f *testing.F) {
-	f.Add("Inception.srt")
-	f.Add("x.tar.gz")
-	f.Add("../../etc/passwd")
-	f.Fuzz(func(t *testing.T, file string) {
-		id, ext, dotted := strings.Cut(token(subtitle{ID: 1, Filename: file}), ".")
-		if id != "1" || dotted && !plainExt(ext) {
-			t.Fatalf("token for %q is %q.%q", file, id, ext)
-		}
-	})
 }

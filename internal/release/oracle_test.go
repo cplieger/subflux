@@ -22,7 +22,6 @@ type upstreamPattern struct {
 	Pattern     string   `json:"pattern"`
 	Options     []string `json:"options"`
 	Replacement string   `json:"replacement"`
-	Spec        string   `json:"spec"`
 }
 
 func readJSON(t testing.TB, name string, v any) {

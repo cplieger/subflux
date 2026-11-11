@@ -69,5 +69,5 @@ func (e Encoding) String() string {
 	return "Encoding(" + strconv.Itoa(int(e)) + ")"
 }
 
-// ErrUndecodable reports Unknown, or bytes the encoding cannot read or write.
-var ErrUndecodable = errors.New("subtitleenc: bytes not decodable in this encoding")
+// errUndecodable reports Unknown, or bytes the encoding cannot read or write.
+var errUndecodable = errors.New("subtitleenc: bytes not decodable in this encoding")

@@ -2,57 +2,69 @@ package archive
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/nwaples/rardecode/v2"
 )
 
-// maxRAREntries caps how many entries the walk will inspect before giving up.
-const maxRAREntries = 4096
+// maxRARDictionary bounds the window a rar member may declare: rardecode
+// allocates it inside Next, and its default allows 4 GiB.
+const maxRARDictionary = 64 << 20
 
-// rarMembers opens data as a RAR (v4 or v5) and returns a sequence over its
-// entries.
-//
-// The sequence is a STREAM: each member is readable only while it is current,
-// so the selection loop must read before it advances.
-//
-// The walk stops at the first Next error, which is also how a healthy archive
-// ends, so a truncated archive reports whatever the members it did reach
-// support rather than a separate transport complaint.
-func rarMembers(data []byte) (func(func(member) bool), error) {
-	r, err := rardecode.NewReader(bytes.NewReader(data))
+// rarMembers walks data's rar headers, at most maxEntries of them. A rar is a
+// stream, so each member's read opens the archive again and walks to it.
+func rarMembers(data []byte) ([]member, error) {
+	r, err := openRAR(data)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrNotArchive, err)
+		return nil, err
 	}
-
-	return func(yield func(member) bool) {
-		for range maxRAREntries {
-			hdr, err := r.Next()
-			if err != nil {
-				return
-			}
-			if !yield(rarMember(r, hdr)) {
-				return
-			}
+	var ms []member
+	for {
+		hdr, err := r.Next()
+		if errors.Is(err, io.EOF) {
+			return ms, nil
 		}
-	}, nil
-}
-
-// read is only valid while this entry is current, which is the constraint
-// that makes the selection loop read before it advances.
-func rarMember(r io.Reader, hdr *rardecode.FileHeader) member {
-	return member{
-		name:        hdr.Name,
-		packed:      hdr.PackedSize,
-		unpacked:    hdr.UnPackedSize,
-		sizeUnknown: hdr.UnKnownSize,
-		isDir:       hdr.IsDir,
-		read:        func() ([]byte, error) { return readRAREntry(r, hdr.Name) },
+		if err != nil {
+			return nil, refuse(err, "rar header %d", len(ms)+1)
+		}
+		if len(ms) == maxEntries {
+			return nil, refuse(nil, "rar holds more than %d headers", maxEntries)
+		}
+		k := len(ms)
+		ms = append(ms, member{
+			name:        hdr.Name,
+			packed:      hdr.PackedSize,
+			unpacked:    hdr.UnPackedSize,
+			sizeUnknown: hdr.UnKnownSize,
+			isDir:       hdr.IsDir,
+			read:        func() ([]byte, error) { return readRARMember(data, k) },
+		})
 	}
 }
 
-func readRAREntry(r io.Reader, name string) ([]byte, error) {
-	content, err := io.ReadAll(io.LimitReader(r, maxExtractSize+1))
-	return checkMemberContent(name, content, err)
+func openRAR(data []byte) (*rardecode.Reader, error) {
+	r, err := rardecode.NewReader(bytes.NewReader(data), rardecode.MaxDictionarySize(maxRARDictionary))
+	switch {
+	case errors.Is(err, rardecode.ErrNoSig):
+		return nil, errNoContainer
+	case err != nil:
+		return nil, refuse(err, "rar")
+	}
+	return r, nil
+}
+
+// readRARMember reads the k-th header's member.
+func readRARMember(data []byte, k int) ([]byte, error) {
+	r, err := openRAR(data)
+	if err != nil {
+		return nil, err
+	}
+	var hdr *rardecode.FileHeader
+	for i := range k + 1 {
+		if hdr, err = r.Next(); err != nil {
+			return nil, refuse(err, "rar header %d", i+1)
+		}
+	}
+	return readMember(hdr.Name, r)
 }

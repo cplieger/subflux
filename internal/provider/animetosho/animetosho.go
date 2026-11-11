@@ -11,16 +11,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/cplieger/animap/mapread"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/animemap"
-	"github.com/cplieger/subflux/internal/provider/archive"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -209,31 +206,30 @@ func (a *adapter) details(ctx context.Context, es []entry) ([]answer, error) {
 	return per, cmp.Or(err, first)
 }
 
-// Fetch downloads an attachment, xz-compressed, from AnimeTosho's storage
-// and answers it decompressed, named as the link names it.
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+// Fetch downloads an attachment from AnimeTosho's storage as stored, xz
+// compressed, named as the link names it less its ".xz".
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	u, ok := storageURL(ref.Token())
 	if !ok {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "not an AnimeTosho storage link")
+		return nil, provider.Fail(provider.Permanent, "not an AnimeTosho storage link")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	resp, err := a.c.Do(req)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, provider.MaxBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	if len(b) == 0 {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "AnimeTosho answered an empty attachment")
+		return nil, provider.Fail(provider.Permanent, "AnimeTosho answered an empty attachment")
 	}
-	n := cmp.Or(u.Query().Get("filename"), path.Base(u.Path))
-	return provider.Payload{Name: strings.TrimSuffix(n, ".xz"), Bytes: archive.Decompress(b)}, nil
+	return b, nil
 }
 
 // storageURL is an attachment link on AnimeTosho's storage host, which is

@@ -12,7 +12,7 @@ With no `/config/config.yaml`, subflux starts unconfigured, and the first settin
 
 ## First start
 
-Every first start runs one guided flow. You create the admin account, walk the setup wizard and can then add a passkey. The wizard steps are Sonarr and Radarr, media roots, subtitle sites, languages, search, scoring and post-processing.
+Every first start runs one guided flow. You create the admin account, walk the setup wizard and can then add a passkey. The wizard steps are Sonarr and Radarr, media roots, subtitle sites, languages, search and post-processing.
 
 - From scratch, every step is prefilled with defaults.
 - With a `config.yaml` you wrote, every step the file already answers is prefilled and collapsed. Saved secrets show as present without their values. A fully valid file goes straight to a review screen with a **Finish** button, and collapsed steps stay open for review before you finish.
@@ -34,32 +34,23 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `sources[].api_key` | required | The API key from the General page of that app's Settings |
 | `sources[].public_url` | _(unset)_ | The address your browser opens the instance at, for links on the web page |
 | `sources[].enabled` | `true` | Set `false` to stop reading from the instance while keeping its entry, which is still checked as written |
-| `sources[].path_mappings[]` | `[]` | Up to 32 `{from, to}` pairs, for media mounted at another path in subflux than in Sonarr or Radarr: a path the instance reports under `from` is read under `to` |
+| `sources[].path_mappings[]` | `[]` | Up to 32 `{from, to}` pairs, for media mounted at another path in subflux than in Sonarr or Radarr: a path the instance reports under `from` is read under `to`. subflux writes subtitles only under each mapping's `to`, or with no mappings under the instance's root folders |
 | `sources[].exclude_tags[]` | `[no-subflux]` | Up to 32 tag labels, matched ignoring case. subflux skips the shows and movies that carry one. An empty list skips nothing |
-| `media_roots` | _(unset)_ | The media folders, at the same paths Sonarr and Radarr use. The first-start file sets `/media` |
 | `languages` | required | The subtitle languages to fetch. List at least one target in `default` or a rule |
 | `languages.close_varieties` | `false` | Download a close variety automatically when the exact one is missing, such as `pt-PT` or bare `pt` for a `pt-BR` target |
 | `languages.default[]` | `[]` | The targets for items no rule matches, at most 16. Each has a `tag` and optional `variants` (`standard`, `hi`, `forced`), default `[standard]` |
 | `languages.rules[].audio` | required | A language tag, such as `ja` or `pt-BR`. subflux tries an item's original language first, then each audio track, and the rule whose tag is closest wins |
 | `languages.rules[].targets[]` | required | The targets for an item the rule matches, at most 16. An empty list fetches nothing and skips `default` |
-| `providers.<name>.enabled` | Gestdown, AnimeTosho and YIFY Subtitles on in the first-start file | Which subtitle sites to search, with their account settings |
-| `providers.<name>.priority` | per site | Breaks a tie between equal scores. Lower is more trusted |
+| `providers.<name>` | _(none)_ | The subtitle sites to search, by name: `opensubtitles`, `gestdown`, `subsource`, `subdl`, `betaseries`, `animetosho`, `yifysubtitles` or `hdbits`. Until a site is listed, subflux searches none |
+| `providers.<name>.enabled` | `true` | Set `false` to stop searching a listed site while keeping its settings. A site that is off may leave its required keys empty |
+| `providers.<name>.priority` | `0` | From 0 to 100. Among equally good results, the site with the lower number goes first, then the site whose name sorts first |
 | `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |
 | `scan.change_interval` | `30s` | How often subflux checks each source for imports, renames and deletes, from `10s` to `1h` |
 | `scan.whole_interval` | `24h` | Time between the end of one full library scan and the start of the next, from `1h` to `720h` |
-| `search.upgrade_enabled` | `true` | Look for better subtitles during scans |
-| `search.upgrade_window_days` | `7` | How many days after a download subflux keeps looking for a better match |
-| `search.scan_delay` | `5s` | Pause after each scan item that asked a site. Minimum `5s` |
-| `search.provider_timeout` | `1h` | How long a site rests after repeated failures. Minimum `1h` |
-| `search.min_score` | `0` | The lowest score a result may have to be downloaded, from 0 to 100 |
-| `search.download_max_attempts` | `3` | Download attempts per result before subflux moves to the next one |
-| `search.max_provider_concurrency` | `4` | How many sites subflux asks at the same time |
-| `search.max_sse_clients` | `32` | How many open browser tabs can receive live updates |
-| `adaptive.enabled` | `true` | Wait longer between searches for an item that keeps finding nothing |
-| `adaptive.initial_delay` | `7D` | The first wait after a search with no result |
-| `adaptive.max_delay` | `3M` | The longest wait between searches |
-| `adaptive.backoff_multiplier` | `2` | How much each wait grows |
-| `adaptive.max_attempts` | `0` | Searches before subflux gives up on an item. `0` retries forever |
+| `search.min_fit` | `other` | The lowest fit class downloaded automatically: `other`, `same_source`, `same_release` or `exact`. [How subflux works](how-it-works.md) explains each |
+| `search.min_fit_by_target` | _(none)_ | A minimum fit per target language, replacing `min_fit` for it, such as `{ja: same_release}`. Each key is a target listed in `languages` |
+| `search.upgrade_window_days` | `7` | For how many days after a download a better fitting subtitle replaces it, from 0 to 365. `0` turns these upgrades off |
+| `search.scan_delay` | `5s` | The least time between two automatic searches on one site, from `5s` to `10m` |
 | `embedded_subtitles.ignore_codecs` | `[pgs, vobsub]` | The formats of subtitle tracks inside a video that do not count as a subtitle it has, so subflux still downloads one: any of `srt`, `ass`, `ssa`, `webvtt`, `mov_text`, `pgs`, `vobsub`, `dvbsub`, `teletext`, `cea608` and `ttml` |
 | `timing.sync` | `true` | Re-time each downloaded subtitle against a subtitle track inside the video |
 | `timing.audio_fallback` | `false` | Also try the video's speech when its subtitle tracks cannot verify a download's timing. It is slower, and it can spot a different cut only when the video also has a usable subtitle track |
@@ -69,7 +60,6 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `post_processing.normalize_line_endings` | `true` | Convert line endings to CRLF, the SRT standard |
 | `post_processing.clean_whitespace` | `true` | Trim lines and remove empty lines |
 | `post_processing.remove_empty` | `true` | Drop subtitle lines left with no text |
-| `scoring.weights` | see the example file | How much each release property adds to a score. A hash match scores 100 |
 | `trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited |
 | `allowed_hosts` | `[]` | The host names subflux answers for. Leave empty to accept any |
 | `auth.basic_enabled` | `true` | Password login. It can be turned off only while OIDC is on |
@@ -105,23 +95,4 @@ Only `SUBFLUX_*` names and `CONFIG_ROOT`, `MEDIA_FOLDER`, `PUID`, `PGID`, `TZ`, 
 
 ## Command line
 
-The `subflux` command talks to a running server. It reads the server address from `SUBFLUX_URL`, which defaults to `http://127.0.0.1:8374`, and an API key from `SUBFLUX_API_KEY` when login is on. An admin creates a key in the web page's Security dialog. Run `subflux --help` for every flag.
-
-| Command | What it does |
-| --- | --- |
-| `subflux search --title "The Wire"` | Searches every site for an item and prints scored results. `--download` saves the top result, or the one `--pick N` names |
-| `subflux scan` | Starts a full library scan |
-| `subflux status` | Prints download and search counts |
-| `subflux state` | Prints saved downloads, filtered by `--type`, `--lang` or `--provider` |
-| `subflux locks`, `subflux unlock` | List manual locks and clear one |
-| `subflux backoff` | Lists items waiting between searches |
-| `subflux providers` | Lists the sites and whether each is on |
-| `subflux timeouts`, `subflux timeouts-reset` | Show site timeouts and reset every site's state |
-| `subflux score --video <name> --sub <name>` | Shows how a subtitle release would score against a video release |
-
-Two account commands use a private socket inside the container instead of the network, so run them inside it with `docker exec -it subflux /subflux <command>`:
-
-- `reset-password --user <name>` asks for a new password for an existing user.
-- `generate-api-key --user <name> --label <label>` prints a new API key once.
-
-If password login was turned off and OIDC is unavailable, `docker exec subflux /subflux enable-password-login` sets `auth.basic_enabled: true` in the file. Restart the container to apply it.
+With no arguments, `subflux` runs the server. `subflux health` is the probe the image's `HEALTHCHECK` runs: it exits 0 while the server reports itself healthy and 1 otherwise. `subflux --help` prints the usage line.

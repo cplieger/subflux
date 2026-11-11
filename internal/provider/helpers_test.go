@@ -22,7 +22,7 @@ const (
 // scripted is an adapter whose calls the test writes.
 type scripted struct {
 	search func(context.Context, provider.Client, provider.Query) ([]provider.Candidate, error)
-	fetch  func(context.Context, provider.Client, provider.Ref) (provider.Payload, error)
+	fetch  func(context.Context, provider.Client, provider.Ref) ([]byte, error)
 	c      provider.Client
 }
 
@@ -33,9 +33,9 @@ func (s *scripted) Search(ctx context.Context, q provider.Query) ([]provider.Can
 	return s.search(ctx, s.c, q)
 }
 
-func (s *scripted) Fetch(ctx context.Context, r provider.Ref) (provider.Payload, error) {
+func (s *scripted) Fetch(ctx context.Context, r provider.Ref) ([]byte, error) {
 	if s.fetch == nil {
-		return provider.Payload{}, nil
+		return nil, nil
 	}
 	return s.fetch(ctx, s.c, r)
 }

@@ -26,10 +26,8 @@ type providerMap struct {
 	tags   []Tag
 }
 
-// NewProviderMap builds a map from pairs, refusing an empty, over-64-byte or
-// invalid UTF-8 label, a zero tag, and a label listed twice; the error names
-// the first bad pair. A tag may carry several labels, kept in pair order.
-func NewProviderMap(pairs []WirePair) (ProviderMap, error) {
+// newProviderMap is MustProviderMap's build, its refusal returned.
+func newProviderMap(pairs []WirePair) (ProviderMap, error) {
 	m := &providerMap{byWire: map[string]Tag{}, byTag: map[Tag][]string{}, tags: make([]Tag, 0, len(pairs))}
 	for i, p := range pairs {
 		var problem string
@@ -54,10 +52,12 @@ func NewProviderMap(pairs []WirePair) (ProviderMap, error) {
 	return ProviderMap{m}, nil
 }
 
-// MustProviderMap is NewProviderMap for package-level adapter tables; it
-// panics on NewProviderMap's error.
+// MustProviderMap builds a package-level adapter table's map from pairs. It
+// panics on an empty, over-64-byte or invalid UTF-8 label, a zero tag or a
+// label listed twice, naming the first bad pair; a tag may carry several
+// labels, kept in pair order.
 func MustProviderMap(pairs []WirePair) ProviderMap {
-	m, err := NewProviderMap(pairs)
+	m, err := newProviderMap(pairs)
 	if err != nil {
 		panic(err)
 	}

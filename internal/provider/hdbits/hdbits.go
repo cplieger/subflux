@@ -252,7 +252,7 @@ func (a *adapter) list(ctx context.Context, pace *rate.Limiter, torrent int, wan
 			release = strings.TrimSuffix(s.Filename, path.Ext(s.Filename))
 		}
 		out = append(out, provider.Candidate{
-			Ref:       provider.NewRef(token(s)),
+			Ref:       provider.NewRef(strconv.Itoa(int(s.ID))),
 			Lang:      tag,
 			Release:   release,
 			Flags:     provider.Flags(language.Flags{}, s.Title, s.Filename),
@@ -260,29 +260,6 @@ func (a *adapter) list(ctx context.Context, pace *rate.Limiter, torrent int, wan
 		})
 	}
 	return out, nil
-}
-
-// token is the subtitle's id and the listed file's extension, "551609.ass",
-// or the id alone when the extension is not 1 to 8 ASCII letters or digits;
-// Fetch names the payload by it, since getdox names no file.
-func token(s subtitle) string {
-	id := strconv.Itoa(int(s.ID))
-	if ext := strings.ToLower(strings.TrimPrefix(path.Ext(s.Filename), ".")); plainExt(ext) {
-		return id + "." + ext
-	}
-	return id
-}
-
-func plainExt(ext string) bool {
-	if len(ext) < 1 || len(ext) > 8 {
-		return false
-	}
-	for _, r := range ext {
-		if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
-			return false
-		}
-	}
-	return true
 }
 
 var excluded = []string{"commentary", "extras", "lyrics"}
@@ -336,14 +313,13 @@ func (a *adapter) Test(ctx context.Context) error {
 // Fetch answers the subtitle's getdox body, from the download cache when a
 // season's earlier episode fetched it; concurrent fetches of one id share
 // one download.
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
-	name := ref.Token()
-	id, ext, dotted := strings.Cut(name, ".")
-	if n, err := strconv.ParseUint(id, 10, 31); err != nil || n == 0 || strconv.FormatUint(n, 10) != id || dotted && !plainExt(ext) {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "the token is not a subtitle id")
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
+	id := ref.Token()
+	if n, err := strconv.ParseUint(id, 10, 31); err != nil || n == 0 || strconv.FormatUint(n, 10) != id {
+		return nil, provider.Fail(provider.Permanent, "the token is not a subtitle id")
 	}
 	if b, ok := a.downloads.get(id); ok {
-		return provider.Payload{Name: name, Bytes: b}, nil
+		return b, nil
 	}
 	v, err, _ := a.fetches.Do(id, func() (any, error) {
 		if b, ok := a.downloads.get(id); ok {
@@ -352,10 +328,10 @@ func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload
 		return a.download(ctx, id)
 	})
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	b, _ := v.([]byte)
-	return provider.Payload{Name: name, Bytes: b}, nil
+	return b, nil
 }
 
 func (a *adapter) download(ctx context.Context, id string) ([]byte, error) {

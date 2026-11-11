@@ -30,6 +30,7 @@ import (
 type library struct {
 	store *statedb.Store
 	w     *mediawrite.Writer
+	roots *fakeRoots
 	root  string
 	dir   string // the video directory
 	key   media.Key
@@ -46,10 +47,11 @@ func newLibrary(t *testing.T, policy string, d mediawrite.Deps, inject func(*med
 	writeFile(t, video, "video")
 	store := openStoreAt(t, filepath.Join(tmp, "subflux.bolt"), policy)
 	ids, keys := seedKeys(t, store, video)
-	d.Store, d.Roots = store, rootsOf(root)
+	roots := rootsOf(root)
+	d.Store, d.Roots = store, roots
 	w := newWriter(t, d, inject)
 	run(t, w)
-	return &library{store: store, w: w, root: root, dir: filepath.Dir(video), key: keys[0], inst: ids[0]}
+	return &library{store: store, w: w, roots: roots, root: root, dir: filepath.Dir(video), key: keys[0], inst: ids[0]}
 }
 
 func (l *library) path(name string) string { return filepath.Join(l.dir, name) }
@@ -681,6 +683,68 @@ func TestAttemptsRecordedOnce(t *testing.T) {
 			t.Errorf("history = %+v, want nothing for an attempt with no run", rows)
 		}
 	})
+}
+
+// TestUndeliveredAttemptRefused: every cause that keeps a delivery from
+// landing records the attempt it was to deliver with a refusal, never the
+// delivered spelling "", which search's attempt memory would hold for 30
+// days.
+func TestUndeliveredAttemptRefused(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		inject func(*mediawrite.Faults)
+		edit   func(t *testing.T, l *library, d *mediawrite.Delivery)
+		name   string
+	}{
+		{name: "invalid", edit: func(_ *testing.T, _ *library, d *mediawrite.Delivery) { d.Tag = language.Tag{} }},
+		{name: "outside every root", edit: func(t *testing.T, l *library, _ *mediawrite.Delivery) {
+			other := t.TempDir()
+			writeFile(t, filepath.Join(other, "x"), "x")
+			l.roots.set(other)
+			l.w.RootsChanged()
+			eventually(t, "the old root to go", func() bool { return !mediawrite.Available(l.w, l.root) })
+		}},
+		{name: "a pending write on a supersede", edit: func(t *testing.T, l *library, d *mediawrite.Delivery) {
+			s := l.managed(t, "S01E01.en.srt", srtOf("old"))
+			d.Supersedes = []mediawrite.Superseded{s}
+			pending := delivery(t, l.inst, "other")
+			pend := statedb.PendingDeliver{Record: statedb.FileRecord{Inst: l.inst, Name: "S01E01.en.srt", Tag: enTag, Timing: timing.Identity{}, Provenance: &pending.Provenance}, Baseline: pending.Cues}
+			pend.Attempts = []statedb.Download{{At: time.Now(), Target: enTag, Variant: language.Standard, Items: []media.Key{l.key}, Inst: l.inst, Run: statedb.RunID{3}, Attempt: 1, Delivered: true}}
+			if err := l.store.BeginDeliver(t.Context(), pend); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "every numbered name taken", inject: func(f *mediawrite.Faults) {
+			lstat := f.Lstat
+			f.Lstat = func(dir *os.Root, name string) (fs.FileInfo, error) {
+				if strings.HasPrefix(name, "S01E01.en.") && name != "S01E01.en.srt" {
+					return dir.Stat(".")
+				}
+				return lstat(dir, name)
+			}
+		}, edit: func(_ *testing.T, _ *library, d *mediawrite.Delivery) { d.Numbered = true }},
+		{name: "the stage write failed, after the intent", inject: func(f *mediawrite.Faults) {
+			f.Write = func(*os.File, []byte) error { return errors.New("disk full") }
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			l := newLibrary(t, enOnly, mediawrite.Deps{}, c.inject)
+			d := delivery(t, l.inst, "hello")
+			if c.edit != nil {
+				c.edit(t, l, &d)
+			}
+			if _, err := l.w.Deliver(t.Context(), d); err == nil {
+				t.Fatal("Deliver succeeded")
+			}
+			rows := history(t, l.store, l.key)
+			i := slices.IndexFunc(rows, func(r statedb.Download) bool { return r.Candidate == d.Candidate })
+			if i < 0 || rows[i].Delivered || rows[i].Refusal != "write_failed" {
+				t.Errorf("history = %+v, want the attempt undelivered, write_failed", rows)
+			}
+		})
+	}
 }
 
 func TestRemovesNeverNameChosen(t *testing.T) {

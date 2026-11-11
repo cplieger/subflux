@@ -6,7 +6,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/cplieger/bolttable"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
@@ -77,7 +76,7 @@ type keyReader struct {
 
 func (r *keyReader) fail(what string) {
 	if r.err == nil {
-		r.err = fmt.Errorf("%w: key %s", bolttable.ErrCorrupt, what)
+		r.err = fmt.Errorf("%w: key %s", ErrCorrupt, what)
 	}
 	r.b = nil
 }

@@ -161,7 +161,7 @@ func TestSearchRecorded(t *testing.T) {
 		slices.Sort(el)
 		// uk is English; the SDH file is hearing impaired, "[retail+HI
 		// removed]" is not; the Extras archive is left out.
-		if want := []string{"478421.srt", "532620.srt", "532621.srt HI"}; !slices.Equal(en, want) {
+		if want := []string{"478421", "532620", "532621 HI"}; !slices.Equal(en, want) {
 			t.Errorf("English %q, want %q", en, want)
 		}
 		if len(el) != 3 {
@@ -280,9 +280,9 @@ func TestFilenameNamesRelease(t *testing.T) {
 			rels[c.Ref.Token()] = c.Release
 		}
 		want := map[string]string{
-			"1.srt":      "Inception.2010.2160p.WEB-DL.DTS-HD.MA.5.1-TheFarm",
-			"2.srt":      "Inception.2010.2160p.WEB-DL-TheFarm.SDH",
-			"532620.srt": "Inception 2010 2160p UHD BluRay DTS-HD MA 5.1 HDR x265-CtrlHD",
+			"1":      "Inception.2010.2160p.WEB-DL.DTS-HD.MA.5.1-TheFarm",
+			"2":      "Inception.2010.2160p.WEB-DL-TheFarm.SDH",
+			"532620": "Inception 2010 2160p UHD BluRay DTS-HD MA 5.1 HDR x265-CtrlHD",
 		}
 		for tok, rel := range want {
 			if rels[tok] != rel {
@@ -355,19 +355,19 @@ func TestFetchRecorded(t *testing.T) {
 		ctx := providertest.Serve(t, t.Context(), rec, host)
 		a := providertest.Build(t, hdbits.NewEntry(), values)
 		want, _ := os.ReadFile("testdata/getdox-344222.srt")
-		for _, tok := range []string{"344222.srt", "344222"} {
+		for _, tok := range []string{"344222", "344222"} {
 			p, err := a.Fetch(ctx, provider.NewRef(tok))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if p.Name != tok || string(p.Bytes) != string(want) {
-				t.Errorf("payload %q of %d bytes", p.Name, len(p.Bytes))
+			if string(p) != string(want) {
+				t.Errorf("%s: payload of %d bytes, want %d", tok, len(p), len(want))
 			}
 		}
 		if reqs, _ := rec.requests(); len(reqs) != 1 || reqs[0] != "GET /getdox.php" {
 			t.Errorf("requests %q, want one download served twice", reqs)
 		}
-		for _, tok := range []string{"", "abc", "0", "-1", "0344222", "344222.", "344222.s/rt", "344222.toolongext", "4294967296"} {
+		for _, tok := range []string{"", "abc", "0", "-1", "0344222", "344222.", "344222.srt", "344222.s/rt", "4294967296"} {
 			if _, err := a.Fetch(ctx, provider.NewRef(tok)); !isKind(err, provider.Permanent) {
 				t.Errorf("token %q: %v, want Permanent", tok, err)
 			}
@@ -388,7 +388,7 @@ func TestFetchVerdictNotCached(t *testing.T) {
 		}), host)
 		a := providertest.Build(t, hdbits.NewEntry(), "username: user-1\npasskey: wrongpasskey0123456789")
 		for range 2 {
-			_, err := a.Fetch(ctx, provider.NewRef("344222.srt"))
+			_, err := a.Fetch(ctx, provider.NewRef("344222"))
 			if !isKind(err, provider.Auth) || strings.Contains(err.Error(), "wrongpasskey0123456789") {
 				t.Errorf("%v, want Auth without the passkey", err)
 			}

@@ -2,7 +2,6 @@ package subtitleenc
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"testing"
 	"unicode/utf8"
@@ -107,9 +106,9 @@ func (pr pointerRule) standardCodes(t *testing.T) (want map[rune][]byte, codes m
 }
 
 // TestEncodeWritesTheStandardCode drives every two-byte code of each
-// multibyte page through its decoder: Encode writes each character at the
-// pointer the standard's index pointer names, and Decode accepts a code only
-// when it is that one. ISO-2022-JP writes jis0208 at EUC-JP's pointer.
+// multibyte page through its decoder: the codec read checks against writes
+// each character at the pointer the standard's index pointer names, and
+// Decode accepts a code only when it is that one. ISO-2022-JP writes jis0208 at EUC-JP's pointer.
 func TestEncodeWritesTheStandardCode(t *testing.T) {
 	t.Parallel()
 	for _, pr := range pointerRules {
@@ -121,15 +120,15 @@ func TestEncodeWritesTheStandardCode(t *testing.T) {
 			}
 			var bad []string
 			for r, code := range want {
-				if got, err := pr.enc.Encode([]byte(string(r))); err != nil || !bytes.Equal(got, code) {
-					bad = append(bad, fmt.Sprintf("Encode(%U) = % X, %v; want % X", r, got, err, code))
+				if got, ok := codecs[pr.enc].encode([]byte(string(r))); !ok || !bytes.Equal(got, code) {
+					bad = append(bad, fmt.Sprintf("encode(%U) = % X, %t; want % X", r, got, ok, code))
 				}
 				if pr.enc != EUCJP {
 					continue
 				}
 				iso := append(append([]byte("\x1b$B"), code[0]-0x80, code[1]-0x80), "\x1b(B"...)
-				if got, err := ISO2022JP.Encode([]byte(string(r))); err != nil || !bytes.Equal(got, iso) {
-					bad = append(bad, fmt.Sprintf("ISO2022JP.Encode(%U) = % X, %v; want % X", r, got, err, iso))
+				if got, ok := codecs[ISO2022JP].encode([]byte(string(r))); !ok || !bytes.Equal(got, iso) {
+					bad = append(bad, fmt.Sprintf("ISO2022JP encode(%U) = % X, %t; want % X", r, got, ok, iso))
 				}
 			}
 			for code, r := range codes {
@@ -175,9 +174,9 @@ func TestEncodeStandardRows(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := tt.enc.Encode([]byte(tt.text))
-			if err != nil || !bytes.Equal(got, tt.want) {
-				t.Errorf("Encode(%q) = % X, %v; want % X", tt.text, got, err, tt.want)
+			got, ok := codecs[tt.enc].encode([]byte(tt.text))
+			if !ok || !bytes.Equal(got, tt.want) {
+				t.Errorf("encode(%q) = % X, %t; want % X", tt.text, got, ok, tt.want)
 			}
 		})
 	}
@@ -194,8 +193,8 @@ func TestEncodeStandardRows(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got, err := tt.enc.Encode([]byte(tt.text)); !errors.Is(err, ErrUndecodable) || got != nil {
-				t.Errorf("Encode(%q) = % X, %v; want ErrUndecodable", tt.text, got, err)
+			if got, ok := codecs[tt.enc].encode([]byte(tt.text)); ok {
+				t.Errorf("encode(%q) = % X; want no code", tt.text, got)
 			}
 		})
 	}

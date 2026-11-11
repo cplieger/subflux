@@ -64,7 +64,7 @@ func (r authReader) keysOf(userID int64) ([]access.Key, error) {
 			return nil, err
 		}
 		if !ok {
-			return nil, fmt.Errorf("%w: key_user names key %d, which is not stored", bolttable.ErrCorrupt, id)
+			return nil, fmt.Errorf("%w: key_user names key %d, which is not stored", ErrCorrupt, id)
 		}
 		out = append(out, *k)
 	}

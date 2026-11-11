@@ -21,7 +21,6 @@ import (
 // episode].
 type skyhookList struct {
 	Orders   map[string][][3]uint64 `json:"orders"`
-	Title    string                 `json:"title"`
 	Episodes [][5]any               `json:"episodes"`
 	TVDB     uint64                 `json:"tvdb"`
 }

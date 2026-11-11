@@ -243,8 +243,8 @@ func (a *adapter) idParams(q *provider.Query, wires []string, n numbering) (url.
 	default:
 		return nil, false
 	}
-	if a.useHash && q.Hash.OSHash != 0 {
-		p.Set("moviehash", fmt.Sprintf("%016x", q.Hash.OSHash))
+	if a.useHash && q.OSHash != 0 {
+		p.Set("moviehash", fmt.Sprintf("%016x", q.OSHash))
 	}
 	return p, true
 }
@@ -340,60 +340,59 @@ func (a *adapter) Test(ctx context.Context) error {
 
 type downloadAnswer struct {
 	Link      string `json:"link"`
-	ResetUTC  string `json:"reset_time_utc"`
 	Requests  int    `json:"requests"`
 	Remaining int    `json:"remaining"`
 }
 
 // Fetch asks the API host for the file's link, which spends a quota unit and
 // so is sent once, then GETs the link.
-func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) (provider.Payload, error) {
+func (a *adapter) Fetch(ctx context.Context, ref provider.Ref) ([]byte, error) {
 	id, err := strconv.ParseUint(ref.Token(), 10, 31)
 	if err != nil || id == 0 {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "the file id is not a number")
+		return nil, provider.Fail(provider.Permanent, "the file id is not a number")
 	}
 	s, err := a.session(ctx)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	body, err := json.Marshal(struct {
 		Format string `json:"sub_format"`
 		FileID uint64 `json:"file_id"`
 	}{"srt", id})
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	// /download answers 503 on the VIP search host, so it always goes to
 	// the API host.
 	var r downloadAnswer
 	err = a.call(ctx, http.MethodPost, apiHost, "/download", nil, body, s.token, maxAnswerBody, &r)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	if r.Remaining*10 < (r.Requests+r.Remaining)*3 {
 		slog.Warn("opensubtitles: download quota low", "remaining", r.Remaining, "used", r.Requests)
 	}
 	link, err := url.Parse(r.Link)
 	if err != nil || r.Link == "" {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered a download with no link")
+		return nil, provider.Fail(provider.Permanent, "OpenSubtitles answered a download with no link")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link.String(), http.NoBody)
 	if err != nil {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered an unusable link")
+		return nil, provider.Fail(provider.Permanent, "OpenSubtitles answered an unusable link")
 	}
 	resp, err := a.do(req, "")
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := provider.ReadAll(resp, provider.MaxBody)
 	if err != nil {
-		return provider.Payload{}, err
+		return nil, err
 	}
 	if len(b) == 0 {
-		return provider.Payload{}, provider.Fail(provider.Permanent, "OpenSubtitles answered an empty file")
+		return nil, provider.Fail(provider.Permanent, "OpenSubtitles answered an empty file")
 	}
-	return provider.Payload{Name: provider.PayloadName(resp), Bytes: b}, nil
+	return b, nil
 }
 
 // call sends one API request to host, carrying the key and, when set, the

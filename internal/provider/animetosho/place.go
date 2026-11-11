@@ -60,17 +60,13 @@ func (p *placer) candidates(an answer, fq *feedQuery) []provider.Candidate {
 }
 
 // place reads claim c of a file of anime's answer. A name stating seasons
-// numbers its episodes as TVDB does ("S01E05 - Title"), so it is the
-// searched landings of that anime landing on one of them: AnimeTosho files a
-// later season's releases under the first season's anime too. Any other
-// Regular or Special claim numbers them as AniDB does ("2nd Season - 05"),
-// so it is the searched landings of that anime, kind and numbers. On a
-// one-episode anime a file claiming nothing is its regular episode 1, and a
-// one-number form counts as no claim there, since a film's name carries its
-// title's numbers ("Show Movie 02"). A credit or promotion label is offered
-// while its anime has a searched landing of that kind, and a file claiming
-// nothing while it has a searched parody or other one: AniDB numbers each of
-// those kinds as one sequence a name cannot be read against.
+// ("S01E05") numbers as TVDB does and lands on any searched landing of it,
+// since AnimeTosho files later seasons under the first season's anime. Other
+// Regular or Special claims number as AniDB does ("2nd Season - 05"). On a
+// one-episode anime a missing or one-number claim is episode 1 ("Show Movie
+// 02" is a title). Credits and promotions match while the anime has a searched
+// landing of that kind; a file claiming nothing is offered while it has a
+// searched parody or other one, kinds AniDB numbers as one unreadable sequence.
 func (p *placer) place(anime int, c animemap.Claim) place {
 	single := animemap.Single(p.x, anime)
 	if c.Step == animemap.ByAbsolute && single {

@@ -31,6 +31,7 @@ const MaxAlertSource = 512
 // The per-entity kinds, one per constructor.
 const (
 	kindProvider      = "provider"
+	kindProviderData  = "provider_data"
 	kindSource        = "source"
 	kindSourceOverlap = "source_overlap"
 	kindMediaServer   = "media_server"
@@ -39,7 +40,7 @@ const (
 
 var (
 	fixedKinds  = []AlertSource{AlertConfig, AlertStore, AlertJobRecords, AlertBackup, AlertAuthDisabled, AlertAdminSocket, AlertRestartPending, AlertPendingWrites}
-	entityKinds = []string{kindProvider, kindSource, kindSourceOverlap, kindMediaServer, kindMediaRoot}
+	entityKinds = []string{kindProvider, kindProviderData, kindSource, kindSourceOverlap, kindMediaServer, kindMediaRoot}
 )
 
 // The per-entity constructors return "<kind>:<value>" when that is at most
@@ -50,6 +51,10 @@ var (
 
 // ProviderAlert is the source for a subtitle provider, by its id.
 func ProviderAlert(id string) AlertSource { return entitySource(kindProvider, id) }
+
+// ProviderDataAlert is the source for the data a subtitle provider
+// downloads, such as AnimeTosho's anime map, by the provider's id.
+func ProviderDataAlert(id string) AlertSource { return entitySource(kindProviderData, id) }
 
 // SourceAlert is the source for a media source, by its id.
 func SourceAlert(id string) AlertSource { return entitySource(kindSource, id) }

@@ -100,9 +100,9 @@ func (h *Harness) recorded(t *testing.T) {
 			t.Errorf("candidate %s: language %v is not one asked and mapped", c.Ref.Token(), c.Lang)
 		}
 	}
-	p, err := a.Fetch(ctx, got[0].Ref)
-	if err != nil || len(p.Bytes) == 0 {
-		t.Fatalf("fetch %s: %d bytes, %v", got[0].Ref.Token(), len(p.Bytes), err)
+	b, err := a.Fetch(ctx, got[0].Ref)
+	if err != nil || len(b) == 0 {
+		t.Fatalf("fetch %s: %d bytes, %v", got[0].Ref.Token(), len(b), err)
 	}
 }
 

@@ -369,6 +369,28 @@ func TestUndeliveredAttemptsAreNeverPruned(t *testing.T) {
 	}
 }
 
+func TestUnlandedDeliveryRefusesItsAttempt(t *testing.T) {
+	s, _ := newLibrary(t, "sonarr")
+	k, inst := showEpisode(t, s, "sonarr", epPath)
+	d := pendingDeliver(t, inst, managedName, 1, k)
+	staged, cut := attemptOf(inst, false, k), attemptOf(inst, false, k)
+	staged.Attempt, cut.Attempt, cut.Refusal = 2, 3, "different_cut"
+	d.Attempts = append(d.Attempts, staged, cut)
+	beginDeliver(t, s, d)
+	endDeliver(t, s, inst, managedName, false)
+	got := storedDownloads(t, s)
+	refusals := make([]string, 0, len(got))
+	for _, row := range got {
+		if row.Delivered {
+			t.Errorf("row %+v delivered", row)
+		}
+		refusals = append(refusals, row.Refusal)
+	}
+	if want := []string{"write_failed", "", "different_cut"}; !slices.Equal(refusals, want) {
+		t.Errorf("refusals %q, want %q: the attempt it was to deliver write_failed, the others as staged", refusals, want)
+	}
+}
+
 func TestEndDeliverKeepsOwnNameAmongRemoves(t *testing.T) {
 	s, _ := newLibrary(t, "sonarr")
 	k, inst := showEpisode(t, s, "sonarr", epPath)

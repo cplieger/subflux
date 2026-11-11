@@ -1,223 +1,128 @@
-// Package archive extracts a subtitle from a ZIP or RAR container.
+// Package archive unwraps a fetched subtitle payload: Decompress removes a
+// gzip or xz layer and Extract takes one member out of a zip or rar.
 //
-// One export does the work: Extract. Everything else here is unexported,
-// because a symbol only this package's tests reach is surface nobody has to
-// maintain.
-//
-// Each container supplies a SEQUENCE of members (zip.go, rar.go). One
-// selection policy walks any such sequence (member.go): the entry gate, the
-// episode match, and the classification of a miss. Extract picks which
-// container to open and decides what a refusal means to a caller.
-//
-// Which member answers for which episode is epmarker's judgement, not this
-// package's. Only the filepath.Base narrowing is local, because a directory
-// named for a season must not answer for a member inside it.
+// Every decoder allocation is bounded from the headers before the decoder
+// runs (xz.go, zipwalk.go, rar.go), since a few crafted header bytes can
+// otherwise declare gigabytes. ErrNotArchive is the only refusal a caller
+// branches on; every refusal of bytes that did open is one line and
+// httpclient.Permanent, so no retry fetches the same bytes again.
 package archive
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/textsafe"
-	"github.com/cplieger/subflux/internal/epmarker"
-	"github.com/cplieger/subflux/internal/language"
-	"github.com/cplieger/subflux/internal/subtitleenc"
-	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// maxExtractSize is the maximum size of a single extracted subtitle file (5 MB).
-const maxExtractSize = 5 << 20
-
-// maxNamesInError bounds how many member names a refusal lists, and maxNameBytes
-// bounds each one. A real pack holds around 30 members and a crafted one up to
-// maxZipEntries, so the whole list has no place in a log attribute.
-const (
-	maxNamesInError = 8
-	maxNameBytes    = 128
-)
-
-// ErrNotArchive reports that data is not a container this package can open. It
-// is the one refusal a caller branches on: the raw bytes are still the whole
-// story and timing.ParseCues is what names them. Every other refusal
-// describes an archive that DID open.
+// ErrNotArchive reports bytes that are neither zip nor rar: they are the
+// subtitle candidate as they are.
 var ErrNotArchive = errors.New("not a readable zip or rar archive")
 
-// Extract returns the subtitle for want from an archive.
-//
-// Tries ZIP first, then RAR, using magic bytes to skip a probe that cannot
-// match. If the data is not a recognized archive, returns it only when it
-// looks like subtitle content.
-//
-// A fixed target refuses rather than falling back to an unmatched member, so a
-// season pack cannot yield the wrong episode. An epmarker.Any target takes the
-// first readable subtitle, which is what a movie download wants.
-//
-// A nil error means the returned bytes are the answer. An error matching
-// ErrNotArchive means nothing here could read the data; any other error
-// describes an archive that opened and had no subtitle for this target.
-func Extract(data []byte, want epmarker.Target) ([]byte, error) {
-	if looksLikeSubtitle(data) && !hasSignature(data) {
-		return data, nil
-	}
+const (
+	// maxMember bounds one extracted member and Decompress's output.
+	maxMember = 5 << 20
+	// maxEntries bounds the zip central-directory records and rar headers
+	// read; real subtitle packs hold a few dozen.
+	maxEntries = 4096
 
-	content, err := extractFromContainer(data, want)
-	if err == nil {
-		return content, nil
-	}
+	maxNameBytes  = 128
+	maxCauseBytes = 512
+)
 
-	if looksLikeSubtitle(data) {
-		return data, nil
-	}
-	return nil, err
-}
-
-// extractFromContainer picks the reader by magic bytes, trying both only when
-// the magic is unknown (a self-extracting or prefixed archive carries neither
-// signature at offset zero yet still reads).
-func extractFromContainer(data []byte, want epmarker.Target) ([]byte, error) {
-	switch {
-	case hasZIPMagic(data):
-		return extractWith(zipMembers, data, want)
-	case hasRARMagic(data):
-		return extractWith(rarMembers, data, want)
-	default:
-		content, zipErr := extractWith(zipMembers, data, want)
-		if zipErr == nil {
-			return content, nil
-		}
-		content, rarErr := extractWith(rarMembers, data, want)
-		if rarErr == nil {
-			return content, nil
-		}
-		return nil, statedRefusal(zipErr, rarErr)
-	}
-}
-
-func extractWith(
-	open func([]byte) (func(func(member) bool), error),
-	data []byte,
-	want epmarker.Target,
-) ([]byte, error) {
+// Extract returns the member choose picks, calling it once with every gated
+// member's full name in archive order. Before zip.NewReader, which reads
+// central-directory headers until a bad one whatever the end record
+// declares, it walks the directory from its classic or ZIP64 offset,
+// refusing at record maxEntries+1 or a count the walk contradicts, and
+// checks len(r.File) after the open. Bytes neither zip nor rar give
+// ErrNotArchive; any other error, a choose error or an index outside the
+// list included, refuses an archive that did open.
+func Extract(data []byte, choose func(names []string) (int, error)) ([]byte, error) {
 	members, err := open(data)
 	if err != nil {
 		return nil, err
 	}
-	return selectMember(members, want)
-}
-
-// statedRefusal returns the first refusal that says more than "I could not
-// read this". Both readers run when the magic is unknown, so one may have
-// opened the data and refused for a stated reason while the other simply
-// failed to parse it.
-func statedRefusal(errs ...error) error {
-	for _, err := range errs {
-		if err != nil && !errors.Is(err, ErrNotArchive) {
-			return err
+	var gated []member
+	for _, m := range members {
+		if gate(m) {
+			gated = append(gated, m)
 		}
 	}
-	return ErrNotArchive
+	if len(gated) == 0 {
+		return nil, refuse(nil, "archive holds no subtitle member among its %d", len(members))
+	}
+	names := make([]string, len(gated))
+	for i := range gated {
+		names[i] = gated[i].name
+	}
+	i, err := choose(names)
+	if err != nil {
+		return nil, refuse(err, "no member chosen of %d", len(gated))
+	}
+	if i < 0 || i >= len(gated) {
+		return nil, refuse(nil, "member %d chosen of %d", i, len(gated))
+	}
+	return gated[i].read()
 }
 
-// checkMemberContent turns a container read into the (content, error) pair the
-// selection loop expects, applying the size cap.
-func checkMemberContent(name string, content []byte, readErr error) ([]byte, error) {
-	safe := summarizeNames([]string{name})
+// open reads data's members by its magic, trying both containers when it
+// carries neither at offset zero (a self-extracting or prefixed archive).
+func open(data []byte) ([]member, error) {
 	switch {
-	case readErr != nil:
-		return nil, fmt.Errorf("read member %s: %w", safe, readErr)
-	case len(content) == 0:
-		return nil, fmt.Errorf("member %s is empty", safe)
-	case len(content) > maxExtractSize:
-		return nil, fmt.Errorf("member %s is above the %d-byte cap", safe, maxExtractSize)
+	case hasZIPMagic(data):
+		ms, err := zipMembers(data)
+		if errors.Is(err, errNoContainer) {
+			return nil, refuse(nil, "zip has no end of central directory record")
+		}
+		return ms, err
+	case hasRARMagic(data):
+		ms, err := rarMembers(data)
+		if errors.Is(err, errNoContainer) {
+			return nil, refuse(nil, "rar signature unreadable")
+		}
+		return ms, err
 	}
-	return content, nil
+	ms, err := zipMembers(data)
+	if !errors.Is(err, errNoContainer) {
+		return ms, err
+	}
+	ms, err = rarMembers(data)
+	if errors.Is(err, errNoContainer) {
+		return nil, ErrNotArchive
+	}
+	return ms, err
 }
 
-// summarizeNames renders member names for an error that reaches the
-// operator's log. Names are upstream-controlled, so each is sanitized and
-// capped, and the list is truncated because a crafted archive may declare
-// thousands.
-func summarizeNames(names []string) string {
-	shown := names
-	if len(shown) > maxNamesInError {
-		shown = shown[:maxNamesInError]
-	}
-	safe := make([]string, 0, len(shown)+1)
-	for _, n := range shown {
-		safe = append(safe, textsafe.SanitizeSingleLineBounded(n, maxNameBytes))
-	}
-	if len(names) > len(shown) {
-		safe = append(safe, fmt.Sprintf("(+%d more)", len(names)-len(shown)))
-	}
-	return strings.Join(safe, ", ")
+// errNoContainer is a reader finding no trace of its container, which open
+// turns into ErrNotArchive or, under that container's magic, a refusal.
+var errNoContainer = errors.New("no container")
+
+// refusal is every refusal of bytes that opened. Its text lands in a slog
+// attribute, so it is one line rather than an errors.Join.
+type refusal struct {
+	err error
+	msg string
 }
 
-func hasSignature(data []byte) bool {
-	return hasZIPMagic(data) || hasRARMagic(data)
+func (r *refusal) Error() string {
+	if r.err == nil {
+		return r.msg
+	}
+	return r.msg + ": " + textsafe.SanitizeSingleLineBounded(r.err.Error(), maxCauseBytes)
+}
+
+func (r *refusal) Unwrap() error { return r.err }
+
+func refuse(cause error, format string, args ...any) error {
+	return httpclient.Permanent(&refusal{err: cause, msg: fmt.Sprintf(format, args...)})
 }
 
 func hasZIPMagic(data []byte) bool {
-	return len(data) >= 4 &&
-		data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4
+	return len(data) >= 4 && string(data[:4]) == "PK\x03\x04"
 }
 
 func hasRARMagic(data []byte) bool {
-	return len(data) >= 6 &&
-		data[0] == 'R' && data[1] == 'a' && data[2] == 'r' &&
-		data[3] == '!' && data[4] == 0x1a && data[5] == 0x07
-}
-
-var subtitleSignatures = [][]byte{
-	[]byte(" --> "),
-	[]byte("[Script Info"),
-	[]byte("Dialogue:"),
-	[]byte("WEBVTT"),
-}
-
-// looksLikeSubtitle probes the decoded form rather than raw bytes, so a
-// UTF-16 subtitle (NUL-interleaved) is judged on its text rather than being
-// read as binary, and an unnamed payload is probed raw.
-func looksLikeSubtitle(data []byte) bool {
-	return looksLikeSubtitleRaw(decodeView(data))
-}
-
-// decodeView returns data unchanged when Detect, with no hint, cannot name
-// and decode it.
-func decodeView(data []byte) []byte {
-	text, err := subtitleenc.Detect(data, language.Tag{}).Decode(data)
-	if err != nil {
-		return data
-	}
-	return text
-}
-
-func looksLikeSubtitleRaw(data []byte) bool {
-	if len(data) == 0 {
-		return false
-	}
-
-	probe := data
-	if bytes.HasPrefix(probe, []byte{0xEF, 0xBB, 0xBF}) {
-		probe = probe[3:]
-	}
-	if len(probe) == 0 {
-		return false
-	}
-
-	if len(probe) > 4096 {
-		probe = probe[:4096]
-	}
-
-	if !subtitlefile.LooksLikeText(probe) {
-		return false
-	}
-
-	for _, sig := range subtitleSignatures {
-		if bytes.Contains(probe, sig) {
-			return true
-		}
-	}
-	return false
+	return len(data) >= 6 && string(data[:6]) == "Rar!\x1a\x07"
 }
