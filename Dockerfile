@@ -13,7 +13,7 @@ ARG FFMPEG_VERSION=9.0.2
 ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
 # --- Source downloads (cached independently) ---
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS sources
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 ARG FFMPEG_VERSION
@@ -88,7 +88,7 @@ EOF
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
 # Produces ~5MB ffmpeg + ~2MB ffprobe. No network, no HW accel.
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS ffmpeg-builder
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS ffmpeg-builder
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
@@ -165,7 +165,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 # the pinned @cplieger client libraries; the bundling itself happens in the
 # Go builder stage via cmd/bundle (esbuild's Go API — see that stage), which
 # consumes this stage's static-src tree with the fetched node_modules.
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS ts-builder
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018
@@ -194,13 +194,13 @@ COPY internal/server/static-src/ ./
 # renovate: datasource=npm depName=@cplieger/actions
 ARG CPLIEGER_ACTIONS_VERSION=3.2.0
 # renovate: datasource=npm depName=@cplieger/reactive
-ARG CPLIEGER_REACTIVE_VERSION=2.3.0
+ARG CPLIEGER_REACTIVE_VERSION=2.4.0
 # renovate: datasource=npm depName=@cplieger/ui-primitives
 ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.2.0
 # renovate: datasource=npm depName=@cplieger/fetch
 ARG CPLIEGER_FETCH_VERSION=2.3.0
 # renovate: datasource=npm depName=@cplieger/keyenc
-ARG CPLIEGER_KEYENC_VERSION=1.1.0
+ARG CPLIEGER_KEYENC_VERSION=1.3.0
 # renovate: datasource=npm depName=@cplieger/sse
 ARG CPLIEGER_SSE_VERSION=1.2.1
 
@@ -301,7 +301,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     sh scripts/collect-licenses.sh --name subflux .
 
 # --- Final image ---
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
