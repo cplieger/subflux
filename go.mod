@@ -19,7 +19,7 @@ require (
 	github.com/cplieger/go/ssrf v1.1.0
 	github.com/cplieger/go/textsafe v1.1.0
 	github.com/cplieger/go/yamlenv v1.1.0
-	github.com/cplieger/langtag/v3 v3.2.0-dev.3
+	github.com/cplieger/langtag/v3 v3.2.0
 	github.com/dlclark/regexp2/v2 v2.13.0
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/ulikunitz/xz v0.5.17
