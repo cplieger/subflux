@@ -366,6 +366,10 @@ type authTables struct {
 	tokensByIssuer *bolttable.Index[string, tokenRow]
 	unreported     *bolttable.Index[account.FailureRef, failureRow]
 	attrsByUser    *bolttable.Index[int64, attributionRow]
+	log            *bolttable.Table[uint64, logRow]
+	logClasses     *bolttable.Table[account.LogClass, logClassRow]
+	logByClass     *bolttable.Index[uint64, logRow]
+	logCounts      map[account.LogClass]*bolttable.Counter[uint64, logRow]
 }
 
 // The auth table prefixes (design section 4).
@@ -382,6 +386,8 @@ const (
 	pSecrets      byte = 0x29
 	pAttributions byte = 0x2A
 	pMethodState  byte = 0x2B
+	pLog          byte = 0x2C
+	pLogClasses   byte = 0x2D
 )
 
 // The unique indexes whose conflict answers an account sentinel (rule 4).
@@ -405,6 +411,9 @@ var (
 	secretsCodec     = rowCodec[secretsRow, *secretsRow]{version: 1}
 	attributionCodec = rowCodec[attributionRow, *attributionRow]{version: 1}
 	methodStateCodec = rowCodec[methodStateRow, *methodStateRow]{version: 1}
+	logCodec         = rowCodec[logRow, *logRow]{version: 1}
+	logClassCodec    = rowCodec[logClassRow, *logClassRow]{version: 1}
+	logSeqKeys       bolttable.Uint64Key
 )
 
 // defineAuthIn declares auth's tables in ns, so a test can declare one more
@@ -426,6 +435,8 @@ func defineAuthIn(ns *bolttable.Namespace) (*authTables, error) {
 		secrets:      define(&d, ns, pSecrets, "secrets", constKeys, secretsCodec, silent),
 		attributions: define(&d, ns, pAttributions, "key_attributions", idKeys, attributionCodec, live),
 		methodState:  define(&d, ns, pMethodState, "auth_method_state", constKeys, methodStateCodec, silent),
+		log:          define(&d, ns, pLog, "security_log", logSeqKeys, logCodec, silent),
+		logClasses:   define(&d, ns, pLogClasses, "log_classes", logClassKeys, logClassCodec, silent),
 	}
 	plain := bolttable.IndexOptions{Version: 1}
 	unique := bolttable.IndexOptions{Version: 1, Unique: true}
@@ -442,8 +453,20 @@ func defineAuthIn(ns *bolttable.Namespace) (*authTables, error) {
 	a.tokensByIssuer = index(&d, a.tokens, "token_issued_by", plain, tokenIssuerEntries)
 	a.unreported = index(&d, a.failures, "unreported", plain, unreportedEntries)
 	a.attrsByUser = index(&d, a.attributions, "attribution_user", plain, attributionUserEntries)
+	a.logByClass = index(&d, a.log, "class", plain, logClassEntries)
 	if d.err == nil {
 		a.userCount, d.err = bolttable.DefineCounter(a.users, "user_count", 1, func(int64, *userRow) int64 { return 1 })
+	}
+	a.logCounts = make(map[account.LogClass]*bolttable.Counter[uint64, logRow], len(account.LogClasses()))
+	for _, class := range account.LogClasses() {
+		if d.err == nil {
+			a.logCounts[class], d.err = bolttable.DefineCounter(a.log, "log_"+string(class), 1, func(_ uint64, v *logRow) int64 {
+				if v.Class == string(class) {
+					return 1
+				}
+				return 0
+			})
+		}
 	}
 	byID := func(id int64) []byte { return idKeys.AppendKey(nil, id) }
 	cascade(&d, a.users, a.sessions, byID)
@@ -529,4 +552,11 @@ func unreportedEntries(f account.FailureRef, v *failureRow) []bolttable.Entry {
 
 func attributionUserEntries(id int64, v *attributionRow) []bolttable.Entry {
 	return one(idKeys.AppendKey(idKeys.AppendKey(nil, v.UserID), id))
+}
+
+// logClassEntries keys an entry by class, then Seq, so a class's entries
+// scan in Seq order, and projects At, which a Before prune compares without
+// reading the row.
+func logClassEntries(seq uint64, v *logRow) []bolttable.Entry {
+	return []bolttable.Entry{{Key: appendUint64(logClassKeys.AppendKey(nil, account.LogClass(v.Class)), seq), Value: appendTime(nil, v.At)}}
 }

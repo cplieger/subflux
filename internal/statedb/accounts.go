@@ -101,13 +101,15 @@ var (
 	errCleanupTimeout = errors.New("statedb: a cleanup with a timeout not above zero")
 )
 
-// drawID is the sequence an account create draws its ID from; a test swaps
-// it to reach rule 17's bound without 2^53 creates.
+// drawID is the sequence an account ID or log Seq is drawn from; a test
+// swaps it to reach the 2^53 - 1 bound of rules 17 and 22 without that many
+// draws.
 var drawID = func(tx *bolttable.Tx, next func(*bolttable.Tx) (uint64, error)) (uint64, error) { return next(tx) }
 
-// newID assigns the next ID of t's sequence, which a delete never lowers and
-// a rollback returns, so no committed ID is assigned twice (rule 17).
-func newID[K, V any](tx *bolttable.Tx, t *bolttable.Table[K, V]) (int64, error) {
+// newSeq assigns the next number of t's sequence, which a delete never
+// lowers and a rollback returns, so no committed number is assigned twice
+// (rules 17 and 22).
+func newSeq[K, V any](tx *bolttable.Tx, t *bolttable.Table[K, V]) (uint64, error) {
 	n, err := drawID(tx, t.NextID)
 	if err != nil {
 		return 0, err
@@ -115,7 +117,13 @@ func newID[K, V any](tx *bolttable.Tx, t *bolttable.Table[K, V]) (int64, error) 
 	if n == 0 || n > maxID {
 		return 0, fmt.Errorf("%w: %d", errIDRange, n)
 	}
-	return int64(n), nil
+	return n, nil
+}
+
+// newID is newSeq as the int64 ID an account record carries.
+func newID[K, V any](tx *bolttable.Tx, t *bolttable.Table[K, V]) (int64, error) {
+	n, err := newSeq(tx, t)
+	return int64(n), err //nolint:gosec // G115: newSeq bounds n to 2^53 - 1
 }
 
 // conflictErr maps a unique-index conflict to the sentinel its index answers
