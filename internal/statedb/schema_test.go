@@ -22,6 +22,7 @@ var designSilent = []string{
 	"activation", "passes", "cursors", "stamps", "overlaps", "baselines",
 	"ordinals", "intents", "work", "jobs", "credentials", "no_results", "root_evidence", "counts",
 	"session_activity", "passkey_use", "key_use", "tokens", "failures", "secrets", "auth_method_state",
+	"security_log", "log_classes",
 }
 
 // allFixtures is every core fixture, then every auth fixture.
@@ -74,7 +75,7 @@ func TestNoCrossNamespaceDeclaration(t *testing.T) {
 	})
 	t.Run("each prefix is taken", func(t *testing.T) {
 		probe := bolttable.Must(s.Namespace("probe"))
-		for _, p := range []byte{pCredentials, pCounts, pUsers, pMethodState} {
+		for _, p := range []byte{pCredentials, pCounts, pUsers, pMethodState, pLog, pLogClasses} {
 			if _, err := bolttable.Define(probe, p, fmt.Sprintf("clash_%x", p), instKeys, stampCodec, bolttable.TableOptions{}); err == nil {
 				t.Errorf("a third namespace declared prefix %#x, which core or auth holds", p)
 			}

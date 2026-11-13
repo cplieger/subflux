@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -57,6 +59,24 @@ func TestFormatGolden(t *testing.T) {
 			}
 		}
 	})
+	t.Run("every log entry field is stored", func(t *testing.T) {
+		e := fixtureLogEntry()
+		for _, path := range zeroFields(reflect.ValueOf(e), "LogEntry") {
+			t.Errorf("the fixture leaves %s zero, so its round trip proves nothing", path)
+		}
+		row := logRowOf(&e)
+		b, err := logCodec.Append(nil, &row)
+		if err != nil {
+			t.Fatalf("Append: %v", err)
+		}
+		var back logRow
+		if err := logCodec.Decode(b, &back); err != nil {
+			t.Fatalf("Decode: %v", err)
+		}
+		if got := logEntryOf(e.Event.Seq, &back); !reflect.DeepEqual(got, e) {
+			t.Errorf("the stored entry reads back %+v, want %+v", got, e)
+		}
+	})
 	got := formatLines(t)
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		var b strings.Builder
@@ -93,6 +113,22 @@ func TestFormatGolden(t *testing.T) {
 			t.Errorf("%s is in %s but no longer produced; run %s", id, formatGolden, regenerate)
 		}
 	}
+}
+
+// zeroFields lists the zero leaf fields under v, a time.Time or netip.Addr
+// counting as one leaf.
+func zeroFields(v reflect.Value, path string) []string {
+	if v.Kind() != reflect.Struct || v.Type() == reflect.TypeFor[time.Time]() || v.Type() == reflect.TypeFor[netip.Addr]() {
+		if v.IsZero() {
+			return []string{path}
+		}
+		return nil
+	}
+	var out []string
+	for i := range v.NumField() {
+		out = append(out, zeroFields(v.Field(i), path+"."+v.Type().Field(i).Name)...)
+	}
+	return out
 }
 
 // goldenDrift names what changed between the pinned line w and g, "" for
@@ -205,6 +241,7 @@ func formatLines(t *testing.T) []goldenLine {
 			{"tokens.issued_by", entriesOf(a.tokensByIssuer)},
 			{"failures.unreported", entriesOf(a.unreported)},
 			{"key_attributions.user", entriesOf(a.attrsByUser)},
+			{"security_log.class", entriesOf(a.logByClass)},
 		} {
 			entries, err := ix.scan(r)
 			if err != nil {

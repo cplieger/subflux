@@ -3,6 +3,8 @@ package statedb
 import (
 	"errors"
 	"fmt"
+	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/cplieger/access"
@@ -257,6 +259,110 @@ func (r *methodStateRow) check() error {
 	}
 	return nil
 }
+
+// logClassKeys keys log_classes, and prefixes the class index, by a class
+// of account.LogClasses; ParseKey refuses any other.
+var logClassKeys = keyCodec[account.LogClass]{
+	version: 1,
+	put:     func(dst []byte, c account.LogClass) []byte { return appendText(dst, string(c)) },
+	parse: func(r *keyReader) account.LogClass {
+		c := account.LogClass(r.text("log class"))
+		if r.err == nil && !slices.Contains(account.LogClasses(), c) {
+			r.fail("log class")
+		}
+		return c
+	},
+}
+
+// 0x2C security_log: account.LogEntry less Event.Seq, which the key holds.
+type logRow struct {
+	At             time.Time  `json:"at"`
+	IP             netip.Addr `json:"ip"`
+	Class          string     `json:"class"`
+	ActorLabel     string     `json:"actor_label"`
+	ActorUserAgent string     `json:"actor_user_agent"`
+	ActorKeySuffix string     `json:"actor_key_suffix"`
+	Detail         string     `json:"detail"`
+	Event          eventRow   `json:"event"`
+}
+
+type eventRow struct {
+	At         time.Time     `json:"at"`
+	Kind       string        `json:"kind"`
+	Method     string        `json:"method"`
+	Role       string        `json:"role"`
+	SessionIDs []string      `json:"session_ids"`
+	Actor      eventActorRow `json:"actor"`
+	UserID     int64         `json:"user_id"`
+	KeyID      int64         `json:"key_id"`
+	PasskeyID  int64         `json:"passkey_id"`
+	Trusted    bool          `json:"trusted"`
+}
+
+type eventActorRow struct {
+	SessionID string `json:"session_id"`
+	OutOfBand string `json:"out_of_band"`
+	UserID    int64  `json:"user_id"`
+	KeyID     int64  `json:"key_id"`
+}
+
+var errRowLogClass = errors.New("statedb: stored log class is not one of account.LogClasses")
+
+func (r *logRow) check() error {
+	if !slices.Contains(account.LogClasses(), account.LogClass(r.Class)) {
+		return errRowLogClass
+	}
+	for _, id := range []struct {
+		what string
+		v    int64
+	}{
+		{"event user id", r.Event.UserID},
+		{"event key id", r.Event.KeyID},
+		{"event passkey id", r.Event.PasskeyID},
+		{"actor user id", r.Event.Actor.UserID},
+		{"actor key id", r.Event.Actor.KeyID},
+	} {
+		if err := nonNegative(id.what, id.v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func logRowOf(e *account.LogEntry) logRow {
+	ev := &e.Event
+	return logRow{
+		At: e.At, IP: e.IP, Class: string(e.Class),
+		ActorLabel: e.ActorLabel, ActorUserAgent: e.ActorUserAgent, ActorKeySuffix: e.ActorKeySuffix, Detail: e.Detail,
+		Event: eventRow{
+			At: ev.At, Kind: string(ev.Kind), Method: string(ev.Method), Role: string(ev.Role), SessionIDs: ev.SessionIDs,
+			Actor:  eventActorRow{SessionID: ev.Actor.SessionID, OutOfBand: ev.Actor.OutOfBand, UserID: ev.Actor.UserID, KeyID: ev.Actor.KeyID},
+			UserID: ev.UserID, KeyID: ev.KeyID, PasskeyID: ev.PasskeyID, Trusted: ev.Trusted,
+		},
+	}
+}
+
+func logEntryOf(seq uint64, r *logRow) account.LogEntry {
+	ev := &r.Event
+	return account.LogEntry{
+		At: r.At, IP: r.IP, Class: account.LogClass(r.Class),
+		ActorLabel: r.ActorLabel, ActorUserAgent: r.ActorUserAgent, ActorKeySuffix: r.ActorKeySuffix, Detail: r.Detail,
+		Event: account.Event{
+			At: ev.At, Kind: account.EventKind(ev.Kind), Method: access.Method(ev.Method), Role: access.Role(ev.Role), SessionIDs: ev.SessionIDs,
+			Actor:  account.EventActor{SessionID: ev.Actor.SessionID, OutOfBand: ev.Actor.OutOfBand, UserID: ev.Actor.UserID, KeyID: ev.Actor.KeyID},
+			UserID: ev.UserID, KeyID: ev.KeyID, PasskeyID: ev.PasskeyID, Seq: seq, Trusted: ev.Trusted,
+		},
+	}
+}
+
+// 0x2D log_classes: a class's Keep evictions. A primary row, not a
+// bolttable counter, because Verify recomputes counters from rows and would
+// zero it.
+type logClassRow struct {
+	Evicted uint64 `json:"evicted"`
+}
+
+func (*logClassRow) check() error { return nil }
 
 func positive(what string, id int64) error {
 	if id < 1 {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/access"
+	"github.com/cplieger/access/account"
 	"github.com/cplieger/bolttable"
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/media"
@@ -372,14 +373,18 @@ func seedBoth(t *testing.T, path string, ts *tables) AuthSecrets {
 	if err != nil {
 		t.Fatalf("AuthSecrets: %v", err)
 	}
+	for range 2 {
+		mustAppendLog(t, s.Accounts(), testLogEntry(account.LogClassChange, accountsAt))
+	}
+	mustPruneLog(t, s.Accounts(), account.LogPrune{Class: account.LogClassChange, Keep: 1, Limit: 10})
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 	return secrets
 }
 
-// heldRows reports whether the seeded core row, and the seeded user and
-// secrets, are in the store.
+// heldRows reports whether the seeded core row, and the seeded user,
+// secrets, log entry and log class row, are in the store.
 func heldRows(t *testing.T, s *Store, secrets AuthSecrets) (core, auth bool) {
 	t.Helper()
 	err := s.db.View(t.Context(), func(r *bolttable.ReadTx) error {
@@ -395,7 +400,16 @@ func heldRows(t *testing.T, s *Store, secrets AuthSecrets) (core, auth bool) {
 		if err != nil {
 			return err
 		}
-		core, auth = item, stored && n == 1 && sec.FailureKey == sum32(secrets.FailureKey) && sec.DeviceKey == sum32(secrets.DeviceKey)
+		_, entry, err := s.a.log.Get(r, 2)
+		if err != nil {
+			return err
+		}
+		class, classStored, err := s.a.logClasses.Get(r, account.LogClassChange)
+		if err != nil {
+			return err
+		}
+		logHeld := entry && classStored && class.Evicted == 1
+		core, auth = item, stored && n == 1 && sec.FailureKey == sum32(secrets.FailureKey) && sec.DeviceKey == sum32(secrets.DeviceKey) && logHeld
 		return nil
 	})
 	if err != nil {

@@ -111,6 +111,9 @@ func seedOwned(t *testing.T, a *AccountStore) seeded {
 	if err := a.PutAuthFailure(ctx, account.FailureCount{Name: "gone", Method: access.MethodPassword, Count: 1}); err != nil {
 		t.Fatal(err)
 	}
+	for range 3 {
+		mustAppendLog(t, a, testLogEntry(account.LogClassChange, accountsAt))
+	}
 	return sd
 }
 
@@ -213,6 +216,32 @@ func TestBatchRerunKeepsCommittedRun(t *testing.T) {
 				t.Errorf("CleanupExpiredOneTimeTokens = %d, %v; want 2", n, err)
 			}
 		}},
+		{"AppendLog", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) {
+			e := testLogEntry(account.LogClassSession, accountsAt)
+			if err := a.AppendLog(marked, e); err != nil {
+				t.Fatal(err)
+			}
+			if got := logSeqs(t, a); len(got) != 4 || got[3] != e.Event.Seq {
+				t.Errorf("stored Seqs %v, want the seeded three, then the returned %d", got, e.Event.Seq)
+			}
+		}},
+		{"AppendLog in an Update reusing its entry", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) {
+			e := testLogEntry(account.LogClassSession, accountsAt)
+			if err := a.Update(marked, func(tx account.Tx) error { return tx.AppendLog(marked, e) }); err != nil {
+				t.Fatal(err)
+			}
+			if got := logSeqs(t, a); len(got) != 4 || got[3] != e.Event.Seq {
+				t.Errorf("stored Seqs %v, want the seeded three, then the returned %d", got, e.Event.Seq)
+			}
+		}},
+		{"PruneLog", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) {
+			if n, err := a.PruneLog(marked, account.LogPrune{Class: account.LogClassChange, Keep: 1, Limit: 10}); err != nil || n != 2 {
+				t.Errorf("PruneLog = %d, %v; want 2", n, err)
+			}
+			if st := logStats(t, a); len(st) != 1 || st[0].Evicted != 2 || st[0].Count != 1 {
+				t.Errorf("LogStats %+v, want Count 1 and Evicted 2: the committed run's prune alone", st)
+			}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, f := rerunStore(t, tempPath(t))
@@ -246,7 +275,7 @@ func authRows(t *testing.T, s *Store) []int {
 	return []int{
 		countRows(t, s, s.a.users, nil), countRows(t, s, s.a.keys, nil), countRows(t, s, s.a.passkeys, nil),
 		countRows(t, s, s.a.sessions, nil), countRows(t, s, s.a.tokens, nil), countRows(t, s, s.a.failures, nil),
-		countRows(t, s, s.a.attributions, nil),
+		countRows(t, s, s.a.attributions, nil), countRows(t, s, s.a.log, nil), countRows(t, s, s.a.logClasses, nil),
 	}
 }
 
@@ -336,6 +365,23 @@ func TestFailedWriteReturnsNothing(t *testing.T) {
 		{"CleanupExpiredOneTimeTokens", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) error {
 			n, err := a.CleanupExpiredOneTimeTokens(marked, accountsAt)
 			wantZero(t, n)
+			return err
+		}},
+		{"AppendLog keeps the caller's Seq", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) error {
+			e := testLogEntry(account.LogClassSession, accountsAt)
+			e.Event.Seq = 99
+			err := a.AppendLog(marked, e)
+			if e.Event.Seq != 99 {
+				t.Errorf("Seq %d after the failed append, want the caller's 99", e.Event.Seq)
+			}
+			return err
+		}},
+		{"PruneLog", func(t *testing.T, a *AccountStore, marked context.Context, _ seeded) error {
+			n, err := a.PruneLog(marked, account.LogPrune{Class: account.LogClassChange, Keep: 1, Limit: 10})
+			wantZero(t, n)
+			if st := logStats(t, a); len(st) != 1 || st[0].Evicted != 0 {
+				t.Errorf("LogStats %+v after the failed prune, want Evicted 0", st)
+			}
 			return err
 		}},
 	} {

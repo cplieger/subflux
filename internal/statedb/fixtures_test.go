@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"testing"
 	"time"
@@ -246,6 +247,12 @@ func authFixtures(t *testing.T) []fixture {
 		f.name = "key_attributions." + string(action)
 		fs = append(fs, f)
 	}
+	entry := fixtureLogEntry()
+	fs = append(fs,
+		authFix(t, "security_log", func(a *authTables) *bolttable.Table[uint64, logRow] { return a.log }, logSeqKeys, logCodec,
+			entry.Event.Seq, logRowOf(&entry)),
+		authFix(t, "log_classes", func(a *authTables) *bolttable.Table[account.LogClass, logClassRow] { return a.logClasses }, logClassKeys, logClassCodec,
+			account.LogClassChange, logClassRow{Evicted: 7}))
 	return append(fs, authFix(t, "auth_method_state", func(a *authTables) *bolttable.Table[constKey, methodStateRow] { return a.methodState }, constKeys, methodStateCodec,
 		constKey{}, methodStateRow{
 			PasswordLogin: true, OIDCIssuer: "https://idp.example", RPID: "subflux.example",
@@ -255,6 +262,22 @@ func authFixtures(t *testing.T) []fixture {
 				OIDCAllowedGroups: setDigestRow{Count: 2, SHA256: sum32{11}}, PasskeyOrigins: setDigestRow{Count: 1, SHA256: sum32{12}},
 			},
 		}))
+}
+
+// fixtureLogEntry sets every account.LogEntry field, At at the millisecond
+// precision account writes.
+func fixtureLogEntry() account.LogEntry {
+	at := time.Date(2026, 11, 5, 12, 0, 0, int(123*time.Millisecond), time.UTC)
+	return account.LogEntry{
+		At: at, IP: netip.MustParseAddr("2001:db8::7"), Class: account.LogClassChange,
+		ActorLabel: "laptop", ActorUserAgent: "Firefox", ActorKeySuffix: "a1b2", Detail: "app detail",
+		Event: account.Event{
+			At: at, Kind: account.EventKeyMinted, Method: access.MethodPasskey, Role: access.RoleAdmin,
+			SessionIDs: []string{"0123456789abcdef", "fedcba9876543210"},
+			Actor:      account.EventActor{SessionID: "0123456789abcdef", OutOfBand: "cli", UserID: 3, KeyID: 5},
+			UserID:     4, KeyID: 6, PasskeyID: 7, Seq: 9, Trusted: true,
+		},
+	}
 }
 
 // openSchema opens a fresh file under a fresh copy of the production schema,

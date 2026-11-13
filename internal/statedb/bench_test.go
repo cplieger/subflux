@@ -539,6 +539,29 @@ func BenchmarkPruneFailures(b *testing.B) {
 	}
 }
 
+// BenchmarkLogTrim is one append and its at-append trim at a full class of
+// 10,000 entries, which costs one counter read and one removed entry.
+func BenchmarkLogTrim(b *testing.B) {
+	_, a := benchAccounts(b)
+	appendLogBulk(b, a, 10_000)
+	ctx := b.Context()
+	trim := account.LogPrune{Class: account.LogClassChange, Keep: 10_000, Limit: 10_000}
+	for b.Loop() {
+		if err := a.Update(ctx, func(tx account.Tx) error {
+			if err := tx.AppendLog(ctx, testLogEntry(account.LogClassChange, accountsAt)); err != nil {
+				return err
+			}
+			n, err := tx.PruneLog(ctx, trim)
+			if err == nil && n != 1 {
+				err = fmt.Errorf("the trim removed %d entries, want 1", n)
+			}
+			return err
+		}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // BenchmarkSignInBurst is one burst per iteration of the stamps 16
 // concurrent sign-ins write: a session's activity, a key's use, a passkey's
 // sign count and a failure count each. Every one is silent, so the burst

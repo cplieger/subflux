@@ -3,7 +3,7 @@ module github.com/cplieger/subflux
 go 1.27.4
 
 require (
-	github.com/cplieger/access v1.0.0-dev.9
+	github.com/cplieger/access v1.0.0-dev.10
 	github.com/cplieger/animap/mapread v0.3.2
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.16
 	github.com/cplieger/bolttable v1.2.0-dev.1
