@@ -59,60 +59,39 @@ func (p *placer) candidates(an answer, fq *feedQuery) []provider.Candidate {
 	return out
 }
 
-// place reads claim c of a file of anime's answer. A name stating seasons
-// ("S01E05") numbers as TVDB does and lands on any searched landing of it,
-// since AnimeTosho files later seasons under the first season's anime. Other
-// Regular or Special claims number as AniDB does ("2nd Season - 05"). On a
-// one-episode anime a missing or one-number claim is episode 1 ("Show Movie
-// 02" is a title). Credits and promotions match while the anime has a searched
-// landing of that kind; a file claiming nothing is offered while it has a
-// searched parody or other one, kinds AniDB numbers as one unreadable sequence.
+// place reads claim c of a file of anime's answer: placed on each searched
+// landing of anime it Lands on, since AnimeTosho files later seasons under
+// the first season's anime ("S02E05" lands through TVDB) and names the rest
+// in AniDB's numbering ("2nd Season - 05"). On a one-episode anime a missing
+// or one-number claim is episode 1 ("Show Movie 02" is a title). Credits and
+// promotions match while the anime has a searched landing of that kind; a
+// file claiming nothing is offered while it has a searched parody or other
+// one, kinds AniDB numbers as one unreadable sequence.
 func (p *placer) place(anime int, c animemap.Claim) place {
 	single := animemap.Single(p.x, anime)
 	if c.Step == animemap.ByAbsolute && single {
 		c = animemap.Claim{}
 	}
-	if len(c.Markers) > 0 {
-		refs := p.onTVDB(anime, c.Markers)
-		return place{refs: refs, ok: len(refs) > 0}
-	}
 	switch c.Kind {
 	case mapread.Regular, mapread.Special:
-		refs := p.searched(anime, c.Kind, c.Episodes)
+		refs := p.landed(anime, &c)
 		return place{refs: refs, ok: len(refs) > 0}
 	case mapread.Credit, mapread.Promotion:
 		return place{offered: true, ok: p.has(anime, c.Kind)}
 	}
 	if single {
-		if refs := p.searched(anime, mapread.Regular, []int{1}); len(refs) > 0 {
+		if refs := p.landed(anime, &animemap.Claim{Kind: mapread.Regular, Episodes: []int{1}}); len(refs) > 0 {
 			return place{refs: refs, ok: true}
 		}
 	}
 	return place{offered: true, ok: p.has(anime, mapread.Parody) || p.has(anime, mapread.Other)}
 }
 
-// searched are the searched landings of anime, kind and one of numbers.
-func (p *placer) searched(anime int, kind mapread.Kind, numbers []int) []mapread.Ref {
+// landed are the searched landings of anime claim c Lands on.
+func (p *placer) landed(anime int, c *animemap.Claim) []mapread.Ref {
 	var out []mapread.Ref
-	for _, l := range p.landings {
-		if l.AniDB == anime && l.Kind == kind && slices.Contains(numbers, l.Number) {
-			out = append(out, l.Ref)
-		}
-	}
-	return out
-}
-
-// onTVDB are the searched landings of anime that land, on the query's
-// series, on one of markers.
-func (p *placer) onTVDB(anime int, markers []epmarker.Marker) []mapread.Ref {
-	var out []mapread.Ref
-	for _, l := range p.landings {
-		if l.AniDB != anime {
-			continue
-		}
-		if slices.ContainsFunc(animemap.Covers(p.x, l.Ref, p.q), func(n media.Numbering) bool {
-			return slices.Contains(markers, epmarker.Marker{Season: n.Season, Episode: n.Episode})
-		}) {
+	for i := range p.landings {
+		if l := &p.landings[i]; l.AniDB == anime && c.Lands(p.x, p.q, l) {
 			out = append(out, l.Ref)
 		}
 	}

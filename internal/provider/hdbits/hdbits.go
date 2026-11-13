@@ -117,6 +117,11 @@ type adapter struct {
 	passkey   string
 }
 
+// Close ends its caches' fetches and waits for them.
+func (a *adapter) Close(ctx context.Context) error {
+	return errors.Join(a.torrents.Close(ctx), a.lists.Close(ctx))
+}
+
 func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one
 	lookup, key, err := a.lookup(&q)
 	if err != nil {

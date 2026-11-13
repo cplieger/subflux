@@ -15,18 +15,21 @@ import (
 
 // Map holds one process's anime map: the index, its tag and its refresh
 // state, shared by every adapter an engine builds and kept across engine
-// swaps. The zero Map is not usable; New makes one.
+// swaps. The zero Map is not usable; New makes one, and its owner ends it
+// with Close.
 type Map struct {
 	good      time.Time // the last good refresh: the held tag confirmed or a new one indexed
 	holdUntil time.Time
 	index     *mapread.Index
 	refused   map[string]error // a tag whose Fetch failed permanently, and why
 	reports   map[string]func(text string, active bool)
-	flight    chan struct{} // closed when the refresh in flight ends
+	flight    chan struct{}      // closed when the refresh in flight ends
+	cancel    context.CancelFunc // ends the refresh in flight
 	cond      condition
 	held      string
 	mu        sync.Mutex
 	streak    bool // a failed attempt's WARN was logged since the last good one
+	closed    bool
 }
 
 // condition is the map's alert state as of the last attempt.
@@ -51,20 +54,22 @@ func Hosts() []string {
 // Index is the newest index, or nil when none was ever read. When the held
 // one is missing or 6 hours old and no failed attempt holds refreshes off, it
 // starts one refresh over c, the calling adapter's Client, or joins the one
-// in flight, and waits for the
-// earliest of its end, 10 seconds and ctx's end. The refresh runs on its own
-// 2-minute timeout whatever happens to ctx, and a failed one keeps the held
-// index.
+// in flight, and waits for the earliest of its end, 10 seconds and ctx's
+// end. The refresh runs on its own 2-minute timeout whatever happens to ctx,
+// its requests not the calling Search's, until Close; a failed one keeps the
+// held index. After Close it returns the held index and starts nothing.
 func (m *Map) Index(ctx context.Context, c provider.Client) *mapread.Index {
 	m.mu.Lock()
 	now := time.Now()
-	if m.index != nil && now.Sub(m.good) < maxAge || now.Before(m.holdUntil) {
+	if m.closed || m.index != nil && now.Sub(m.good) < maxAge || now.Before(m.holdUntil) {
 		defer m.mu.Unlock()
 		return m.index
 	}
 	if m.flight == nil {
+		var rctx context.Context
+		rctx, m.cancel = context.WithCancel(provider.Detached(ctx))
 		m.flight = make(chan struct{})
-		go m.refresh(context.WithoutCancel(ctx), c, m.flight)
+		go m.refresh(rctx, c)
 	}
 	done := m.flight
 	m.mu.Unlock()
@@ -79,6 +84,28 @@ func (m *Map) Index(ctx context.Context, c provider.Client) *mapread.Index {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.index
+}
+
+// Close ends the refresh in flight, if any, and waits for its goroutine to
+// return, or for ctx's end, whose error it returns. The refresh it ends is
+// not a failed attempt: it neither logs nor reports.
+func (m *Map) Close(ctx context.Context) error {
+	m.mu.Lock()
+	m.closed = true
+	done := m.flight
+	if done != nil {
+		m.cancel()
+	}
+	m.mu.Unlock()
+	if done == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Report registers report as entry name's view of the map's condition and

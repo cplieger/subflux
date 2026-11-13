@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/cplieger/animap/mapread"
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/provider"
 )
@@ -74,4 +75,17 @@ func Covers(x *mapread.Index, ref mapread.Ref, q *provider.Query) []media.Number
 		}
 	}
 	return out
+}
+
+// Lands reports whether a file of anime l.AniDB's release claiming c is
+// landing l. A claim whose markers state seasons ("S01E05") numbers as TVDB
+// does, so it is l when l lands on one of them on the query's series; any
+// other claim is l when it names l's kind and number.
+func (c *Claim) Lands(x *mapread.Index, q *provider.Query, l *mapread.Landing) bool {
+	if len(c.Markers) > 0 {
+		return slices.ContainsFunc(Covers(x, l.Ref, q), func(n media.Numbering) bool {
+			return slices.Contains(c.Markers, epmarker.Marker{Season: n.Season, Episode: n.Episode})
+		})
+	}
+	return c.Kind == l.Kind && slices.Contains(c.Episodes, l.Number)
 }

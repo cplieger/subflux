@@ -41,7 +41,7 @@ Reloading the page during setup returns you to the step you were on. Finishing s
 | `languages.default[]` | `[]` | The targets for items no rule matches, at most 16. Each has a `tag` and optional `variants` (`standard`, `hi`, `forced`), default `[standard]` |
 | `languages.rules[].audio` | required | A language tag, such as `ja` or `pt-BR`. subflux tries an item's original language first, then each audio track, and the rule whose tag is closest wins |
 | `languages.rules[].targets[]` | required | The targets for an item the rule matches, at most 16. An empty list fetches nothing and skips `default` |
-| `providers.<name>` | _(none)_ | The subtitle sites to search, by name: `opensubtitles`, `gestdown`, `subsource`, `subdl`, `betaseries`, `animetosho`, `yifysubtitles` or `hdbits`. Until a site is listed, subflux searches none |
+| `providers.<name>` | _(none)_ | The subtitle sites to search, by name: `opensubtitles`, `gestdown`, `subsource`, `subdl`, `betaseries`, `animetosho`, `yifysubtitles`, `hdbits`, `tsukihime`, `jimaku`, `subsro`, `assrt` or `subx`. Until a site is listed, subflux searches none |
 | `providers.<name>.enabled` | `true` | Set `false` to stop searching a listed site while keeping its settings. A site that is off may leave its required keys empty |
 | `providers.<name>.priority` | `0` | From 0 to 100. Among equally good results, the site with the lower number goes first, then the site whose name sorts first |
 | `providers.<name>.settings` | per site | Account settings: each site's keys, listed in its section of the Settings dialog |

@@ -72,11 +72,23 @@ type Tester interface {
 	Test(ctx context.Context) error
 }
 
+// Closer is implemented by an adapter whose calls start goroutines that
+// outlive them, such as a cache's shared fetch, and by every adapter Build
+// returns. Its owner calls Close once it makes no more calls; Close ends
+// those goroutines and waits for them, or for ctx's end, whose error it
+// returns.
+type Closer interface {
+	Close(ctx context.Context) error
+}
+
 // Query is built once per run. For an episode External holds the series'
 // ids; Year is the root's (0 unknown); Titles are the root's title then its
 // alternative titles; Langs are this provider's tags from the query union;
-// OSHash is the video's OpenSubtitles hash, zero when unknown.
+// OSHash is the video's OpenSubtitles hash, zero when unknown; Video is the
+// video's scene name, else its file's base name less its extension, "" when
+// neither is known.
 type Query struct {
+	Video     string
 	Titles    []string
 	Langs     []language.Tag
 	External  media.ExternalIDs

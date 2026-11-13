@@ -1,0 +1,305 @@
+openapi: 3.0.0
+info:
+  title: Subs.ro API
+  description: API for searching and downloading subtitles from subs.ro.
+  version: 1.0.0
+servers:
+  - url: https://api.subs.ro/v1.0
+    description: API v1.0
+paths:
+  /search/{searchField}/{value}:
+    get:
+      summary: Search for subtitles
+      parameters:
+        - name: searchField
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [imdbid, tmdbid, title, release]
+        - name: value
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ro, en, ita, fra, ger, ung, gre, por, spa, alt]
+      responses:
+        '200':
+          description: A list of subtitles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /subtitle/{id}:
+    get:
+      summary: Get subtitle details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subtitle details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailsResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /subtitle/{id}/download:
+    get:
+      summary: Download subtitle archive
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Binary archive file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /movie/{imdbid}:
+    get:
+      summary: Get movie details
+      parameters:
+        - name: imdbid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Movie details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieDetailsResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /quota:
+    get:
+      summary: Get API usage and quota information
+      responses:
+        '200':
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Subs-Api-Key
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: apiKey
+  security:
+    - ApiKeyHeader: []
+    - ApiKeyQuery: []
+
+  schemas:
+    SubtitleItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        description:
+          type: string
+        link:
+          type: string
+        downloadLink:
+          type: string
+        title:
+          type: string
+        year:
+          type: integer
+        imdbid:
+          type: string
+        tmdbid:
+          type: integer
+        poster:
+          type: string
+        translator:
+          type: string
+        language:
+          type: string
+        type:
+          type: string
+          enum: [movie, series]
+
+    MoviePlots:
+      type: object
+      properties:
+        en:
+          type: string
+        ro:
+          type: string
+
+    MovieItem:
+      type: object
+      properties:
+        imdbid:
+          type: string
+        tmdbid:
+          type: integer
+        title:
+          type: string
+        ro_title:
+          type: string
+        year:
+          type: integer
+        type:
+          type: string
+          enum: [movie, series]
+        poster:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        plots:
+          $ref: '#/components/schemas/MoviePlots'
+        countries:
+          type: array
+          items:
+            type: string
+        directors:
+          type: array
+          items:
+            type: string
+        cast:
+          type: array
+          items:
+            type: string
+        runtime:
+          type: integer
+        has_trailer:
+          type: boolean
+        rating:
+          type: number
+          format: float
+
+    MovieDetailsResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/Meta'
+        item:
+          $ref: '#/components/schemas/MovieItem'
+
+    Meta:
+      type: object
+      properties:
+        requestId:
+          type: string
+
+    SearchResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/Meta'
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleItem'
+
+    DetailsResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/Meta'
+        item:
+          $ref: '#/components/schemas/SubtitleItem'
+
+    QuotaInfo:
+      type: object
+      properties:
+        total_quota:
+          type: integer
+        used_quota:
+          type: integer
+        remaining_quota:
+          type: integer
+        quota_type:
+          type: string
+          enum: [anonymous, api_key]
+        ip_address:
+          type: string
+        api_key:
+          type: string
+          description: Masked API key
+
+    QuotaResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/Meta'
+        quota:
+          $ref: '#/components/schemas/QuotaInfo'
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+              message:
+                type: string
+              meta:
+                $ref: '#/components/schemas/Meta'

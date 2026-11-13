@@ -24,6 +24,7 @@ const (
 	MaxHandles           = maxHandles
 	MaxHandlesPerOwner   = maxHandlesPerOwner
 	CauseSettingsChanged = causeSettingsChanged
+	CloseTimeout         = closeTimeout
 )
 
 // Picked is one wanted pair as a run ranks it.

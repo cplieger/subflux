@@ -10,7 +10,7 @@ A full scan that is cut short by a restart resumes where it stopped. Items scann
 
 ## Search and fit
 
-subflux searches eight subtitle sites through one interface: OpenSubtitles, Gestdown, SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles and HDBits. It also reads the subtitle tracks already inside each video file with ffprobe. That is local inspection, not a site.
+subflux searches thirteen subtitle sites through one interface: OpenSubtitles, Gestdown, SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits, TsukiHime, Jimaku, Subs.ro, Assrt and SubX. It also reads the subtitle tracks already inside each video file with ffprobe. That is local inspection, not a site.
 
 Each result first goes through an identity check. Nothing the site says may contradict the item: the IMDb, TVDB or TMDB ID it matched, the season and episode, the episode title and the year. A result the site found for the show or movie but cannot place on the episode is offered in manual search only.
 

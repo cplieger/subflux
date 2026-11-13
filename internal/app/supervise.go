@@ -19,10 +19,12 @@ type component struct {
 	name string
 }
 
-// supervision is what supervise runs and drains. closeStore may be nil.
+// supervision is what supervise runs and drains. closeProviders and
+// closeStore may be nil.
 type supervision struct {
 	beginDrain       func()
 	shutdownSettings func(ctx context.Context) error
+	closeProviders   func(ctx context.Context) error
 	closeStore       func() error
 	producers, sinks []component
 	drainBudget      time.Duration
@@ -39,9 +41,9 @@ type exit struct {
 // while its phase is live, the cause even when nil ("<name> exited"). Each
 // cause runs one drain: beginDrain; within httpGrace the producers cancelled,
 // stopped (each stop bounding its own) and awaited, then the settings shut
-// down; then the sinks cancelled and awaited until drainBudget. An overrun
-// or a drain-time error joins the cause and leaves the store open for a
-// request or job still on it.
+// down; then the sinks cancelled and awaited, and the providers closed,
+// until drainBudget. An overrun or a drain-time error joins the cause and
+// leaves the store open for a request or job still on it.
 func supervise(ctx context.Context, sv *supervision) error {
 	// Only the drain stops a component, so beginDrain precedes every stop.
 	prodCtx, cancelProducers := context.WithCancel(context.WithoutCancel(ctx))
@@ -69,6 +71,11 @@ func supervise(ctx context.Context, sv *supervision) error {
 	defer cancel2()
 	if !awaitAll(phase2, sinks) {
 		drainErrs = append(drainErrs, errors.New("app: sinks overran the drain budget"))
+	}
+	if sv.closeProviders != nil {
+		if err := sv.closeProviders(phase2); err != nil {
+			drainErrs = append(drainErrs, fmt.Errorf("app: the providers' goroutines overran the drain budget: %w", err))
+		}
 	}
 	for len(exits) > 0 {
 		drainErrs = appendDrainErr(drainErrs, <-exits)

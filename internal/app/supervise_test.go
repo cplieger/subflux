@@ -63,6 +63,10 @@ func base(j *journal) *supervision {
 			j.add("settings")
 			return nil
 		},
+		closeProviders: func(context.Context) error {
+			j.add("providers closed")
+			return nil
+		},
 		closeStore: func() error {
 			j.add("store closed")
 			return nil
@@ -101,9 +105,9 @@ func TestSuperviseFirstCause(t *testing.T) {
 			t.Errorf("supervise = %v, want the producer's error naming it", err)
 		}
 		steps := j.list()
-		drain, loop, settings, sink, closed := j.index("drain"), j.index("loop stopped"), j.index("settings"), j.index("status stopped"), j.index("store closed")
-		if drain != 0 || drain > loop || loop > settings || settings > sink || sink > closed {
-			t.Errorf("drain order %v; want drain, producers, settings, sinks, store", steps)
+		drain, loop, settings, sink, provs, closed := j.index("drain"), j.index("loop stopped"), j.index("settings"), j.index("status stopped"), j.index("providers closed"), j.index("store closed")
+		if drain != 0 || drain > loop || loop > settings || settings > sink || sink > provs || provs > closed {
+			t.Errorf("drain order %v; want drain, producers, settings, sinks, providers, store", steps)
 		}
 	})
 	t.Run("sink_returns_early", func(t *testing.T) {
@@ -315,6 +319,25 @@ func closed() <-chan struct{} {
 	c := make(chan struct{})
 	close(c)
 	return c
+}
+
+// TestProvidersOverrunKeepStoreOpen: a provider table whose goroutines
+// outlive the drain budget fails the drain, which leaves the store open.
+func TestProvidersOverrunKeepStoreOpen(t *testing.T) {
+	j := &journal{}
+	sv := base(j)
+	stuck := errors.New("still refreshing")
+	sv.closeProviders = func(ctx context.Context) error {
+		if _, ok := ctx.Deadline(); !ok {
+			t.Error("closeProviders got no drain deadline")
+		}
+		return stuck
+	}
+	sv.sinks = []component{returner("status", nil, closed())}
+	err := result(t, superviseAsync(t.Context(), sv))
+	if !errors.Is(err, stuck) || j.index("store closed") >= 0 {
+		t.Errorf("supervise = %v, steps %v; want the providers' error and the store left open", err, j.list())
+	}
 }
 
 func TestRunWithoutSinksServesUntilCancel(t *testing.T) {

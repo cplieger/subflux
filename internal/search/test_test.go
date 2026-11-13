@@ -24,6 +24,19 @@ type tester struct {
 	calls *int
 }
 
+// closingTester is a tester that counts its closes, each after a test.
+type closingTester struct {
+	tester
+	closes int
+}
+
+func (a *closingTester) Close(context.Context) error {
+	if *a.calls > a.closes {
+		a.closes++
+	}
+	return nil
+}
+
 func (a tester) Test(context.Context) error {
 	*a.calls++
 	return a.err
@@ -90,6 +103,21 @@ func TestTestAnswers(t *testing.T) {
 			})
 		})
 	}
+	t.Run("closes its adapter", func(t *testing.T) {
+		inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
+			calls := 0
+			a := &closingTester{}
+			a.calls = &calls
+			e := testedEntry(nil, &calls)
+			e.New = func(provider.Client, formschema.Values) (provider.Adapter, error) { return a, nil }
+			if ok, _, err := search.Test(t.Context(), r.funnel, e, providertest.Config(t, e, "api_key: k")); !ok || err != nil {
+				t.Fatalf("Test = %v, %v", ok, err)
+			}
+			if calls != 1 || a.closes != 1 {
+				t.Errorf("tested %d times, closed %d times; want once each, the close after the test", calls, a.closes)
+			}
+		})
+	})
 	t.Run("no tester", func(t *testing.T) {
 		inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
 			e := testEntry("plain")

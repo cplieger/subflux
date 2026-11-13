@@ -674,6 +674,91 @@ func TestNextWorkErrorBacksOff(t *testing.T) {
 	})
 }
 
+// TestDrainClosesAdapters: the drain closes each provider's adapter once,
+// after the search it ended has returned.
+func TestDrainClosesAdapters(t *testing.T) {
+	inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
+		p, inst := r.deliverable()
+		var entered atomic.Bool
+		p.onSearch = func(ctx context.Context) error {
+			entered.Store(true)
+			<-ctx.Done()
+			time.Sleep(time.Second)
+			return ctx.Err()
+		}
+		stop := r.drain(r.engine())
+		r.enqueue(statedb.Scan, inst)
+		time.Sleep(time.Minute)
+		synctest.Wait()
+		if n := len(p.closed()); n != 0 || !entered.Load() {
+			t.Fatalf("%d closes before the drain ended, a search running %v; want none and one", n, entered.Load())
+		}
+		if err := stop(); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Drain = %v", err)
+		}
+		if c := p.closed(); !slices.Equal(c, []int{0}) {
+			t.Errorf("closes with searches running %v, want one close after the search returned", c)
+		}
+	})
+}
+
+// TestDrainClosesUnderOneDeadline: every adapter is closed at once under
+// one close bound, so the drain ends one bound after it began however many
+// providers it holds, a slow adapter beside a hanging one still closes in
+// time, and each overrun is logged.
+func TestDrainClosesUnderOneDeadline(t *testing.T) {
+	const overran = "search: a provider's goroutines outlived its close"
+	hang := func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	closes := func(t *testing.T, r *rig) time.Duration {
+		t.Helper()
+		stop := r.drain(r.engine())
+		synctest.Wait()
+		start := time.Now()
+		if err := stop(); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Drain = %v", err)
+		}
+		return time.Since(start)
+	}
+	t.Run("every adapter hanging", func(t *testing.T) {
+		inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
+			r.provider("p", "en").onClose = hang
+			r.provider("q", "en").onClose = hang
+			r.provider("s", "en").onClose = hang
+			if took := closes(t, r); took != search.CloseTimeout {
+				t.Errorf("the drain closed three hanging adapters in %v, want one bound of %v", took, search.CloseTimeout)
+			}
+			if n := r.atLevel(slog.LevelWarn, overran); n != 3 {
+				t.Errorf("%d overruns logged, want 3", n)
+			}
+		})
+	})
+	t.Run("a slow adapter beside a hanging one", func(t *testing.T) {
+		inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
+			r.provider("p", "en").onClose = hang
+			r.provider("q", "en").onClose = func(ctx context.Context) error {
+				select {
+				case <-time.After(time.Second):
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			if took := closes(t, r); took != search.CloseTimeout {
+				t.Errorf("the drain closed a hanging and a 1 s adapter in %v, want one bound of %v", took, search.CloseTimeout)
+			}
+			if n := r.atLevel(slog.LevelWarn, overran); n != 1 {
+				t.Errorf("%d overruns logged, want 1: the slow adapter's close fits the bound", n)
+			}
+			if !r.logs.AttrContains(overran, "provider", "p") {
+				t.Errorf("logs %v, want the overrun to name the hanging provider p", r.logs.Records())
+			}
+		})
+	})
+}
+
 func TestDrainTwiceRefused(t *testing.T) {
 	inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
 		e := r.engine()

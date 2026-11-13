@@ -92,6 +92,11 @@ type adapter struct {
 	c       provider.Client
 }
 
+// Close ends its caches' fetches and waits for them.
+func (a *adapter) Close(ctx context.Context) error {
+	return errors.Join(a.shows.Close(ctx), a.seasons.Close(ctx))
+}
+
 // Search asks each of q's languages in turn for the episode's season; a
 // failed language returns what the earlier ones found with its failure.
 func (a *adapter) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) { //nolint:gocritic // hugeParam: provider.Adapter takes the Query by value, so concurrent adapters never share one

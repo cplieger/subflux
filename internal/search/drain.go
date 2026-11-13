@@ -3,8 +3,11 @@ package search
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"sync"
 	"time"
 
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"
 )
@@ -26,6 +29,10 @@ const (
 	pollEvery = time.Minute
 	// maxPoll is statedb.NextWork's largest limit.
 	maxPoll = 1000
+	// closeTimeout bounds closing an engine's adapters, all at once, or the
+	// connection test's one: a closed cache's fetch ends with its request's
+	// cancellation.
+	closeTimeout = 5 * time.Second
 )
 
 var errDrainTwice = errors.New("search: Drain called twice")
@@ -67,8 +74,8 @@ func (e *Engine) Drain(ctx context.Context) error {
 
 // stop sets the draining flag, so nothing starts another goroutine, ends
 // every manual job, drops the handles, waits for the running goroutines,
-// releases every binding and settles the SearchNow jobs no run took
-// Interrupted, their Item rows staying for the next engine.
+// closes every adapter, releases every binding and settles the SearchNow
+// jobs no run took Interrupted, their Item rows staying for the next engine.
 func (e *Engine) stop() {
 	e.mu.Lock()
 	e.draining = true
@@ -79,6 +86,7 @@ func (e *Engine) stop() {
 	e.handles.clear()
 	_ = e.scans.Wait()
 	_ = e.items.Wait()
+	e.closeAdapters()
 	for i := range e.providers {
 		e.providers[i].binding.Release()
 	}
@@ -205,4 +213,29 @@ func (b *backoff) fail() int {
 		b.wait = min(2*b.wait, storeRetryMax)
 	}
 	return b.failures
+}
+
+// closeAdapters closes every adapter at once under one closeTimeout, so the
+// shutdown's bound does not grow with the number of providers.
+func (e *Engine) closeAdapters() {
+	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	for i := range e.providers {
+		p := &e.providers[i]
+		wg.Go(func() { closeAdapter(ctx, e.log, &p.entry, p.adapter) })
+	}
+	wg.Wait()
+}
+
+// closeAdapter closes a, which Build made a Closer, until ctx ends, logging
+// an overrun.
+func closeAdapter(ctx context.Context, log *slog.Logger, e *provider.Entry, a provider.Adapter) {
+	c, ok := a.(provider.Closer)
+	if !ok {
+		return
+	}
+	if err := c.Close(ctx); err != nil {
+		log.Warn("search: a provider's goroutines outlived its close", "provider", e.ID, "error", err)
+	}
 }

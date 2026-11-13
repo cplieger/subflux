@@ -20,6 +20,7 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/provider/providers"
 	"github.com/cplieger/subflux/internal/scan"
 	"github.com/cplieger/subflux/internal/settings"
 	"github.com/cplieger/subflux/internal/statedb"
@@ -107,7 +108,9 @@ var (
 // overrun, for a request or job still on it. cmd/subflux exits 1 on any
 // error.
 func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam: callers build Config inline and Run reads it once
-	snap := settings.Load(cfg.Paths.Config, registries)
+	table := providers.New()
+	reg := registries(table)
+	snap := settings.Load(cfg.Paths.Config, reg)
 	level, format := setupLogging(snap, cfg.LogOutput)
 	logLoad(snap)
 	marker := health.NewMarker(cfg.Paths.Health)
@@ -120,7 +123,7 @@ func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam
 		slog.Error("app: could not open the state store", "path", cfg.Paths.Store, "error", err)
 		return fmt.Errorf("app: %w", err)
 	}
-	sv, err := serve(ctx, &cfg, &process{snap: snap, store: store, marker: marker, level: level, format: format})
+	sv, err := serve(ctx, &cfg, &process{snap: snap, registries: reg, providers: table, store: store, marker: marker, level: level, format: format})
 	if err != nil {
 		return errors.Join(err, store.Close())
 	}
@@ -129,14 +132,17 @@ func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam
 	return supervise(ctx, sv)
 }
 
-// process is what Run sets up before serve: the loaded snapshot, the open
-// store, the health marker and the log handler's level and format.
+// process is what Run sets up before serve: the loaded snapshot, the
+// registries and provider table it was parsed with, the open store, the
+// health marker and the log handler's level and format.
 type process struct {
-	snap   settings.Snapshot
-	store  *statedb.Store
-	marker health.Signal
-	level  *slog.LevelVar
-	format slogx.Format
+	marker     health.Signal
+	providers  *providers.Table
+	store      *statedb.Store
+	level      *slog.LevelVar
+	snap       settings.Snapshot
+	registries settings.Registries
+	format     slogx.Format
 }
 
 // serve builds every component over the open store and binds the HTTP port,
@@ -167,7 +173,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 	}
 	activate := wrapActivate(newActivate(store, st, writer))
 	deps := sourceDeps(slog.Default())
-	svc := settings.NewService(cfg.Paths.Config, registries, snap, activate, saveCheck(deps))
+	svc := settings.NewService(cfg.Paths.Config, p.registries, snap, activate, saveCheck(deps))
 	if cfg.Settings != nil {
 		cfg.Settings(svc)
 	}
@@ -209,6 +215,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (*supervision, error) {
 		},
 		sinks:            []component{{name: "job records", run: st.Run}, {name: "media writer", run: writer.Run}},
 		shutdownSettings: svc.Shutdown,
+		closeProviders:   p.providers.Close,
 		closeStore:       store.Close,
 		drainBudget:      drainBudget,
 		httpGrace:        httpGrace,

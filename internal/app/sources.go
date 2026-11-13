@@ -29,13 +29,11 @@ import (
 // sourceKinds are the media source adapters the binary registers.
 var sourceKinds = []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}
 
-// providerEntries are the provider table, built once so every engine shares
-// its entries' state, such as the anime map; app passes the same slice to
-// search.New.
-var providerEntries = providers.Entries()
-
-// registries are the adapter kinds settings parses each section with.
-var registries = settings.Registries{Sources: sourceKinds, Providers: providerEntries}
+// registries are the adapter kinds settings parses each section with, over
+// the process's provider table, whose entries every engine shares.
+func registries(t *providers.Table) settings.Registries {
+	return settings.Registries{Sources: sourceKinds, Providers: t.Entries}
+}
 
 // sourceHTTPTimeout bounds a request on the client every source and SkyHook
 // share; it sits above the longest per-request budget, Root's 60 s, so that

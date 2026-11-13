@@ -25,21 +25,25 @@ import (
 const foreign = "foreign.example.test"
 
 // wantHosts is design 5.4's table with the download-link hosts the
-// 2026-11-06 capture recorded (hosts.md); AnimeTosho's is its .org title
-// search until SE2-4.
+// 2026-11-06 capture recorded.
 var wantHosts = map[provider.ProviderID][]string{
 	"animetosho":    {"feed.animetosho.net", "storage.animetosho.net", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"},
+	"assrt":         {"api.assrt.net", "file0.assrt.net"},
 	"betaseries":    {"api.betaseries.com", "www.betaseries.com", "subtitles.betaseries.com"},
 	"gestdown":      {"api.gestdown.info"},
 	"hdbits":        {"hdbits.org"},
+	"jimaku":        {"jimaku.cc"},
 	"opensubtitles": {"api.opensubtitles.com", "vip-api.opensubtitles.com", "www.opensubtitles.com"},
 	"subdl":         {"api.subdl.com", "dl.subdl.com"},
 	"subsource":     {"api.subsource.net"},
+	"subsro":        {"api.subs.ro"},
+	"subx":          {"subx-api.duckdns.org"},
+	"tsukihime":     {"api.tsukihime.org", "storage.tsukihime.org", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"},
 	"yifysubtitles": {"yifysubtitles.ch"},
 }
 
 func TestEntries(t *testing.T) {
-	es := providers.Entries()
+	es := providers.New().Entries
 	ids := make([]provider.ProviderID, 0, len(es))
 	for _, e := range es {
 		ids = append(ids, e.ID)
@@ -63,9 +67,9 @@ func TestEntries(t *testing.T) {
 	if len(ids) != len(wantHosts) {
 		t.Errorf("%d entries, want %d", len(ids), len(wantHosts))
 	}
-	again := providers.Entries()
+	again := providers.New().Entries
 	again[0].Hosts[0] = "changed.example.test"
-	if providers.Entries()[0].Hosts[0] == "changed.example.test" {
+	if providers.New().Entries[0].Hosts[0] == "changed.example.test" {
 		t.Error("Entries shares its rows between calls")
 	}
 }
@@ -103,6 +107,7 @@ func TestQueryUnion(t *testing.T) {
 		{"subsource", []string{"pt-BR"}, []string{"brazilian_portuguese"}},
 		{"subdl", []string{"nb"}, []string{"NO"}},
 		{"gestdown", []string{"pt-BR"}, []string{"pt-BR"}},
+		{"subx", []string{"es"}, []string{"es-419", "es-ES"}},
 	} {
 		if got := wires(r.id, r.needing...); !slices.Equal(got, r.want) {
 			t.Errorf("%s asked for %v sends %q, want %q", r.id, r.needing, got, r.want)
@@ -185,7 +190,7 @@ var tokens = []string{
 }
 
 func TestClientRefusesUnlistedHost(t *testing.T) {
-	for _, e := range providers.Entries() {
+	for _, e := range providers.New().Entries {
 		t.Run(string(e.ID), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				away := &counter{}
@@ -290,7 +295,7 @@ func TestStoredLinkOnUnlistedHost(t *testing.T) {
 
 func entry(t *testing.T, id provider.ProviderID) provider.Entry {
 	t.Helper()
-	for _, e := range providers.Entries() {
+	for _, e := range providers.New().Entries {
 		if e.ID == id {
 			return e
 		}
@@ -454,15 +459,15 @@ func TestDownloadGETRetried(t *testing.T) {
 	}
 }
 
-// TestExceptionEntries: yifysubtitles is the one named exception (5.8).
+// TestExceptionEntries: subx and yifysubtitles are the named exceptions (5.8).
 func TestExceptionEntries(t *testing.T) {
 	var got []provider.ProviderID
-	for _, e := range providers.Entries() {
+	for _, e := range providers.New().Entries {
 		if e.Exception {
 			got = append(got, e.ID)
 		}
 	}
-	if want := []provider.ProviderID{"yifysubtitles"}; !slices.Equal(got, want) {
+	if want := []provider.ProviderID{"subx", "yifysubtitles"}; !slices.Equal(got, want) {
 		t.Errorf("Exception entries %v, want %v", got, want)
 	}
 }
@@ -471,7 +476,7 @@ func TestExceptionEntries(t *testing.T) {
 // carry subflux's agent, but yifysubtitles', which carry its browser agent.
 func TestUserAgentPolicy(t *testing.T) {
 	subflux := "subflux/" + buildinfo.Version() + " (+https://github.com/cplieger/subflux)"
-	for _, e := range providers.Entries() {
+	for _, e := range providers.New().Entries {
 		t.Run(string(e.ID), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				want := subflux
@@ -506,11 +511,96 @@ func TestUserAgentPolicy(t *testing.T) {
 	}
 }
 
+// TestClosedCachesAskNothing: an adapter keeping a lookup cache closes it
+// at its Close, so a search that asks when open asks nothing once closed;
+// every other adapter asks as before.
+func TestClosedCachesAskNothing(t *testing.T) {
+	asks := func(e provider.Entry, closed bool) (n int) {
+		synctest.Test(t, func(t *testing.T) {
+			home := &counter{answer: http.NotFoundHandler()}
+			ctx := providertest.Serve(t, t.Context(), home, e.Hosts...)
+			a := providertest.Build(t, e, values(t, e))
+			if closed {
+				if err := a.(provider.Closer).Close(t.Context()); err != nil {
+					t.Errorf("%s: Close: %v", e.ID, err)
+				}
+			}
+			for _, q := range queries() {
+				_, _ = a.Search(ctx, q)
+			}
+			synctest.Wait()
+			n = len(home.seen())
+		})
+		return n
+	}
+	var silenced []provider.ProviderID
+	for _, e := range providers.New().Entries {
+		if asks(e, false) > 0 && asks(e, true) == 0 {
+			silenced = append(silenced, e.ID)
+		}
+	}
+	if want := []provider.ProviderID{"gestdown", "hdbits", "subsource"}; !slices.Equal(silenced, want) {
+		t.Errorf("adapters a Close silenced %v, want the cache keepers %v", silenced, want)
+	}
+}
+
+// TestTableCloseEndsRefresh: the anime map's refresh outlives the search
+// that started it; the table's Close ends its request and returns once it
+// has, and a later search starts none.
+func TestTableCloseEndsRefresh(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		table := providers.New()
+		e := entry(t, "animetosho")
+		var mu sync.Mutex
+		open, asked := 0, 0
+		ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Host != "github.com" {
+				http.NotFound(w, r)
+				return
+			}
+			mu.Lock()
+			open++
+			asked++
+			mu.Unlock()
+			<-r.Context().Done()
+			mu.Lock()
+			open--
+			mu.Unlock()
+		}), e.Hosts...)
+		e = table.Entries[slices.IndexFunc(table.Entries, func(x provider.Entry) bool { return x.ID == "animetosho" })]
+		a := providertest.Build(t, e, values(t, e))
+		_, _ = a.Search(ctx, queries()[1])
+		synctest.Wait()
+		mu.Lock()
+		before := open
+		mu.Unlock()
+		if before != 1 {
+			t.Fatalf("%d refresh requests open after the search returned, want 1", before)
+		}
+		if err := table.Close(t.Context()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		mu.Lock()
+		after := open
+		mu.Unlock()
+		if after != 0 {
+			t.Errorf("%d refresh requests open when Close returned, want none", after)
+		}
+		_, _ = a.Search(ctx, queries()[1])
+		synctest.Wait()
+		mu.Lock()
+		defer mu.Unlock()
+		if asked != 1 {
+			t.Errorf("%d refresh requests asked, want no new one after Close", asked)
+		}
+	})
+}
+
 // TestCredentialedEntriesTest: every entry with a Secret or a required
 // String builds a Tester, so a connection test can check its credentials.
 func TestCredentialedEntriesTest(t *testing.T) {
 	credentialed := 0
-	for _, e := range providers.Entries() {
+	for _, e := range providers.New().Entries {
 		if !slices.ContainsFunc(e.Schema.Fields, func(f formschema.Field) bool {
 			return f.Kind == formschema.Secret || f.Kind == formschema.String && f.Required
 		}) {
@@ -521,7 +611,7 @@ func TestCredentialedEntriesTest(t *testing.T) {
 			t.Errorf("%s takes credentials and builds no Tester", e.ID)
 		}
 	}
-	if credentialed != 5 {
-		t.Errorf("%d credentialed entries, want 5 (betaseries, hdbits, opensubtitles, subdl, subsource)", credentialed)
+	if credentialed != 9 {
+		t.Errorf("%d credentialed entries, want 9 (assrt, betaseries, hdbits, jimaku, opensubtitles, subdl, subsource, subsro, subx)", credentialed)
 	}
 }

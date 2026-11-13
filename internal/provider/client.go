@@ -134,9 +134,19 @@ func (p *pinned) admitException(req *http.Request, sent *atomic.Int64) error {
 // returned after a request is told from one returned before any.
 type sentKey struct{}
 
+// Detached is ctx for work a call starts but does not own, such as the
+// anime map's shared refresh: never cancelled with ctx, and its requests are
+// not the call's, so they neither count toward an Exception's cap nor turn
+// the call's Skipped into a Failure.
+func Detached(ctx context.Context) context.Context {
+	return context.WithValue(context.WithoutCancel(ctx), sentKey{}, (*atomic.Int64)(nil))
+}
+
 func (c Client) httpClient(timeout time.Duration) *http.Client {
 	return &http.Client{Transport: c.rt, Timeout: timeout, CheckRedirect: ssrf.SafeRedirectPolicy(nil)}
 }
+
+func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 // HTTPClient is a new http.Client over the Client's pinned round tripper, for
 // a library that takes one. Every hop is pinned whatever CheckRedirect the
@@ -149,24 +159,37 @@ func (c Client) HTTPClient() *http.Client { return c.httpClient(httpClientTimeou
 // from 2 seconds; any other method is sent once, so a quota-spending POST
 // never spends twice. An Exception entry's 403, 429 or 503 is RateLimited
 // for at least an hour and never retried.
-func (c Client) Do(req *http.Request) (*http.Response, error) {
+func (c Client) Do(req *http.Request) (*http.Response, error) { return c.do(req, true) }
+
+// DoNoRedirect is Do for a provider whose answers never redirect: a 3xx is
+// a Permanent failure, its Location never requested.
+func (c Client) DoNoRedirect(req *http.Request) (*http.Response, error) { return c.do(req, false) }
+
+func (c Client) do(req *http.Request, follow bool) (*http.Response, error) {
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
-		return c.once(req)
+		return c.once(req, follow)
 	}
 	return httpclient.Do(req.Context(), func(ctx context.Context) (*http.Response, error) {
-		return c.once(req.Clone(ctx))
+		return c.once(req.Clone(ctx), follow)
 	}, httpclient.WithMaxAttempts(fetchAttempts), httpclient.WithBaseDelay(fetchBaseDelay))
 }
 
-func (c Client) once(req *http.Request) (*http.Response, error) {
+func (c Client) once(req *http.Request, follow bool) (*http.Response, error) {
 	host := req.URL.Hostname()
-	resp, err := c.httpClient(0).Do(req) // #nosec G704 -- pinned refuses every host outside the entry's Hosts before dialing
+	hc := c.httpClient(0)
+	if !follow {
+		hc.CheckRedirect = refuseRedirect
+	}
+	resp, err := hc.Do(req) // #nosec G704 -- pinned refuses every host outside the entry's Hosts before dialing
 	if err != nil {
 		return nil, transportFailure(req.Context(), host, err)
 	}
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
 		return resp, nil
+	case !follow && resp.StatusCode >= 300 && resp.StatusCode < 400 && resp.StatusCode != http.StatusNotModified:
+		httpclient.DrainClose(resp.Body)
+		return nil, &Failure{Kind: Permanent, Host: host, Status: resp.StatusCode, Msg: "answered a redirect, which this provider never sends"}
 	case resp.StatusCode == http.StatusNotModified:
 		if req.Header.Get("If-None-Match") != "" || req.Header.Get("If-Modified-Since") != "" {
 			return resp, nil
