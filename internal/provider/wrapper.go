@@ -70,6 +70,14 @@ type testable struct {
 	tester Tester
 }
 
+// Close closes the wrapped adapter when it is a Closer.
+func (w *wrapped) Close(ctx context.Context) error {
+	if c, ok := w.inner.(Closer); ok {
+		return c.Close(ctx)
+	}
+	return nil
+}
+
 func (w *testable) Test(ctx context.Context) error {
 	ctx, sent := counting(ctx)
 	return w.fail(ctx, w.tester.Test(ctx), sent)

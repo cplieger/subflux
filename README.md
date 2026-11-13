@@ -24,7 +24,7 @@ subflux gets subtitles in your languages onto your whole library:
 
 subflux is built for people who run Sonarr, Radarr or both on a Docker host and want subtitles without picking them by hand. It picks languages from each file's audio track and can fetch forced and hearing-impaired versions. A 52,000-episode library runs in 1 GB of memory.
 
-You need a Sonarr or Radarr instance with its API key, and your media mounted writable at the paths they use. subflux searches eight subtitle sites:
+You need a Sonarr or Radarr instance with its API key, and your media mounted writable at the paths they use. subflux searches thirteen subtitle sites:
 
 | Site | What it finds | What it needs |
 | --- | --- | --- |
@@ -36,6 +36,13 @@ You need a Sonarr or Radarr instance with its API key, and your media mounted wr
 | AnimeTosho | Anime subtitles from the releases it indexes | No account |
 | YIFY Subtitles | Movie subtitles | No account |
 | HDBits | Subtitles of HDBits.org torrents | An account and its passkey |
+| TsukiHime | Anime subtitles from the releases it indexes | No account |
+| Jimaku | Japanese subtitles, mostly for Japanese drama and film | An API key |
+| Subs.ro | Romanian subtitles, and some in eight other languages | An API key |
+| Assrt | Chinese and English subtitles | An API token |
+| SubX | Spanish subtitles from the Subdivx catalogue | An API key |
+
+Every site but two is read through its official API or published feed. The exceptions are YIFY Subtitles, which has no API, and SubX, which re-serves Subdivx, a site with no API. subflux reads both sparingly: it honours each host's `robots.txt`, sends at most four requests per search and pauses the site for at least an hour after any refusal.
 
 Anime episode mapping comes from [animap](https://github.com/cplieger/animap), where you can report wrong or missing anime subtitles caused by a mapping.
 
@@ -151,6 +158,7 @@ subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Prometheus
 - [FFmpeg](https://ffmpeg.org/) and [x264](https://www.videolan.org/developers/x264.html) are built into the image to read subtitle and audio tracks and to stream the preview in the timing editor.
 - The timing engine is a Go port of the alignment algorithm in [alass](https://github.com/kaegi/alass) by [@kaegi](https://github.com/kaegi).
 - The audio timing uses a port of the voice-activity detector from the [WebRTC project](https://webrtc.org/), re-tuned for film audio.
+- Chinese and English subtitle search is provided by [Assrt](https://assrt.net/).
 
 ## Contributing
 

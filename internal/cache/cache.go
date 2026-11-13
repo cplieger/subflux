@@ -22,13 +22,16 @@ const (
 )
 
 // Cache maps keys to fetched values; the zero value is not usable, New
-// makes one.
+// makes one. Its owner ends it with Close.
 type Cache[T any] struct {
 	found   func(T) bool
 	entries map[string]*entry[T]
 	flights map[string]*flight[T]
+	idle    chan struct{} // made by a Close that waits; closed when running reaches 0
 	mu      sync.Mutex
 	used    uint64 // the use clock entries' last uses read
+	running int    // fetch goroutines not yet returned, listed or not
+	closed  bool
 }
 
 type entry[T any] struct {
@@ -47,6 +50,9 @@ type flight[T any] struct {
 	err      error
 	waiters  int
 }
+
+// errClosed answers GetOrFetch after Close.
+var errClosed = errors.New("cache: closed")
 
 // errFetchExited answers the waiters of a fn that ended its goroutine
 // (runtime.Goexit) without returning.
@@ -72,22 +78,28 @@ func NonEmpty[E any](s []E) bool { return len(s) > 0 }
 // GetOrFetch returns key's live value, else fn's, which it keeps when fn
 // succeeds; an error is never kept. Concurrent calls for one key share one fn,
 // run with the first caller's context values. A caller whose ctx ends first
-// gets ctx's error while the others keep waiting; fn's context ends only when
-// every caller waiting on it has left, and a later call then starts afresh.
-// A panic in fn is kept nowhere: every caller still waiting re-panics with
-// an error carrying fn's panic value and stack, and with none left it is
-// logged.
+// gets ctx's error while the others keep waiting; fn's context ends at Close
+// or when every caller waiting on it has left, a later call then starting
+// afresh. After Close it answers an error and starts nothing. A panic in fn
+// is kept nowhere: every caller still waiting re-panics with an error
+// carrying fn's panic value and stack, and with none left it is logged.
 func (c *Cache[T]) GetOrFetch(ctx context.Context, key string, fn func(context.Context) (T, error)) (T, error) {
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		var zero T
+		return zero, errClosed
+	}
 	if v, ok := c.live(key); ok {
 		c.mu.Unlock()
 		return v, nil
 	}
 	f, ok := c.flights[key]
 	if !ok {
-		fctx, cancel := context.WithCancel(context.WithoutCancel(ctx)) //nolint:gosec // G118: fetch's defer and the last leave call f.cancel
+		fctx, cancel := context.WithCancel(context.WithoutCancel(ctx)) //nolint:gosec // G118: fetch's defer, the last leave and Close call f.cancel
 		f = &flight[T]{done: make(chan struct{}), cancel: cancel}
 		c.flights[key] = f
+		c.running++
 		go c.fetch(fctx, key, f, fn)
 	}
 	f.waiters++
@@ -139,6 +151,11 @@ func (c *Cache[T]) fetch(ctx context.Context, key string, f *flight[T], fn func(
 		}
 		f.value, f.err, f.panicked = v, err, p
 		close(f.done)
+		c.running--
+		if c.running == 0 && c.idle != nil {
+			close(c.idle)
+			c.idle = nil
+		}
 		if p != nil && f.waiters == 0 {
 			slog.Error("cache: a fetch panicked after every caller left", "key", key, "panic", p.value, "stack", string(p.stack))
 		}
@@ -148,6 +165,32 @@ func (c *Cache[T]) fetch(ctx context.Context, key string, f *flight[T], fn func(
 		c.set(key, v)
 	}
 	returned = true
+}
+
+// Close ends every fetch in flight, including one every caller has left,
+// and waits for their goroutines to return, or for ctx's end, whose error it
+// returns. A caller still waiting gets what its ended fetch returned.
+func (c *Cache[T]) Close(ctx context.Context) error {
+	c.mu.Lock()
+	c.closed = true
+	for _, f := range c.flights {
+		f.cancel()
+	}
+	if c.running == 0 {
+		c.mu.Unlock()
+		return nil
+	}
+	if c.idle == nil {
+		c.idle = make(chan struct{})
+	}
+	idle := c.idle
+	c.mu.Unlock()
+	select {
+	case <-idle:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // leave drops a waiter that stopped waiting; the last one ends the fetch and

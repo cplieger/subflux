@@ -232,7 +232,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 		}
 	}
 	path := fixture(t, text.String())
-	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}, Providers: providers.Entries()}
+	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}, Providers: providers.New().Entries}
 	s := NewService(path, r, Load(path, r), nil, nil)
 	if m := s.Snapshot().Mode(); m != ModeActive {
 		failure, _ := s.Snapshot().Failure()

@@ -82,7 +82,7 @@ func TestEntrySummaryBounds(t *testing.T) {
 // Required values set, so a registry fault fails here and not at a user's
 // activation.
 func TestRegistryBuilds(t *testing.T) {
-	entries := providers.Entries()
+	entries := providers.New().Entries
 	var text strings.Builder
 	for _, e := range entries {
 		fmt.Fprintf(&text, "%s:\n  settings: {", e.ID)

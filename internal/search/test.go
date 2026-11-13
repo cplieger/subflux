@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/cplieger/subflux/internal/provider"
@@ -18,6 +19,11 @@ func Test(ctx context.Context, f *providercalls.Funnel, e provider.Entry, cfg pr
 	if err != nil {
 		return false, "", fmt.Errorf("search: build %s: %w", e.ID, err)
 	}
+	defer func() {
+		cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+		defer cancel()
+		closeAdapter(cctx, slog.Default(), &e, a)
+	}()
 	tester, has := a.(provider.Tester)
 	if !has {
 		return true, "no credentials to check", nil

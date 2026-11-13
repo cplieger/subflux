@@ -194,6 +194,19 @@ func TestSkippedPassesThrough(t *testing.T) {
 			t.Errorf("%+v, want Permanent", f)
 		}
 	})
+	t.Run("after a detached request", func(t *testing.T) {
+		ctx := providertest.Serve(t, t.Context(), text("{}"), host)
+		s := &scripted{search: func(ctx context.Context, c provider.Client, _ provider.Query) ([]provider.Candidate, error) {
+			if _, err := get(t, provider.Detached(ctx), c, "https://"+host+"/"); err != nil {
+				return nil, err
+			}
+			return nil, &provider.Skipped{Cause: "no IMDb id"}
+		}}
+		_, err := providertest.Build(t, entry(s, []string{host}), "").Search(ctx, provider.Query{})
+		if _, ok := errors.AsType[*provider.Skipped](err); !ok {
+			t.Errorf("err %v (%T), want the *Skipped: a detached request is not the call's", err, err)
+		}
+	})
 }
 
 type testerAdapter struct {
@@ -202,6 +215,46 @@ type testerAdapter struct {
 }
 
 func (a *testerAdapter) Test(context.Context) error { return a.err }
+
+// closerAdapter records its Close calls and answers err.
+type closerAdapter struct {
+	scripted
+	err    error
+	closes int
+}
+
+func (a *closerAdapter) Close(context.Context) error { a.closes++; return a.err }
+
+// TestBuildCloses: every adapter Build returns is a Closer, closing the
+// adapter it wraps when that one is, with its answer, and answering nil
+// otherwise.
+func TestBuildCloses(t *testing.T) {
+	gone := errors.New("still fetching")
+	for _, c := range []struct {
+		name  string
+		inner provider.Adapter
+		want  error
+	}{
+		{"closer", &closerAdapter{err: gone}, gone},
+		{"plain", &scripted{}, nil},
+		{"tester", &testerAdapter{}, nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := entry(&scripted{}, []string{host})
+			e.New = func(provider.Client, formschema.Values) (provider.Adapter, error) { return c.inner, nil }
+			cl, ok := providertest.Build(t, e, "").(provider.Closer)
+			if !ok {
+				t.Fatal("Build's adapter is no Closer")
+			}
+			if err := cl.Close(t.Context()); !errors.Is(err, c.want) {
+				t.Errorf("Close: %v, want %v", err, c.want)
+			}
+			if ca, ok := c.inner.(*closerAdapter); ok && ca.closes != 1 {
+				t.Errorf("the wrapped adapter closed %d times, want 1", ca.closes)
+			}
+		})
+	}
+}
 
 func TestBuild(t *testing.T) {
 	s := &scripted{}

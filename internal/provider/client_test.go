@@ -185,3 +185,31 @@ func TestClientOwnsUserAgent(t *testing.T) {
 		t.Error("built an entry that is no Exception with its own User-Agent")
 	}
 }
+
+func TestDoNoRedirect(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var n atomic.Int64
+		ctx := providertest.Serve(t, t.Context(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			n.Add(1)
+			if r.URL.Path == "/moved" {
+				http.Redirect(w, r, "https://"+host+"/there", http.StatusFound)
+				return
+			}
+			_, _ = w.Write([]byte("ok"))
+		}), host)
+		c := clientFor(t, host)
+		resp, err := c.DoNoRedirect(request(t, ctx, http.MethodGet, "https://"+host+"/moved"))
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		if f := failure(t, err); f.Kind != provider.Permanent || f.Status != http.StatusFound {
+			t.Errorf("%+v, want Permanent with the 302", f)
+		}
+		if got := n.Load(); got != 1 {
+			t.Errorf("%d requests, want 1: the Location is never asked", got)
+		}
+		if body, err := get(t, ctx, c, "https://"+host+"/moved"); err != nil || body != "ok" {
+			t.Errorf("Do: %q, %v; want the redirect followed", body, err)
+		}
+	})
+}

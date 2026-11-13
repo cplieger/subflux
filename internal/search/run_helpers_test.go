@@ -458,10 +458,32 @@ type scripted struct {
 	payloads map[string]scriptPayload
 	onFetch  func(context.Context) error
 	onSearch func(context.Context) error
+	onClose  func(context.Context) error
 	answers  []scriptAnswer
 	queries  []provider.Query
 	fetched  []string
+	closes   []int // the Searches running at each Close
+	running  int
 	mu       sync.Mutex
+}
+
+// Close records how many Searches were still running, then returns
+// onClose's answer, when set.
+func (s *scripted) Close(ctx context.Context) error {
+	s.mu.Lock()
+	s.closes = append(s.closes, s.running)
+	hook := s.onClose
+	s.mu.Unlock()
+	if hook != nil {
+		return hook(ctx)
+	}
+	return nil
+}
+
+func (s *scripted) closed() []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.closes)
 }
 
 type scriptPayload struct {
@@ -485,7 +507,13 @@ func (s *scripted) answer(err error, cands ...provider.Candidate) *scripted {
 func (s *scripted) Search(ctx context.Context, q provider.Query) ([]provider.Candidate, error) {
 	s.mu.Lock()
 	hook := s.onSearch
+	s.running++
 	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.running--
+		s.mu.Unlock()
+	}()
 	if hook != nil {
 		if err := hook(ctx); err != nil {
 			return nil, err

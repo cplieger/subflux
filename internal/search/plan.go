@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cplieger/subflux/internal/embedded"
@@ -519,7 +520,7 @@ func (h *heldEvidence) settled(p pair) bool {
 
 // planQuery fills the query every provider is asked with, less its tags
 // and the hash: the instance's media, its first item's numbering, the
-// root's year and titles and the parsed video string.
+// root's year and titles and the video string, which it also parses.
 func (r *run) planQuery(probe statedb.VideoProbe) {
 	first := r.items[0].item
 	kind := r.root.Native.Kind
@@ -533,9 +534,14 @@ func (r *run) planQuery(probe statedb.VideoProbe) {
 	if kind == media.Movie && first.External != (media.ExternalIDs{}) {
 		ext = first.External
 	}
+	video := r.inst.SceneName
+	if video == "" && r.inst.VideoPath != "" {
+		base := filepath.Base(r.inst.VideoPath)
+		video = strings.TrimSuffix(base, filepath.Ext(base))
+	}
 	r.query = provider.Query{
 		Kind: kind, Year: r.root.Year, External: ext, Numbering: first.Numbering, Absolute: first.Absolute,
-		Titles: titles,
+		Titles: titles, Video: video,
 	}
 	r.subject = subject{titles: titles, year: r.root.Year, kind: kind}
 	for i := range r.items {

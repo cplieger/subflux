@@ -358,6 +358,69 @@ func TestGetOrFetchLastCallerEndsFetch(t *testing.T) {
 	})
 }
 
+// TestCloseJoinsFetches: Close ends every fetch goroutine, the one its
+// caller still waits on and the one every caller left, and returns only once
+// both have returned; a call after Close starts none.
+func TestCloseJoinsFetches(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := New(NonEmpty[int])
+		var exited atomic.Int32
+		windDown := func(d time.Duration) func(context.Context) ([]int, error) {
+			return func(ctx context.Context) ([]int, error) {
+				<-ctx.Done()
+				time.Sleep(d)
+				exited.Add(1)
+				return nil, ctx.Err()
+			}
+		}
+		var waited error
+		var wg sync.WaitGroup
+		wg.Go(func() { _, waited = c.GetOrFetch(t.Context(), "held", windDown(time.Second)) })
+		left, leave := context.WithCancel(t.Context())
+		wg.Go(func() { _, _ = c.GetOrFetch(left, "left", windDown(2*time.Second)) })
+		synctest.Wait()
+		leave()
+		synctest.Wait()
+		start := time.Now()
+		if err := c.Close(t.Context()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		if n, took := exited.Load(), time.Since(start); n != 2 || took != 2*time.Second {
+			t.Errorf("Close returned after %v with %d fetches returned; want both, after the slower one's 2s", took, n)
+		}
+		wg.Wait()
+		if !errors.Is(waited, context.Canceled) {
+			t.Errorf("the waiting caller got %v, want its ended fetch's context.Canceled", waited)
+		}
+		called := false
+		if _, err := c.GetOrFetch(t.Context(), "after", func(context.Context) ([]int, error) { called = true; return nil, nil }); !errors.Is(err, errClosed) || called {
+			t.Errorf("GetOrFetch after Close: %v, fetched %v; want errClosed and no fetch", err, called)
+		}
+		if err := c.Close(t.Context()); err != nil {
+			t.Errorf("a second Close: %v", err)
+		}
+	})
+}
+
+// TestCloseBoundedByContext: a fetch that ignores its end keeps Close
+// waiting only until Close's own context ends.
+func TestCloseBoundedByContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := New(NonEmpty[int])
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			_, _ = c.GetOrFetch(t.Context(), "k", func(context.Context) ([]int, error) { time.Sleep(time.Minute); return nil, nil })
+		})
+		synctest.Wait()
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		if err := c.Close(ctx); !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Close: %v, want its context's DeadlineExceeded", err)
+		}
+		wg.Wait()
+	})
+}
+
 func BenchmarkGetOrFetch(b *testing.B) {
 	c := New(NonEmpty[int])
 	fn := func(context.Context) ([]int, error) { return []int{1}, nil }

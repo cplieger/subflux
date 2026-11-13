@@ -15,17 +15,9 @@ const ID provider.ProviderID = "animetosho"
 // name is how the map's alert names this provider.
 const name = "AnimeTosho"
 
-// languages lists every pickable tag, so every target is asked; an
-// attachment's ISO 639-2 language is read through language.Parse, not this
-// map, whose labels are never sent.
-var languages = sync.OnceValue(func() language.ProviderMap {
-	names := language.Names()
-	pairs := make([]language.WirePair, 0, len(names))
-	for _, n := range names {
-		pairs = append(pairs, language.WirePair{Wire: n.Tag.String(), Tag: n.Tag})
-	}
-	return language.MustProviderMap(pairs)
-})
+// languages lists every pickable tag: an attachment's ISO 639-2 language
+// names no region or script.
+var languages = sync.OnceValue(func() language.ProviderMap { return animemap.Languages() })
 
 // NewEntry is AnimeTosho's row of the provider table, reading m, the
 // process's anime map, from every adapter it builds.

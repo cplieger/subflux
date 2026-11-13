@@ -288,6 +288,30 @@ func TestVideoStringPathParsesBaseName(t *testing.T) {
 	})
 }
 
+// TestQueryCarriesVideoString: a provider is asked with the video's scene
+// name, else its file's base name less its extension.
+func TestQueryCarriesVideoString(t *testing.T) {
+	for _, c := range []struct {
+		name, scene string
+		want        string
+	}{
+		{"scene name", "Show.S01E01.720p.HDTV.x264-OTHER", "Show.S01E01.720p.HDTV.x264-OTHER"},
+		{"path", "", stem(1)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			inRig(t, "default: [{tag: en}]", func(t *testing.T, r *rig) {
+				p := r.provider("p", "en")
+				item := episode(1)
+				item.SceneName = c.scene
+				r.pick(r.seed(show, nil, item)[0], statedb.Scan)
+				if got := p.lastQuery().Video; got != c.want {
+					t.Errorf("Video %q, want %q", got, c.want)
+				}
+			})
+		})
+	}
+}
+
 func TestOneSweepPerInstance(t *testing.T) {
 	inRig(t, "default: [{tag: en}, {tag: fr}]", func(t *testing.T, r *rig) {
 		a := r.provider("a", "en", "fr")

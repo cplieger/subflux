@@ -54,15 +54,14 @@ type outcome struct {
 	fetched bool
 }
 
-func (m *Map) refresh(ctx context.Context, c provider.Client, done chan struct{}) {
+func (m *Map) refresh(ctx context.Context, c provider.Client) {
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
-	defer cancel()
 	m.mu.Lock()
 	held := m.held
 	m.mu.Unlock()
-	o := attempt(ctx, c, held, m.refusal)
+	o := attemptFn(ctx, c, held, m.refusal)
+	cancel()
 	m.finish(&o)
-	close(done)
 }
 
 // refusal is why tag was refused, nil when it was not.
@@ -71,6 +70,9 @@ func (m *Map) refusal(tag string) error {
 	defer m.mu.Unlock()
 	return m.refused[tag]
 }
+
+// attemptFn is attempt; a test holds a refresh by replacing it.
+var attemptFn = attempt
 
 // attempt asks for the latest tag and fetches it unless it is the held one
 // or a refused one, which fails again with its remembered cause.
@@ -94,11 +96,20 @@ func attempt(ctx context.Context, c provider.Client, held string, refused func(s
 }
 
 // finish records an attempt's outcome, logs it and reports the condition to
-// every registered entry.
+// every registered entry; an attempt ending after Close records nothing. It
+// is the refresh's last act and closes the flight it clears before unlocking:
+// a Close finding no flight returns at once, so it must never see the flight
+// cleared while its goroutine still runs.
 func (m *Map) finish(o *outcome) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	done := m.flight
+	defer close(done)
 	m.flight = nil
+	m.cancel()
+	if m.closed {
+		return
+	}
 	now := time.Now()
 	if o.err == nil {
 		if o.index != nil {
