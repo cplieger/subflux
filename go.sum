@@ -34,8 +34,8 @@ github.com/cplieger/go/urlform v1.2.0 h1:AQkwiRasHq1e57dzpFyrSRZWgp503XNPJ0DikXQ
 github.com/cplieger/go/urlform v1.2.0/go.mod h1:o7cRPRmslS3o05jpTJHqGKebD4eawAV7rIOB4AdGLao=
 github.com/cplieger/go/yamlenv v1.1.0 h1:vNaxHJnJMmg7MfRhqTBDaFPhMylEzzEtNefCvqU9ZPc=
 github.com/cplieger/go/yamlenv v1.1.0/go.mod h1:2kEi6iiRSxaaAusNrPoC6l0BUqvVVskkR1Cdpt15nUg=
-github.com/cplieger/langtag/v3 v3.2.0-dev.3 h1:M/+7UG4GV2NeDLe2Frc8Se/AmNmg0SqsCedVXFJ3MPE=
-github.com/cplieger/langtag/v3 v3.2.0-dev.3/go.mod h1:LnW2uXqaqUVWNZ3gnLhWhdjSfipA/87DuPHcyyNsNFc=
+github.com/cplieger/langtag/v3 v3.2.0 h1:HqJQOgfVrI5eNtxo1DbOw33wsLt6shKAWxd1y6e3xjs=
+github.com/cplieger/langtag/v3 v3.2.0/go.mod h1:LnW2uXqaqUVWNZ3gnLhWhdjSfipA/87DuPHcyyNsNFc=
 github.com/dlclark/regexp2/v2 v2.13.0 h1:sGPfGE1Bx7H3F9vcCdLrKUFvnau7DGiQZxHPQ6rMMs4=
 github.com/dlclark/regexp2/v2 v2.13.0/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/fxamacker/cbor/v2 v2.10.0 h1:HVF3T5vYwLqO81ebPirWEPNv2SMrUMD3HLnKgEr6uWE=
