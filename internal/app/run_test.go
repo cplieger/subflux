@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,6 +25,10 @@ import (
 
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/slogx"
+	"github.com/cplieger/subflux/internal/accounts"
+	"github.com/cplieger/subflux/internal/adminsock"
+	"github.com/cplieger/subflux/internal/backup"
+	"github.com/cplieger/subflux/internal/clientaddr"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -79,7 +84,7 @@ func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })
 	dir := t.TempDir()
-	b := &booted{paths: testPaths(dir), done: make(chan error, 1)}
+	b := &booted{paths: testPaths(t, dir), done: make(chan error, 1)}
 	if text != "" {
 		if err := os.WriteFile(b.paths.Config, []byte(text), 0o600); err != nil {
 			t.Fatal(err)
@@ -116,8 +121,19 @@ func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 	return b
 }
 
-func testPaths(dir string) Paths {
-	return Paths{Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy")}
+// testPaths lays the files out in dir and the admin socket in a short
+// directory of its own, since a Unix socket path is bounded at 108 bytes.
+func testPaths(t *testing.T, dir string) Paths {
+	t.Helper()
+	sock, err := os.MkdirTemp("", "sfx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(sock) })
+	return Paths{
+		Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy"),
+		SocketDir: sock, Socket: filepath.Join(sock, "admin.sock"),
+	}
 }
 
 func eventually(cond func() bool) bool {
@@ -172,7 +188,7 @@ func TestRunReturnsBindError(t *testing.T) {
 	shorten(t, &listenAddr, held.Addr().String())
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })
-	paths := testPaths(t.TempDir())
+	paths := testPaths(t, t.TempDir())
 	err = Run(t.Context(), Config{Paths: paths, LogOutput: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), held.Addr().String()) {
 		t.Errorf("Run = %v, want an error naming %s", err, held.Addr())
@@ -219,7 +235,7 @@ func TestBootFailureClosesStore(t *testing.T) {
 			c.arm(t)
 			prev := slog.Default()
 			t.Cleanup(func() { slog.SetDefault(prev) })
-			paths := testPaths(t.TempDir())
+			paths := testPaths(t, t.TempDir())
 			if err := os.WriteFile(paths.Config, []byte(validLanguages), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -435,12 +451,22 @@ func newLoop(t *testing.T, src changeSource) *changeLoop {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &changeLoop{svc: src, level: new(slog.LevelVar), metrics: obs.New(), alerts: st, running: slogx.JSON}
+	return &changeLoop{svc: src, level: new(slog.LevelVar), metrics: obs.New(), alerts: st, exposure: clientaddr.NewDetector(), running: slogx.JSON}
 }
 
 func hasAlert(st *status.Store, src status.AlertSource) bool {
+	_, ok := alertText(st, src)
+	return ok
+}
+
+// alertText is the text of src's active alert, false when none is.
+func alertText(st *status.Store, src status.AlertSource) (string, bool) {
 	snap, _ := st.Snapshot()
-	return slices.ContainsFunc(snap.Alerts, func(a status.Alert) bool { return a.Source == src })
+	i := slices.IndexFunc(snap.Alerts, func(a status.Alert) bool { return a.Source == src })
+	if i < 0 {
+		return "", false
+	}
+	return snap.Alerts[i].Text, true
 }
 
 func TestChangeLoopRaisesConfigWhileDiverged(t *testing.T) {
@@ -468,41 +494,60 @@ func TestChangeLoopRaisesConfigWhileDiverged(t *testing.T) {
 	step(false)
 }
 
-func TestRestartPendingComparesRunningFormat(t *testing.T) {
+// TestRestartPendingNamesWhatChangesAtRestart: restart_pending is raised
+// while a commit holds a log format other than the running handler's, or
+// config.yaml's auth section carries disable_auth: true with the booted
+// bypass off, and its text names each.
+func TestRestartPendingNamesWhatChangesAtRestart(t *testing.T) {
+	const (
+		format  = "the log format changes at the next restart"
+		authOff = "config.yaml's auth.disable_auth: true turns authentication off at a restart that accepts the auth section"
+	)
 	dir := t.TempDir()
-	load := func(server string) settings.Snapshot {
+	load := func(t *testing.T, text string) settings.Snapshot {
 		t.Helper()
 		path := filepath.Join(dir, "config.yaml")
-		if err := os.WriteFile(path, []byte("server:\n"+server+validLanguages), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(text+validLanguages), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		return settings.Load(path, settings.Registries{})
 	}
-	t.Run("loop", func(t *testing.T) {
+	type commit struct{ text, want string }
+	run := func(t *testing.T, commits []commit) {
+		t.Helper()
 		f := &fakeSource{ch: make(chan struct{}, 1)}
 		applied := make(chan struct{})
 		l := newLoop(t, f)
 		l.running, l.applied = slogx.Text, func() { applied <- struct{}{} }
 		go func() { _ = l.run(t.Context()) }()
-		for _, c := range []struct {
-			server  string
-			pending bool
-		}{
-			{"  log_format: text\n  log_level: debug\n", false},
-			{"  log_format: json\n", true},
-			{"  log_format: text\n", false},
-		} {
-			f.snap = load(c.server)
+		for _, c := range commits {
+			f.snap = load(t, c.text)
 			f.ch <- struct{}{}
 			select {
 			case <-applied:
 			case <-time.After(waitBudget):
 				t.Fatal("the loop did not apply the commit")
 			}
-			if got := hasAlert(l.alerts, status.AlertRestartPending); got != c.pending {
-				t.Errorf("running text, commit %q: restart_pending = %v, want %v", c.server, got, c.pending)
+			if got, _ := alertText(l.alerts, status.AlertRestartPending); got != c.want {
+				t.Errorf("running text, booted bypass off, commit %q: restart_pending %q, want %q", c.text, got, c.want)
 			}
 		}
+	}
+	t.Run("log format", func(t *testing.T) {
+		run(t, []commit{
+			{"server:\n  log_format: text\n  log_level: debug\n", ""},
+			{"server:\n  log_format: json\n", format},
+			{"server:\n  log_format: text\n", ""},
+		})
+	})
+	t.Run("disable_auth", func(t *testing.T) {
+		run(t, []commit{
+			{"server:\n  log_format: text\nauth:\n  disable_auth: false\n", ""},
+			{"server:\n  log_format: text\nauth:\n  disable_auth: true\n", authOff},
+			{"auth:\n  disable_auth: true\n", format + "; " + authOff},
+			{"server:\n  log_format: text\nauth:\n  password_login: nope\n  disable_auth: true\n", ""},
+			{"server:\n  log_format: text\n  allowed_hosts: [other.example]\nauth:\n  passkey_origins: ['https://nas.example']\n  disable_auth: true\n", authOff},
+		})
 	})
 	t.Run("boot_format", func(t *testing.T) {
 		b := boot(t, "server:\n  log_format: text\n"+validLanguages, nil)
@@ -515,7 +560,7 @@ func TestRestartPendingComparesRunningFormat(t *testing.T) {
 
 func TestChangeLoopCallsAppliedPerCommit(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	svc := settings.NewService(path, settings.Registries{}, settings.Load(path, settings.Registries{}), nil, nil)
+	svc := settings.NewService(path, settings.Registries{}, settings.Load(path, settings.Registries{}), nil, nil, nil)
 	level := new(slog.LevelVar)
 	calls := make(chan slog.Level, 1)
 	ctx, cancel := context.WithCancel(t.Context())
@@ -571,7 +616,7 @@ func TestChangeLoopCallsAppliedPerCommit(t *testing.T) {
 	})
 	t.Run("nil_hook", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.yaml")
-		svc := settings.NewService(path, settings.Registries{}, settings.Load(path, settings.Registries{}), nil, nil)
+		svc := settings.NewService(path, settings.Registries{}, settings.Load(path, settings.Registries{}), nil, nil, nil)
 		level := new(slog.LevelVar)
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
@@ -760,7 +805,8 @@ func settingsChangedReaders(t *testing.T) []string {
 }
 
 // TestActivationOfSettings: the store keys coverage on the sources, the
-// language policy and the embedded formats the settings ignore.
+// language policy and the embedded formats the settings ignore, and records
+// the auth section's method record.
 func TestActivationOfSettings(t *testing.T) {
 	fake := sourcetest.NewFake(&sourcetest.Library{}, mediasource.Capabilities{Kinds: []media.Kind{media.Movie}})
 	kinds := []mediasource.AdapterKind{sourcetest.FakeKind("fake", fake)}
@@ -786,5 +832,234 @@ func TestActivationOfSettings(t *testing.T) {
 	}
 	if want := []string{"dvbsub", "srt"}; !slices.Equal(got.IgnoredCodecs, want) {
 		t.Errorf("IgnoredCodecs = %v, want %v", got.IgnoredCodecs, want)
+	}
+	if got.Auth == nil || *got.Auth != accounts.MethodRecord(a.Auth) {
+		t.Errorf("Auth = %+v, want the auth section's method record", got.Auth)
+	}
+}
+
+func TestAuthEventDuringHTTPDrainIsLogged(t *testing.T) {
+	logs := &syncBuffer{}
+	var accts *accounts.Service
+	ready, entered, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	signedIn := make(chan int, 1)
+	b := boot(t, "", func(c *Config) {
+		c.LogOutput = logs
+		c.Accounts = func(a *accounts.Service) { accts = a }
+		c.Routes = func(mux *http.ServeMux) {
+			defer close(ready)
+			routes, err := accts.Routes(writeAuthError)
+			if err != nil {
+				t.Errorf("Routes: %v", err)
+				return
+			}
+			var login string
+			for _, r := range routes {
+				mux.Handle(r.Method+" "+r.Path, r.Handler)
+				if r.Name == "authLoginPassword" {
+					login = r.Path
+				}
+			}
+			// Held until the drain begins, then a sign-in that fails, served
+			// in-process while HTTP drains.
+			mux.HandleFunc("POST /hold", func(http.ResponseWriter, *http.Request) {
+				close(entered)
+				<-release
+				r := httptest.NewRequest(http.MethodPost, "https://nas.example"+login, strings.NewReader(`{"username":"eve","password":"wrong horse battery staple"}`))
+				r.Header.Set("Content-Type", "application/json")
+				r.Header.Set("Origin", "https://nas.example")
+				r.Header.Set("Sec-Fetch-Site", "same-origin")
+				r.RemoteAddr = "127.0.0.1:40000"
+				w := httptest.NewRecorder()
+				mux.ServeHTTP(w, r)
+				signedIn <- w.Code
+			})
+		}
+	})
+	<-ready
+	go func() {
+		req, _ := http.NewRequestWithContext(context.WithoutCancel(t.Context()), http.MethodPost, "http://"+b.addr+"/hold", http.NoBody)
+		if resp, err := http.DefaultTransport.RoundTrip(req); err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	select {
+	case <-entered:
+	case <-time.After(waitBudget):
+		t.Fatal("the held request never arrived")
+	}
+	b.cancel()
+	if !eventually(func() bool { return !b.markerPresent() }) {
+		t.Fatal("the drain never began")
+	}
+	close(release)
+	if code := <-signedIn; code != http.StatusUnauthorized {
+		t.Fatalf("the sign-in during the drain answered %d, want 401", code)
+	}
+	if err := b.wait(t); err != nil {
+		t.Fatalf("Run = %v, want nil: both sinks done inside the budget", err)
+	}
+	if !strings.Contains(logs.String(), `"msg":"accounts: audit","kind":"login.failure"`) {
+		t.Errorf("no audit line for the sign-in served during the HTTP drain:\n%s", logs.String())
+	}
+}
+
+func TestSocketBindFailureDegrades(t *testing.T) {
+	t.Run("a refused socket directory", func(t *testing.T) {
+		logs := &syncBuffer{}
+		b := boot(t, "", func(c *Config) {
+			c.LogOutput = logs
+			// Group and other access: Listen refuses the directory.
+			if err := os.Chmod(c.Paths.SocketDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !hasAlert(b.status, status.AlertAdminSocket) {
+			t.Error("boot ran without the admin socket and raised no admin_socket")
+		}
+		if !strings.Contains(logs.String(), `"level":"ERROR","msg":"app: could not bind the admin socket`) {
+			t.Errorf("no ERROR for the refused socket:\n%s", logs.String())
+		}
+	})
+	t.Run("a bound socket answers", func(t *testing.T) {
+		b := boot(t, "", nil)
+		if hasAlert(b.status, status.AlertAdminSocket) {
+			t.Error("admin_socket raised with the socket bound")
+		}
+		reply, err := adminsock.Call(t.Context(), b.paths.Socket, &adminsock.Request{Command: adminsock.SetupToken})
+		if err != nil || reply.Secret == "" {
+			t.Errorf("setup-token over the socket = %+v, %v; want a token", reply, err)
+		}
+	})
+}
+
+func TestBootRaisesAuthDisabled(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		want bool
+	}{
+		{validLanguages + "auth:\n  disable_auth: true\n", true},
+		{validLanguages, false},
+	} {
+		b := boot(t, c.text, nil)
+		if got := hasAlert(b.status, status.AlertAuthDisabled); got != c.want {
+			t.Errorf("boot of %q: auth_disabled %v, want %v", c.text, got, c.want)
+		}
+	}
+}
+
+func TestExposureResetOnServerSave(t *testing.T) {
+	dir := t.TempDir()
+	load := func(text string) settings.Snapshot {
+		t.Helper()
+		path := filepath.Join(dir, "config.yaml")
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return settings.Load(path, settings.Registries{})
+	}
+	det := clientaddr.NewDetector()
+	seen := func() bool {
+		_, ok := det.State(time.Now())
+		return ok
+	}
+	expose := func() {
+		h := clientaddr.Middleware(func() clientaddr.Resolver { return clientaddr.New(nil) }, det)(http.NotFoundHandler())
+		r := httptest.NewRequest(http.MethodGet, "http://nas.example/", nil)
+		r.RemoteAddr = "203.0.113.7:40000"
+		h.ServeHTTP(httptest.NewRecorder(), r)
+		if !seen() {
+			t.Fatal("a public client over plain HTTP recorded no exposure")
+		}
+	}
+	f := &fakeSource{ch: make(chan struct{}, 1), snap: load(validLanguages)}
+	applied := make(chan struct{})
+	l := newLoop(t, f)
+	l.exposure, l.applied = det, func() { applied <- struct{}{} }
+	l.server, l.serverOK = f.snap.Server()
+	go func() { _ = l.run(t.Context()) }()
+	for _, c := range []struct {
+		name, text string
+		reset      bool
+	}{
+		{"another section changed", validLanguages + "auth:\n  breached_passwords: true\n", false},
+		{"the server section failed, its fail-closed values the defaults", validLanguages + "server:\n  trusted_proxies: [nope]\n", true},
+		{"the server section absent again", validLanguages, true},
+		{"trusted_proxies changed", validLanguages + "server:\n  trusted_proxies: [10.0.0.0/8]\n", true},
+		{"the same server section again", validLanguages + "server:\n  trusted_proxies: [10.0.0.0/8]\n", false},
+		{"log_level changed", validLanguages + "server:\n  trusted_proxies: [10.0.0.0/8]\n  log_level: debug\n", true},
+	} {
+		expose()
+		f.snap = load(c.text)
+		f.ch <- struct{}{}
+		select {
+		case <-applied:
+		case <-time.After(waitBudget):
+			t.Fatal("the loop did not apply the change")
+		}
+		if got := !seen(); got != c.reset {
+			t.Errorf("%s: exposure reset %v, want %v", c.name, got, c.reset)
+		}
+	}
+}
+
+func TestDrainsPreferDone(t *testing.T) {
+	dir := t.TempDir()
+	store, err := statedb.Open(filepath.Join(dir, "subflux.bolt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	st, err := status.New(t.Context(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.yaml")
+	snap := settings.Load(path, settings.Registries{})
+	svc := settings.NewService(path, settings.Registries{}, snap, nil, nil, nil)
+	m := obs.New()
+	accts, err := newAccounts(t.Context(), store, svc, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backups := backup.New(backup.Deps{Store: store, Status: st, Metrics: m, Config: func() backup.Config { return backup.Config{} }})
+	sock := adminsock.New(adminsock.Deps{Accounts: accts, Settings: passwordLogin{svc}, Store: store})
+	paths := testPaths(t, dir)
+	ln, err := adminsock.Listen(t.Context(), paths.SocketDir, paths.Socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	for _, c := range []component{
+		{name: "accounts", run: accts.Run},
+		{name: "backups", run: backups.Run},
+		{name: "admin socket", run: func(ctx context.Context) error { return sock.Serve(ctx, ln) }},
+		{name: "store health", run: func(ctx context.Context) error { return storeHealth(ctx, store, st) }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			exits := make(chan exit, 1)
+			done := start(canceled(t.Context()), []component{c}, exits)[0]
+			<-done
+			if e := <-exits; e.err != nil && !errors.Is(e.err, context.Canceled) {
+				t.Fatalf("%s returned %v on its context's end", c.name, e.err)
+			}
+			for i := range 1000 {
+				if !await(expired, done) {
+					t.Fatalf("run %d: a drain past its deadline reported its closed done channel as an overrun", i)
+				}
+			}
+		})
+	}
+}
+
+func TestBootRunsBackups(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "backups")
+	boot(t, validLanguages+"backup:\n  enabled: true\n  path: "+dir+"\n", nil)
+	if !eventually(func() bool {
+		names, _ := filepath.Glob(filepath.Join(dir, "subflux-*.bolt"))
+		return len(names) == 1
+	}) {
+		t.Error("an enabled backup section with no backup yet wrote none after boot")
 	}
 }

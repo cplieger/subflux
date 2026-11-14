@@ -67,6 +67,9 @@ type Field struct {
 	Kind     Kind
 	// Required refuses an absent key, and for String and Secret an empty one.
 	Required bool
+	// BootOnly marks a key read only at startup: BootOnlyChanges refuses a
+	// change to it, and a form renders it read-only.
+	BootOnly bool
 }
 
 // FieldError is one refused value: Path is relative to the node Decode was

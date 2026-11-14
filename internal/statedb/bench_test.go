@@ -410,7 +410,7 @@ func BenchmarkCountCommit(b *testing.B) {
 					ip := netip.AddrFrom4([4]byte{10, byte(attempts >> 8), byte(attempts), byte(i)})
 					wg.Go(func() {
 						start := time.Now()
-						_, err := svc.PasswordLogin(ctx, account.Client{UserAgent: "bench", IP: ip, Peer: ip},
+						_, err := svc.PasswordLogin(ctx, account.Client{UserAgent: "bench", Peer: ip, Via: access.ViaDirect},
 							account.Credentials{Username: name, Password: access.NewSecret("wrong password")})
 						spent.Add(int64(time.Since(start)))
 						if !errors.Is(err, account.ErrInvalidCredentials) {

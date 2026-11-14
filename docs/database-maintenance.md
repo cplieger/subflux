@@ -33,6 +33,28 @@ To recover a damaged file:
 
 The database reuses its free space but does not shrink its file on its own while running. At each start, subflux compacts the file when its free pages make up at least half of it and at least 64 MiB, and logs `statedb: store compacted`. A compaction that fails only logs a `statedb: store compaction failed` warning, and subflux starts on the uncompacted file. You never need to compact it by hand.
 
+## Inspecting the database
+
+`subflux store` asks the running subflux for the database's counts and sizes, through the admin socket inside the container. Run it with `docker exec subflux subflux store`. It needs the container running, since only the running process can open the file.
+
+- `subflux store` reads the counts and sizes and changes nothing.
+- `subflux store --verify` also rebuilds every index, counter and derived row (each item's subtitle coverage and the library counts) from the rows they come from, and lists each one that differs. It changes nothing, and on a large library it takes a while. It needs settings in force: with no `config.yaml`, or one that does not load, it fails with `statedb: no activation in force`.
+- `subflux store --verify --repair` rewrites each index entry, counter and derived row that `--verify` found different. It never rewrites a primary row: a media item, a download, a lock or an account stays as stored. `--repair` without `--verify` is refused.
+
+It prints one JSON object, holding no key, stored value or secret:
+
+| Field | What it holds |
+| --- | --- |
+| `Namespaces` | each part of the database: its `Name`, its `Format` digest and its `Tables`, each with a `Name`, its row count `Rows` and the `Bytes` its pages use |
+| `Mismatches` | with `--verify`, each table, index, counter or derived row that differs: its `Name`, the `Missing`, `Extra` and `Undecodable` entries, and `Repaired` when `--repair` rewrote it |
+| `Verified` | whether `--verify` ran |
+| `Rev`, `OldestRetained`, `ConfigRev` | the newest change revision, the oldest one still kept for live updates, and the revision of the settings in force |
+| `Commits` | the write transactions committed since subflux started |
+| `FileBytes`, `FreeBytes` | the file's size and its free space, which compaction returns |
+| `Epoch` | a random identity for this run's open of the file, new at every start |
+
+A row that cannot be decoded during `--verify` stops the command with a `statedb: inspect` error naming its table; recover the file as in [When the database cannot be opened](#when-the-database-cannot-be-opened).
+
 ## Removing unused database files
 
 subflux keeps its data in `/config/subflux.bolt`, the lock file `subflux.bolt.lock` beside it, and the `.old` copies a reset keeps. It never reads, prunes or deletes files named `subflux.db`, `subflux.db-wal`, `subflux.db-shm` or `subflux-<timestamp>.db`. If your settings folder holds any of them, they are unused and only take up space.

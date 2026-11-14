@@ -54,7 +54,7 @@ func TestAlertsActiveFollowsStatus(t *testing.T) {
 	st.Reconcile(status.ProviderAlert("a"), false, "")
 	shows(`subflux_alerts_active{id="",kind="config"} 1`,
 		`subflux_alerts_active{id="b",kind="provider"} 1`)
-	st.RetainAlerts("provider", nil)
+	st.RetainAlerts(status.ProviderAlerts, nil)
 	shows(`subflux_alerts_active{id="",kind="config"} 1`)
 
 	t.Run("active_series_never_deleted", func(t *testing.T) {

@@ -1,7 +1,6 @@
 package status
 
 import (
-	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -264,19 +263,16 @@ func (s *Store) Cancel(id JobID) error {
 	return nil
 }
 
-// liveJobs lists the live jobs, newest started first, ties by ID; s.mu is
-// held.
-func (s *Store) liveJobs() []Job {
+// liveJobs lists the live jobs keep accepts, newest started first, ties by
+// ID; s.mu is held.
+func (s *Store) liveJobs(keep func(*Job) bool) []Job {
 	jobs := make([]Job, 0, len(s.live))
 	for _, l := range s.live {
-		jobs = append(jobs, cloneJob(l.job))
-	}
-	slices.SortFunc(jobs, func(a, b Job) int {
-		if c := b.Started.Compare(a.Started); c != 0 {
-			return c
+		if keep(&l.job) {
+			jobs = append(jobs, cloneJob(l.job))
 		}
-		return cmp.Compare(a.ID, b.ID)
-	})
+	}
+	slices.SortFunc(jobs, func(a, b Job) int { return jobOrder(&a, b.Started, b.ID) })
 	return jobs
 }
 

@@ -53,30 +53,30 @@ func (s *Store) Reconcile(source AlertSource, active bool, text string) {
 	s.bump()
 }
 
-// RetainAlerts clears every alert of kind, a per-entity kind, whose source is
-// not in live, and from then on Reconcile drops a raise of that kind outside
-// live; a kind never retained accepts every source. A fixed or unknown kind,
-// or a live source of another kind, is a programming fault: logged at ERROR,
-// and nothing changes.
-func (s *Store) RetainAlerts(kind string, live []AlertSource) {
+// RetainAlerts clears every alert of kind whose source is not in live, and
+// from then on Reconcile drops a raise of that kind outside live; a kind
+// never retained accepts every source. The zero AlertKind, or a live source
+// of another kind, is a programming fault: logged at ERROR, and nothing
+// changes.
+func (s *Store) RetainAlerts(kind AlertKind, live []AlertSource) {
 	if !slices.Contains(entityKinds, kind) {
-		slog.Error("status: alerts of this kind are not retained by configuration", "kind", kind)
+		slog.Error("status: retained alerts of no kind")
 		return
 	}
 	set := make(map[AlertSource]bool, len(live))
 	for _, src := range live {
-		if k, _, ok := AlertKindID(src); !ok || k != kind {
-			slog.Error("status: a retained source is not of its kind", "kind", kind, "source", string(src))
+		if k, _, ok := AlertKindID(src); !ok || k != kind.name {
+			slog.Error("status: a retained source is not of its kind", "kind", kind.String(), "source", string(src))
 			return
 		}
 		set[src] = true
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.retained[kind] = set
+	s.retained[kind.name] = set
 	cleared := false
 	for src := range s.alerts {
-		if k, _, _ := AlertKindID(src); k == kind && !set[src] {
+		if k, _, _ := AlertKindID(src); k == kind.name && !set[src] {
 			delete(s.alerts, src)
 			cleared = true
 		}

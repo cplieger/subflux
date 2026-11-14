@@ -35,7 +35,7 @@ func fixture(t testing.TB, text string) string {
 }
 
 func serve(path string, activate func(context.Context, Active) error, check SaveCheck) *Service {
-	return NewService(path, Registries{}, Load(path, Registries{}), activate, check)
+	return NewService(path, Registries{}, Load(path, Registries{}), activate, nil, check)
 }
 
 // node parses text, one YAML document, into its root node.
@@ -666,7 +666,7 @@ func TestSaveBodyShapes(t *testing.T) {
 
 func TestNewServiceOfZeroSnapshotRefusesSaves(t *testing.T) {
 	path := fixture(t, "server: {}\n"+validLanguages)
-	s := NewService(path, Registries{}, Snapshot{}, nil, nil)
+	s := NewService(path, Registries{}, Snapshot{}, nil, nil, nil)
 	if s.Snapshot().Mode() != Failed {
 		t.Errorf("mode %v, want Failed", s.Snapshot().Mode())
 	}

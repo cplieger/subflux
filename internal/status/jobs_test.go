@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -239,10 +240,6 @@ func TestLiveRetentionKeepsUndurableJob(t *testing.T) {
 				if got, ok, err := s.Keyed(t.Context(), 7, key); err != nil || !ok || got.State != status.Done {
 					t.Errorf("Keyed answers %v %v %v, want Done", got.State, ok, err)
 				}
-				snap, _ := s.Snapshot()
-				if n := len(snap.Jobs); n != 51 {
-					t.Errorf("%d live jobs, want 50 durable plus the undurable one", n)
-				}
 				close(release)
 				synctest.Wait()
 			})
@@ -256,25 +253,33 @@ func TestLiveRetentionBounds(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		done := make(chan error)
 		go func() { done <- s.Run(ctx) }()
+		running := begin(t, s, 7, nil, nil)
 		var ids []status.JobID
 		for range 51 {
 			time.Sleep(time.Second)
-			j := begin(t, s, 7, nil, nil)
-			finish(s, j.ID, status.Succeeded)
-			ids = append(ids, j.ID)
+			ids = append(ids, begin(t, s, 7, nil, nil).ID)
 		}
-		running := begin(t, s, 7, nil, nil)
+		// Ended newest started first, so the oldest-ended is the newest
+		// started and only its eviction keeps it out of the window.
+		for _, id := range slices.Backward(ids) {
+			time.Sleep(time.Second)
+			finish(s, id, status.Succeeded)
+		}
 		snap, _ := s.Snapshot()
-		if len(snap.Jobs) != 51 {
-			t.Errorf("%d live jobs, want 50 ended and one running", len(snap.Jobs))
-		}
-		if _, ok, _ := s.Get(t.Context(), ids[0]); !ok {
-			t.Error("the evicted job is not in the stored records")
-		}
+		var live []status.JobID
 		for _, j := range snap.Jobs {
-			if j.ID == ids[0] {
-				t.Error("the oldest-ended of 51 stayed live")
-			}
+			live = append(live, j.ID)
+		}
+		want := slices.Clone(ids[:50])
+		slices.Reverse(want)
+		if !slices.Equal(live, want) {
+			t.Errorf("the window holds %d jobs, want the 50 latest-ended, newest started first", len(live))
+		}
+		if snap.Unfinished != 1 {
+			t.Errorf("Unfinished %d, want the one running", snap.Unfinished)
+		}
+		if _, ok, _ := s.Get(t.Context(), ids[50]); !ok {
+			t.Error("the evicted job is not in the stored records")
 		}
 		time.Sleep(liveAge + time.Minute)
 		snap, _ = s.Snapshot()

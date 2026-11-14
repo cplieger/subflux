@@ -185,8 +185,8 @@ func TestJobBounds(t *testing.T) {
 	if err := start(100); !errors.Is(err, syncsched.ErrSyncCapacity) {
 		t.Errorf("the 65th job: %v, want ErrSyncCapacity", err)
 	}
-	if n := len(snapshotJobs(r)); n != syncsched.MaxQueued {
-		t.Errorf("%d jobs visible, want %d", n, syncsched.MaxQueued)
+	if snap, _ := r.status.Snapshot(); snap.Unfinished != syncsched.MaxQueued {
+		t.Errorf("%d jobs unfinished, want %d", snap.Unfinished, syncsched.MaxQueued)
 	}
 }
 

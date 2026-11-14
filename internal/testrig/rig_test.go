@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/access"
+	"github.com/cplieger/subflux/internal/adminsock"
 	"github.com/cplieger/subflux/internal/app"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
@@ -109,16 +111,33 @@ func TestBootOverRealStore(t *testing.T) {
 	if err := first.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	booted := storeRev(t, paths.Store)
-	if booted == 0 {
+	if storeRev(t, paths.Store) == 0 {
 		t.Fatal("a fresh directory's boot left the store at revision 0, so its activation wrote nothing")
 	}
+	// A boot over a store with no user mints a setup token, a write of its own.
+	addUser(t, paths.Store)
+	booted := storeRev(t, paths.Store)
 	second := Start(t, Options{Mutate: func(c *app.Config) { c.Paths = paths }})
 	if err := second.Stop(); err != nil {
 		t.Fatal(err)
 	}
 	if got := storeRev(t, paths.Store); got != booted {
 		t.Errorf("a restart with unchanged settings moved Rev from %d to %d", booted, got)
+	}
+}
+
+// addUser adds an admin to the stopped rig's store.
+func addUser(t *testing.T, path string) {
+	t.Helper()
+	s, err := statedb.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	now := time.Now()
+	u := &access.User{Username: "admin", Role: access.RoleAdmin, Enabled: true, WebAuthnHandle: access.GenerateWebAuthnHandle(), CreatedAt: now, UpdatedAt: now}
+	if err := s.Accounts().CreateUser(t.Context(), u); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -711,5 +730,31 @@ func TestRigSaveAppliesToNextDelivery(t *testing.T) {
 	}
 	if got := read(m.deliver(t, inst, "<i>Hello again</i>")); !strings.Contains(got, "<i>Hello again</i>") {
 		t.Errorf("the delivery right after a strip_tags: false save, its sources apply held, reads %q, want its tags kept", got)
+	}
+}
+
+func TestRigSocketAfterUncleanExit(t *testing.T) {
+	dir, err := os.MkdirTemp("", "sfx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	path := filepath.Join(dir, "admin.sock")
+	// A crashed process leaves its socket file behind.
+	stale, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale.(*net.UnixListener).SetUnlinkOnClose(false)
+	if err := stale.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(path); err != nil {
+		t.Fatalf("the stale socket is gone before boot: %v", err)
+	}
+	Start(t, Options{Mutate: func(c *app.Config) { c.Paths.SocketDir, c.Paths.Socket = dir, path }})
+	reply, err := adminsock.Call(t.Context(), path, &adminsock.Request{Command: adminsock.SetupToken})
+	if err != nil || reply.Secret == "" {
+		t.Errorf("setup-token over the rebound socket = %+v, %v; want a token", reply, err)
 	}
 }

@@ -111,6 +111,14 @@ func (s Server) LogFormat() string {
 	return s.p.format
 }
 
+// Equal reports whether s and o hold the same proxies, allowed hosts, log
+// level and log format; Hosts follows from AllowedHosts and how the section
+// parsed, which Snapshot.Server's ok tells.
+func (s Server) Equal(o Server) bool {
+	return slices.Equal(s.TrustedProxies(), o.TrustedProxies()) && slices.Equal(s.AllowedHosts(), o.AllowedHosts()) &&
+		s.LogLevel() == o.LogLevel() && s.LogFormat() == o.LogFormat()
+}
+
 // parseServer reads the server section, nil when absent. Each list entry its
 // parser refuses is a field error at its index, so a Server never runs a
 // partial list.

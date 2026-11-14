@@ -248,3 +248,46 @@ tests:
         exp_alerts:
           - exp_labels: {severity: warning, job: subflux, instance: b, source: tv}
             exp_annotations: {summary: subflux has not completed a full scan of tv, description: *stalled}
+
+  # SubfluxBackupStale: an instance that never backed up pages once it has
+  # run an hour; one whose backups succeed, or are off, stays silent.
+  - interval: 1m
+    input_series:
+      - series: 'subflux_backup_enabled{job="subflux",instance="a"}'
+        values: '1x700'
+      - series: 'subflux_backup_interval_seconds{job="subflux",instance="a"}'
+        values: '3600x700'
+      - series: 'subflux_backup_last_success_timestamp_seconds{job="subflux",instance="a"}'
+        values: '0x700'
+      - series: 'process_start_time_seconds{job="subflux",instance="a"}'
+        values: '36000x700'
+      - series: 'subflux_backup_enabled{job="subflux",instance="b"}'
+        values: '1x700'
+      - series: 'subflux_backup_interval_seconds{job="subflux",instance="b"}'
+        values: '3600x700'
+      - series: 'subflux_backup_last_success_timestamp_seconds{job="subflux",instance="b"}'
+        values: '0+60x700'
+      - series: 'process_start_time_seconds{job="subflux",instance="b"}'
+        values: '0x700'
+      - series: 'subflux_backup_enabled{job="subflux",instance="c"}'
+        values: '0x700'
+      - series: 'subflux_backup_interval_seconds{job="subflux",instance="c"}'
+        values: '3600x700'
+      - series: 'subflux_backup_last_success_timestamp_seconds{job="subflux",instance="c"}'
+        values: '0x700'
+      - series: 'process_start_time_seconds{job="subflux",instance="c"}'
+        values: '0x700'
+    alert_rule_test:
+      - eval_time: 670m
+        alertname: SubfluxBackupStale
+        exp_alerts: []
+      - eval_time: 680m
+        alertname: SubfluxBackupStale
+        exp_alerts:
+          - exp_labels: {severity: warning, job: subflux, instance: a}
+            exp_annotations:
+              summary: subflux has not made a backup in two backup intervals
+              description: >
+                Scheduled backups are on, but none has succeeded for twice the
+                backup frequency. The subflux log names the error of each failed
+                run; check that the backup folder is writable and has space.

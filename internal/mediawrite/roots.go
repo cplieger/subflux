@@ -100,7 +100,7 @@ func (w *Writer) applyRootsLocked(paths []string) {
 		live = append(live, status.MediaRootAlert(p))
 	}
 	slices.Sort(live)
-	w.alerts.RetainAlerts("media_root", live)
+	w.alerts.RetainAlerts(status.MediaRootAlerts, live)
 }
 
 // stateOfLocked is the deepest configured root containing path lexically.

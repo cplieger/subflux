@@ -6,7 +6,7 @@ This page lists what subflux reports about itself and the alert rules that ship 
 
 subflux serves Prometheus metrics at `/metrics` on port 8374, with no login.
 
-The `dev` branch is being rebuilt, so its image exports only the series below. The series for searches, downloads, providers, media roots, backups and the database return with the parts of subflux that own them.
+The `dev` branch is being rebuilt, so its image exports only the series below. The series for searches, downloads, providers, media roots and the database return with the parts of subflux that own them.
 
 | Metric | Owner | Meaning |
 | --- | --- | --- |
@@ -16,8 +16,13 @@ The `dev` branch is being rebuilt, so its image exports only the series below. T
 | `subflux_config_mode{mode}` | settings | 1 for the current state of `config.yaml` (`unconfigured`, `failed` or `active`), 0 for the others |
 | `subflux_alerts_active{kind,id}` | alerts | 1 for each problem subflux reports, labelled with its kind and id; a cleared problem's series goes away |
 | `subflux_build_info{version}` | build | always 1, labelled with the running version |
+| `subflux_auth_events_dropped_total` | accounts | sign-in audit lines (failed sign-ins, refusals and rate limits) dropped because their log queue was full; a rising count means a burst of refused requests outran the log |
 | `subflux_scan_last_complete_timestamp_seconds{source}` | scan | when the media source's latest full scan completed, or when its scan loop started before one has; a removed source's series goes away |
 | `subflux_scan_whole_interval_seconds` | scan | the `scan.whole_interval` setting in force |
+| `subflux_backup_enabled` | backup | 1 while `backup.enabled` is on, else 0 |
+| `subflux_backup_interval_seconds` | backup | the `backup.frequency` setting in force |
+| `subflux_backup_last_success_timestamp_seconds` | backup | when the newest backup in `backup.path` was made, read from its file name; 0 before any |
+| `subflux_backup_failures_total` | backup | scheduled backup runs that failed |
 
 The `go_*` and `process_*` series, such as `process_start_time_seconds`, describe the subflux process itself.
 
@@ -45,6 +50,7 @@ Load the rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus 
 | `SubfluxSourceUnreachable` | a Sonarr or Radarr instance could not be reached for 15m | warning |
 | `SubfluxScanStalled` | a media source has gone two full scan intervals with no completed full scan, for 2h | warning |
 | `SubfluxStoreWriteFailing` | writes to the database have failed for 5m | critical |
+| `SubfluxBackupStale` | backups are on and none has succeeded for two backup intervals, on an instance that has run for an hour, for 15m | warning |
 | `SubfluxConditionActive` | any other problem has stood for 15m | warning |
 
 `SubfluxTargetDown` and `SubfluxTargetAbsent` are two rules because neither covers the other. `up == 0` catches a configured target that is failing and keeps its labels. `absent(up{job="subflux"})` catches a target that no longer exists, such as a dropped scrape target, a removed scrape config, or a deleted Kubernetes pod or ServiceMonitor. Keep the job matcher exact. A regex `absent()` asks whether any matching target is up, so one healthy replica hides every failed one, and its result carries no `job` label to route on.
@@ -58,10 +64,10 @@ Each problem subflux reports is one `subflux_alerts_active` series. Its `kind` d
 | Kind | What it means | Rule |
 | --- | --- | --- |
 | `config` | `config.yaml` holds settings that are not live | `SubfluxConditionActive` |
-| `restart_pending` | a saved log format waits for a restart | none |
+| `restart_pending` | a saved log format waits for a restart, or `config.yaml` sets `auth.disable_auth: true` while login is on | none |
 | `job_records` | finished jobs are not yet stored | `SubfluxConditionActive`, unless `store` is active on the same instance |
 | `store` | a write to the database failed | `SubfluxStoreWriteFailing` |
-| `backup` | a scheduled backup failed | none |
+| `backup` | a scheduled backup failed | none; `SubfluxBackupStale` pages when no backup succeeds for two backup intervals |
 | `auth_disabled` | login is turned off by `auth.disable_auth` | none |
 | `admin_socket` | the admin socket could not be opened | `SubfluxConditionActive` |
 | `pending_writes` | subtitle changes wait to be written | `SubfluxConditionActive`, unless `media_root` is active on the same instance |
@@ -72,4 +78,4 @@ Each problem subflux reports is one `subflux_alerts_active` series. Its `kind` d
 | `media_server` | a media server cannot be reached or refuses subflux | `SubfluxConditionActive` |
 | `media_root` | a media root cannot be read | `SubfluxMediaUnavailable` |
 
-`SubfluxConditionActive` covers every kind not named in its exclusion list, so a kind added in a later release pages with no new rule. It leaves out `restart_pending` and `auth_disabled`, since one is a restart request and the other a setting you chose, and `backup`, whose own rule returns with scheduled backups. `job_records` and `pending_writes` usually follow from a database or media root fault, so each stays quiet while its cause is active on the same subflux instance, and that cause pages once. On `dev`, today's build raises `config`, `restart_pending`, `job_records`, `source`, `source_overlap`, `pending_writes` and `media_root`; the other kinds return with the parts of subflux that own them.
+`SubfluxConditionActive` covers every kind not named in its exclusion list, so a kind added in a later release pages with no new rule. It leaves out `restart_pending` and `auth_disabled`, since one is a restart request and the other a setting you chose, and `backup`, since `SubfluxBackupStale` reads the backup series instead: one failed run that the next retry repairs pages nobody, and an instance that never made a backup pages once it has run an hour. `job_records` and `pending_writes` usually follow from a database or media root fault, so each stays quiet while its cause is active on the same subflux instance, and that cause pages once. On `dev`, today's build raises every kind but `media_server`, which returns with media server support.

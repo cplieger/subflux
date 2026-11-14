@@ -3,6 +3,7 @@ package status
 import (
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -89,7 +90,7 @@ func TestRetainAlertsDropsLaterRaise(t *testing.T) {
 		s.Reconcile(keep, true, "down")
 		s.Reconcile(gone, true, "down")
 		s.Reconcile(SourceAlert("sonarr"), true, "down")
-		s.RetainAlerts("provider", []AlertSource{keep})
+		s.RetainAlerts(ProviderAlerts, []AlertSource{keep})
 		got := alerts(s)
 		if _, ok := got[gone]; ok {
 			t.Error("a source outside the live set survived RetainAlerts")
@@ -110,8 +111,8 @@ func TestRetainAlertsDropsLaterRaise(t *testing.T) {
 		name string
 		act  func(*Store)
 	}{
-		{"retaining a fixed kind", func(s *Store) { s.RetainAlerts("config", nil) }},
-		{"retaining with a source of another kind", func(s *Store) { s.RetainAlerts("provider", []AlertSource{SourceAlert("x")}) }},
+		{"retaining the zero kind", func(s *Store) { s.RetainAlerts(AlertKind{}, nil) }},
+		{"retaining with a source of another kind", func(s *Store) { s.RetainAlerts(ProviderAlerts, []AlertSource{SourceAlert("x")}) }},
 		{"reconciling an unknown kind", func(s *Store) { s.Reconcile("bogus:x", true, "typo") }},
 	}
 	for _, f := range faults {
@@ -135,4 +136,46 @@ func TestRetainAlertsDropsLaterRaise(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetainAlertsEveryKind(t *testing.T) {
+	kinds := []struct {
+		make func(string) AlertSource
+		kind AlertKind
+		name string
+	}{
+		{ProviderAlert, ProviderAlerts, "provider"},
+		{ProviderDataAlert, ProviderDataAlerts, "provider_data"},
+		{SourceAlert, SourceAlerts, "source"},
+		{SourceOverlapAlert, SourceOverlapAlerts, "source_overlap"},
+		{MediaServerAlert, MediaServerAlerts, "media_server"},
+		{MediaRootAlert, MediaRootAlerts, "media_root"},
+	}
+	for _, k := range kinds {
+		t.Run(k.name, func(t *testing.T) {
+			rec := capture.Default(t)
+			s := newStore()
+			s.Reconcile(k.make("keep"), true, "down")
+			s.Reconcile(k.make("gone"), true, "down")
+			s.RetainAlerts(k.kind, []AlertSource{k.make("keep")})
+			got := alerts(s)
+			if _, ok := got[k.make("gone")]; ok || len(got) != 1 || rec.CountLevel(slog.LevelError, "status:") != 0 {
+				t.Errorf("alerts %v, logged %q; want only keep, no ERROR", got, rec.Messages())
+			}
+			if k.kind.String() != k.name {
+				t.Errorf("String() = %q, want %q", k.kind.String(), k.name)
+			}
+		})
+	}
+	t.Run("no kind is made outside the package", func(t *testing.T) {
+		typ := reflect.TypeFor[AlertKind]()
+		if typ.Kind() != reflect.Struct {
+			t.Fatalf("AlertKind is a %v, which a literal converts to", typ.Kind())
+		}
+		for f := range typ.Fields() {
+			if f.IsExported() {
+				t.Errorf("AlertKind exports field %s, so another package can make a kind", f.Name)
+			}
+		}
+	})
 }

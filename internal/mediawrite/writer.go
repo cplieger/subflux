@@ -39,7 +39,7 @@ type Roots interface {
 // Alerts is declared here, its caller; status.Store implements it.
 type Alerts interface {
 	Reconcile(source status.AlertSource, active bool, text string)
-	RetainAlerts(kind string, live []status.AlertSource)
+	RetainAlerts(kind status.AlertKind, live []status.AlertSource)
 }
 
 var _ Alerts = (*status.Store)(nil)

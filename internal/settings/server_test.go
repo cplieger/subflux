@@ -311,3 +311,28 @@ func loopback(s Server) bool {
 	r.RemoteAddr = "127.0.0.1:50000"
 	return s.Hosts().Allows(r) && s.Hosts().Active()
 }
+
+func TestServerEqual(t *testing.T) {
+	server := func(text string) Server {
+		t.Helper()
+		s, ok := loadText(t, validLanguages+"server:\n"+text).Server()
+		if !ok {
+			t.Fatalf("server section %q did not parse", text)
+		}
+		return s
+	}
+	base := "  trusted_proxies: [10.0.0.0/8]\n  allowed_hosts: [nas.lan]\n  log_level: info\n  log_format: json\n"
+	if !server(base).Equal(server(base)) {
+		t.Error("two loads of one section differ")
+	}
+	for name, text := range map[string]string{
+		"trusted_proxies": "  trusted_proxies: [10.0.0.0/16]\n  allowed_hosts: [nas.lan]\n  log_level: info\n  log_format: json\n",
+		"allowed_hosts":   "  trusted_proxies: [10.0.0.0/8]\n  allowed_hosts: [nas.home]\n  log_level: info\n  log_format: json\n",
+		"log_level":       "  trusted_proxies: [10.0.0.0/8]\n  allowed_hosts: [nas.lan]\n  log_level: warn\n  log_format: json\n",
+		"log_format":      "  trusted_proxies: [10.0.0.0/8]\n  allowed_hosts: [nas.lan]\n  log_level: info\n  log_format: text\n",
+	} {
+		if server(base).Equal(server(text)) {
+			t.Errorf("a changed %s reads as equal", name)
+		}
+	}
+}

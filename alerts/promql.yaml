@@ -8,9 +8,10 @@
 # that matcher to your scrape job name. The other rules carry no job matcher,
 # so add one if you run more than one instance.
 #
-# Every rule after SubfluxHTTP5xx reads subflux_alerts_active, which holds one
-# series per problem subflux reports, labelled with the problem's kind and id.
-# docs/monitoring.md lists each kind and its rule.
+# Every rule after SubfluxHTTP5xx but the scan and backup rules reads
+# subflux_alerts_active, which holds one series per problem subflux reports,
+# labelled with the problem's kind and id. docs/monitoring.md lists each kind
+# and its rule.
 groups:
   - name: subflux
     rules:
@@ -114,8 +115,26 @@ groups:
             The last write to /config/subflux.bolt failed and none has
             succeeded since. The /config volume may be full, read-only or
             failing. The log names the error.
+      # Backups are on and none has succeeded for two backup intervals, an
+      # instance that never made one included, since its last-success series
+      # is 0. The uptime guard gives a fresh start an hour for its first copy.
+      - alert: SubfluxBackupStale
+        expr: >
+          subflux_backup_enabled == 1
+          and on(job, instance) (time() - subflux_backup_last_success_timestamp_seconds)
+          > on(job, instance) (2 * subflux_backup_interval_seconds)
+          and on(job, instance) (time() - process_start_time_seconds) > 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux has not made a backup in two backup intervals"
+          description: >
+            Scheduled backups are on, but none has succeeded for twice the
+            backup frequency. The subflux log names the error of each failed
+            run; check that the backup folder is writable and has space.
       # Every other kind, so a kind added later is covered with no new rule.
-      # backup is left to the backup rule that returns with scheduled backups;
+      # backup is left to SubfluxBackupStale above;
       # restart_pending and auth_disabled are a restart request and a setting
       # you chose. job_records and pending_writes follow from store and
       # media_root on the same instance, so each cause pages once.
