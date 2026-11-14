@@ -545,8 +545,8 @@ func TestClosedCachesAskNothing(t *testing.T) {
 }
 
 // TestTableCloseEndsRefresh: the anime map's refresh outlives the search
-// that started it; the table's Close ends its request and returns once it
-// has, and a later search starts none.
+// that started it; the table's Close ends its request at once, not at the
+// refresh's timeout, and a later search starts none.
 func TestTableCloseEndsRefresh(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		table := providers.New()
@@ -577,9 +577,16 @@ func TestTableCloseEndsRefresh(t *testing.T) {
 		if before != 1 {
 			t.Fatalf("%d refresh requests open after the search returned, want 1", before)
 		}
+		start := time.Now()
 		if err := table.Close(t.Context()); err != nil {
 			t.Fatalf("Close: %v", err)
 		}
+		if waited := time.Since(start); waited != 0 {
+			t.Errorf("Close returned after %v, want at once", waited)
+		}
+		// The handler sees its request end on the server's goroutine, which
+		// Close does not join.
+		synctest.Wait()
 		mu.Lock()
 		after := open
 		mu.Unlock()
