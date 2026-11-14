@@ -50,6 +50,7 @@ Load the rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus 
 | `SubfluxSourceUnreachable` | a Sonarr or Radarr instance could not be reached for 15m | warning |
 | `SubfluxScanStalled` | a media source has gone two full scan intervals with no completed full scan, for 2h | warning |
 | `SubfluxStoreWriteFailing` | writes to the database have failed for 5m | critical |
+| `SubfluxBackupStale` | backups are on and none has succeeded for two backup intervals, on an instance that has run for an hour, for 15m | warning |
 | `SubfluxConditionActive` | any other problem has stood for 15m | warning |
 
 `SubfluxTargetDown` and `SubfluxTargetAbsent` are two rules because neither covers the other. `up == 0` catches a configured target that is failing and keeps its labels. `absent(up{job="subflux"})` catches a target that no longer exists, such as a dropped scrape target, a removed scrape config, or a deleted Kubernetes pod or ServiceMonitor. Keep the job matcher exact. A regex `absent()` asks whether any matching target is up, so one healthy replica hides every failed one, and its result carries no `job` label to route on.
