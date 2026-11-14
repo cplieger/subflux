@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
 	"github.com/cplieger/go/slogx"

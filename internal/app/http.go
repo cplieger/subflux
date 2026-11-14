@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/subflux/internal/obs"
 )
