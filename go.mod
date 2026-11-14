@@ -3,14 +3,14 @@ module github.com/cplieger/subflux
 go 1.27.4
 
 require (
-	github.com/cplieger/access v1.0.0-dev.10
+	github.com/cplieger/access v1.0.0-dev.11
 	github.com/cplieger/animap/mapread v0.3.2
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.16
 	github.com/cplieger/bolttable v1.2.0-dev.1
 	github.com/cplieger/go/filesafe v1.1.0
 	github.com/cplieger/go/health v1.1.0
 	github.com/cplieger/go/httpclient v1.2.0
-	github.com/cplieger/go/httpserver v1.4.0
+	github.com/cplieger/go/httpserver v1.5.0-dev.2
 	github.com/cplieger/go/jsonx v1.1.0
 	github.com/cplieger/go/keyenc v1.3.0
 	github.com/cplieger/go/keylock v1.1.0
@@ -26,6 +26,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
+	golang.org/x/term v0.48.0
 	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0

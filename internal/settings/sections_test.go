@@ -98,7 +98,7 @@ func TestProvidersAndSearchSections(t *testing.T) {
 	})
 	t.Run("an adapter's New error fails the save, which writes nothing", func(t *testing.T) {
 		path := fixture(t, validLanguages)
-		s := NewService(path, r, Load(path, r), nil, nil)
+		s := NewService(path, r, Load(path, r), nil, nil, nil)
 		_, errs, err := s.Save(t.Context(), node(t, validLanguages+"providers: {keyed: {settings: {api_key: wrong}}}\n"), s.Snapshot().Revision())
 		if err != nil || !slices.Equal(errPaths(errs), []string{"providers.keyed.settings"}) {
 			t.Fatalf("Save = %v, %v; want one error at providers.keyed.settings", errs, err)
@@ -126,6 +126,50 @@ func TestSearchSectionNeedsLanguages(t *testing.T) {
 	t.Run("a search section beside a parsed one is checked against it", func(t *testing.T) {
 		if got, want := failurePaths(t, loadWith(t, Registries{}, validLanguages+"search: {min_fit_by_target: {fr: exact}}\n")), []string{"search.min_fit_by_target.fr"}; !slices.Equal(got, want) {
 			t.Errorf("paths %v, want %v", got, want)
+		}
+	})
+}
+
+func TestSectionSchemasCoverFlatSections(t *testing.T) {
+	schemas := SectionSchemas()
+	keys := make([]string, 0, len(schemas))
+	for _, s := range schemas {
+		keys = append(keys, s.Key)
+	}
+	// Platform-auth design 4.3: every section decoded with a schema, in table
+	// order; languages, sources and providers are hand-walked.
+	want := []string{"server", "auth", "scan", "search", "post_processing", "timing", "embedded_subtitles", "backup"}
+	if !slices.Equal(keys, want) {
+		t.Fatalf("sections %v, want %v", keys, want)
+	}
+	unknownAt := func(t *testing.T, text, path string) bool {
+		t.Helper()
+		errs, _ := loadText(t, validLanguages+text).Failure()
+		return slices.ContainsFunc(errs, func(e formschema.FieldError) bool { return e.Path == path && e.Message == "unknown key" })
+	}
+	for _, s := range schemas {
+		t.Run(s.Key+" accepts each served key and refuses others", func(t *testing.T) {
+			for _, f := range s.Schema.Fields {
+				if unknownAt(t, s.Key+": {"+f.Key+": x}\n", s.Key+"."+f.Key) {
+					t.Errorf("%s.%s is served but refused as an unknown key", s.Key, f.Key)
+				}
+			}
+			if !unknownAt(t, s.Key+": {not_served: x}\n", s.Key+".not_served") {
+				t.Errorf("%s.not_served is not refused as an unknown key", s.Key)
+			}
+		})
+	}
+	t.Run("only auth.disable_auth is BootOnly", func(t *testing.T) {
+		var boot []string
+		for _, s := range schemas {
+			for _, f := range s.Schema.Fields {
+				if f.BootOnly {
+					boot = append(boot, s.Key+"."+f.Key)
+				}
+			}
+		}
+		if !slices.Equal(boot, []string{"auth.disable_auth"}) {
+			t.Errorf("BootOnly fields %v, want [auth.disable_auth]", boot)
 		}
 	})
 }

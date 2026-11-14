@@ -42,11 +42,11 @@ var writeFile = func(ctx context.Context, path string, data []byte) error {
 // Save replaces the file with doc, a whole document as Document answers it,
 // each unchanged scalar taken from the stored file, and makes it live. base
 // is the Revision the document was read at; another is ErrConflict, checked
-// first. A document that does not parse, a check that refuses it, or a file
-// changed on disk since this service last read or wrote it answers the live
-// snapshot and field errors, writing nothing. The write and activate run to
-// the end whatever ctx does, and only Shutdown cancels them; a failed
-// activate restores the file and answers ErrActivation.
+// first. A document that does not parse, a check or activation that refuses
+// it (a *formschema.RefusedError), or a file changed on disk since this service
+// last read or wrote it answers the live snapshot and field errors, the file
+// unchanged. Write and activate run to the end whatever ctx does, and only
+// Shutdown cancels them; another activate error answers ErrActivation.
 func (s *Service) Save(ctx context.Context, doc *yaml.Node, base string) (Snapshot, []formschema.FieldError, error) {
 	if err := s.lock(ctx); err != nil {
 		return s.Snapshot(), nil, err
@@ -77,20 +77,34 @@ func (s *Service) Save(ctx context.Context, doc *yaml.Node, base string) (Snapsh
 		return cur, rootError(msgChangedOnDisk), nil
 	}
 	next := fromBytes(data, s.r)
-	if errs, failed := next.Failure(); failed {
+	active, errs := s.prepare(ctx, cur, next)
+	if len(errs) > 0 {
 		return cur, errs, nil
 	}
+	return s.commit(ctx, cur, next, &active)
+}
+
+// prepare refuses next, the merged document's snapshot, for its own field
+// errors, a change to a BootOnly field, then the save check's answer; from
+// Failed or unconfigured the check's prev is the zero Active.
+func (s *Service) prepare(ctx context.Context, cur, next Snapshot) (Active, []formschema.FieldError) {
+	if errs, failed := next.Failure(); failed {
+		return Active{}, errs
+	}
 	active, _ := next.Active()
+	if errs := bootOnlyChanges(cur.p.doc, next.p.doc); len(errs) > 0 {
+		return Active{}, errs
+	}
 	if s.check != nil {
 		prev, ok := cur.Active()
 		if !ok {
 			prev = Active{}
 		}
 		if errs := s.check(ctx, prev, active); len(errs) > 0 {
-			return cur, errs, nil
+			return Active{}, errs
 		}
 	}
-	return s.commit(ctx, cur, next, &active)
+	return active, nil
 }
 
 // commit writes next's file, activates it and makes it live, on a context
@@ -106,6 +120,10 @@ func (s *Service) commit(ctx context.Context, cur, next Snapshot, active *Active
 	if s.activate != nil {
 		if err := s.activate(sctx, *active); err != nil {
 			s.restore()
+			if refused, ok := errors.AsType[*formschema.RefusedError](err); ok {
+				slog.Warn("settings: the save was refused on activation; config.yaml is restored", "path", s.path, "fields", fieldText(refused.Fields))
+				return cur, refused.Fields, nil
+			}
 			return cur, nil, fmt.Errorf("%w: %w", ErrActivation, err)
 		}
 	}
@@ -164,6 +182,22 @@ func readFile(path string) fileState {
 		return fileState{}
 	}
 	return fileState{data: data, present: true, known: true}
+}
+
+// storedSection is an expanded copy of the stored document's first section
+// named name, nil when it has none; a name left unresolved stays as written.
+func storedSection(doc *yaml.Node, name string) *yaml.Node {
+	if doc == nil {
+		return nil
+	}
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if k, ok := sectionName(doc.Content[i]); ok && k == name {
+			v := deepCopy(doc.Content[i+1])
+			_ = expand(v, name)
+			return v
+		}
+	}
+	return nil
 }
 
 func rootError(msg string) []formschema.FieldError {

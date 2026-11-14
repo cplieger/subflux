@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/cplieger/subflux/internal/accounts"
+	"github.com/cplieger/subflux/internal/backup"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
@@ -54,8 +56,11 @@ func (m *Mode) UnmarshalText(b []byte) error {
 	return fmt.Errorf("%w: %q", errUnknownMode, b)
 }
 
-// Registries lists the adapter kinds each hand-walked section accepts.
+// Registries is what the binary hands the section parsers: the adapter
+// kinds each hand-walked section accepts, and the state store's directory,
+// which backup.path may not name.
 type Registries struct {
+	StoreDir  string
 	Sources   []mediasource.AdapterKind
 	Providers []provider.Entry
 }
@@ -64,10 +69,12 @@ type Registries struct {
 type Active struct {
 	Languages language.Policy
 	Server    Server
+	Auth      accounts.Config
 	Sources   []mediasource.Config
 	Providers []provider.Config
 	Embedded  embedded.Config
 	Search    search.Config
+	Backup    backup.Config
 	Scan      mediasource.Schedule
 	Media     mediawrite.Config
 	Timing    timing.Config
@@ -82,6 +89,12 @@ type snapshot struct {
 	// server is the section in force; serverOK is false only in Failed when
 	// the section's own parse failed, and server is then its fail-closed value.
 	server Server
+	// auth is the section in force; authOK is false only in Failed when the
+	// section did not parse, and auth is then the defaults.
+	auth accounts.Config
+	// fileAuth is the section as its own parse read it, kept when a cross
+	// check or Boot refuses it; the defaults when that parse failed.
+	fileAuth accounts.Config
 	// doc is the file's mapping as written, before expansion, and view is
 	// Document's node for it; both nil when there is no mapping.
 	doc, view *yaml.Node
@@ -91,6 +104,7 @@ type snapshot struct {
 	active    Active
 	mode      Mode
 	serverOK  bool
+	authOK    bool
 }
 
 // Mode answers which state the snapshot is in.
@@ -126,4 +140,26 @@ func (s Snapshot) Server() (Server, bool) {
 		return denyAllServer(), false
 	}
 	return s.p.server, s.p.serverOK
+}
+
+// Auth is the auth section in force: Active's, unconfigured's defaults, or in
+// Failed the section when it parsed and passed its cross check; false only in
+// Failed when it did not, and the answer is then the defaults, which accounts
+// runs with password sign-in refused to every client that is not local.
+func (s Snapshot) Auth() (accounts.Config, bool) {
+	if s.p == nil {
+		return accounts.Config{}, false
+	}
+	return s.p.auth, s.p.authOK
+}
+
+// FileAuth is the auth section as config.yaml's own parse read it, the one
+// the next boot decodes, in force or not: a section a cross check or Boot
+// refused keeps its values, and one that failed to parse, or no file, reads
+// as the defaults.
+func (s Snapshot) FileAuth() accounts.Config {
+	if s.p == nil {
+		return accounts.Config{}
+	}
+	return s.p.fileAuth
 }

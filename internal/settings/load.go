@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/go/filesafe"
 	"github.com/cplieger/go/yamlenv"
+	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v4"
 )
@@ -109,7 +110,10 @@ func parse(root *yaml.Node, r Registries, f fileState) Snapshot {
 	}
 	active, failed, serrs := parseSections(r, names, values, tainted)
 	errs = append(errs, serrs...)
-	s := &snapshot{mode: mode, active: active, server: active.Server, serverOK: true, file: f, revision: rand.Text()}
+	s := &snapshot{
+		mode: mode, active: active, server: active.Server, serverOK: true, auth: active.Auth, authOK: true,
+		fileAuth: active.Auth, file: f, revision: rand.Text(),
+	}
 	if stored != nil {
 		s.doc, s.view = stored, view(stored, doc)
 	}
@@ -119,12 +123,23 @@ func parse(root *yaml.Node, r Registries, f fileState) Snapshot {
 	if len(errs) == 0 || mode == Unconfigured {
 		return Snapshot{s}
 	}
-	s.mode, s.failure, s.serverOK = Failed, errs, !failed["server"]
+	s.fail(errs, failed, sh.opaque, values["server"])
+	return Snapshot{s}
+}
+
+// fail makes s Failed with errs, keeping each of the server and auth
+// sections that parsed: a failed server section is its fail-closed value, or
+// denies every Host when the file is opaque, and a failed auth section is the
+// defaults.
+func (s *snapshot) fail(errs []formschema.FieldError, failed map[string]bool, opaque bool, server []*yaml.Node) {
+	s.mode, s.failure, s.serverOK, s.authOK = Failed, errs, !failed["server"], !failed[accounts.SectionKey]
+	if !s.authOK {
+		s.auth = accounts.Config{}
+	}
 	switch {
-	case sh.opaque:
+	case opaque:
 		s.server = denyAllServer()
 	case failed["server"]:
-		s.server = failClosedServer(values["server"])
+		s.server = failClosedServer(server)
 	}
-	return Snapshot{s}
 }

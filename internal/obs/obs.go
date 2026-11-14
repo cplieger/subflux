@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
@@ -31,6 +32,16 @@ type Metrics struct {
 	panics       *measure.Counter
 	configMode   *measure.LabeledGauge
 	alertsActive *measure.LabeledGauge
+	authDropped  *measure.Counter
+	backup       backupSeries
+}
+
+// backupSeries are the backup runner's schedule, last success and failures.
+type backupSeries struct {
+	enabled     *measure.Gauge
+	interval    *measure.Gauge
+	lastSuccess *measure.Gauge
+	failures    *measure.Counter
 }
 
 // New builds the registry, prefix subflux, with the platform series
@@ -44,9 +55,17 @@ func New() *Metrics {
 		panics:       measure.NewCounter("panics_total", "HTTP handler panics recovered."),
 		configMode:   measure.NewLabeledGauge("config_mode", "1 for the configuration's current mode, 0 for the others.", []string{"mode"}),
 		alertsActive: measure.NewLabeledGauge("alerts_active", "1 for each active alert, by its kind and id.", []string{"kind", "id"}),
+		authDropped:  measure.NewCounter("auth_events_dropped_total", "Sign-in audit events dropped because the audit log queue was full."),
+		backup: backupSeries{
+			enabled:     measure.NewGauge("backup_enabled", "1 while scheduled backups are on, else 0."),
+			interval:    measure.NewGauge("backup_interval_seconds", "The time between scheduled backups."),
+			lastSuccess: measure.NewGauge("backup_last_success_timestamp_seconds", "When the newest backup was made, 0 before any."),
+			failures:    measure.NewCounter("backup_failures_total", "Scheduled backup runs that failed."),
+		},
 	}
 	buildInfo := measure.NewLabeledGauge("build_info", "Always 1, labelled with the running version.", []string{"version"})
-	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, m.alertsActive, buildInfo)
+	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, m.alertsActive, m.authDropped,
+		m.backup.enabled, m.backup.interval, m.backup.lastSuccess, m.backup.failures, buildInfo)
 	buildInfo.Set(1, buildinfo.Version())
 	for _, mode := range configModes {
 		m.configMode.Set(0, mode)
@@ -105,3 +124,30 @@ func (m *Metrics) SetAlertActive(kind, id string) { m.alertsActive.Set(1, kind, 
 
 // DeleteAlertActive removes a cleared alert's alerts_active series.
 func (m *Metrics) DeleteAlertActive(kind, id string) { m.alertsActive.Delete(kind, id) }
+
+// IncAuthEventsDropped counts one sign-in audit event the full audit queue
+// dropped.
+func (m *Metrics) IncAuthEventsDropped() { m.authDropped.Inc() }
+
+// SetBackupSchedule sets backup_enabled and backup_interval_seconds.
+func (m *Metrics) SetBackupSchedule(enabled bool, interval time.Duration) {
+	v := 0.0
+	if enabled {
+		v = 1
+	}
+	m.backup.enabled.Set(v)
+	m.backup.interval.Set(interval.Seconds())
+}
+
+// SetBackupLastSuccess sets backup_last_success_timestamp_seconds to at, 0
+// for the zero time.
+func (m *Metrics) SetBackupLastSuccess(at time.Time) {
+	v := 0.0
+	if !at.IsZero() {
+		v = float64(at.Unix())
+	}
+	m.backup.lastSuccess.Set(v)
+}
+
+// IncBackupFailure counts one failed backup run.
+func (m *Metrics) IncBackupFailure() { m.backup.failures.Inc() }

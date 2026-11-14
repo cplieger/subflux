@@ -40,7 +40,7 @@ var alertParity = []parityRow{
 	{old: "SubfluxMediaUnavailable", successor: "SubfluxMediaUnavailable"},
 	{old: "SubfluxMediaUnwritable", removal: "folder level: each video's write problem is reported on its own; the root level is SubfluxMediaUnavailable"},
 	{old: "SubfluxScanStalled", successor: "SubfluxScanStalled"},
-	{old: "SubfluxBackupStale", pending: "PA2-5"},
+	{old: "SubfluxBackupStale", successor: "SubfluxBackupStale"},
 }
 
 var taskID = regexp.MustCompile(`^[A-Z]{2,4}[0-9]*-[0-9]+[a-z]?$`)

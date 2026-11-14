@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -27,14 +26,15 @@ import (
 // for a retained kind.
 type fakeAlerts struct {
 	active   map[status.AlertSource]string
-	kind     string // the retained kind; its sources outside retained are dropped
+	kind     status.AlertKind // the retained kind; its sources outside retained are dropped
 	retained []status.AlertSource
 	raised   int
 	mu       sync.Mutex
 }
 
-func ofKind(src status.AlertSource, kind string) bool {
-	return kind != "" && (strings.HasPrefix(string(src), kind+":") || strings.HasPrefix(string(src), kind+"#"))
+func ofKind(src status.AlertSource, kind status.AlertKind) bool {
+	k, _, ok := status.AlertKindID(src)
+	return ok && kind != (status.AlertKind{}) && k == kind.String()
 }
 
 func (a *fakeAlerts) Reconcile(src status.AlertSource, active bool, text string) {
@@ -54,7 +54,7 @@ func (a *fakeAlerts) Reconcile(src status.AlertSource, active bool, text string)
 	a.raised++
 }
 
-func (a *fakeAlerts) RetainAlerts(kind string, live []status.AlertSource) {
+func (a *fakeAlerts) RetainAlerts(kind status.AlertKind, live []status.AlertSource) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.kind, a.retained = kind, slices.Clone(live)

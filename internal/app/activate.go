@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/settings"
@@ -11,11 +12,12 @@ import (
 )
 
 // newActivate makes a parsed configuration live: the store's activation,
-// then the alerts each configuration-keyed kind retains, then the writer's
-// section.
-func newActivate(store *statedb.Store, st *status.Store, writer *mediawrite.Writer) activateFunc {
+// its auth record judged by guard's method guard, then the alerts each
+// configuration-keyed kind retains, then the writer's section.
+func newActivate(store *statedb.Store, st *status.Store, writer *mediawrite.Writer, guard func() statedb.MethodGuard) activateFunc {
 	return func(ctx context.Context, a settings.Active) error {
 		act := activationOf(&a)
+		act.Guard = guard()
 		if err := store.Activate(ctx, act); err != nil {
 			return err
 		}
@@ -27,16 +29,20 @@ func newActivate(store *statedb.Store, st *status.Store, writer *mediawrite.Writ
 	}
 }
 
-// activationOf is the part of a the store keys coverage on.
-func activationOf(a *settings.Active) statedb.Activation {
-	return statedb.Activation{Languages: a.Languages, Sources: sourceIDs(a), IgnoredCodecs: a.Embedded.Ignored()}
+// newActivateAuth is the auth half of a boot that is not Active: the auth
+// section in force recorded alone, judged by guard's method guard.
+func newActivateAuth(store *statedb.Store, guard func() statedb.MethodGuard) func(context.Context, accounts.Config) error {
+	return func(ctx context.Context, c accounts.Config) error {
+		return store.ActivateAuth(ctx, accounts.MethodRecord(c), guard())
+	}
 }
 
-// The per-entity alert kinds of status.ProviderAlert and ProviderDataAlert.
-const (
-	providerAlertKind     = "provider"
-	providerDataAlertKind = "provider_data"
-)
+// activationOf is the part of a the store keys coverage on, and its auth
+// record.
+func activationOf(a *settings.Active) statedb.Activation {
+	auth := accounts.MethodRecord(a.Auth)
+	return statedb.Activation{Auth: &auth, Languages: a.Languages, Sources: sourceIDs(a), IgnoredCodecs: a.Embedded.Ignored()}
+}
 
 // retainProviders keeps the provider and provider-data alerts of the
 // enabled providers in cfgs and clears the rest, so a disabled or removed
@@ -49,6 +55,6 @@ func retainProviders(st *status.Store, cfgs []provider.Config) {
 			data = append(data, status.ProviderDataAlert(id))
 		}
 	}
-	st.RetainAlerts(providerAlertKind, calls)
-	st.RetainAlerts(providerDataAlertKind, data)
+	st.RetainAlerts(status.ProviderAlerts, calls)
+	st.RetainAlerts(status.ProviderDataAlerts, data)
 }

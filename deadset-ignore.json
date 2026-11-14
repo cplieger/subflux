@@ -38,12 +38,6 @@
       "reason": "A member of search.WhyNot, an exported closed enum: a package holding a WhyNot names any of its values, so the set is exported whole."
     },
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Unconfigured",
-      "path": "internal/settings/snapshot.go",
-      "reason": "A member of settings.Mode, an exported closed enum: a package holding a Mode names any of its values, so the set is exported whole."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Jobs",
       "path": "internal/status/snapshot.go",
@@ -63,30 +57,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertStore",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until PA-2 (internal/status#AlertStore): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertBackup",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until PA-2 (internal/status#AlertBackup): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertAuthDisabled",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until PA-2 (internal/status#AlertAuthDisabled): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#AlertAdminSocket",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until PA-2 (internal/status#AlertAdminSocket): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlert",
       "path": "internal/status/sources.go",
       "reason": "Retained until MS-3 (internal/status#MediaServerAlert): its first caller outside the package lands there."
@@ -101,37 +71,19 @@
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Label",
       "path": "internal/formschema/schema.go",
-      "reason": "Retained until PA-2 (internal/formschema#Field.Label): its first reader lands there."
+      "reason": "Retained until AP-1 (internal/formschema#Field.Label): its first reader, the settings form api serves, lands there."
     },
     {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/formschema#Field.Help",
       "path": "internal/formschema/schema.go",
-      "reason": "Retained until PA-2 (internal/formschema#Field.Help): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Snapshot.Document",
-      "path": "internal/settings/document.go",
-      "reason": "Retained until PA-2 (internal/settings#Snapshot.Document): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.TrustedProxies",
-      "path": "internal/settings/server.go",
-      "reason": "Retained until PA-2 (internal/settings#Server.TrustedProxies): its first caller outside the package lands there."
+      "reason": "Retained until AP-1 (internal/formschema#Field.Help): its first reader, the settings form api serves, lands there."
     },
     {
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.Hosts",
       "path": "internal/settings/server.go",
       "reason": "Retained until AP-1 (internal/settings#Server.Hosts): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.AllowedHosts",
-      "path": "internal/settings/server.go",
-      "reason": "Retained until PA-2 (internal/settings#Server.AllowedHosts): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -218,12 +170,6 @@
       "reason": "Retained until AP-1 (internal/media#ParseRootKey): its first caller outside the package lands there."
     },
     {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Backup",
-      "path": "internal/statedb/backup.go",
-      "reason": "Retained until PA-2 (internal/statedb#Store.Backup): its first caller outside the package lands there."
-    },
-    {
       "code": "DS1301",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageCount.Items",
       "path": "internal/statedb/counts.go",
@@ -285,54 +231,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AccountStore",
-      "path": "internal/statedb/accounts.go",
-      "reason": "Retained until PA-2 (internal/statedb#AccountStore): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.Accounts",
-      "path": "internal/statedb/accounts.go",
-      "reason": "Retained until PA-2 (internal/statedb#Store.Accounts): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#MethodStateOf",
-      "path": "internal/statedb/accounts_methods.go",
-      "reason": "Retained until PA-2 (internal/statedb#MethodStateOf): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.ActivateAuth",
-      "path": "internal/statedb/accounts_methods.go",
-      "reason": "Retained until PA-2 (internal/statedb#Store.ActivateAuth): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets",
-      "path": "internal/statedb/secrets.go",
-      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets.FailureKey",
-      "path": "internal/statedb/secrets.go",
-      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#AuthSecrets.DeviceKey",
-      "path": "internal/statedb/secrets.go",
-      "reason": "Retained until PA-2 (internal/statedb#AuthSecrets.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.AuthSecrets",
-      "path": "internal/statedb/secrets.go",
-      "reason": "Retained until PA-2 (internal/statedb#Store.AuthSecrets): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#MarkAccounts",
       "path": "internal/statedb/feed.go",
       "reason": "Retained until AP-1b (internal/statedb#MarkAccounts): its first caller outside the package lands there."
@@ -354,120 +252,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ParseInstanceID",
       "path": "internal/statedb/ids.go",
       "reason": "Retained until AP-1b (internal/statedb#ParseInstanceID): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#TableStat.Name",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#TableStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#TableStat.Rows",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#TableStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#TableStat.Bytes",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#TableStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Mismatch.Name",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Mismatch.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Mismatch.Undecodable",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Mismatch.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Mismatch.Repaired",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Mismatch.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#NamespaceStat.Name",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#NamespaceStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#NamespaceStat.Tables",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#NamespaceStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#NamespaceStat.Format",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#NamespaceStat.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Namespaces",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Mismatches",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Rev",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.OldestRetained",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.ConfigRev",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Commits",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.FileBytes",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.FreeBytes",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Epoch",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Inspection.Verified",
-      "path": "internal/statedb/inspect.go",
-      "reason": "Retained until PA-2 (internal/statedb#Inspection.*): its first reader lands there."
     },
     {
       "code": "DS1501",
@@ -561,42 +345,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#WriteHealth): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.Last",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#WriteHealth.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.LastFailed",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#WriteHealth.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.LastOK",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#WriteHealth.*): its first reader lands there."
-    },
-    {
-      "code": "DS1301",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#WriteHealth.Failures",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#WriteHealth.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Store.WriteHealth",
-      "path": "internal/statedb/write.go",
-      "reason": "Retained until PA-2 (internal/statedb#Store.WriteHealth): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#ErrSourceInactive",
       "path": "internal/statedb/pass.go",
       "reason": "Retained until AP-1 (internal/statedb#ErrSourceInactive): api's error codes, its first reader outside the package, land there."
@@ -618,18 +366,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/mediawrite#Timed.Timing",
       "path": "internal/mediawrite/current.go",
       "reason": "Retained until AP-1 (internal/mediawrite#Timed.Timing): api's file view, its first reader, lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediasource#ScheduleSchema",
-      "path": "internal/mediasource/schedule.go",
-      "reason": "Retained until PA-2 (internal/mediasource#ScheduleSchema): the settings section schemas, its first reader outside the file, land there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/embedded#Schema",
-      "path": "internal/embedded/section.go",
-      "reason": "Retained until PA-2 (internal/embedded#Schema): settings.SectionSchemas, its first caller outside the package, lands there."
     },
     {
       "code": "DS1301",
@@ -834,6 +570,84 @@
       "symbol": "go://github.com/cplieger/subflux/internal/release#radarrCommit",
       "path": "internal/release/patterns_source.go",
       "reason": "cmd/release-patterns reads it from the source through go/ast, as patterns.manifest.json's pin names it, and Renovate's regex manager bumps it, so no Go reader exists."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/accounts#Service.Hasher",
+      "path": "internal/accounts/accounts.go",
+      "reason": "Retained until AP-1 (internal/accounts#Service.Hasher): its first caller outside the package, the provider credential funnel, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/accounts#Hasher",
+      "path": "internal/accounts/hasher.go",
+      "reason": "Retained until AP-1 (internal/accounts#Hasher*): its first caller outside the package, the provider credential funnel, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/accounts#Config.OIDCLabel",
+      "path": "internal/accounts/config.go",
+      "reason": "Retained until AP-1 (internal/accounts#Config.OIDCLabel): its first caller outside the package, /api/session, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/accounts#Descriptors",
+      "path": "internal/accounts/routes.go",
+      "reason": "Retained until AP-1 (internal/accounts#Descriptors): its first caller outside the package, the wire generator, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/clientaddr#PlainHTTP",
+      "path": "internal/clientaddr/exposure.go",
+      "reason": "Retained until AP-1 (internal/clientaddr#PlainHTTP): its first reader outside the package, the exposure warning api serves, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/clientaddr#NoTrustedProxies",
+      "path": "internal/clientaddr/exposure.go",
+      "reason": "Retained until AP-1 (internal/clientaddr#NoTrustedProxies): its first reader outside the package, the exposure warning api serves, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#SectionSchema",
+      "path": "internal/settings/sections.go",
+      "reason": "Retained until AP-1 (internal/settings#SectionSchema*): its first reader outside the package, the settings form api serves, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#SectionSchema.Key",
+      "path": "internal/settings/sections.go",
+      "reason": "Retained until AP-1 (internal/settings#SectionSchema*): its first reader, the settings form api serves, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#SectionSchema.Schema",
+      "path": "internal/settings/sections.go",
+      "reason": "Retained until AP-1 (internal/settings#SectionSchema*): its first reader, the settings form api serves, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/settings#SectionSchemas",
+      "path": "internal/settings/sections.go",
+      "reason": "Retained until AP-1 (internal/settings#SectionSchema*): its first caller outside the package, the settings form api serves, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#Snapshot.Unfinished",
+      "path": "internal/status/snapshot.go",
+      "reason": "Retained until AP-1 (internal/status#Snapshot.Unfinished): its first reader, the status document api serves, lands there."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlerts",
+      "path": "internal/status/sources.go",
+      "reason": "Retained until MS-3 (internal/status#MediaServerAlerts): its first caller outside the package, the media server alerts, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/accounts#loggedField.field",
+      "path": "internal/accounts/config.go",
+      "reason": "The record field each row's key feeds, read by TestLoggedFieldsCoverRecord, which fails when statedb.AuthMethodState gains a string field no row names; production reads the rows by key."
     }
   ]
 }

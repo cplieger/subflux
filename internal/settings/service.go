@@ -2,10 +2,14 @@ package settings
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 
+	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v4"
 )
@@ -28,9 +32,11 @@ type SaveCheck func(ctx context.Context, prev, next Active) []formschema.FieldEr
 
 // Service holds the live snapshot and saves the file.
 type Service struct {
-	activate func(context.Context, Active) error
-	check    SaveCheck
-	cur      atomic.Pointer[snapshot]
+	activate     func(context.Context, Active) error
+	activateAuth func(context.Context, accounts.Config) error
+	check        SaveCheck
+	cur          atomic.Pointer[snapshot]
+	booted       atomic.Pointer[snapshot]
 	// stop cancels every Save's write-and-activate context; only Shutdown
 	// fires it.
 	stop    context.Context
@@ -50,20 +56,24 @@ type Service struct {
 }
 
 // NewService serves s, which Load(path, r) answered. activate makes a parsed
-// configuration live, nil when nothing needs to; check may be nil.
-func NewService(path string, r Registries, s Snapshot, activate func(context.Context, Active) error, check SaveCheck) *Service {
+// configuration live, at Boot and on every Save; activateAuth makes the auth
+// section in force live at a Boot that is not Active. Either may be nil when
+// nothing needs to, and check may be nil. A *formschema.RefusedError from either
+// is a refusal of the user's values, never an activation failure.
+func NewService(path string, r Registries, s Snapshot, activate func(context.Context, Active) error, activateAuth func(context.Context, accounts.Config) error, check SaveCheck) *Service {
 	stop, cancel := context.WithCancel(context.Background())
 	svc := &Service{
-		activate: activate,
-		check:    check,
-		stop:     stop,
-		cancel:   cancel,
-		changed:  make(chan struct{}, 1),
-		slot:     make(chan struct{}, 1),
-		closing:  make(chan struct{}),
-		drained:  make(chan struct{}),
-		path:     path,
-		r:        r,
+		activate:     activate,
+		activateAuth: activateAuth,
+		check:        check,
+		stop:         stop,
+		cancel:       cancel,
+		changed:      make(chan struct{}, 1),
+		slot:         make(chan struct{}, 1),
+		closing:      make(chan struct{}),
+		drained:      make(chan struct{}),
+		path:         path,
+		r:            r,
 	}
 	if s.p == nil {
 		s = rootFailure("settings: no snapshot was loaded", fileState{})
@@ -75,6 +85,10 @@ func NewService(path string, r Registries, s Snapshot, activate func(context.Con
 
 // Snapshot answers the live snapshot.
 func (s *Service) Snapshot() Snapshot { return Snapshot{s.cur.Load()} }
+
+// Booted answers the snapshot Boot left in force, which no later Save
+// changes; the zero Snapshot until a Boot returns nil.
+func (s *Service) Booted() Snapshot { return Snapshot{s.booted.Load()} }
 
 // Changed is signalled after every commit and every Diverged change: capacity
 // 1, coalescing, read by app's change loop alone.
@@ -126,6 +140,59 @@ func (s *Service) Merge(section string, entry *yaml.Node, parse func(expanded *y
 		return errs
 	}
 	return parse(out)
+}
+
+// Boot activates the loaded snapshot once, before the first Save: activate
+// on an Active load, activateAuth with Auth() on any other whose auth section
+// is in force, nothing on a Failed load whose auth section failed. A
+// *formschema.RefusedError makes the snapshot Failed with its field errors added
+// and the auth section counted as failed, and Boot returns nil; any other
+// error is returned with the snapshot unchanged. Booted answers what a nil
+// return left in force.
+func (s *Service) Boot(ctx context.Context) error {
+	if err := s.lock(ctx); err != nil {
+		return err
+	}
+	defer s.unlock()
+	cur := s.cur.Load()
+	var err error
+	if auth, ok := (Snapshot{cur}).Auth(); cur.mode == ModeActive {
+		if s.activate != nil {
+			err = s.activate(ctx, cur.active)
+		}
+	} else if ok && s.activateAuth != nil {
+		err = s.activateAuth(ctx, auth)
+	}
+	refused, isRefusal := errors.AsType[*formschema.RefusedError](err)
+	switch {
+	case isRefusal:
+		slog.Warn("settings: the sign-in settings in force are refused; sign-in keeps the stored ones until a Save repairs them",
+			"path", s.path, "fields", fieldText(refused.Fields))
+		cur = cur.refuseAuth(refused.Fields)
+		s.cur.Store(cur)
+	case err != nil:
+		return err
+	}
+	s.booted.Store(cur)
+	return nil
+}
+
+// refuseAuth is s Failed with fields added and its auth section counted as
+// failed, every other section kept as it parsed.
+func (s *snapshot) refuseAuth(fields []formschema.FieldError) *snapshot {
+	next := *s
+	next.mode, next.revision = Failed, rand.Text()
+	next.failure = append(slices.Clone(s.failure), fields...)
+	next.auth, next.authOK = accounts.Config{}, false
+	return &next
+}
+
+func fieldText(fields []formschema.FieldError) []string {
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		out = append(out, f.Path+": "+f.Message)
+	}
+	return out
 }
 
 // Shutdown refuses every later Save with ErrClosed and waits for the Save in

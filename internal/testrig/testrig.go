@@ -47,8 +47,16 @@ type Rig struct {
 func Start(tb testing.TB, o Options) *Rig {
 	tb.Helper()
 	dir := tb.TempDir()
+	sock, mkErr := os.MkdirTemp("", "sfx") //nolint:usetesting // a Unix socket path is bounded at 108 bytes, which a test's TempDir can pass
+	if mkErr != nil {
+		tb.Fatal(mkErr)
+	}
+	tb.Cleanup(func() { _ = os.RemoveAll(sock) })
 	r := &Rig{
-		Paths:  app.Paths{Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy")},
+		Paths: app.Paths{
+			Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy"),
+			SocketDir: sock, Socket: filepath.Join(sock, "admin.sock"),
+		},
 		Client: &http.Client{Timeout: readyBudget},
 		done:   make(chan error, 1),
 	}

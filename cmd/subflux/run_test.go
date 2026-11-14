@@ -26,7 +26,7 @@ func TestMainExitsOneOnRunError(t *testing.T) {
 		return errors.New("listen tcp :8374: bind: address already in use\nforged line")
 	})
 	var stdout, stderr strings.Builder
-	if code := run(nil, &stdout, &stderr); code != 1 {
+	if code := run(nil, nil, &stdout, &stderr); code != 1 {
 		t.Errorf("run = %d, want 1", code)
 	}
 	if out := stderr.String(); !strings.Contains(out, "address already in use") || strings.Count(out, "\n") != 1 {
@@ -37,20 +37,20 @@ func TestMainExitsOneOnRunError(t *testing.T) {
 	}
 
 	swapRunApp(t, func(context.Context, app.Config) error { return nil })
-	if code := run(nil, &stdout, &stderr); code != 0 {
+	if code := run(nil, nil, &stdout, &stderr); code != 0 {
 		t.Errorf("run after a clean Run = %d, want 0", code)
 	}
 	for _, args := range [][]string{{"bogus"}, {"health", "extra"}, {"--help", "extra"}} {
 		stdout.Reset()
 		stderr.Reset()
-		if code := run(args, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "usage") || stdout.Len() != 0 {
+		if code := run(args, nil, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "usage") || stdout.Len() != 0 {
 			t.Errorf("run(%q) = %d, stdout %q, stderr %q; want 2 with usage on stderr", args, code, stdout.String(), stderr.String())
 		}
 	}
 	for _, arg := range []string{"-h", "--help", "help"} {
 		stdout.Reset()
 		stderr.Reset()
-		if code := run([]string{arg}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "usage") || stderr.Len() != 0 {
+		if code := run([]string{arg}, nil, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "usage") || stderr.Len() != 0 {
 			t.Errorf("run(%q) = %d, stdout %q, stderr %q; want 0 with usage on stdout", arg, code, stdout.String(), stderr.String())
 		}
 	}

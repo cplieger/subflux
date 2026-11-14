@@ -11,5 +11,5 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == "health" {
 		health.RunProbe(paths.Health)
 	}
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }

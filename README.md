@@ -80,15 +80,17 @@ services:
 2. Replace `/path/to/media` with your media folder, and `/media` with the root folder Sonarr and Radarr show under Settings, then Media Management. If they use two root folders, add one line for each.
 3. Run `docker compose up -d`.
 4. From another device on your network, open the host's address on port 8374 in a browser, for example `http://192.0.2.10:8374`.
-5. Create the admin account.
+5. Create the admin account. Opened at a host name instead, such as `http://nas.lan:8374`, through a reverse proxy, or from outside your network, the page asks for the setup token that `docker logs subflux` shows.
 6. In the setup wizard, enter Sonarr's address as you open it from another device, not `localhost`, and the API key from the General page of Sonarr's Settings. Do the same for Radarr.
 7. Enter the right-hand paths from step 2 as media roots, pick your subtitle sites and languages, then click **Finish**.
 
 Run `docker logs subflux`. You should see `HTTP server listening`.
 
+When one root folder holds several shares mounted separately, such as `/media/tv` and `/media/anime` from two NAS shares, give the source one path mapping per share with the same path on both sides. Each share is then its own media root, so an unmounted share pauses only its own folder instead of looking empty. [Configuration](docs/configuration.md#sources) shows the mapping.
+
 ## Configuration reference
 
-Every setting is in the web page's Settings dialog and is saved to `/config/config.yaml`. A save applies at once, with no restart. To write the file yourself, see [Configuration](docs/configuration.md).
+Every setting is in the web page's Settings dialog and is saved to `/config/config.yaml`. A save applies at once, with no restart. To write the file yourself, see [Configuration](docs/configuration.md). A value in the file cannot hold a literal `${`, which always starts a `${SUBFLUX_...}` environment reference, and YAML anchors and aliases are refused. Do not edit the file while a settings save runs, since the save overwrites an edit made meanwhile.
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -103,9 +105,11 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | `timing.audio_fallback` | `false` | Also try the video's speech when its subtitle tracks cannot verify a download's timing |
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
 | `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |
-| `trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited |
-| `allowed_hosts` | `[]` | The host names subflux answers for. Leave empty to accept any |
-| `logging.level` | `info` | `debug`, `info`, `warn` or `error` |
+| `server.trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited. List it before exposing subflux |
+| `server.allowed_hosts` | `[]` | The host names subflux answers for. Leave empty to accept any |
+| `server.log_level` | `info` | `debug`, `info`, `warn` or `error` |
+| `auth.passkey_origins` | `[]` | The `https` addresses passkeys sign in from. Empty turns passkeys off |
+| `backup.enabled` | `false` | Write a copy of the database to `/config/backups` every 24 hours |
 
 Every other setting, the command line and environment references in `config.yaml` are in [Configuration](docs/configuration.md).
 
@@ -124,11 +128,11 @@ Every other setting, the command line and environment references in `config.yaml
 
 ## Security
 
-Create the admin account right after the first start. Until one exists, the first visitor to the page creates it. Keep port 8374 on your own network, or put a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md) with HTTPS in front of it and set `trusted_proxies` and `allowed_hosts`. `/metrics` and `/api/health` answer without a login.
+Create the admin account right after the first start. Until one exists, a browser on your own network that connects directly at an IP address creates it, and any other visitor, one coming through your reverse proxy included, needs the one-time setup token subflux writes to `docker logs subflux`. Behind a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md), list the proxy in `server.trusted_proxies` before you expose subflux: until then, setup through a proxy that adds no `X-Forwarded-For` header looks like a direct visit from your network and needs no token. Keep port 8374 on your own network, or put the proxy with HTTPS in front of it and set `server.allowed_hosts`. `/metrics` and `/api/health` answer without a login.
 
-Logins use passwords, passkeys or OIDC, and an admin can create API keys for scripts. Saved site passwords and API keys are never sent back to the browser. Passkeys cover your whole domain, so with subflux at `subflux.example.com` the browser offers them on every `example.com` host. Setting `auth.disable_auth` turns login off and treats every request as an admin.
+Logins use passwords, passkeys or OIDC, and an admin can create API keys for scripts. Saved site passwords and API keys are never sent back to the browser. Passkeys work only at the addresses `auth.passkey_origins` lists. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
-The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
+The image has no shell and runs as the user in `compose.yaml`. subflux checks each subtitle site's address before it connects. [Security](docs/hardening.md) covers the setup token, reverse proxies, passkeys, API key permissions, running subflux on the internet and what the image contains.
 
 ## Troubleshooting
 
@@ -149,7 +153,7 @@ subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Prometheus
 
 - [Configuration](docs/configuration.md) lists every setting and command, for anyone writing `config.yaml` by hand.
 - [How subflux works](docs/how-it-works.md) covers fit classes, timing, credential handling and the limits.
-- [Security](docs/hardening.md) covers reverse proxies, passkeys and what the image contains.
+- [Security](docs/hardening.md) covers the setup token, reverse proxies, passkeys, API key permissions, running subflux on the internet and what the image contains.
 - [Monitoring and alerts](docs/monitoring.md) lists the metrics, the alert rules and the kinds of problem each rule pages for.
 - [Database maintenance](docs/database-maintenance.md) covers format resets, a database that cannot be opened and compaction.
 

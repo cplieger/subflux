@@ -4,11 +4,13 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediarefresh"
@@ -29,10 +31,11 @@ import (
 // sourceKinds are the media source adapters the binary registers.
 var sourceKinds = []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}
 
-// registries are the adapter kinds settings parses each section with, over
-// the process's provider table, whose entries every engine shares.
-func registries(t *providers.Table) settings.Registries {
-	return settings.Registries{Sources: sourceKinds, Providers: t.Entries}
+// registries are what settings parses each section with: the adapter kinds,
+// the process's provider table, whose entries every engine shares, and the
+// directory of the store at storePath.
+func registries(t *providers.Table, storePath string) settings.Registries {
+	return settings.Registries{StoreDir: filepath.Dir(storePath), Sources: sourceKinds, Providers: t.Entries}
 }
 
 // sourceHTTPTimeout bounds a request on the client every source and SkyHook
@@ -45,11 +48,14 @@ func sourceDeps(log *slog.Logger) mediasource.Deps {
 	return mediasource.Deps{HTTP: &http.Client{Timeout: sourceHTTPTimeout}, Logger: log}
 }
 
-// saveCheck refuses a save whose added or reconnected source entries do not
-// answer; mediasource.CheckSaved owns which entries those are.
-func saveCheck(deps mediasource.Deps) settings.SaveCheck {
+// saveCheck is Save's check: media sources refuse added or reconnected
+// entries that do not answer (mediasource.CheckSaved owns which), then
+// methods, the method guard's advisory pre-check, refuses a sign-in change
+// that would strand a user.
+func saveCheck(deps mediasource.Deps, methods func(context.Context, accounts.Config) []formschema.FieldError) settings.SaveCheck {
 	return func(ctx context.Context, prev, next settings.Active) []formschema.FieldError {
-		return mediasource.CheckSaved(ctx, sourceKinds, deps, prev.Sources, next.Sources)
+		errs := mediasource.CheckSaved(ctx, sourceKinds, deps, prev.Sources, next.Sources)
+		return append(errs, methods(ctx, next.Auth)...)
 	}
 }
 
@@ -62,12 +68,6 @@ func sourceIDs(a *settings.Active) []media.SourceID {
 	return ids
 }
 
-// The per-entity alert kinds of status.SourceAlert and SourceOverlapAlert.
-const (
-	sourceAlertKind  = "source"
-	overlapAlertKind = "source_overlap"
-)
-
 // retainSources keeps the source and overlap alerts of ids and clears the
 // rest, so a removed source's alert never outlives it.
 func retainSources(st *status.Store, ids []media.SourceID) {
@@ -76,8 +76,8 @@ func retainSources(st *status.Store, ids []media.SourceID) {
 	for i, id := range ids {
 		srcs[i], overlaps[i] = status.SourceAlert(string(id)), status.SourceOverlapAlert(string(id))
 	}
-	st.RetainAlerts(sourceAlertKind, srcs)
-	st.RetainAlerts(overlapAlertKind, overlaps)
+	st.RetainAlerts(status.SourceAlerts, srcs)
+	st.RetainAlerts(status.SourceOverlapAlerts, overlaps)
 }
 
 // liveSources is the source Set in force, from boot: the writer's media

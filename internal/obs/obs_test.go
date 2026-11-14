@@ -101,3 +101,24 @@ func TestPlatformSeries(t *testing.T) {
 		}
 	}
 }
+
+func TestBackupSeries(t *testing.T) {
+	m := obs.New()
+	m.SetBackupSchedule(true, 24*time.Hour)
+	m.SetBackupLastSuccess(time.Unix(1700000000, 0))
+	m.IncBackupFailure()
+	body := scrape(t, m)
+	for _, want := range []string{"subflux_backup_enabled 1\n", "subflux_backup_interval_seconds 86400\n", "subflux_backup_last_success_timestamp_seconds 1700000000\n", "subflux_backup_failures_total 1\n"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("exposition lacks %q:\n%s", want, body)
+		}
+	}
+	m.SetBackupSchedule(false, time.Hour)
+	m.SetBackupLastSuccess(time.Time{})
+	body = scrape(t, m)
+	for _, want := range []string{"subflux_backup_enabled 0\n", "subflux_backup_interval_seconds 3600\n", "subflux_backup_last_success_timestamp_seconds 0\n"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("exposition lacks %q:\n%s", want, body)
+		}
+	}
+}

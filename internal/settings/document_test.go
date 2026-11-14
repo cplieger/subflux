@@ -174,6 +174,14 @@ var sectionFixtures = map[string]struct {
 		text:    "server:\n  trusted_proxies: [10.0.0.0/8, 192.168.1.5]\n  allowed_hosts: [nas.lan, 'nas.lan:8374']\n  log_level: \"debug\"\n  log_format: text\n",
 		secrets: nil,
 	},
+	"auth": {
+		text: "auth:\n  password_login: false\n  session_idle_timeout: 2h\n  session_absolute_timeout: 72h\n  check_breached_passwords: true\n" +
+			"  disable_auth: false\n  passkey_origins: ['https://nas.lan', 'https://nas.lan:8443']\n" +
+			"  oidc_enabled: true\n  oidc_issuer: 'https://idp.example/realm'\n  oidc_client_id: subflux\n  oidc_client_secret: s3\n" +
+			"  oidc_redirect_url: 'https://nas.lan/api/auth/oidc/callback'\n  oidc_label: Company login\n" +
+			"  oidc_auto_provision: true\n  oidc_allowed_groups: [media, admins]\n",
+		secrets: []string{"auth.oidc_client_secret"},
+	},
 	"sources": {
 		text: "sources:\n  - id: tv\n    type: sonarr\n    enabled: true\n    url: 'http://sonarr:8989'\n    api_key: k1\n" +
 			"    public_url: 'https://tv.example'\n    path_mappings:\n      - {from: /tv, to: /media/tv}\n    exclude_tags: [no-subs]\n" +
@@ -210,6 +218,10 @@ var sectionFixtures = map[string]struct {
 		text:    "embedded_subtitles:\n  ignore_codecs: [pgs, dvbsub, teletext]\n",
 		secrets: nil,
 	},
+	"backup": {
+		text:    "backup:\n  enabled: true\n  frequency: 12h\n  retention: 3\n  path: /srv/backups\n",
+		secrets: nil,
+	},
 }
 
 // TestDocumentRoundTrip saves the Document of one file holding every
@@ -233,7 +245,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 	}
 	path := fixture(t, text.String())
 	r := Registries{Sources: []mediasource.AdapterKind{sonarr.Kind, radarr.Kind}, Providers: providers.New().Entries}
-	s := NewService(path, r, Load(path, r), nil, nil)
+	s := NewService(path, r, Load(path, r), nil, nil, nil)
 	if m := s.Snapshot().Mode(); m != ModeActive {
 		failure, _ := s.Snapshot().Failure()
 		t.Fatalf("fixture mode %v (%v), want active", m, failure)
