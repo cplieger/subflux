@@ -7,7 +7,7 @@
   "reportNeedlessDisables": true,
   "reportUnscopedDisables": true,
   "rules": {
-    "declaration-block-single-line-max-declarations": null,
+    "at-charset-rule-no-invalid": true,
     "declaration-no-important": true,
     "declaration-property-value-no-unknown": true,
     "function-no-unknown": true,
@@ -44,6 +44,7 @@
     "selector-max-combinators": 4,
     "selector-max-universal": 1,
     "time-min-milliseconds": 10,
+    "value-no-invalid": true,
     "at-rule-no-vendor-prefix": true,
     "property-no-vendor-prefix": [
       true,
