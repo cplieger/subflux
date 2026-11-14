@@ -2101,7 +2101,7 @@
       {
         "key": "video",
         "title": "video encoding",
-        "reason": "codec, grading, resolution and bit depth are encoder choices over one timeline.",
+        "reason": "codec, grading, resolution, bit depth and 3D frame packing are encoder choices over one timeline.",
         "stems": [
           "hdr*",
           "dv-*",
@@ -2118,6 +2118,7 @@
           "2160p",
           "generated-dynamic-hdr",
           "upscaled",
+          "3d",
           "*-boost"
         ]
       },
