@@ -58,17 +58,18 @@ func (r *rig) due() []statedb.Work {
 }
 
 // rootGone moves the rig's media root away, so it is unavailable.
-func (r *rig) rootGone() {
-	r.t.Helper()
-	if err := os.Rename(r.dir, r.dir+".gone"); err != nil {
-		r.t.Fatal(err)
-	}
-	r.rootsChanged()
-}
+func (r *rig) rootGone() { r.moveRoot(r.dir, r.dir+".gone") }
 
-func (r *rig) rootBack() {
+func (r *rig) rootBack() { r.moveRoot(r.dir+".gone", r.dir) }
+
+// moveRoot renames the media root and has the writer probe it again. The
+// first wait lets a probe still running finish first: one that opened the
+// root before the rename answers from the moved directory, and the pass
+// after it starts no probe of a root with one outstanding.
+func (r *rig) moveRoot(from, to string) {
 	r.t.Helper()
-	if err := os.Rename(r.dir+".gone", r.dir); err != nil {
+	synctest.Wait()
+	if err := os.Rename(from, to); err != nil {
 		r.t.Fatal(err)
 	}
 	r.rootsChanged()

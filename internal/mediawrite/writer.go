@@ -72,6 +72,7 @@ type Writer struct {
 	kick       chan struct{}               // a pending request for a probe pass
 	recoverReq chan struct{}               // a pending request to start recovery attempts
 	paths      map[string]*rootState       // by configured path; guarded by mu
+	probes     map[*probeRun]struct{}      // probes whose goroutine has not returned, a gone root's included; guarded by mu
 	outlived   map[statedb.Intent]struct{} // intents a pass left pending, until a count finds them settled; guarded by mu
 	modes      publishModes
 	recoveries sync.WaitGroup
@@ -104,6 +105,7 @@ func New(d Deps) *Writer {
 		kick:       make(chan struct{}, 1),
 		recoverReq: make(chan struct{}, 1),
 		paths:      map[string]*rootState{},
+		probes:     map[*probeRun]struct{}{},
 		outlived:   map[statedb.Intent]struct{}{},
 	}
 	w.cfg.Store(&Config{})
@@ -112,12 +114,15 @@ func New(d Deps) *Writer {
 
 // Run reads the root set and probes every root at once, then every 5
 // minutes and after each RootsChanged, until ctx ends; it returns nil
-// once the recovery attempts it started have returned. Each probe runs in
-// its own goroutine, one outstanding per root: a probe stuck in a hung
-// mount's syscall outlives Run and is discarded when it returns. After
-// each probe the root's pending writes are recovered, and a call under a
-// root that returned waits for or fails during that recovery.
+// once the recovery attempts it started have returned and every probe has
+// returned or turned overdue. Each probe runs in its own goroutine, one
+// outstanding per root: an overdue one, stuck in a hung mount's syscall,
+// outlives Run and is discarded when it returns. After each probe the
+// root's pending writes are recovered, and a call under a root that
+// returned waits for or fails during that recovery.
 func (w *Writer) Run(ctx context.Context) error {
+	// Deferred first so it runs last: a recovery's failed write may start a probe.
+	defer w.awaitProbes()
 	defer w.recoveries.Wait()
 	w.probePass(ctx)
 	close(w.started)

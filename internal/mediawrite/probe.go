@@ -44,6 +44,7 @@ type probeResult struct {
 func (w *Writer) startProbeLocked(ctx context.Context, rs *rootState, write bool) *probeRun {
 	r := &probeRun{settled: make(chan struct{}), write: write}
 	rs.probe = r
+	w.probes[r] = struct{}{}
 	cur := rs.cur
 	if cur != nil {
 		cur.borrows++
@@ -122,6 +123,7 @@ func (w *Writer) listsEntry(root *os.Root) error {
 func (w *Writer) finishProbe(rs *rootState, r *probeRun, borrowed *rootHandle, res probeResult) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	delete(w.probes, r)
 	if borrowed != nil {
 		borrowed.releaseLocked()
 	}
@@ -143,6 +145,19 @@ func (w *Writer) finishProbe(rs *rootState, r *probeRun, borrowed *rootHandle, r
 		r.settleLocked(true)
 	}
 	w.wantRecoveryLocked(rs)
+}
+
+// awaitProbes waits until every probe has returned or turned overdue.
+func (w *Writer) awaitProbes() {
+	w.mu.Lock()
+	settled := make([]chan struct{}, 0, len(w.probes))
+	for r := range w.probes {
+		settled = append(settled, r.settled)
+	}
+	w.mu.Unlock()
+	for _, ch := range settled {
+		<-ch
+	}
 }
 
 // overdue marks rs unavailable when r has not settled by its deadline; r's

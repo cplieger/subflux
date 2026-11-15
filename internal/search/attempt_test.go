@@ -620,17 +620,11 @@ func TestDeliveryWriterRefusals(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(other, ".root"), nil, 0o644); err != nil {
 				return err
 			}
-			r.roots = []string{other}
+			r.setRoots(other)
 			r.rootsChanged()
 			return nil
 		}},
-		{name: "an unavailable root defers", want: mediawrite.ErrRootUnavailable, hook: func(r *rig, _ statedb.InstanceID) error {
-			if err := os.Rename(r.dir, r.dir+".gone"); err != nil {
-				return err
-			}
-			r.rootsChanged()
-			return nil
-		}},
+		{name: "an unavailable root defers", want: mediawrite.ErrRootUnavailable, hook: func(r *rig, _ statedb.InstanceID) error { return r.rootGoneFromHook() }},
 		{name: "a pending write on the name defers", want: mediawrite.ErrPathPending, hook: func(r *rig, inst statedb.InstanceID) error {
 			cues, err := timing.ParseCues(srtBytes)
 			if err != nil {
