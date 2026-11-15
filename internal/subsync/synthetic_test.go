@@ -205,6 +205,9 @@ func thinned(ref, inc []Span, tm timing.Timing, target float64) []Span {
 	return displaced(ref, lo)
 }
 
+// modelNone is modelOf's answer for a refusal, where no model fits.
+const modelNone Model = 0
+
 // modelOf reads the model a result's timing shows: a refusal is an
 // unmeasured Identity at confidence 0, and a fit at offset 0 is a shift
 // that Canonical made Identity.
@@ -218,7 +221,7 @@ func modelOf(r Result) Model {
 		return ModelPiecewise
 	}
 	if !r.Measured && r.Confidence == 0 {
-		return ModelNone
+		return modelNone
 	}
 	return ModelShift
 }
