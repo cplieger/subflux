@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/mediawrite"
+	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"
 )
 
@@ -224,6 +225,79 @@ func TestHungProbeOneOutstanding(t *testing.T) {
 		if _, ok := alerts.text(status.MediaRootAlert(a)); ok {
 			t.Error("the alert outlived the root's return")
 		}
+	})
+}
+
+// blockedProbe is a running writer over one root whose write probe blocks
+// until release closes.
+type blockedProbe struct {
+	release chan struct{}
+	done    chan error // Run's result
+	stop    context.CancelFunc
+	wrote   atomic.Bool // the probe's write returned
+}
+
+// runBlockedProbe starts Run over root in the caller's bubble and returns
+// once its boot probe blocks.
+func runBlockedProbe(t *testing.T, store *statedb.Store, root string) *blockedProbe {
+	t.Helper()
+	p := &blockedProbe{release: make(chan struct{}), done: make(chan error, 1)}
+	w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(root)}, func(f *mediawrite.Faults) {
+		write := f.ProbeWrite
+		f.ProbeWrite = func(ctx context.Context, r *os.Root) error {
+			<-p.release
+			defer p.wrote.Store(true)
+			return write(ctx, r)
+		}
+	})
+	ctx, stop := context.WithCancel(context.Background())
+	p.stop = stop
+	go func() { p.done <- w.Run(ctx) }()
+	synctest.Wait()
+	return p
+}
+
+func TestRunWaitsForItsProbes(t *testing.T) {
+	t.Parallel()
+	t.Run("until the probe returns", func(t *testing.T) {
+		t.Parallel()
+		a := filepath.Join(t.TempDir(), "a")
+		writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+		store := openStore(t)
+		synctest.Test(t, func(t *testing.T) {
+			p := runBlockedProbe(t, store, a)
+			p.stop()
+			synctest.Wait()
+			if len(p.done) != 0 {
+				t.Error("Run returned while its write probe was still writing")
+			}
+			close(p.release)
+			if err := <-p.done; err != nil {
+				t.Errorf("Run: %v", err)
+			}
+			if !p.wrote.Load() {
+				t.Error("Run returned before its write probe's write did")
+			}
+		})
+	})
+	t.Run("until the probe turns overdue", func(t *testing.T) {
+		t.Parallel()
+		a := filepath.Join(t.TempDir(), "a")
+		writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+		store := openStore(t)
+		synctest.Test(t, func(t *testing.T) {
+			p := runBlockedProbe(t, store, a)
+			defer close(p.release)
+			p.stop()
+			time.Sleep(mediawrite.RootProbeTimeout)
+			synctest.Wait()
+			if len(p.done) == 0 {
+				t.Fatal("Run still waits on a probe past its overdue deadline")
+			}
+			if err := <-p.done; err != nil {
+				t.Errorf("Run: %v", err)
+			}
+		})
 	})
 }
 

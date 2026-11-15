@@ -244,13 +244,7 @@ func TestDownloadCausesClosed(t *testing.T) {
 			p.serve("a", &provider.Failure{Kind: provider.RateLimited, Msg: "slow", RetryAfter: time.Hour}, nil)
 		}},
 		{name: "root unavailable", want: "media_root_unavailable", outcome: status.Failed, arrange: func(r *rig, p *scripted) {
-			p.onFetch = func(context.Context) error {
-				if err := os.Rename(r.dir, r.dir+".gone"); err != nil {
-					return err
-				}
-				r.rootsChangedFromHook()
-				return nil
-			}
+			p.onFetch = func(context.Context) error { return r.rootGoneFromHook() }
 		}},
 		{name: "outside every root", want: "outside_root", outcome: status.Failed, arrange: func(r *rig, p *scripted) {
 			p.onFetch = func(context.Context) error {
@@ -258,7 +252,7 @@ func TestDownloadCausesClosed(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(other, ".root"), nil, 0o644); err != nil {
 					return err
 				}
-				r.roots = []string{other}
+				r.setRoots(other)
 				r.rootsChangedFromHook()
 				return nil
 			}
@@ -332,6 +326,18 @@ func TestDownloadCausesClosed(t *testing.T) {
 func (r *rig) rootsChangedFromHook() {
 	r.writer.RootsChanged()
 	time.Sleep(time.Second)
+}
+
+// rootGoneFromHook is rootGone from such a goroutine: the first sleep
+// returns once a probe still running, which would answer from the moved
+// directory, has settled.
+func (r *rig) rootGoneFromHook() error {
+	time.Sleep(time.Second)
+	if err := os.Rename(r.dir, r.dir+".gone"); err != nil {
+		return err
+	}
+	r.rootsChangedFromHook()
+	return nil
 }
 
 // seededInst is the rig's one seeded instance.

@@ -64,7 +64,8 @@ type rig struct {
 	dbPath      string
 	cfg         search.Config
 	timing      timing.Config
-	roots       []string
+	roots       []string // the writer's MediaRoots; guarded by rootsMu
+	rootsMu     sync.Mutex
 }
 
 // inRig runs f in a synctest bubble over a fresh rig whose languages
@@ -213,7 +214,18 @@ func airedReading(items []mediasource.Item, orders map[string][]media.Numbering)
 }
 
 // MediaRoots is the rig's configured roots.
-func (r *rig) MediaRoots(context.Context) []string { return slices.Clone(r.roots) }
+func (r *rig) MediaRoots(context.Context) []string {
+	r.rootsMu.Lock()
+	defer r.rootsMu.Unlock()
+	return slices.Clone(r.roots)
+}
+
+// setRoots configures paths as the rig's roots; the caller tells the writer.
+func (r *rig) setRoots(paths ...string) {
+	r.rootsMu.Lock()
+	defer r.rootsMu.Unlock()
+	r.roots = paths
+}
 
 func parsePolicy(t *testing.T, text string) language.Policy {
 	t.Helper()
