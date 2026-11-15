@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"

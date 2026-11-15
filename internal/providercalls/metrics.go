@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/status"
 )
