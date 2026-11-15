@@ -30,14 +30,14 @@ func TestGuardSpanCount(t *testing.T) {
 		ref, inc []Span
 		want     Model
 	}{
-		{"10,001 reference spans", big, ok, ModelNone},
-		{"10,001 candidate spans", ok, big, ModelNone},
+		{"10,001 reference spans", big, ok, modelNone},
+		{"10,001 candidate spans", ok, big, modelNone},
 		{"10,000 spans a side", big[:maxSpans], big[:maxSpans], ModelShift},
-		{"4 reference spans", ok[:4], ok, ModelNone},
-		{"4 candidate spans", ok, ok[:4], ModelNone},
+		{"4 reference spans", ok[:4], ok, modelNone},
+		{"4 candidate spans", ok, ok[:4], modelNone},
 		{"5 spans a side", ok[:5], ok[:5], ModelShift},
-		{"reference coverage 0.04", regular(100, 1_000, 25_000), ok, ModelNone},
-		{"reference coverage 0.96", regular(100, 24_000, 25_000), ok, ModelNone},
+		{"reference coverage 0.04", regular(100, 1_000, 25_000), ok, modelNone},
+		{"reference coverage 0.96", regular(100, 24_000, 25_000), ok, modelNone},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -48,7 +48,7 @@ func TestGuardSpanCount(t *testing.T) {
 			if modelOf(r) != c.want {
 				t.Errorf("model = %d, want %d", modelOf(r), c.want)
 			}
-			if c.want == ModelNone && (r.Timing != timing.Identity{} || r.Measured || r.Confidence != 0) {
+			if c.want == modelNone && (r.Timing != timing.Identity{} || r.Measured || r.Confidence != 0) {
 				t.Errorf("refused input: result %+v, want Identity, unmeasured, confidence 0", r)
 			}
 		})
@@ -160,8 +160,8 @@ func TestUpToShiftNeverLinear(t *testing.T) {
 	if _, ok := r.Timing.(timing.Linear); ok || modelOf(r) != ModelShift {
 		t.Errorf("up to ModelShift: %+v, want a shift", r)
 	}
-	if _, err := AlignReference(t.Context(), video, video, ModelNone); err == nil {
-		t.Error("up to ModelNone: no error")
+	if _, err := AlignReference(t.Context(), video, video, modelNone); err == nil {
+		t.Error("up to the zero Model: no error")
 	}
 }
 

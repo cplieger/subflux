@@ -75,7 +75,7 @@ func TestAudioOffsetBeyondLimit(t *testing.T) {
 	for _, c := range []struct {
 		shift int64
 		want  Model
-	}{{limit - 20_000, ModelShift}, {-(limit - 20_000), ModelShift}, {limit + 20_000, ModelNone}, {-(limit + 20_000), ModelNone}} {
+	}{{limit - 20_000, ModelShift}, {-(limit - 20_000), ModelShift}, {limit + 20_000, modelNone}, {-(limit + 20_000), modelNone}} {
 		r, err := AlignAudio(t.Context(), speechOf(video, dur), nil, unmap(video, 1, c.shift), dur)
 		if err != nil {
 			t.Fatal(err)
@@ -83,7 +83,7 @@ func TestAudioOffsetBeyondLimit(t *testing.T) {
 		if modelOf(r) != c.want {
 			t.Errorf("shift %d: model %d (%+v), want %d", c.shift, modelOf(r), r.Timing, c.want)
 		}
-		if c.want == ModelNone && r != noFit {
+		if c.want == modelNone && r != noFit {
 			t.Errorf("shift %d: refused fit %+v, want the MethodNone no-fit result", c.shift, r)
 		}
 	}
@@ -182,7 +182,7 @@ func TestAudioOffsetLimitClamped(t *testing.T) {
 			t.Parallel()
 			video := episode(t, 6, c.cues)
 			dur := video[len(video)-1].EndMs + 10_000
-			for shift, want := range map[int64]Model{c.within: ModelShift, c.past: ModelNone} {
+			for shift, want := range map[int64]Model{c.within: ModelShift, c.past: modelNone} {
 				r, err := AlignAudio(t.Context(), speechOf(video, dur), nil, unmap(video, 1, shift), dur)
 				if err != nil || modelOf(r) != want {
 					t.Errorf("%d ms video, shift %d: model %d (%+v), %v, want %d", dur, shift, modelOf(r), r.Timing, err, want)

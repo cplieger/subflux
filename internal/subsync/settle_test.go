@@ -351,7 +351,7 @@ func TestSettlePerGround(t *testing.T) {
 			t.Errorf("%#v %v %v, want the fit Verified", tm, v, err)
 		}
 	})
-	t.Run("ModelNone is Identity and Unverified", func(t *testing.T) {
+	t.Run("a refusal is Identity and Unverified", func(t *testing.T) {
 		t.Parallel()
 		if tm, v, err := Settle(new(noFit), false, AtIdentity); err != nil || tm != (timing.Identity{}) || v != timing.Unverified {
 			t.Errorf("%#v %v %v", tm, v, err)

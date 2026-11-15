@@ -11,10 +11,10 @@ import (
 // Model is the hypothesis the pipeline selected, and AlignReference's ceiling.
 type Model uint8
 
-// The models, in the order the pipeline tries them.
+// The models, in the order the pipeline tries them. The zero Model is none
+// of them, so AlignReference refuses an unset ceiling.
 const (
-	ModelNone Model = iota // the guard refused an input
-	ModelShift
+	ModelShift Model = iota + 1
 	ModelLinear
 	ModelPiecewise
 )
@@ -41,8 +41,8 @@ var noFit = Result{Timing: timing.Identity{}, Method: timing.MethodNone}
 // piecewise with a drop state on the selected global model's scale; every
 // non-Drop segment it emits holds a kept cue's start. More than maxSpans
 // spans on either side, fewer than minSpans, or a reference speech coverage
-// outside (0.05, 0.95) is ModelNone. A context ended before or during a
-// stage returns its error and no result.
+// outside (0.05, 0.95) is the no-fit result, MethodNone. A context ended
+// before or during a stage returns its error and no result.
 func AlignReference(ctx context.Context, ref, inc []Span, upTo Model) (Result, error) {
 	if upTo < ModelShift || upTo > ModelPiecewise {
 		return Result{}, fmt.Errorf("subsync: AlignReference up to model %d", upTo)
