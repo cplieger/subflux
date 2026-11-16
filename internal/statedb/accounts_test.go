@@ -284,7 +284,7 @@ func TestActivityNeverMovesBackwards(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, use := range []time.Time{at(12, 30), at(12, 0)} {
-			if err := a.TouchAPIKey(ctx, key.ID, use); err != nil {
+			if err := a.TouchAPIKey(ctx, key.ID, key.KeyHash, use); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -501,7 +501,7 @@ func TestUpdateAbsentIsNotFound(t *testing.T) {
 		if err := a.UpdateSessionActivity(ctx, access.NewHash("none"), access.SessionActivity{At: accountsAt}); err != nil {
 			t.Error(err)
 		}
-		if err := a.TouchAPIKey(ctx, 99, accountsAt); err != nil {
+		if err := a.TouchAPIKey(ctx, 99, access.NewHash("none"), accountsAt); err != nil {
 			t.Error(err)
 		}
 		if n, m := countRows(t, s, s.a.activity, nil), countRows(t, s, s.a.keyUse, nil); n != 0 || m != 0 {
@@ -626,7 +626,7 @@ func TestStampsReserveNoRevision(t *testing.T) {
 		"a passkey sign-in": func() error {
 			return a.UpdatePasskeyAfterLogin(ctx, u.ID, cred.CredentialID, access.PasskeyLoginUpdate{At: accountsAt.Add(time.Minute), SignCount: 2, RawFlags: 5})
 		},
-		"a key use": func() error { return a.TouchAPIKey(ctx, key.ID, accountsAt.Add(time.Minute)) },
+		"a key use": func() error { return a.TouchAPIKey(ctx, key.ID, key.KeyHash, accountsAt.Add(time.Minute)) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			before := headRev(t, s)

@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/go/slogx/capture"
 )
 
 func TestFailedServerSectionFailsClosed(t *testing.T) {
@@ -178,6 +180,31 @@ func TestRootFailureDeniesEveryHost(t *testing.T) {
 			t.Errorf("mode %v, Server() %v", s.Mode(), ok)
 		}
 	})
+}
+
+func TestHostRefusalLogsThroughTheLoggerInstalledAfterTheParse(t *testing.T) {
+	snaps := map[string]Snapshot{
+		"listed":         loadText(t, "server: {allowed_hosts: [nas.lan]}\n"+validLanguages),
+		"failed section": loadText(t, "server: {allowed_hosts: [nas.lan, http://x]}\n"+validLanguages),
+		"root failure":   loadText(t, "[server]\n"),
+	}
+	for name, snap := range snaps {
+		t.Run(name, func(t *testing.T) {
+			rec := capture.Default(t)
+			srv, _ := snap.Server()
+			w := httptest.NewRecorder()
+			srv.Hosts().Middleware()(http.NotFoundHandler()).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://evil.example/", nil))
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("= %d, want 403", w.Code)
+			}
+			if n := rec.CountLevel(slog.LevelWarn, "httpserver: host not allowed"); n != 1 {
+				t.Errorf("%d WARN refusal lines, want 1", n)
+			}
+			if host, _ := rec.AttrValue("httpserver: host not allowed", "host"); host != "evil.example" {
+				t.Errorf("refusal host %q, want evil.example", host)
+			}
+		})
+	}
 }
 
 func TestServerSection(t *testing.T) {

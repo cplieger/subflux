@@ -104,8 +104,8 @@ func TestPasswordLoginGateWhileAuthUnparsed(t *testing.T) {
 		st := newSite(t, e, accesstest.NewMemStore(), nil)
 		createUser(t, st.s, "admin", access.RoleAdmin, testPassword)
 		e.set(func(e *env) { e.authOK = false })
-		if code, answer := login(t, st, "203.0.113.7"); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, accesshttp.CodePasswordLoginDisabled)
+		if code, answer := login(t, st, "203.0.113.7"); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, access.CodePasswordLoginDisabled)
 		}
 		select {
 		case ev := <-st.s.audit.events:
@@ -127,11 +127,11 @@ func TestPasswordLoginGateWhileAuthUnparsed(t *testing.T) {
 		})
 		w := newBrowser(t, siteOrigin, proxy).sendWith(st, http.MethodPost, st.path(t, routeLoginPassword),
 			`{"username":"admin","password":"`+testPassword+`"}`, http.Header{"X-Forwarded-For": {"192.168.1.9"}})
-		if w.Code != http.StatusForbidden || codeOf(t, w) != string(accesshttp.CodePasswordLoginDisabled) {
-			t.Errorf("sign-in of a private client through the listed proxy = %d %s, want 403 %s", w.Code, w.Body, accesshttp.CodePasswordLoginDisabled)
+		if w.Code != http.StatusForbidden || codeOf(t, w) != string(access.CodePasswordLoginDisabled) {
+			t.Errorf("sign-in of a private client through the listed proxy = %d %s, want 403 %s", w.Code, w.Body, access.CodePasswordLoginDisabled)
 		}
-		if code, answer := login(t, st, bridge); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-			t.Errorf("sign-in from the host's forwarder %s = %d %s, want 403 %s", bridge, code, answer, accesshttp.CodePasswordLoginDisabled)
+		if code, answer := login(t, st, bridge); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+			t.Errorf("sign-in from the host's forwarder %s = %d %s, want 403 %s", bridge, code, answer, access.CodePasswordLoginDisabled)
 		}
 	})
 	t.Run("password sign-in parsed off beside another broken key", func(t *testing.T) {
@@ -140,8 +140,8 @@ func TestPasswordLoginGateWhileAuthUnparsed(t *testing.T) {
 		createUser(t, st.s, "admin", access.RoleAdmin, testPassword)
 		e.set(func(e *env) { e.auth = parsed(t, map[string]any{keyPasswordLogin: no}) })
 		for _, peer := range []string{"127.0.0.1", "203.0.113.7"} {
-			if code, answer := login(t, st, peer); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-				t.Errorf("sign-in from %s = %d %s, want 403 %s", peer, code, answer, accesshttp.CodePasswordLoginDisabled)
+			if code, answer := login(t, st, peer); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+				t.Errorf("sign-in from %s = %d %s, want 403 %s", peer, code, answer, access.CodePasswordLoginDisabled)
 			}
 		}
 	})
@@ -161,8 +161,8 @@ func TestSignInBusyAnswers503(t *testing.T) {
 		permits = append(permits, p)
 	}
 	w := newBrowser(t, siteOrigin, "192.0.2.10").call(t, st, routeLoginPassword, accesshttp.LoginRequest{Username: "admin", Password: "not the password at all"})
-	if w.Code != http.StatusServiceUnavailable || codeOf(t, w) != string(accesshttp.CodeBusy) {
-		t.Errorf("sign-in with every permit held = %d %s, want 503 %s", w.Code, w.Body, accesshttp.CodeBusy)
+	if w.Code != http.StatusServiceUnavailable || codeOf(t, w) != string(access.CodeBusy) {
+		t.Errorf("sign-in with every permit held = %d %s, want 503 %s", w.Code, w.Body, access.CodeBusy)
 	}
 	if got := puts.Load(); got != 0 {
 		t.Errorf("failure records written by a busy sign-in = %d, want 0", got)
@@ -183,9 +183,9 @@ func TestSignInBusyAnswers503(t *testing.T) {
 			switch {
 			case w.Code == http.StatusOK:
 				ok.Add(1)
-			case w.Code == http.StatusServiceUnavailable && codeOf(t, w) == string(accesshttp.CodeBusy):
+			case w.Code == http.StatusServiceUnavailable && codeOf(t, w) == string(access.CodeBusy):
 			default:
-				t.Errorf("concurrent sign-in %d = %d %s, want 200 or 503 %s", i, w.Code, w.Body, accesshttp.CodeBusy)
+				t.Errorf("concurrent sign-in %d = %d %s, want 200 or 503 %s", i, w.Code, w.Body, access.CodeBusy)
 			}
 		})
 	}
@@ -251,8 +251,8 @@ func TestOIDCStartsWriteNothing(t *testing.T) {
 		b := newBrowser(t, siteOrigin, "127.0.0.1")
 		b.signInPassword(t, st, "admin")
 		w := b.call(t, st, "authOIDCStartStepUp", accesshttp.RedirectRequest{Redirect: long})
-		if w.Code != http.StatusBadRequest || codeOf(t, w) != string(accesshttp.CodeBadRequest) {
-			t.Errorf("step-up start = %d %s, want 400 %s", w.Code, w.Body, accesshttp.CodeBadRequest)
+		if w.Code != http.StatusBadRequest || codeOf(t, w) != string(access.CodeBadRequest) {
+			t.Errorf("step-up start = %d %s, want 400 %s", w.Code, w.Body, access.CodeBadRequest)
 		}
 	})
 }
@@ -280,8 +280,8 @@ func TestOIDCLinkBoundToBrowser(t *testing.T) {
 		b.signInPassword(t, st, "carol")
 		return record(b.call(t, st, "authOIDCLinkPending", nil))
 	}
-	if w := link(newBrowser(t, siteOrigin, "192.0.2.11")); w.Code != http.StatusNotFound || codeOf(t, w) != string(accesshttp.CodeNotFound) {
-		t.Errorf("another browser's link = %d %s, want 404 %s: no pending link travels with it", w.Code, w.Body, accesshttp.CodeNotFound)
+	if w := link(newBrowser(t, siteOrigin, "192.0.2.11")); w.Code != http.StatusNotFound || codeOf(t, w) != string(access.CodeNotFound) {
+		t.Errorf("another browser's link = %d %s, want 404 %s: no pending link travels with it", w.Code, w.Body, access.CodeNotFound)
 	}
 	if w := link(a); w.Code != http.StatusOK {
 		t.Fatalf("the starting browser's link = %d %s, want 200", w.Code, w.Body)

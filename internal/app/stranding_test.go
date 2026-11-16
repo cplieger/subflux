@@ -83,7 +83,7 @@ func bootSite(t *testing.T, text string, seed func(t *testing.T, storePath strin
 	return s
 }
 
-func writeAuthError(w http.ResponseWriter, _ *http.Request, e accesshttp.Error) {
+func writeAuthError(w http.ResponseWriter, _ *http.Request, e access.Error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(struct {
@@ -244,8 +244,8 @@ func TestMethodGuardRefusesStranding(t *testing.T) {
 		if code, answer := s.login(t, "127.0.0.1", "ada"); code != http.StatusOK {
 			t.Errorf("loopback sign-in = %d %s, want 200", code, answer)
 		}
-		if code, answer := s.login(t, publicPeer, "ada"); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, accesshttp.CodePasswordLoginDisabled)
+		if code, answer := s.login(t, publicPeer, "ada"); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, access.CodePasswordLoginDisabled)
 		}
 		saveText(t, s.svc, validLanguages+"auth:\n  password_login: true\n")
 		if m := s.svc.Snapshot().Mode(); m != settings.ModeActive {
@@ -311,8 +311,8 @@ func TestMethodGuardRefusesStranding(t *testing.T) {
 		if rec, _ := s.record(t); rec != offWithOIDC {
 			t.Errorf("record = %+v, want the stored one kept", rec)
 		}
-		if code, answer := s.login(t, publicPeer, "eve"); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, accesshttp.CodePasswordLoginDisabled)
+		if code, answer := s.login(t, publicPeer, "eve"); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+			t.Errorf("public sign-in = %d %s, want 403 %s", code, answer, access.CodePasswordLoginDisabled)
 		}
 	})
 }
@@ -336,8 +336,8 @@ func TestAccountsUseTheHostForwarderCheck(t *testing.T) {
 	if code, answer := s.login(t, "127.0.0.1", "ada"); code != http.StatusOK {
 		t.Errorf("loopback sign-in = %d %s, want 200", code, answer)
 	}
-	if code, answer := s.login(t, own.String(), "ada"); code != http.StatusForbidden || answer != string(accesshttp.CodePasswordLoginDisabled) {
-		t.Errorf("sign-in from the host's own %s = %d %s, want 403 %s", own, code, answer, accesshttp.CodePasswordLoginDisabled)
+	if code, answer := s.login(t, own.String(), "ada"); code != http.StatusForbidden || answer != string(access.CodePasswordLoginDisabled) {
+		t.Errorf("sign-in from the host's own %s = %d %s, want 403 %s", own, code, answer, access.CodePasswordLoginDisabled)
 	}
 }
 

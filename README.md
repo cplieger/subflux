@@ -106,7 +106,7 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
 | `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |
 | `server.trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited. List it before exposing subflux |
-| `server.allowed_hosts` | `[]` | The host names subflux answers for. Leave empty to accept any |
+| `server.allowed_hosts` | `[]` | The host names subflux answers for, `/metrics` included; any other is refused with 403. Leave empty to accept any |
 | `server.log_level` | `info` | `debug`, `info`, `warn` or `error` |
 | `auth.passkey_origins` | `[]` | The `https` addresses passkeys sign in from. Empty turns passkeys off |
 | `backup.enabled` | `false` | Write a copy of the database to `/config/backups` every 24 hours |
@@ -136,7 +136,7 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 
 ## Troubleshooting
 
-The healthcheck runs `subflux health`, which asks the web server for `/api/health` and passes while subflux is running with its settings loaded, set up or not. A settings file that does not load makes it fail until you fix the file. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`.
+The healthcheck runs `subflux health`, which asks the web server for `/api/health` and passes while subflux is running with its settings loaded, set up or not. A settings file that does not load makes it fail until you fix the file. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`, and with `server.allowed_hosts` set, list the host name the prober uses too.
 
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
 - An alert says a media root is unavailable. The folder is missing, empty or cannot be opened. Mount it, or fix the root folder in Sonarr or Radarr or the source's `path_mappings`.

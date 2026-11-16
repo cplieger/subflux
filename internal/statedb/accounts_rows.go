@@ -145,15 +145,17 @@ func (*passkeyUseRow) check() error { return nil }
 
 // 0x25 keys, less ID, which the key holds, and LastUsedAt, which 0x26 holds.
 type keyRow struct {
-	CreatedAt  time.Time `json:"created_at"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	KeyHash    string    `json:"key_hash"`
-	KeyPrefix  string    `json:"key_prefix"`
-	KeySuffix  string    `json:"key_suffix"`
-	Label      string    `json:"label"`
-	Scopes     []string  `json:"scopes"`
-	LineageIDs []int64   `json:"lineage_ids"`
-	UserID     int64     `json:"user_id"`
+	CreatedAt     time.Time `json:"created_at"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	PreviousUntil time.Time `json:"previous_until"`
+	KeyHash       string    `json:"key_hash"`
+	PreviousHash  string    `json:"previous_hash"`
+	KeyPrefix     string    `json:"key_prefix"`
+	KeySuffix     string    `json:"key_suffix"`
+	Label         string    `json:"label"`
+	Scopes        []string  `json:"scopes"`
+	LineageIDs    []int64   `json:"lineage_ids"`
+	UserID        int64     `json:"user_id"`
 }
 
 func (r *keyRow) check() error {

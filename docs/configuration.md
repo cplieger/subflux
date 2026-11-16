@@ -136,7 +136,7 @@ Subtitle files named the way other tools name them still count. `movie.pb.srt` r
 | Key | Default | Description |
 | --- | --- | --- |
 | `server.trusted_proxies` | `[]` | Your reverse proxies, each an address or a CIDR range, whose `X-Forwarded-For` subflux believes. See [Security](hardening.md#running-behind-a-reverse-proxy) |
-| `server.allowed_hosts` | `[]` | The host names or addresses subflux answers for, each with an optional port, such as `subflux.example.com` or `192.0.2.5:8374`. Leave empty to accept any. A host listed here also lets the first admin account be created from your network without the setup token |
+| `server.allowed_hosts` | `[]` | The host names or addresses subflux answers for, each with an optional port, such as `subflux.example.com` or `192.0.2.5:8374`. Leave empty to accept any. A set list must also name the host your Prometheus scrapes, since `/metrics` is refused to any other. A host listed here also lets the first admin account be created from your network without the setup token |
 | `server.log_level` | `info` | `debug`, `info`, `warn` or `error` |
 | `server.log_format` | `json` | `json` or `text`. A change takes effect at the next restart |
 
@@ -194,7 +194,7 @@ The other commands ask the running server to act, through a socket only processe
 | `reset-password <user>` | Sets a new password, read twice from the terminal or once from piped input, and signs the user out everywhere: their sessions and API keys are revoked and their sign-in locks cleared |
 | `recovery-link <user>` | Prints a `/recover#<token>` link, valid for 15 minutes, that lets the user set a new password. Open it at subflux's own address |
 | `create-user <user> [--role admin\|user]` | Creates a user, `user` by default, with a password read as `reset-password` reads one |
-| `create-key <user> [--label <text>] [--scope <scope>]...` | Creates an API key for the user and prints it once. Each `--scope` is one of `read`, `operate`, `admin`, `manage_users` and `create_keys`; with none, the key has the user's full access |
+| `create-key <user> --label <text> [--scope <scope>]...` | Creates an API key for the user and prints it once. The label is required and must differ from the label of every unexpired key the user holds. Each `--scope` is one of `read`, `operate`, `admin`, `manage_users` and `create_keys`; with none, the key has the user's full access |
 | `setup-token` | Prints a fresh setup token while no account exists, replacing the one in the log |
 | `enable-password-login` | Saves `auth.password_login: true` into the settings in force, for when no other sign-in method works. It prints the errors instead when the file would still not load, and changes nothing when there is no `config.yaml`, since password sign-in is then already on |
 | `store [--verify [--repair]]` | Prints the database's counts and sizes, as [Database maintenance](database-maintenance.md#inspecting-the-database) describes |

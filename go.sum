@@ -1,11 +1,11 @@
 github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBqoWM=
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/access v1.0.0-dev.11 h1:pGHfSs5f6LCspaXda8GRCtsmWAc9wj7IjBSEQr4BOR0=
-github.com/cplieger/access v1.0.0-dev.11/go.mod h1:xYyhwhkl/KdaaCjIoNaT8QaB2UfpbURnxZ86x+6gOto=
+github.com/cplieger/access v1.0.0-dev.12 h1:7tYwe9JFGIRzFQIjIy2Ddxkz7e1wtITGzo63csK1Hoo=
+github.com/cplieger/access v1.0.0-dev.12/go.mod h1:xYyhwhkl/KdaaCjIoNaT8QaB2UfpbURnxZ86x+6gOto=
 github.com/cplieger/animap/mapread v0.3.2 h1:oBS2esAwE3WSMWb9ypUGw2vAAV/lHWDKlObYZ8AWUQQ=
 github.com/cplieger/animap/mapread v0.3.2/go.mod h1:/KLtoKslemgqFHUACjfaCz7F78WQpd3FDjQJ4oY8lic=
-github.com/cplieger/arrapi/v3 v3.2.0-dev.16 h1:UfKM+Br/UQx4Los1dDtwuwa2Q9W7kbKY8pop9vGh960=
-github.com/cplieger/arrapi/v3 v3.2.0-dev.16/go.mod h1:48eoSNuIblVN7HHvUQSfoJrkNk1xaHzsk0lN63+Tlwk=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.17 h1:JRv2SlmdK/bsRVzvSz/6gi+tumwkuB98lxDt+WnZJzM=
+github.com/cplieger/arrapi/v3 v3.2.0-dev.17/go.mod h1:48eoSNuIblVN7HHvUQSfoJrkNk1xaHzsk0lN63+Tlwk=
 github.com/cplieger/bolttable v1.2.0-dev.1 h1:RVOkHRMlWPq+uyxPwvs1bfPwMie2mNop+cHfu6W5YC8=
 github.com/cplieger/bolttable v1.2.0-dev.1/go.mod h1:apFAaQyv0QFEG8LEq5NQN//Qf1inuzALqk/qsBouLfo=
 github.com/cplieger/go/filesafe v1.1.0 h1:zCInOHIkszZQKNxIQvPgaFg592E5J27+/2hfbPmzEfA=

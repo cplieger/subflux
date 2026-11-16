@@ -170,11 +170,15 @@ func parseProxy(e string) (netip.Prefix, bool) {
 	return netip.Prefix{}, false
 }
 
-// hostPolicy is ParseHostList over entries, and the canonical hosts it
-// accepted, once each in file order: the keys its policy matches, a port
-// dropped.
+// hostPolicy is ParseHostList over entries, answering a refused Host 403
+// host_not_allowed and logging it through processLogger, and the canonical
+// hosts it accepted, once each in file order: the keys its policy matches, a
+// port dropped.
 func hostPolicy(entries []string, loopbackExempt bool) (policy *httpserver.HostPolicy, allowed []string) {
-	policy, _ = httpserver.ParseHostList(entries, httpserver.WithLoopbackExempt(loopbackExempt))
+	policy, _ = httpserver.ParseHostList(entries,
+		httpserver.WithHostAllowlistError("host_not_allowed", "This host is not listed in server.allowed_hosts."),
+		httpserver.WithHostAllowlistLogger(processLogger),
+		httpserver.WithLoopbackExempt(loopbackExempt))
 	for _, e := range entries {
 		if h := httpserver.CanonicalHost(strings.TrimSpace(e)); h != "" && !slices.Contains(allowed, h) {
 			allowed = append(allowed, h)
@@ -186,7 +190,7 @@ func hostPolicy(entries []string, loopbackExempt bool) (policy *httpserver.HostP
 // denyAllServer is a root-level failure's fail-closed value: default log
 // fields, no trusted proxy, every Host refused.
 func denyAllServer() Server {
-	p, _ := httpserver.ParseHostList([]string{rootEntry})
+	p, _ := hostPolicy([]string{rootEntry}, false)
 	return Server{&server{hosts: p, level: slog.LevelInfo, format: formatJSON}}
 }
 

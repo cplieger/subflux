@@ -207,6 +207,13 @@ func TestServerRefusals(t *testing.T) {
 			t.Errorf("Call: %v, want a not_found Error", err)
 		}
 	})
+	t.Run("a label another key of the user holds is label_taken", func(t *testing.T) {
+		path, _ := served(t, &fakes{err: account.ErrKeyLabelTaken})
+		_, err := Call(t.Context(), path, &Request{Command: CreateKey, Username: "alice", Label: "ci"})
+		if e, ok := errors.AsType[*Error](err); !ok || e.Code != "label_taken" {
+			t.Errorf("Call: %v, want a label_taken Error", err)
+		}
+	})
 	t.Run("a backend failure is internal and logged", func(t *testing.T) {
 		path, rec := served(t, &fakes{err: errors.New("disk on fire")})
 		_, err := Call(t.Context(), path, &Request{Command: SetupToken})

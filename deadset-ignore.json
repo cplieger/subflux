@@ -81,12 +81,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Server.Hosts",
-      "path": "internal/settings/server.go",
-      "reason": "Retained until AP-1 (internal/settings#Server.Hosts): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/settings#ErrClosed",
       "path": "internal/settings/service.go",
       "reason": "One of Save's sentinels: its first caller outside settings maps it to an HTTP code."
@@ -648,6 +642,24 @@
       "symbol": "go://github.com/cplieger/subflux/internal/accounts#loggedField.field",
       "path": "internal/accounts/config.go",
       "reason": "The record field each row's key feeds, read by TestLoggedFieldsCoverRecord, which fails when statedb.AuthMethodState gains a string field no row names; production reads the rows by key."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/wirespec#AttemptRefusal",
+      "path": "internal/wirespec/wire.go",
+      "reason": "Retained until AP-1h (internal/wirespec#*): HistoryDoc's refusal type, which the generated client names when history.list lands on httpwire's page."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/wirespec#FileName.MaxBytes",
+      "path": "internal/wirespec/bounds.go",
+      "reason": "Retained until AP-1h (internal/wirespec#*): the binder and the OpenAPI generator read each bound through its MaxBytes method."
+    },
+    {
+      "code": "DS1501",
+      "symbol": "go://github.com/cplieger/subflux/internal/wirespec#UploadName.MaxBytes",
+      "path": "internal/wirespec/bounds.go",
+      "reason": "Retained until AP-1h (internal/wirespec#*): the binder and the OpenAPI generator read each bound through its MaxBytes method."
     }
   ]
 }

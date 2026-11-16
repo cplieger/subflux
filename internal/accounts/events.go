@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/access/accesshttp"
+	"github.com/cplieger/access"
 	"github.com/cplieger/go/textsafe"
 )
 
@@ -24,18 +24,18 @@ const dropWarnEvery = time.Minute
 // on log output.
 type auditSink struct {
 	warned  time.Time
-	events  chan accesshttp.AuditEvent
+	events  chan access.AuditEvent
 	metrics droppedCounter
 	logger  *slog.Logger
 	mu      sync.Mutex
 }
 
 func newAuditSink(m droppedCounter, l *slog.Logger) *auditSink {
-	return &auditSink{events: make(chan accesshttp.AuditEvent, auditQueue), metrics: m, logger: l}
+	return &auditSink{events: make(chan access.AuditEvent, auditQueue), metrics: m, logger: l}
 }
 
 // enqueue queues e, or counts it dropped when the queue is full.
-func (a *auditSink) enqueue(_ *http.Request, e accesshttp.AuditEvent) { //nolint:gocritic // hugeParam: accesshttp's Audit signature
+func (a *auditSink) enqueue(_ *http.Request, e access.AuditEvent) { //nolint:gocritic // hugeParam: access's Audit hook signature
 	select {
 	case a.events <- e:
 		return
@@ -75,7 +75,7 @@ func (a *auditSink) run(ctx context.Context) {
 
 // log writes e as one INFO line, every string made single-line safe: a
 // username or reason can carry text a client chose.
-func (a *auditSink) log(e *accesshttp.AuditEvent) {
+func (a *auditSink) log(e *access.AuditEvent) {
 	a.logger.Info("accounts: audit",
 		"kind", textsafe.SanitizeSingleLine(e.Kind),
 		"success", e.Success,

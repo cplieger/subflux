@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"AP-1a", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
+	"AP-1h", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
 
@@ -105,7 +105,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/settings#Codes", "AP-1"},
 	{"internal/settings#Mode.UnmarshalText", "AP-1"},
 	{"internal/settings#SectionSchema*", "AP-1"},
-	{"internal/settings#Server.Hosts", "AP-1"},
 	{"internal/settings#Service.Merge", "AP-1"},
 	{"internal/statedb#Codes", "AP-1"},
 	{"internal/statedb#Coverage", "AP-1"},
@@ -173,6 +172,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/timing#SkipReason.UnmarshalText", "AP-1"},
 	{"internal/timing#Verdict.MarshalText", "AP-1"},
 	{"internal/timing#Verdict.UnmarshalText", "AP-1"},
+	{"internal/wirespec#*", "AP-1h"},
 }
 
 func TestRetainedSetMatchesDeadset(t *testing.T) {

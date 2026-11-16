@@ -212,6 +212,7 @@ var refusals = []refusal{
 	{sentinel(accounts.ErrUnknownRole), "role_invalid", http.StatusBadRequest, slog.LevelInfo},
 	{sentinel(account.ErrUnknownScope), "unknown_scope", http.StatusBadRequest, slog.LevelInfo},
 	{typed[*account.TextError](), "label_invalid", http.StatusBadRequest, slog.LevelInfo},
+	{sentinel(account.ErrKeyLabelTaken), "label_taken", http.StatusConflict, slog.LevelInfo},
 	{sentinel(account.ErrSetupComplete), "setup_complete", http.StatusConflict, slog.LevelInfo},
 	{sentinel(account.ErrPolicyRefused), "forbidden", http.StatusForbidden, slog.LevelInfo},
 	{typed[*inspectError](), "inspect_failed", http.StatusInternalServerError, slog.LevelError},
