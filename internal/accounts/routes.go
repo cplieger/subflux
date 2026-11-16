@@ -50,7 +50,7 @@ func Descriptors() []accesshttp.Descriptor {
 // Routes is every access route subflux serves, each refusal written through
 // errs and each audit event queued for Run. Password sign-in is refused to a
 // client that is not local while the auth section failed to parse.
-func (s *Service) Routes(errs accesshttp.ErrorWriter) ([]accesshttp.Route, error) {
+func (s *Service) Routes(errs access.ErrorWriter) ([]accesshttp.Route, error) {
 	dc := descriptorConfig()
 	h, err := accesshttp.New(accesshttp.Config{
 		Account: s.account, Errors: errs, Audit: s.audit.enqueue, Logger: s.deps.Logger,
@@ -70,7 +70,7 @@ func (s *Service) Routes(errs accesshttp.ErrorWriter) ([]accesshttp.Route, error
 
 // passwordGate is the password sign-in route behind the unparsed-section
 // rule: password_login is unknown then, so only a local client may use it.
-func (s *Service) passwordGate(next http.Handler, errs accesshttp.ErrorWriter) http.Handler {
+func (s *Service) passwordGate(next http.Handler, errs access.ErrorWriter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := s.deps.Config(); ok {
 			next.ServeHTTP(w, r)
@@ -81,14 +81,14 @@ func (s *Service) passwordGate(next http.Handler, errs accesshttp.ErrorWriter) h
 			next.ServeHTTP(w, r)
 			return
 		}
-		e := accesshttp.AuditEvent{Kind: "login.failure", Method: access.MethodPassword, Reason: "password_login_disabled"}
+		e := access.AuditEvent{Kind: "login.failure", Method: access.MethodPassword, Reason: "password_login_disabled"}
 		if ip := addr.IP(); ip.IsValid() {
 			e.IP = ip.String()
 		}
 		s.audit.enqueue(r, e)
 		w.Header().Set("Cache-Control", "no-store")
-		errs(w, r, accesshttp.Error{
-			Status: http.StatusForbidden, Code: accesshttp.CodePasswordLoginDisabled,
+		errs(w, r, access.Error{
+			Status: http.StatusForbidden, Code: access.CodePasswordLoginDisabled,
 			Detail: "Until the auth settings are repaired, password sign-in works only from a device on this server's own network that connects directly, not through a proxy.",
 		})
 	})

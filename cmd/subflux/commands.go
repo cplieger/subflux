@@ -18,7 +18,7 @@ var commandUsage = map[adminsock.Command]string{
 	adminsock.ResetPassword:       "<user>",
 	adminsock.RecoveryLink:        "<user>",
 	adminsock.CreateUser:          "<user> [--role admin|user]",
-	adminsock.CreateKey:           "<user> [--label <text>] [--scope <scope>]...",
+	adminsock.CreateKey:           "<user> --label <text> [--scope <scope>]...",
 	adminsock.SetupToken:          "",
 	adminsock.EnablePasswordLogin: "",
 	adminsock.Store:               "[--verify [--repair]]",
@@ -59,23 +59,8 @@ func parse(c adminsock.Command, args []string, stdin io.Reader, stderr io.Writer
 		}
 		req.Username, args = args[0], args[1:]
 	}
-	fs := flag.NewFlagSet(c.String(), flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() {}
-	switch c {
-	case adminsock.CreateUser:
-		fs.StringVar(&req.Role, "role", "user", "admin or user")
-	case adminsock.CreateKey:
-		fs.StringVar(&req.Label, "label", "", "the key's label")
-		fs.Func("scope", "a scope the key carries; none is full access", func(s string) error {
-			req.Scopes = append(req.Scopes, s)
-			return nil
-		})
-	case adminsock.Store:
-		fs.BoolVar(&req.Verify, "verify", false, "rescan every index, counter and derived row")
-		fs.BoolVar(&req.Repair, "repair", false, "with --verify, rewrite what differs")
-	}
-	if fs.Parse(args) != nil || fs.NArg() != 0 || (req.Repair && !req.Verify) {
+	fs := flags(req, stderr)
+	if fs.Parse(args) != nil || fs.NArg() != 0 || (req.Repair && !req.Verify) || (c == adminsock.CreateKey && req.Label == "") {
 		return nil, errUsage
 	}
 	if c == adminsock.ResetPassword || c == adminsock.CreateUser {
@@ -86,6 +71,27 @@ func parse(c adminsock.Command, args []string, stdin io.Reader, stderr io.Writer
 		req.Password = pw
 	}
 	return req, nil
+}
+
+// flags is the flag set of req's command, each flag writing into req.
+func flags(req *adminsock.Request, stderr io.Writer) *flag.FlagSet {
+	fs := flag.NewFlagSet(req.Command.String(), flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {}
+	switch req.Command {
+	case adminsock.CreateUser:
+		fs.StringVar(&req.Role, "role", "user", "admin or user")
+	case adminsock.CreateKey:
+		fs.StringVar(&req.Label, "label", "", "the key's label, unique among the user's unexpired keys")
+		fs.Func("scope", "a scope the key carries; none is full access", func(s string) error {
+			req.Scopes = append(req.Scopes, s)
+			return nil
+		})
+	case adminsock.Store:
+		fs.BoolVar(&req.Verify, "verify", false, "rescan every index, counter and derived row")
+		fs.BoolVar(&req.Repair, "repair", false, "with --verify, rewrite what differs")
+	}
+	return fs
 }
 
 // report writes c's answer and returns the exit code.

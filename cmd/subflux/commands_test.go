@@ -286,7 +286,7 @@ func TestEachWordDispatches(t *testing.T) {
 			t.Errorf("%s --no-such-flag: exit %d, stdout %q, stderr %q; want 2 with its own usage", w, code, out, errOut)
 		}
 	}
-	for _, args := range [][]string{{"reset-password"}, {"create-key"}, {"recovery-link", "a", "b"}, {"setup-token", "x"}} {
+	for _, args := range [][]string{{"reset-password"}, {"create-key"}, {"create-key", "alice"}, {"create-key", "alice", "--label", ""}, {"recovery-link", "a", "b"}, {"setup-token", "x"}} {
 		if code, _, _ := cli(t, nil, args...); code != 2 {
 			t.Errorf("%q: exit %d, want 2", args, code)
 		}

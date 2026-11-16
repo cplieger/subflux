@@ -404,7 +404,7 @@ var (
 	activityCodec    = rowCodec[activityRow, *activityRow]{version: 1}
 	passkeyCodec     = rowCodec[passkeyRow, *passkeyRow]{version: 1}
 	passkeyUseCodec  = rowCodec[passkeyUseRow, *passkeyUseRow]{version: 1}
-	apiKeyCodec      = rowCodec[keyRow, *keyRow]{version: 1}
+	apiKeyCodec      = rowCodec[keyRow, *keyRow]{version: 2}
 	keyUseCodec      = rowCodec[keyUseRow, *keyUseRow]{version: 1}
 	tokenCodec       = rowCodec[tokenRow, *tokenRow]{version: 1}
 	failureCodec     = rowCodec[failureRow, *failureRow]{version: 1}
@@ -446,7 +446,7 @@ func defineAuthIn(ns *bolttable.Namespace) (*authTables, error) {
 	a.sessionByHash = index(&d, a.sessions, "session_hash", unique, sessionHashEntries)
 	a.sessionByID = index(&d, a.sessions, "session_id", unique, sessionIDEntries)
 	a.byCredential = index(&d, a.passkeys, ixCredential, unique, credentialEntries)
-	a.keyByHash = index(&d, a.keys, "key_hash", unique, keyHashEntries)
+	a.keyByHash = index(&d, a.keys, "key_hash", bolttable.IndexOptions{Version: 2, Unique: true}, keyHashEntries)
 	a.keysByUser = index(&d, a.keys, "key_user", plain, keyUserEntries)
 	a.tokensBySub = index(&d, a.tokens, "token_subject", plain, tokenSubjectEntries)
 	a.tokensByExpiry = index(&d, a.tokens, "token_expires", plain, tokenExpiryEntries)
@@ -520,7 +520,14 @@ func credentialEntries(_ access.PasskeyRef, v *passkeyRow) []bolttable.Entry {
 	return one(appendText(nil, string(v.CredentialID)))
 }
 
-func keyHashEntries(_ int64, v *keyRow) []bolttable.Entry { return one(appendText(nil, v.KeyHash)) }
+// keyHashEntries indexes the current and the previous secret in one unique
+// index, so neither can be another key's hash (rule 23).
+func keyHashEntries(_ int64, v *keyRow) []bolttable.Entry {
+	if v.PreviousHash == "" {
+		return one(appendText(nil, v.KeyHash))
+	}
+	return []bolttable.Entry{{Key: appendText(nil, v.KeyHash)}, {Key: appendText(nil, v.PreviousHash)}}
+}
 
 func keyUserEntries(_ int64, v *keyRow) []bolttable.Entry {
 	return one(idKeys.AppendKey(nil, v.UserID))

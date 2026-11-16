@@ -19,7 +19,9 @@ import (
 //go:embed placeholder.html
 var placeholder []byte
 
-func handler(m *obs.Metrics, checks []health.Check, routes func(*http.ServeMux)) http.Handler {
+// handler serves every route behind the host gate, inside the logger and
+// the recoverer, so a refused host is logged and counted.
+func handler(m *obs.Metrics, checks []health.Check, snapshot func() settings.Snapshot, routes func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/health", health.CheckHandler(checks...))
 	mux.Handle("GET /metrics", m.Handler())
@@ -32,7 +34,17 @@ func handler(m *obs.Metrics, checks []health.Check, routes func(*http.ServeMux))
 		routes(mux)
 	}
 	logOpt, recoverOpt := httpMetrics(m)
-	return httpserver.Chain(mux, httpserver.Logging(logOpt), httpserver.Recoverer(recoverOpt))
+	return httpserver.Chain(hostGate(snapshot, mux), httpserver.Logging(logOpt), httpserver.Recoverer(recoverOpt))
+}
+
+// hostGate serves next behind the host policy of the server section in
+// force, read per request so a save changing allowed_hosts applies to the
+// next request; the policy answers a refused Host 403 host_not_allowed.
+func hostGate(snapshot func() settings.Snapshot, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv, _ := snapshot().Server()
+		srv.Hosts().Middleware()(next).ServeHTTP(w, r)
+	})
 }
 
 func httpMetrics(m *obs.Metrics) (httpserver.LogOption, httpserver.RecoverOption) {

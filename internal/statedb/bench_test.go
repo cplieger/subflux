@@ -572,6 +572,7 @@ func BenchmarkSignInBurst(b *testing.B) {
 	ctx := b.Context()
 	type signIn struct {
 		session access.Hash
+		keyHash access.Hash
 		cred    []byte
 		key     int64
 		user    int64
@@ -585,7 +586,8 @@ func BenchmarkSignInBurst(b *testing.B) {
 		}
 		in := signIn{session: access.NewHash(fmt.Sprintf("session-%d", i)), cred: fmt.Appendf(nil, "cred-%d", i), user: u.ID}
 		sess := &access.Session{CreatedAt: at, LastActivity: at, AuthTime: at, ID: fmt.Sprintf("s%d", i), TokenHash: in.session, AuthMethod: access.MethodPassword, UserID: u.ID}
-		key := &access.Key{CreatedAt: at, KeyHash: access.NewHash(fmt.Sprintf("key-%d", i)), UserID: u.ID}
+		in.keyHash = access.NewHash(fmt.Sprintf("key-%d", i))
+		key := &access.Key{CreatedAt: at, KeyHash: in.keyHash, UserID: u.ID}
 		err := errors.Join(a.CreateSession(ctx, sess), a.CreateAPIKey(ctx, key),
 			a.CreatePasskey(ctx, &access.PasskeyCredential{CreatedAt: at, UserID: u.ID, CredentialID: in.cred, RawFlags: 1}))
 		if err != nil {
@@ -604,7 +606,7 @@ func BenchmarkSignInBurst(b *testing.B) {
 			wg.Go(func() {
 				err := errors.Join(
 					a.UpdateSessionActivity(ctx, in.session, access.SessionActivity{At: stamp, IP: "192.0.2.1"}),
-					a.TouchAPIKey(ctx, in.key, stamp),
+					a.TouchAPIKey(ctx, in.key, in.keyHash, stamp),
 					a.UpdatePasskeyAfterLogin(ctx, in.user, in.cred, access.PasskeyLoginUpdate{At: stamp, SignCount: uint32(n), RawFlags: 5}),
 					a.PutAuthFailure(ctx, account.FailureCount{Name: failureName(fmt.Sprintf("user%d", i)), Method: access.MethodPassword, Count: n}),
 				)

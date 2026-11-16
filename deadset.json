@@ -102,7 +102,6 @@
       "go://github.com/cplieger/subflux/internal/settings#Codes",
       "go://github.com/cplieger/subflux/internal/settings#Mode.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/settings#SectionSchema*",
-      "go://github.com/cplieger/subflux/internal/settings#Server.Hosts",
       "go://github.com/cplieger/subflux/internal/settings#Service.Merge",
       "go://github.com/cplieger/subflux/internal/statedb#Codes",
       "go://github.com/cplieger/subflux/internal/statedb#Coverage",
@@ -169,7 +168,8 @@
       "go://github.com/cplieger/subflux/internal/timing#SkipReason.MarshalText",
       "go://github.com/cplieger/subflux/internal/timing#SkipReason.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Verdict.MarshalText",
-      "go://github.com/cplieger/subflux/internal/timing#Verdict.UnmarshalText"
+      "go://github.com/cplieger/subflux/internal/timing#Verdict.UnmarshalText",
+      "go://github.com/cplieger/subflux/internal/wirespec#*"
     ]
   }
 }

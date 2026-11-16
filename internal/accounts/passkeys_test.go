@@ -99,8 +99,8 @@ func TestRelyingPartyBuiltOncePerOrigins(t *testing.T) {
 		e.set(func(e *env) {
 			e.auth = parsed(t, map[string]any{keyPasskeyOrigins: []string{"https://media.nas.example", siteOrigin}})
 		})
-		if code, answer := begin(t); code != http.StatusBadRequest || answer != string(accesshttp.CodePasskeysUnavailable) {
-			t.Errorf("passkey begin after a build error = %d %s, want 400 %s", code, answer, accesshttp.CodePasskeysUnavailable)
+		if code, answer := begin(t); code != http.StatusBadRequest || answer != string(access.CodePasskeysUnavailable) {
+			t.Errorf("passkey begin after a build error = %d %s, want 400 %s", code, answer, access.CodePasskeysUnavailable)
 		}
 		var logged bool
 		for _, r := range rec.Records() {
@@ -122,8 +122,8 @@ func TestPasskeySiblingOriginRefused(t *testing.T) {
 
 	t.Run("a ceremony begun at a sibling origin", func(t *testing.T) {
 		_, code, answer := newBrowser(t, sibling, "192.0.2.10").ceremony(t, st, "authLoginPasskeyBegin")
-		if code != http.StatusBadRequest || answer != string(accesshttp.CodeOriginRefused) {
-			t.Errorf("begin from %s = %d %s, want 400 %s", sibling, code, answer, accesshttp.CodeOriginRefused)
+		if code != http.StatusBadRequest || answer != string(access.CodeOriginRefused) {
+			t.Errorf("begin from %s = %d %s, want 400 %s", sibling, code, answer, access.CodeOriginRefused)
 		}
 	})
 	t.Run("an assertion signed for a sibling origin", func(t *testing.T) {
@@ -133,8 +133,8 @@ func TestPasskeySiblingOriginRefused(t *testing.T) {
 			t.Fatalf("begin = %d %s", code, answer)
 		}
 		dev.Origin = sibling
-		if code, answer := b.finish(t, st, "authLoginPasskeyFinish", c, dev.Assert(c.PublicKey)); code != http.StatusUnauthorized || answer != string(accesshttp.CodeAssertionFailed) {
-			t.Errorf("finish relayed from %s = %d %s, want 401 %s", sibling, code, answer, accesshttp.CodeAssertionFailed)
+		if code, answer := b.finish(t, st, "authLoginPasskeyFinish", c, dev.Assert(c.PublicKey)); code != http.StatusUnauthorized || answer != string(access.CodeAssertionFailed) {
+			t.Errorf("finish relayed from %s = %d %s, want 401 %s", sibling, code, answer, access.CodeAssertionFailed)
 		}
 		if hasSession(b) {
 			t.Error("a relayed assertion signed in")
@@ -158,7 +158,7 @@ func TestPasskeyFinishBodyCap(t *testing.T) {
 		t.Fatalf("begin = %d %s", code, answer)
 	}
 	body := []byte(`{"id":"` + strings.Repeat("A", 65<<10) + `"}`)
-	if code, answer := b.finish(t, st, "authLoginPasskeyFinish", c, body); code != http.StatusRequestEntityTooLarge || answer != string(accesshttp.CodeBodyTooLarge) {
-		t.Errorf("a 65 KiB finish = %d %s, want 413 %s", code, answer, accesshttp.CodeBodyTooLarge)
+	if code, answer := b.finish(t, st, "authLoginPasskeyFinish", c, body); code != http.StatusRequestEntityTooLarge || answer != string(access.CodeBodyTooLarge) {
+		t.Errorf("a 65 KiB finish = %d %s, want 413 %s", code, answer, access.CodeBodyTooLarge)
 	}
 }

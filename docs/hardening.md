@@ -53,7 +53,7 @@ List the proxy before you expose subflux. A proxy that is not listed and adds no
 
 ## Blocking DNS rebinding
 
-`server.allowed_hosts` lists the exact host names or addresses subflux answers for, each with an optional port. A request whose `Host` header is not on the list is refused with 403 before it reaches any page:
+`server.allowed_hosts` lists the exact host names or addresses subflux answers for, each with an optional port. A request whose `Host` header is not on the list is refused with 403 `host_not_allowed` before it reaches any page, `/metrics` and `/api/health` included:
 
 ```yaml
 server:
@@ -62,7 +62,7 @@ server:
     - 192.0.2.5
 ```
 
-This closes a gap the cross-origin check leaves open. In a DNS rebinding attack, a malicious page makes its own host name resolve to subflux's address. The browser's request then carries the attacker's name in both `Origin` and `Host`, they agree, and the cross-origin check lets it through. Only an exact `Host` check stops it. A request from the container itself to a loopback address, such as the healthcheck, always passes. Leave `server.allowed_hosts` empty, the default, to accept any `Host`. A `server.allowed_hosts` entry that does not parse is refused when the settings load. Until a save fixes it, only the entries that did parse are admitted, and a list with none admits no `Host`, so a typo never opens the list to every host.
+This closes a gap the cross-origin check leaves open. In a DNS rebinding attack, a malicious page makes its own host name resolve to subflux's address. The browser's request then carries the attacker's name in both `Origin` and `Host`, they agree, and the cross-origin check lets it through. Only an exact `Host` check stops it. A request from inside the container to a loopback address, such as `http://127.0.0.1:8374`, passes while the server settings load. Leave `server.allowed_hosts` empty, the default, to accept any `Host`. A `server.allowed_hosts` entry that does not parse is refused when the settings load. Until a save fixes it, only the entries that did parse are admitted, and a list with none admits no `Host`, so a typo never opens the list to every host.
 
 ## Passkeys
 

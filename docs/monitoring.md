@@ -4,7 +4,7 @@ This page lists what subflux reports about itself and the alert rules that ship 
 
 ## What you get
 
-subflux serves Prometheus metrics at `/metrics` on port 8374, with no login.
+subflux serves Prometheus metrics at `/metrics` on port 8374, with no login. With `server.allowed_hosts` set, list the host name or address your Prometheus scrapes, such as `subflux` for a scrape of `subflux:8374`, or the scrape is refused with 403. An empty list, the default, answers every host.
 
 The `dev` branch is being rebuilt, so its image exports only the series below. The series for searches, downloads, providers, media roots and the database return with the parts of subflux that own them.
 
@@ -34,7 +34,7 @@ subflux writes structured logs to the container log, with UTC timestamps. `serve
 
 ## Knowing the app is alive
 
-The container's healthcheck runs `subflux health`, which asks the web server for `GET /api/health` over loopback, so Docker marks the container unhealthy when the web server stops answering or reports itself unhealthy. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /api/health`. That endpoint answers without a login: `200` with `{"status":"ok"}` while subflux runs with its settings loaded, and `503` listing a fixed reason for each failing check otherwise: "subflux is starting or shutting down", or "The settings file did not load." With no settings file at all, subflux runs on its defaults and answers `200`.
+The container's healthcheck runs `subflux health`, which asks the web server for `GET /api/health` over loopback, so Docker marks the container unhealthy when the web server stops answering or reports itself unhealthy. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /api/health`. With `server.allowed_hosts` set, list the host name the prober uses too. That endpoint answers without a login: `200` with `{"status":"ok"}` while subflux runs with its settings loaded, and `503` listing a fixed reason for each failing check otherwise: "subflux is starting or shutting down", or "The settings file did not load." With no settings file at all, subflux runs on its defaults and answers `200`.
 
 ## Alerting
 

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cplieger/access"
 	"github.com/cplieger/access/accesshttp"
 	"github.com/cplieger/access/accesstest"
 	"github.com/cplieger/access/account"
@@ -28,7 +29,7 @@ type answer struct {
 	Reason string `json:"reason"`
 }
 
-func writeError(w http.ResponseWriter, _ *http.Request, e accesshttp.Error) {
+func writeError(w http.ResponseWriter, _ *http.Request, e access.Error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(answer{Code: string(e.Code), Reason: e.Reason})

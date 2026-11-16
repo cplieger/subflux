@@ -22,8 +22,8 @@ func TestClientFollowsTheResolverGetter(t *testing.T) {
 	const origin = "http://127.0.0.1:8374"
 	setup := accesshttp.SetupPasswordRequest{Username: "ada", Password: testPassword}
 
-	if w := newBrowser(t, origin, "203.0.113.9").call(t, st, "authSetupPassword", setup); codeOf(t, w) != string(accesshttp.CodeSetupTokenRequired) {
-		t.Fatalf("setup from a public peer = %d %s, want %s", w.Code, w.Body, accesshttp.CodeSetupTokenRequired)
+	if w := newBrowser(t, origin, "203.0.113.9").call(t, st, "authSetupPassword", setup); codeOf(t, w) != string(access.CodeSetupTokenRequired) {
+		t.Fatalf("setup from a public peer = %d %s, want %s", w.Code, w.Body, access.CodeSetupTokenRequired)
 	}
 	if w := newBrowser(t, origin, "127.0.0.1").call(t, st, "authSetupPassword", setup); w.Code != http.StatusOK {
 		t.Fatalf("setup from loopback with no token = %d %s, want 200", w.Code, w.Body)

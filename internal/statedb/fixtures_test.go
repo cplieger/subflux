@@ -185,6 +185,7 @@ const (
 	fixturePasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$aGFzaGhhc2g"
 	fixtureSessionHash  = "session-hash-fixture"
 	fixtureKeyHash      = "api-key-hash-fixture"
+	fixturePreviousHash = "api-key-previous-hash-fixture"
 	fixtureTokenHash    = "one-time-hash-fixture"
 )
 
@@ -222,9 +223,10 @@ func authFixtures(t *testing.T) []fixture {
 			passkey, passkeyUseRow{At: fixtureAt.Add(time.Hour), SignCount: 7, RawFlags: 0x1D, CloneWarning: true}),
 		authFix(t, "keys", func(a *authTables) *bolttable.Table[int64, keyRow] { return a.keys }, idKeys, apiKeyCodec,
 			5, keyRow{
-				CreatedAt: fixtureAt, ExpiresAt: fixtureAt.Add(24 * time.Hour), KeyHash: fixtureKeyHash, KeyPrefix: "sfx_", KeySuffix: "a1b2",
+				CreatedAt: fixtureAt, ExpiresAt: fixtureAt.Add(24 * time.Hour), PreviousUntil: fixtureAt.Add(time.Hour),
+				KeyHash: fixtureKeyHash, PreviousHash: fixturePreviousHash, KeyPrefix: "sfx_", KeySuffix: "a1b2",
 				Label: "backup", Scopes: []string{"read", "write"}, LineageIDs: []int64{1, 2, 5}, UserID: 3,
-			}, fixtureKeyHash),
+			}, fixtureKeyHash, fixturePreviousHash),
 		authFix(t, "key_use", func(a *authTables) *bolttable.Table[int64, keyUseRow] { return a.keyUse }, idKeys, keyUseCodec,
 			5, keyUseRow{LastUsedAt: fixtureAt.Add(2 * time.Hour)}),
 		authFix(t, "tokens", func(a *authTables) *bolttable.Table[string, tokenRow] { return a.tokens }, textKeys, tokenCodec,

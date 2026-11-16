@@ -812,6 +812,7 @@ type rescanPasskey struct {
 
 type rescanKey struct {
 	used  time.Time
+	hash  string
 	owner int64
 }
 
@@ -1073,17 +1074,17 @@ func (r *rescan) createKey(a *AccountStore) string {
 		r.t.Fatalf("CreateAPIKey(%d): %v", user, err)
 	}
 	r.assigned("key", key.ID)
-	r.acct.keys[key.ID] = rescanKey{owner: user}
+	r.acct.keys[key.ID] = rescanKey{hash: key.KeyHash.Reveal(), owner: user}
 	return fmt.Sprintf("CreateAPIKey %d: %d", user, key.ID)
 }
 
 func (r *rescan) useKey(a *AccountStore) string {
 	id := pickOf(r, r.acct.keys, cmp.Compare[int64])
 	at := r.at()
-	if err := a.TouchAPIKey(r.t.Context(), id, at); err != nil {
+	k := r.acct.keys[id]
+	if err := a.TouchAPIKey(r.t.Context(), id, access.NewHash(k.hash), at); err != nil {
 		r.t.Fatalf("TouchAPIKey(%d): %v", id, err)
 	}
-	k := r.acct.keys[id]
 	k.used = later(k.used, at)
 	r.acct.keys[id] = k
 	return fmt.Sprintf("TouchAPIKey %d", id)
@@ -1213,7 +1214,7 @@ func (r *rescan) checkAccounts(step string) {
 	}
 	keys := map[int64]rescanKey{}
 	for id, row := range st.keys {
-		keys[id] = rescanKey{used: st.keyUse[id].LastUsedAt, owner: row.UserID}
+		keys[id] = rescanKey{used: st.keyUse[id].LastUsedAt, hash: row.KeyHash, owner: row.UserID}
 	}
 	if !maps.EqualFunc(keys, m.keys, func(a, b rescanKey) bool { return a.owner == b.owner && a.used.Equal(b.used) }) {
 		t.Errorf("%s: keys %+v, the model %+v", step, keys, m.keys)
