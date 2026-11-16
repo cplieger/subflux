@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/rank"
 	"github.com/cplieger/subflux/internal/status"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg/ffmpegtest"

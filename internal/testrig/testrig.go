@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/subflux/internal/app"
 	"github.com/cplieger/subflux/internal/settings"
 )
@@ -42,7 +43,9 @@ type Rig struct {
 	once     sync.Once
 }
 
-// Start runs app.Run until the test ends, once /api/health answers 200, and
+// Start runs app.Run until the test ends, once the app has started and its
+// listener answers /api/health (a 503 over a settings file that did not load
+// included), and
 // fails the test if Run returned an error other than the shutdown it caused.
 func Start(tb testing.TB, o Options) *Rig {
 	tb.Helper()
@@ -54,7 +57,7 @@ func Start(tb testing.TB, o Options) *Rig {
 	tb.Cleanup(func() { _ = os.RemoveAll(sock) })
 	r := &Rig{
 		Paths: app.Paths{
-			Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy"),
+			Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"),
 			SocketDir: sock, Socket: filepath.Join(sock, "admin.sock"),
 		},
 		Client: &http.Client{Timeout: readyBudget},
@@ -70,12 +73,13 @@ func Start(tb testing.TB, o Options) *Rig {
 		tb.Fatal(err)
 	}
 	r.URL = "http://" + ln.Addr().String()
-	got := make(chan *settings.Service, 1)
+	got, gotHealth := make(chan *settings.Service, 1), make(chan *health.Status, 1)
 	cfg := app.Config{
 		Paths:     r.Paths,
 		Listener:  ln,
 		LogOutput: io.Discard,
 		Settings:  func(s *settings.Service) { got <- s },
+		Health:    func(h *health.Status) { gotHealth <- h },
 	}
 	if o.Mutate != nil {
 		o.Mutate(&cfg)
@@ -88,13 +92,14 @@ func Start(tb testing.TB, o Options) *Rig {
 			tb.Errorf("app.Run: %v", err)
 		}
 	})
-	if err := r.awaitReady(got); err != nil {
+	if err := r.awaitReady(got, gotHealth); err != nil {
 		tb.Fatal(err)
 	}
 	return r
 }
 
-func (r *Rig) awaitReady(got <-chan *settings.Service) error {
+func (r *Rig) awaitReady(got <-chan *settings.Service, gotHealth <-chan *health.Status) error {
+	var verdict *health.Status
 	deadline := time.Now().Add(readyBudget)
 	for time.Now().Before(deadline) {
 		select {
@@ -103,17 +108,21 @@ func (r *Rig) awaitReady(got <-chan *settings.Service) error {
 			return errors.Join(errors.New("testrig: app.Run returned during boot"), err)
 		case s := <-got:
 			r.Settings = s
+		case h := <-gotHealth:
+			verdict = h
 		default:
 		}
-		if r.Settings != nil && r.healthy() {
+		if r.Settings != nil && verdict != nil && verdict.Healthy() && r.serving() {
 			return nil
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	return errors.New("testrig: /api/health did not answer 200 in time")
+	return errors.New("testrig: the app did not start and answer /api/health in time")
 }
 
-func (r *Rig) healthy() bool {
+// serving reports that the listener answers /api/health, whatever the
+// verdict.
+func (r *Rig) serving() bool {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, r.URL+"/api/health", http.NoBody)
 	if err != nil {
 		return false
@@ -123,7 +132,7 @@ func (r *Rig) healthy() bool {
 		return false
 	}
 	_ = resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	return true
 }
 
 // Stop cancels Run and returns its error; later calls return the same.

@@ -34,7 +34,7 @@ subflux writes structured logs to the container log, with UTC timestamps. `serve
 
 ## Knowing the app is alive
 
-The container's healthcheck runs `subflux health`, so Docker marks the container unhealthy when the web server stops. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /api/health`. That endpoint answers without a login: `200` with `{"status":"ok"}` while the web server runs, and `503` with the reasons otherwise.
+The container's healthcheck runs `subflux health`, which asks the web server for `GET /api/health` over loopback, so Docker marks the container unhealthy when the web server stops answering or reports itself unhealthy. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /api/health`. That endpoint answers without a login: `200` with `{"status":"ok"}` while subflux runs with its settings loaded, and `503` listing a fixed reason for each failing check otherwise: "subflux is starting or shutting down", or "The settings file did not load." With no settings file at all, subflux runs on its defaults and answers `200`.
 
 ## Alerting
 

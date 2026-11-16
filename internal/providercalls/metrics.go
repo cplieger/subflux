@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/status"
 )
@@ -14,15 +14,15 @@ var healthNames = [...]string{status.OK: "ok", status.Degraded: "degraded", stat
 type funnelMetrics struct {
 	calls   *measure.LabeledCounter
 	seconds *measure.LabeledHistogram
-	health  *measure.LabeledGauge
+	health  *measure.StateSet
 }
 
 func newFunnelMetrics() *funnelMetrics {
 	const id, op = "provider", "op"
 	return &funnelMetrics{
-		calls:   measure.NewLabeledCounter("provider_calls_total", "Provider calls by op and result.", []string{id, op, "result"}),
-		seconds: measure.NewLabeledHistogram("provider_call_duration_seconds", "Time a provider call ran, after admission.", []string{id, op}, measure.WithBuckets(measure.APIBuckets())),
-		health:  measure.NewLabeledGauge("provider_health", "1 for the provider's current health, 0 for the others.", []string{id, "health"}),
+		calls:   measure.NewLabeledCounter("provider_calls_total", "Provider calls by op and result.", measure.UnitCount, []string{id, op, "result"}),
+		seconds: measure.NewLabeledHistogram("provider_call_duration_seconds", "Time a provider call ran, after admission.", measure.UnitSeconds, []string{id, op}, measure.WithBuckets(measure.APIBuckets())),
+		health:  measure.NewStateSet("provider_health", "1 for the provider's current health, 0 for the others.", []string{id, "health"}, healthNames[status.OK:]),
 	}
 }
 
@@ -36,13 +36,7 @@ func (m *funnelMetrics) count(id provider.ProviderID, op Op, err error) {
 }
 
 func (m *funnelMetrics) setHealth(id provider.ProviderID, h status.Health) {
-	for i := status.OK; i <= status.Disabled; i++ {
-		v := 0.0
-		if i == h {
-			v = 1
-		}
-		m.health.Set(v, string(id), healthNames[i])
-	}
+	m.health.Set(healthNames[h], string(id))
 }
 
 // result is a call's bounded result label.

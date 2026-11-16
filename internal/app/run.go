@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpserver"
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/adminsock"
@@ -37,15 +37,13 @@ type Paths struct {
 	Config string
 	// Store is the state file; statedb locks Store + ".lock" beside it.
 	Store string
-	// Health is the liveness marker the health subcommand stats.
-	Health string
 	// SocketDir holds Socket, the admin socket the local commands call.
 	SocketDir, Socket string
 }
 
 // DefaultPaths are the container layout.
 var DefaultPaths = Paths{
-	Config: "/config/config.yaml", Store: "/config/subflux.bolt", Health: health.DefaultPath,
+	Config: "/config/config.yaml", Store: "/config/subflux.bolt",
 	SocketDir: adminsock.Dir, Socket: adminsock.Path,
 }
 
@@ -60,6 +58,9 @@ type Config struct {
 	// Settings, when set, receives the settings service once it is built, so
 	// a test can save through it.
 	Settings func(*settings.Service)
+	// Health, when set, receives the health verdict once it is built
+	// (tests).
+	Health func(*health.Status)
 	// Gather, when set, receives the metrics registry's Gather (tests).
 	Gather func(func(context.Context) ([]measure.Family, error))
 	// Status, when set, receives the status store once it is built (tests).
@@ -91,9 +92,13 @@ const (
 	maxHeaderBytes    = 64 << 10
 )
 
+// ListenAddr is the HTTP listener's address, which the health subcommand
+// probes on loopback.
+const ListenAddr = ":8374"
+
 // The process's address, budgets and read bound; tests shorten them.
 var (
-	listenAddr = ":8374"
+	listenAddr = ListenAddr
 	// drainBudget is the whole shutdown, both phases, below compose's 10 s
 	// stop grace.
 	drainBudget = 8 * time.Second
@@ -127,30 +132,30 @@ func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam
 	snap := settings.Load(cfg.Paths.Config, reg)
 	level, format := setupLogging(snap, cfg.LogOutput)
 	logLoad(snap)
-	marker := health.NewMarker(cfg.Paths.Health)
-	latch := health.NewLatch(marker)
-	latch.Set(false)
-	defer marker.Cleanup()
+	verdict := health.NewStatus()
+	if cfg.Health != nil {
+		cfg.Health(verdict)
+	}
 
 	store, err := statedb.Open(cfg.Paths.Store)
 	if err != nil {
 		slog.Error("app: could not open the state store", "path", cfg.Paths.Store, "error", err)
 		return fmt.Errorf("app: %w", err)
 	}
-	sv, err := serve(ctx, &cfg, &process{snap: snap, registries: reg, providers: table, store: store, marker: marker, level: level, format: format})
+	sv, err := serve(ctx, &cfg, &process{snap: snap, registries: reg, providers: table, store: store, health: verdict, level: level, format: format})
 	if err != nil {
 		return errors.Join(err, store.Close())
 	}
-	latch.Set(true)
-	sv.beginDrain = latch.BeginDrain
+	verdict.Set(true)
+	sv.beginDrain = verdict.BeginDrain
 	return supervise(ctx, sv)
 }
 
 // process is what Run sets up before serve: the loaded snapshot, the
 // registries and provider table it was parsed with, the open store, the
-// health marker and the log handler's level and format.
+// health verdict and the log handler's level and format.
 type process struct {
-	marker     health.Signal
+	health     *health.Status
 	providers  *providers.Table
 	store      *statedb.Store
 	level      *slog.LevelVar
@@ -242,7 +247,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr e
 	if err != nil {
 		return nil, err
 	}
-	srv := httpserver.New(handler(m, p.marker, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
+	srv := httpserver.New(handler(m, healthChecks(p.health, svc), cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
 	srv.ReadTimeout = readTimeout
 	srv.ReadHeaderTimeout = readHeaderTimeout
 	srv.WriteTimeout = writeTimeout

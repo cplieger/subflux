@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/cplieger/go/httpclient"
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"

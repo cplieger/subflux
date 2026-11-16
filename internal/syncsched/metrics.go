@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/timing"
 )
 
@@ -39,11 +39,11 @@ type metrics struct {
 
 func newMetrics() *metrics {
 	return &metrics{
-		runs:     measure.NewLabeledCounter("sync_runs_total", "Alignments by origin, the method that settled them and their verdict.", []string{"origin", "method", "verdict"}),
-		failures: measure.NewLabeledCounter("sync_failures_total", "Alignment stage failures by stage.", []string{"stage"}),
-		wait:     measure.NewHistogram("sync_slot_wait_seconds", "Time an alignment waited for the slot."),
-		seconds:  measure.NewLabeledHistogram("sync_run_seconds", "Time an alignment held the slot, by the method that settled it.", []string{"method"}),
-		depth:    measure.NewLabeledGauge("sync_queue_depth", "Alignments waiting for the slot, by class.", []string{"class"}),
+		runs:     measure.NewLabeledCounter("sync_runs_total", "Alignments by origin, the method that settled them and their verdict.", measure.UnitCount, []string{"origin", "method", "verdict"}),
+		failures: measure.NewLabeledCounter("sync_failures_total", "Alignment stage failures by stage.", measure.UnitCount, []string{"stage"}),
+		wait:     measure.NewHistogram("sync_slot_wait_seconds", "Time an alignment waited for the slot.", measure.UnitSeconds),
+		seconds:  measure.NewLabeledHistogram("sync_run_seconds", "Time an alignment held the slot, by the method that settled it.", measure.UnitSeconds, []string{"method"}),
+		depth:    measure.NewLabeledGauge("sync_queue_depth", "Alignments waiting for the slot, by class.", measure.UnitCount, []string{"class"}),
 	}
 }
 

@@ -185,7 +185,7 @@ Only `SUBFLUX_*` names are read, so a file cannot read the container's other var
 
 ## Command line
 
-With no arguments, `subflux` runs the server. `subflux health` is the probe the image's `HEALTHCHECK` runs: it exits 0 while the server reports itself healthy and 1 otherwise. `subflux --help` prints the usage line.
+With no arguments, `subflux` runs the server. `subflux health` is the probe the image's `HEALTHCHECK` runs: it GETs `/api/health` from the server on `127.0.0.1:8374` and exits 0 on a `2xx` answer and 1 otherwise, writing the reason to stderr. `subflux --help` prints the usage line.
 
 The other commands ask the running server to act, through a socket only processes inside the container can open. Run each with `docker exec -it subflux subflux <command>`. Each acts as the admin socket, which the security log names as the actor. A refused command prints a one-line JSON error and exits 1, and a command line that is not one of these exits 2 after printing its usage.
 

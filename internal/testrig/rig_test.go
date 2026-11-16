@@ -221,7 +221,7 @@ func TestPlaceholderHasNoScript(t *testing.T) {
 }
 
 func TestPublicHealthAndMetrics(t *testing.T) {
-	r := Start(t, Options{Config: []byte("server:\n  allowed_hosts: [nas.lan]\n")})
+	r := Start(t, Options{Config: []byte("server:\n  allowed_hosts: [nas.lan]\n" + mediaLanguages)})
 	if code, body := get(t, r, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"ok"`) {
 		t.Errorf("/api/health = %d %q", code, body)
 	}
@@ -234,6 +234,24 @@ func TestPublicHealthAndMetrics(t *testing.T) {
 	if resp, err := r.Client.Do(mustGet(t, r.URL+"/api/health")); err == nil {
 		_ = resp.Body.Close()
 		t.Error("the rig still serves after Stop")
+	}
+}
+
+// TestHealthNamesAFailedSettingsFile: a settings file that did not load
+// answers 503 naming it, so the image's healthcheck and an uptime probe see
+// a subflux that cannot do its job; no file at all is healthy.
+func TestHealthNamesAFailedSettingsFile(t *testing.T) {
+	failed := Start(t, Options{Config: []byte("server:\n  log_level: info\n")})
+	code, body := get(t, failed, "/api/health")
+	if code != http.StatusServiceUnavailable || !strings.Contains(body, "The settings file did not load.") {
+		t.Errorf("/api/health over a failed file = %d %q, want 503 naming the settings file", code, body)
+	}
+	if strings.Contains(body, "languages") {
+		t.Errorf("/api/health %q quotes the load error; it answers with no sign-in", body)
+	}
+	unconfigured := Start(t, Options{})
+	if code, body := get(t, unconfigured, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"ok"`) {
+		t.Errorf("/api/health with no file = %d %q, want 200", code, body)
 	}
 }
 

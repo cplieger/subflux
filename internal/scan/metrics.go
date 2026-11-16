@@ -3,7 +3,7 @@ package scan
 import (
 	"time"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediasource"
 )
@@ -18,8 +18,8 @@ type metrics struct {
 func newMetrics() metrics {
 	return metrics{
 		lastComplete: measure.NewLabeledGauge("scan_last_complete_timestamp_seconds",
-			"End of the source's latest complete whole pass, or its loop's start before one.", []string{"source"}),
-		wholeInterval: measure.NewGauge("scan_whole_interval_seconds", "The scan section's whole_interval."),
+			"End of the source's latest complete whole pass, or its loop's start before one.", measure.UnitSeconds, []string{"source"}),
+		wholeInterval: measure.NewGauge("scan_whole_interval_seconds", "The scan section's whole_interval.", measure.UnitSeconds),
 	}
 }
 
