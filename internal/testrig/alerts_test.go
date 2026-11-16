@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/app"
 	"go.yaml.in/yaml/v4"
 )

@@ -136,7 +136,7 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 
 ## Troubleshooting
 
-The healthcheck runs `subflux health`, which passes while the web server is running, set up or not. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`.
+The healthcheck runs `subflux health`, which asks the web server for `/api/health` and passes while subflux is running with its settings loaded, set up or not. A settings file that does not load makes it fail until you fix the file. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`.
 
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
 - An alert says a media root is unavailable. The folder is missing, empty or cannot be opened. Mount it, or fix the root folder in Sonarr or Radarr or the source's `path_mappings`.

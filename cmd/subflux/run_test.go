@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -57,22 +59,21 @@ func TestMainExitsOneOnRunError(t *testing.T) {
 }
 
 // TestHealthHelper is the health subcommand's process when the parent test
-// sets SUBFLUX_HEALTH_HELPER to a marker path.
+// sets SUBFLUX_HEALTH_HELPER to a listen address.
 func TestHealthHelper(t *testing.T) {
-	marker := os.Getenv("SUBFLUX_HEALTH_HELPER")
-	if marker == "" {
+	addr := os.Getenv("SUBFLUX_HEALTH_HELPER")
+	if addr == "" {
 		t.Skip("run as TestHealthSubcommand's child")
 	}
-	paths.Health = marker
+	healthAddr = addr
 	os.Args = []string{"subflux", "health"}
 	main()
 }
 
 func TestHealthSubcommand(t *testing.T) {
-	marker := filepath.Join(t.TempDir(), "healthy")
-	probe := func() (int, string) {
+	probe := func(addr string) (int, string) {
 		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHealthHelper$")
-		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+marker)
+		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+addr)
 		var stderr strings.Builder
 		cmd.Stderr = &stderr
 		err := cmd.Run()
@@ -82,13 +83,33 @@ func TestHealthSubcommand(t *testing.T) {
 		}
 		return cmd.ProcessState.ExitCode(), stderr.String()
 	}
-	if code, stderr := probe(); code != 1 || !strings.Contains(stderr, "marker absent") {
-		t.Errorf("health with no marker = %d, %q; want 1 with RunProbe's reason", code, stderr)
+	serve := func(code int) string {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/api/health" {
+				http.NotFound(w, r)
+				return
+			}
+			w.WriteHeader(code)
+		}))
+		t.Cleanup(srv.Close)
+		return srv.Listener.Addr().String()
 	}
-	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+	if code, stderr := probe(serve(http.StatusOK)); code != 0 || stderr != "" {
+		t.Errorf("health against a 200 = %d, %q; want 0 and no output", code, stderr)
+	}
+	if code, stderr := probe(serve(http.StatusServiceUnavailable)); code != 1 || !strings.Contains(stderr, "503") {
+		t.Errorf("health against a 503 = %d, %q; want 1 naming the status", code, stderr)
+	}
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if code, stderr := probe(); code != 0 || stderr != "" {
-		t.Errorf("health with the marker = %d, %q; want 0 and no output", code, stderr)
+	closed := ln.Addr().String()
+	_ = ln.Close()
+	if code, stderr := probe(closed); code != 1 || stderr == "" {
+		t.Errorf("health with nothing listening = %d, %q; want 1 with a reason", code, stderr)
+	}
+	if code, stderr := probe("no-port"); code != 1 || !strings.Contains(stderr, "health:") {
+		t.Errorf("health on a bad address = %d, %q; want 1 naming the address error", code, stderr)
 	}
 }

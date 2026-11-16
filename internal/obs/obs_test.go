@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/httpserver"
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/buildinfo"
 	"github.com/cplieger/subflux/internal/obs"
@@ -50,7 +50,7 @@ func TestHTTPDurationBuckets(t *testing.T) {
 
 func TestRegisterSiblingCollector(t *testing.T) {
 	m := obs.New()
-	c := measure.NewCounter("sse_publish_refused_total", "Refused publishes.")
+	c := measure.NewCounter("sse_publish_refused_total", "Refused publishes.", measure.UnitCount)
 	if err := m.Register(c); err != nil {
 		t.Fatalf("Register = %v", err)
 	}
@@ -58,10 +58,10 @@ func TestRegisterSiblingCollector(t *testing.T) {
 	if body := scrape(t, m); !strings.Contains(body, "subflux_sse_publish_refused_total 1") {
 		t.Errorf("the sibling counter is not exposed:\n%s", body)
 	}
-	if err := m.Register(measure.NewCounter("sse_publish_refused_total", "Again.")); err == nil {
+	if err := m.Register(measure.NewCounter("sse_publish_refused_total", "Again.", measure.UnitCount)); err == nil {
 		t.Error("a duplicate family registered")
 	}
-	if err := m.Register(measure.NewCounter("panics_total", "Clash.")); err == nil {
+	if err := m.Register(measure.NewCounter("panics_total", "Clash.", measure.UnitCount)); err == nil {
 		t.Error("a family clashing with a platform series registered")
 	}
 }

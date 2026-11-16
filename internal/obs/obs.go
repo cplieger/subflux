@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/httpserver"
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/subflux/internal/buildinfo"
 )
 
@@ -30,7 +30,7 @@ type Metrics struct {
 	httpRequests *measure.LabeledCounter
 	httpDuration *measure.Histogram
 	panics       *measure.Counter
-	configMode   *measure.LabeledGauge
+	configMode   *measure.StateSet
 	alertsActive *measure.LabeledGauge
 	authDropped  *measure.Counter
 	backup       backupSeries
@@ -50,26 +50,23 @@ type backupSeries struct {
 func New() *Metrics {
 	m := &Metrics{
 		registry:     measure.NewRegistry("subflux"),
-		httpRequests: measure.NewLabeledCounter("http_requests_total", "HTTP requests by method, route and status.", []string{"method", "path", "status"}),
-		httpDuration: measure.NewHistogram("http_request_duration_seconds", "HTTP request latency.", measure.WithBuckets(measure.APIBuckets())),
-		panics:       measure.NewCounter("panics_total", "HTTP handler panics recovered."),
-		configMode:   measure.NewLabeledGauge("config_mode", "1 for the configuration's current mode, 0 for the others.", []string{"mode"}),
-		alertsActive: measure.NewLabeledGauge("alerts_active", "1 for each active alert, by its kind and id.", []string{"kind", "id"}),
-		authDropped:  measure.NewCounter("auth_events_dropped_total", "Sign-in audit events dropped because the audit log queue was full."),
+		httpRequests: measure.NewLabeledCounter("http_requests_total", "HTTP requests by method, route and status.", measure.UnitCount, []string{"method", "path", "status"}),
+		httpDuration: measure.NewHistogram("http_request_duration_seconds", "HTTP request latency.", measure.UnitSeconds, measure.WithBuckets(measure.APIBuckets())),
+		panics:       measure.NewCounter("panics_total", "HTTP handler panics recovered.", measure.UnitCount),
+		configMode:   measure.NewStateSet("config_mode", "1 for the configuration's current mode, 0 for the others.", []string{"mode"}, configModes),
+		alertsActive: measure.NewLabeledGauge("alerts_active", "1 for each active alert, by its kind and id.", measure.UnitNone, []string{"kind", "id"}),
+		authDropped:  measure.NewCounter("auth_events_dropped_total", "Sign-in audit events dropped because the audit log queue was full.", measure.UnitCount),
 		backup: backupSeries{
-			enabled:     measure.NewGauge("backup_enabled", "1 while scheduled backups are on, else 0."),
-			interval:    measure.NewGauge("backup_interval_seconds", "The time between scheduled backups."),
-			lastSuccess: measure.NewGauge("backup_last_success_timestamp_seconds", "When the newest backup was made, 0 before any."),
-			failures:    measure.NewCounter("backup_failures_total", "Scheduled backup runs that failed."),
+			enabled:     measure.NewGauge("backup_enabled", "1 while scheduled backups are on, else 0.", measure.UnitNone),
+			interval:    measure.NewGauge("backup_interval_seconds", "The time between scheduled backups.", measure.UnitSeconds),
+			lastSuccess: measure.NewGauge("backup_last_success_timestamp_seconds", "When the newest backup was made, 0 before any.", measure.UnitSeconds),
+			failures:    measure.NewCounter("backup_failures_total", "Scheduled backup runs that failed.", measure.UnitCount),
 		},
 	}
-	buildInfo := measure.NewLabeledGauge("build_info", "Always 1, labelled with the running version.", []string{"version"})
+	buildInfo := measure.NewInfo("build_info", "The running version.", []string{"version"})
 	m.registry.MustRegister(m.httpRequests, m.httpDuration, m.panics, m.configMode, m.alertsActive, m.authDropped,
 		m.backup.enabled, m.backup.interval, m.backup.lastSuccess, m.backup.failures, buildInfo)
-	buildInfo.Set(1, buildinfo.Version())
-	for _, mode := range configModes {
-		m.configMode.Set(0, mode)
-	}
+	buildInfo.Set(buildinfo.Version())
 	return m
 }
 
@@ -110,13 +107,7 @@ func (m *Metrics) SetConfigMode(mode string) {
 		slog.Error("obs: unknown config mode", "mode", mode)
 		return
 	}
-	for _, other := range configModes {
-		v := 0.0
-		if other == mode {
-			v = 1
-		}
-		m.configMode.Set(v, other)
-	}
+	m.configMode.Set(mode)
 }
 
 // SetAlertActive sets the alerts_active series of one active alert.

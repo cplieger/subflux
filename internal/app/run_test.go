@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/accounts"
@@ -73,12 +74,13 @@ type booted struct {
 	status *status.Store
 	done   chan error
 	cancel context.CancelFunc
+	health *health.Status
 	paths  Paths
 	addr   string
 }
 
 // boot runs Run on a temp directory with config text (absent when empty)
-// and waits for the health marker; mutate edits the Config first.
+// and waits for a healthy verdict; mutate edits the Config first.
 func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 	t.Helper()
 	prev := slog.Default()
@@ -90,8 +92,11 @@ func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 			t.Fatal(err)
 		}
 	}
-	got, gotStatus := make(chan *settings.Service, 1), make(chan *status.Store, 1)
-	cfg := Config{Paths: b.paths, LogOutput: io.Discard, Settings: func(s *settings.Service) { got <- s }, Status: func(s *status.Store) { gotStatus <- s }}
+	got, gotStatus, gotHealth := make(chan *settings.Service, 1), make(chan *status.Store, 1), make(chan *health.Status, 1)
+	cfg := Config{
+		Paths: b.paths, LogOutput: io.Discard, Settings: func(s *settings.Service) { got <- s },
+		Status: func(s *status.Store) { gotStatus <- s }, Health: func(h *health.Status) { gotHealth <- h },
+	}
 	if cfg.Listener == nil {
 		ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 		if err != nil {
@@ -114,9 +119,10 @@ func boot(t *testing.T, text string, mutate func(*Config)) *booted {
 			t.Error("Run did not return at cleanup")
 		}
 	})
+	b.health = <-gotHealth
 	b.svc, b.status = <-got, <-gotStatus
-	if !eventually(func() bool { _, err := os.Stat(b.paths.Health); return err == nil }) {
-		t.Fatal("the health marker never appeared")
+	if !eventually(b.health.Healthy) {
+		t.Fatal("the health verdict never turned healthy")
 	}
 	return b
 }
@@ -131,7 +137,7 @@ func testPaths(t *testing.T, dir string) Paths {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(sock) })
 	return Paths{
-		Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), Health: filepath.Join(dir, "healthy"),
+		Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"),
 		SocketDir: sock, Socket: filepath.Join(sock, "admin.sock"),
 	}
 }
@@ -159,10 +165,9 @@ func (b *booted) wait(t *testing.T) error {
 	}
 }
 
-func (b *booted) markerPresent() bool {
-	_, err := os.Stat(b.paths.Health)
-	return err == nil
-}
+// healthy reports the process's own verdict, the one GET /api/health reads
+// first.
+func (b *booted) healthy() bool { return b.health.Healthy() }
 
 // validLanguages is the smallest languages section that parses, for a file
 // whose test is about another section: an absent one fails the file.
@@ -244,12 +249,13 @@ func TestBootFailureClosesStore(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer ln.Close()
-			err = Run(t.Context(), Config{Paths: paths, Listener: ln, LogOutput: io.Discard})
+			var verdict *health.Status
+			err = Run(t.Context(), Config{Paths: paths, Listener: ln, LogOutput: io.Discard, Health: func(h *health.Status) { verdict = h }})
 			if err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Errorf("Run = %v, want an error naming %q", err, c.want)
 			}
-			if _, err := os.Stat(paths.Health); !os.IsNotExist(err) {
-				t.Errorf("the health marker exists after a failed boot (%v)", err)
+			if verdict == nil || verdict.Healthy() {
+				t.Error("the verdict was healthy after a failed boot")
 			}
 			storeReleased(t, paths)
 		})
@@ -334,8 +340,8 @@ func TestListenerFailureAfterReadiness(t *testing.T) {
 		fl, use := failing(t)
 		b, release := holdRequest(t, use)
 		close(fl.fail)
-		if !eventually(func() bool { return !b.markerPresent() }) {
-			t.Fatal("the health marker stayed after the listener failed")
+		if !eventually(func() bool { return !b.healthy() }) {
+			t.Fatal("the verdict stayed healthy after the listener failed")
 		}
 		select {
 		case err := <-b.done:
@@ -363,11 +369,11 @@ func TestListenerFailureAfterReadiness(t *testing.T) {
 }
 
 func TestTerminationDrains(t *testing.T) {
-	t.Run("marker_false_before_http_shutdown", func(t *testing.T) {
+	t.Run("unhealthy_before_http_shutdown", func(t *testing.T) {
 		b, release := holdRequest(t, nil)
 		b.cancel()
-		if !eventually(func() bool { return !b.markerPresent() }) {
-			t.Fatal("the marker stayed while the drain waited on a request")
+		if !eventually(func() bool { return !b.healthy() }) {
+			t.Fatal("the verdict stayed healthy while the drain waited on a request")
 		}
 		close(release)
 		if err := b.wait(t); err != nil {
@@ -672,7 +678,7 @@ func TestJobEndedDuringHTTPDrainIsPersisted(t *testing.T) {
 		t.Fatal("the job never started")
 	}
 	b.cancel()
-	if !eventually(func() bool { return !b.markerPresent() }) {
+	if !eventually(func() bool { return !b.healthy() }) {
 		t.Fatal("the drain never began")
 	}
 	close(release)
@@ -889,7 +895,7 @@ func TestAuthEventDuringHTTPDrainIsLogged(t *testing.T) {
 		t.Fatal("the held request never arrived")
 	}
 	b.cancel()
-	if !eventually(func() bool { return !b.markerPresent() }) {
+	if !eventually(func() bool { return !b.healthy() }) {
 		t.Fatal("the drain never began")
 	}
 	close(release)
