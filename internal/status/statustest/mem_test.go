@@ -7,5 +7,5 @@ import (
 )
 
 func TestMemPersisterContract(t *testing.T) {
-	PersisterContract(t, func(*testing.T) status.Persister { return NewMemPersister() })
+	PersisterContract(t, func(*testing.T) status.Persister { return NewMemPersister() }, status.JobLimits{PerOwner: 20, Total: 110})
 }

@@ -200,7 +200,7 @@ func TestStartOrder(t *testing.T) {
 
 // TestKeyedResendAfterRemoval: a keyed request already recorded answers its
 // job whatever its source has done since, a full queue or a Save removing
-// the source included (design 5.3).
+// the source included.
 func TestKeyedResendAfterRemoval(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig(t, movieCaps, daily)

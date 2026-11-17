@@ -19,6 +19,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/testchild"
 )
 
 // env names the behaviour of the children a test starts, as Use sets it;
@@ -106,6 +108,8 @@ var behaviours = map[string]func(arg string, video *os.File) int{
 	},
 	// cat:<path> copies the file at path to stdout.
 	"cat": func(path string, _ *os.File) int { return cat(path) },
+	// speech:<path> writes the audio UseSpeech described at path.
+	"speech": speech,
 	// from-video:<name> reads a directory from the video, appends the call
 	// to its "calls" file and copies <dir>/<name> to stdout, failing as
 	// "fail" does when there is none: per-video answers, set once.
@@ -148,6 +152,10 @@ func Main(m *testing.M) {
 		isChild = isChild || set
 	}
 	if !isChild {
+		if err := os.Setenv("GORACE", testchild.GORACE()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 		os.Exit(m.Run())
 	}
 	call := callOf(os.Args[1:])
@@ -291,12 +299,18 @@ func stdoutFlood(string, *os.File) int {
 func pcm(n int) int {
 	signal.Ignore(syscall.SIGPIPE)
 	out := bufio.NewWriterSize(os.Stdout, 32<<10)
-	var sample [2]byte
+	buf := make([]byte, 0, 16<<10)
 	for i := 0; n < 0 || i < n; i++ {
-		binary.LittleEndian.PutUint16(sample[:], uint16(int16(i)))
-		if _, err := out.Write(sample[:]); err != nil {
-			hang()
+		buf = binary.LittleEndian.AppendUint16(buf, uint16(int16(i)))
+		if len(buf) == cap(buf) {
+			if _, err := out.Write(buf); err != nil {
+				hang()
+			}
+			buf = buf[:0]
 		}
+	}
+	if _, err := out.Write(buf); err != nil {
+		hang()
 	}
 	if err := out.Flush(); err != nil {
 		hang()

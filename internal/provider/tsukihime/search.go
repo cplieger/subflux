@@ -21,8 +21,8 @@ import (
 	"github.com/cplieger/subflux/internal/rank"
 )
 
-// maxRequests is design 5.7's cap on one Search, well under the site's 25
-// requests per 10 seconds per IP: a landing costs 2, then 1 per torrent.
+// maxRequests caps one Search, well under the site's 25 requests per 10
+// seconds per IP: a landing costs 2, then 1 per torrent.
 const maxRequests = 8
 
 // subtitleTrack is an attachment's type for a subtitle track; 0 is a font
@@ -189,7 +189,7 @@ func (s *search) offer(l *mapread.Landing, fs []file) {
 // files reports which of a torrent's files are landing l's. A single file
 // is. Of several, an episode keeps each whose claim Lands on l and a film
 // each claiming nothing, a one-number form counting as none, since a film's
-// name carries its title's numbers (design 5.5).
+// name carries its title's numbers.
 func (s *search) files(l *mapread.Landing, fs []file) []bool {
 	if len(fs) < 2 {
 		return slices.Repeat([]bool{true}, len(fs))

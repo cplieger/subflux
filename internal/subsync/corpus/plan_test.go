@@ -116,8 +116,8 @@ func TestCutStudyPlanRunsBothActions(t *testing.T) {
 	for _, p := range plan {
 		count[p.expect]++
 	}
-	// The cut study's corpus (its REPORT section 1): 32 forward pairs, 30
-	// reversed or must-refuse and 2 re-edits, 33 wrong films, 4 excluded.
+	// The cut study's corpus: 32 forward pairs, 30 reversed or must-refuse
+	// and 2 re-edits, 33 wrong films, 4 excluded.
 	if count[expectDifferentCut] != 32 || count[expectRefuse] != 32 || count[expectWrongFilm] != 33 || count[expectExcluded] != 4 {
 		t.Errorf("plan holds %d forward, %d must-refuse, %d wrong-film, %d excluded pairs, want 32, 32, 33, 4",
 			count[expectDifferentCut], count[expectRefuse], count[expectWrongFilm], count[expectExcluded])

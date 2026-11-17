@@ -13,7 +13,7 @@ import (
 // Activation is the configuration every source fact is judged under: the
 // sources in force, the language policy and the embedded codecs coverage
 // ignores. Auth, when set, is the sign-in configuration table 2B records,
-// and Guard judges a change to it (design 5.4).
+// and Guard judges a change to it.
 type Activation struct {
 	Auth          *AuthMethodState
 	Guard         MethodGuard
@@ -39,7 +39,7 @@ func (a *activation) sameAs(r *activationRow) bool {
 }
 
 // Activate installs a. Changed sources, policy or codecs make one write
-// that applies design 5.4's removal and marks config, so every reader
+// that applies the source removal and marks config, so every reader
 // re-reads in full; the first Activate after Open, and a policy or codec
 // change, also recompute coverage there, deleting only unconfigured pairs'
 // locks. An a.Auth that differs from table 2B's row is judged by a.Guard and
@@ -147,7 +147,7 @@ func (s *Store) applyActivation(tx *bolttable.Tx, stored *activationRow, next *a
 	return s.t.activation.Put(tx, constKey{}, &row)
 }
 
-// removeSources applies design 5.4's removal for every source in removed,
+// removeSources applies the source removal for every source in removed,
 // judging what it hands on under next.
 func (s *Store) removeSources(tx *bolttable.Tx, next *activation, removed map[media.SourceID]bool) error {
 	for src := range removed {
@@ -247,7 +247,7 @@ func (s *Store) releaseNoVideoItems(tx *bolttable.Tx, next *activation, removed 
 // and no sighting still reporting them with no video: a live no-video
 // sighting of the key takes the record over and the key's coverage is
 // recomputed under a; with none the key loses its record, coverage and
-// locks, and its history stays (DECISIONS 1).
+// locks, and its history stays.
 func (s *Store) handOn(tx *bolttable.Tx, a *activation, lost []media.Key) error {
 	if len(lost) == 0 {
 		return nil

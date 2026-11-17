@@ -52,6 +52,12 @@ func failTerminal(h *hookPersister, n int32, landed bool) *atomic.Int32 {
 	return &calls
 }
 
+func TestDefaultLimits(t *testing.T) {
+	if want := (status.JobLimits{PerOwner: 1_000, Total: 10_000}); status.DefaultLimits != want {
+		t.Errorf("DefaultLimits = %+v, want %+v", status.DefaultLimits, want)
+	}
+}
+
 func TestTerminalPersistRetried(t *testing.T) {
 	for _, landed := range []bool{false, true} {
 		name := "failed"

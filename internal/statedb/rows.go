@@ -17,9 +17,9 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// Row values (design section 4) are private structs under JSON with every
-// enum a uint8 converted at the row boundary, so no other package's text
-// codec or field name shapes stored bytes.
+// Row values are private structs under JSON with every enum a uint8
+// converted at the row boundary, so no other package's text codec or field
+// name shapes stored bytes.
 
 // checker is a row whose decode also checks its enums against their sets.
 type checker interface{ check() error }
@@ -532,7 +532,7 @@ func (r *embeddedRow) check() error {
 	return nil
 }
 
-// 0x12 downloads: one attempt, never rewritten (DECISIONS 1).
+// 0x12 downloads: one attempt, never rewritten.
 type downloadRow struct {
 	At         time.Time     `json:"at"`
 	Target     rowTag        `json:"target"`

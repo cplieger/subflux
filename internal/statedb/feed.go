@@ -165,11 +165,11 @@ func (s *Store) onCommit(bolttable.Change) {
 	s.sig.Unlock()
 }
 
-// beforeCommit replaces the touched rows with the library roots they change
-// (design section 3), read as stored after the write, sets the history mark
-// for a download and recounts every such root (CR-UX-1). A change marked
-// config records no subjects, since every reader answers it in full, and
-// stores its revision as config_rev.
+// beforeCommit replaces the touched rows with the library roots they change,
+// read as stored after the write, sets the history mark for a download and
+// recounts every such root. A change marked config records no subjects,
+// since every reader answers it in full, and stores its revision as
+// config_rev.
 func (s *Store) beforeCommit(tx *bolttable.Tx, p *bolttable.Pending) ([]bolttable.Subject, error) {
 	out := subjects{seen: map[string]struct{}{}}
 	for _, sub := range p.Touched {

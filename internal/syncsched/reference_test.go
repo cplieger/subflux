@@ -14,7 +14,7 @@ import (
 // TestReferenceChoice gives the chosen stream the only extractable track:
 // any other choice fails the extraction.
 func TestReferenceChoice(t *testing.T) {
-	video := episode(8, 150)
+	video := episode(8, 60)
 	tests := []struct {
 		name   string
 		tracks []track

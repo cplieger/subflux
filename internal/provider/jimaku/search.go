@@ -117,7 +117,7 @@ func (a *adapter) get(ctx context.Context, u string, v any) error {
 
 // candidates are the subtitle files and zip or rar packs of an entry's
 // files whose URL Fetch accepts, each Japanese and matched by id; the engine
-// chooses a pack's member (design 8.11).
+// chooses a pack's member.
 func candidates(fs []file) []provider.Candidate {
 	var out []provider.Candidate
 	for _, f := range fs {

@@ -3,7 +3,9 @@ package ffmpegtest
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -14,14 +16,46 @@ import (
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
-// UseSpeech makes the PCM children t starts answer WriteSpeech's audio.
+// UseSpeech makes the PCM children t starts answer WriteSpeech's audio,
+// which each child synthesizes when it is called, so a test that runs no
+// audio pass pays nothing for it.
 func UseSpeech(t testing.TB, spans []subsync.Span, durationMs int64) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "speech.pcm")
-	if err := WriteSpeech(path, spans, durationMs); err != nil {
+	b, err := json.Marshal(speechSpec{Spans: spans, DurationMs: durationMs})
+	if err != nil {
 		t.Fatal(err)
 	}
-	UseFor(t, PCM, "cat:"+path)
+	path := filepath.Join(t.TempDir(), "speech.json")
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	UseFor(t, PCM, "speech:"+path)
+}
+
+// speechSpec is the audio UseSpeech hands its children.
+type speechSpec struct {
+	Spans      []subsync.Span
+	DurationMs int64
+}
+
+// speech writes the audio of the speechSpec at path to stdout.
+func speech(path string, _ *os.File) int {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	var s speechSpec
+	if err := json.Unmarshal(b, &s); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	w := bufio.NewWriterSize(os.Stdout, 1<<20)
+	writeSpeech(w, s.Spans, s.DurationMs)
+	if err := w.Flush(); err != nil {
+		return 1
+	}
+	return 0
 }
 
 // WriteSpeech writes 8 kHz s16le audio of durationMs to path: a voiced
@@ -40,7 +74,7 @@ func WriteSpeech(path string, spans []subsync.Span, durationMs int64) error {
 func writeSpeech(w *bufio.Writer, spans []subsync.Span, durationMs int64) {
 	r := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // G404: a seeded fixture, the same audio every run
 	v := voiced()
-	var sample [2]byte
+	buf := make([]byte, 0, 16_000)
 	next := 0
 	for i := range 8 * durationMs {
 		ms := i / 8
@@ -51,9 +85,13 @@ func writeSpeech(w *bufio.Writer, spans []subsync.Span, durationMs int64) {
 		if next < len(spans) && spans[next].StartMs <= ms {
 			s += v[i%int64(len(v))]
 		}
-		binary.LittleEndian.PutUint16(sample[:], uint16(int16(s))) //nolint:gosec // G115: s16le is the bits of the int16 sample
-		_, _ = w.Write(sample[:])
+		buf = binary.LittleEndian.AppendUint16(buf, uint16(int16(s))) //nolint:gosec // G115: s16le is the bits of the int16 sample
+		if len(buf) == cap(buf) {
+			_, _ = w.Write(buf)
+			buf = buf[:0]
+		}
 	}
+	_, _ = w.Write(buf)
 }
 
 // voiced is one second of a 140 Hz harmonic series amplitude-modulated at

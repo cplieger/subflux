@@ -12,8 +12,8 @@ import (
 )
 
 // The key scopes subflux's API keys carry. manage_users and create_keys are
-// subflux's own (DECISIONS 31 and 36): distinct from admin and each other,
-// and implied by no scope, full access included.
+// subflux's own: distinct from admin and each other, and implied by no
+// scope, full access included.
 const (
 	scopeRead        = "read"
 	scopeOperate     = "operate"
@@ -25,8 +25,8 @@ const (
 // groupsClaim is the OIDC claim oidc_allowed_groups is matched against.
 const groupsClaim = "groups"
 
-// rulesOf is the account.Rules c sets: every field section 7.2 names, setup
-// the token rule and MethodUsable methodUsable over the published RP ID.
+// rulesOf is the account.Rules c sets, with setup as the token rule and
+// MethodUsable methodUsable over the published RP ID.
 func rulesOf(c Config, setup func(context.Context, account.Client) bool, rpID func() string) account.Rules {
 	cfg := c.get()
 	breach := account.BreachOff

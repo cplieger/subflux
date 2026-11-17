@@ -22,7 +22,7 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
-// The production scale design section 13 benchmarks at: 63,000 items under
+// The production scale the benchmarks run at: 63,000 items under
 // three targets, one root large enough for a full 500-row page.
 const (
 	benchItems     = 63_000
@@ -252,7 +252,7 @@ func recountLibrary(b *testing.B, tvdb uint64, n int) (*Store, InstanceID) {
 	return s, first
 }
 
-// BenchmarkRecountLargestRoot measures what CR-UX-1's recount adds to a
+// BenchmarkRecountLargestRoot measures what a root's recount adds to a
 // commit: one lock toggle in the 2,000-episode root against the same toggle
 // in a one-episode root, and the recount alone.
 func BenchmarkRecountLargestRoot(b *testing.B) {
@@ -565,7 +565,7 @@ func BenchmarkLogTrim(b *testing.B) {
 // BenchmarkSignInBurst is one burst per iteration of the stamps 16
 // concurrent sign-ins write: a session's activity, a key's use, a passkey's
 // sign count and a failure count each. Every one is silent, so the burst
-// must reserve no revision (AC1).
+// must reserve no revision.
 func BenchmarkSignInBurst(b *testing.B) {
 	const signIns = 16
 	s, a := benchAccounts(b)

@@ -24,7 +24,7 @@ func (s *Scanner) PassNow() {
 }
 
 // whole runs one whole pass made due by d, moves the loop's facts by how it
-// ended (design 5.1's table), and answers what failed it.
+// ended, and answers what failed it.
 func (l *loop) whole(ctx context.Context, set sources, caps mediasource.Capabilities, d due) error {
 	passCtx, cancel := context.WithCancel(ctx)
 	defer cancel()

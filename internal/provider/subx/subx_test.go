@@ -31,10 +31,10 @@ func failure(t *testing.T, err error) *provider.Failure {
 	return f
 }
 
-// TestSubXIsException: SubX is a named exception (design 5.8) sending
-// subflux's own agent, so its first search reads robots.txt, a path that
-// file disallows is refused unsent, and a search or download 403 pauses it
-// an hour with the one request sent.
+// TestSubXIsException: SubX is a named exception sending subflux's own
+// agent, so its first search reads robots.txt, a path that file disallows is
+// refused unsent, and a search or download 403 pauses it an hour with the
+// one request sent.
 func TestSubXIsException(t *testing.T) {
 	if e := subx.NewEntry(); !e.Exception || e.UserAgent != "" {
 		t.Fatalf("Exception %t, UserAgent %q; want an exception with subflux's agent", e.Exception, e.UserAgent)

@@ -74,7 +74,7 @@ func (s *Store) RecordAttempts(ctx context.Context, ds []Download) error {
 }
 
 // appendDownloads appends each row under the next sequence; no write
-// rewrites or deletes one (DECISIONS 1).
+// rewrites or deletes one.
 func (s *Store) appendDownloads(tx *bolttable.Tx, rows []downloadRow) error {
 	for i := range rows {
 		seq, err := s.t.downloads.NextID(tx)

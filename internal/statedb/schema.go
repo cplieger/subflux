@@ -21,8 +21,8 @@ type tables struct {
 	auth   *authTables
 }
 
-// coreTables is namespace core (design section 4): tables 0x01 to 0x18 with
-// their indexes, counter and cascades.
+// coreTables is namespace core: tables 0x01 to 0x18 with their indexes,
+// counter and cascades.
 type coreTables struct {
 	activation   *bolttable.Table[constKey, activationRow]
 	passes       *bolttable.Table[media.SourceID, passRow]
@@ -63,7 +63,7 @@ type coreTables struct {
 	owned        *bolttable.Counter[status.JobID, jobRow]
 }
 
-// The core table prefixes (design section 4).
+// The core table prefixes.
 const (
 	pActivation   byte = 0x01
 	pPasses       byte = 0x02
@@ -217,8 +217,7 @@ func defineCoreIn(ns *bolttable.Namespace) (*coreTables, error) {
 	return c, nil
 }
 
-// declarer keeps the first declaration error, so defineCore reads as the
-// table of section 4 and checks once.
+// declarer keeps the first declaration error, so defineCore checks once.
 type declarer struct{ err error }
 
 func define[K, V any](d *declarer, ns *bolttable.Namespace, prefix byte, name string, k bolttable.KeyCodec[K], v bolttable.Codec[V], o bolttable.TableOptions) *bolttable.Table[K, V] {
@@ -291,8 +290,8 @@ func rootHistoryEntries(seq uint64, v *downloadRow) []bolttable.Entry {
 	return es
 }
 
-// workOrderEntries leads with the cause class, Item rows first (CR-SE-5
-// (b)), then the enqueue sequence, and projects what NextWork serves from.
+// workOrderEntries leads with the cause class, Item rows first, then the
+// enqueue sequence, and projects what NextWork serves from.
 func workOrderEntries(_ InstanceID, v *workRow) []bolttable.Entry {
 	key := appendUint64([]byte{uint8(Item) - v.Cause}, v.Seq)
 	return []bolttable.Entry{{Key: key, Value: appendWorkProjection(nil, v)}}
@@ -372,7 +371,7 @@ type authTables struct {
 	logCounts      map[account.LogClass]*bolttable.Counter[uint64, logRow]
 }
 
-// The auth table prefixes (design section 4).
+// The auth table prefixes.
 const (
 	pUsers        byte = 0x20
 	pSessions     byte = 0x21

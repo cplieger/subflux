@@ -8,8 +8,8 @@ import (
 )
 
 // seedInputs are raw spellings the round-trip, fold and filename tests and the
-// fuzz targets share: canonical tags, decision 16's spellings, the script
-// fold's examples, macrolanguage and legacy codes, and junk.
+// fuzz targets share: canonical tags, the provider spellings subflux accepts,
+// the script fold's examples, macrolanguage and legacy codes, and junk.
 var seedInputs = []string{
 	"", "en", "EN", "en-GB", "en-US-u-ca-gregory", "de", "fr", "fr-CA", "fr-FR",
 	"pt", "pt-BR", "pt-br", "pt-PT", "pt-MO", "es", "es-419", "es-ES", "es-MX", "es-LA",

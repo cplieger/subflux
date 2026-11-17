@@ -12,7 +12,7 @@ import (
 	"github.com/cplieger/subflux/internal/statedb"
 )
 
-// The tick (design section 6).
+// The tick.
 const (
 	// debounce follows a feed wake, so a season pack arrives as one batch.
 	debounce      = 5 * time.Second

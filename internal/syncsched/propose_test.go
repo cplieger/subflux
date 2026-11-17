@@ -167,7 +167,7 @@ func TestKeyedProposeReplays(t *testing.T) {
 // TestRigidFileJobs delivers a flagged-cut pick under each Decision that
 // can carry one: every one is Rigid, whatever its Action.
 func TestRigidFileJobs(t *testing.T) {
-	video := episode(27, 200)
+	video := episode(27, 60)
 	decisions := map[string]timing.Decision{
 		"RigidReference": rigid,
 		"Skip/Disabled":  {Action: timing.Skip, Skip: timing.Disabled},
@@ -268,7 +268,7 @@ func TestMissingFFmpegCause(t *testing.T) {
 }
 
 func TestProposalWithNothingToMatch(t *testing.T) {
-	video := episode(21, 150)
+	video := episode(21, 60)
 	noText := func(t *testing.T) {
 		withReference(t, nil, track{codec: "hdmv_pgs_subtitle", lang: "jpn", index: 2})
 	}
@@ -308,7 +308,7 @@ func TestProposalWithNothingToMatch(t *testing.T) {
 
 func TestProposalBounds(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		video := episode(32, 60)
+		video := episode(32, 16)
 		r := newRig(t)
 		withReference(t, map[int][]byte{2: srt(video)}, japanese)
 		var files []syncsched.Target

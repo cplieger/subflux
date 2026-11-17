@@ -8,12 +8,11 @@ import (
 	"github.com/cplieger/subflux/internal/media"
 )
 
-// OrderJoin is the aired join the Set keys every episode root through
-// (design 3.6): one Joined per listed episode, in order, with the evidence
-// the yielded root carries; or an error wrapping ErrAiredOrderUnavailable, a
-// passed deadline's included, or the store's error, which fails the call. It
-// is a NewSet argument, not a Deps field, so no adapter or media server gets
-// it.
+// OrderJoin is the aired join the Set keys every episode root through: one
+// Joined per listed episode, in order, with the evidence the yielded root
+// carries; or an error wrapping ErrAiredOrderUnavailable, a passed
+// deadline's included, or the store's error, which fails the call. It is a
+// NewSet argument, not a Deps field, so no adapter or media server gets it.
 type OrderJoin interface {
 	Join(ctx context.Context, q JoinQuery) ([]Joined, *RootEvidence, error)
 }

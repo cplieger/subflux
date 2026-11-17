@@ -78,7 +78,7 @@ type pack struct {
 	variant language.Variant
 }
 
-// Select runs design 8.11's steps over in, first matching step: a confident
+// Select runs its matching steps over in, first matching step: a confident
 // title (the only evidence for a special), the count under each compatible
 // order, then the number the orders agree on, or the members they disagree
 // over.

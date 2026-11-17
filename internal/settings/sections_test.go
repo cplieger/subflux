@@ -136,8 +136,8 @@ func TestSectionSchemasCoverFlatSections(t *testing.T) {
 	for _, s := range schemas {
 		keys = append(keys, s.Key)
 	}
-	// Platform-auth design 4.3: every section decoded with a schema, in table
-	// order; languages, sources and providers are hand-walked.
+	// Every section decoded with a schema, in table order; languages,
+	// sources and providers are hand-walked.
 	want := []string{"server", "auth", "scan", "search", "post_processing", "timing", "embedded_subtitles", "backup"}
 	if !slices.Equal(keys, want) {
 		t.Fatalf("sections %v, want %v", keys, want)

@@ -173,8 +173,8 @@ func (l *loop) wholeDue(now time.Time, sched mediasource.Schedule) due {
 }
 
 // tick reads the stored cursor once, probes the source, then runs a due
-// whole pass or else a change batch (design 5.1), and answers the error it
-// ended on. A failed cursor read or probe ends the tick.
+// whole pass or else a change batch, and answers the error it ended on. A
+// failed cursor read or probe ends the tick.
 func (l *loop) tick(ctx context.Context, now time.Time) error {
 	l.lastTick = now
 	set, sched := l.s.current()

@@ -61,7 +61,7 @@ type PendingDeliver struct {
 
 var errNoBaseline = errors.New("statedb: the baseline holds no parsed cues")
 
-// errPinned refuses a change to an instance a pending write pins (design 7).
+// errPinned refuses a change to an instance a pending write pins.
 var errPinned = errors.New("statedb: instance has a pending write")
 
 // BeginDeliver stages d under its record's name: nothing live changes until

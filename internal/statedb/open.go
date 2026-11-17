@@ -45,9 +45,9 @@ type config struct {
 	opts   bolttable.Options
 }
 
-// productionConfig is design section 3's one Open call: a second process
-// waits 5 s for the lock, a format change resets every listed name keeping
-// two .old copies, and a file half free and 64 MiB free compacts.
+// productionConfig is the one Open call: a second process waits 5 s for the
+// lock, a format change resets every listed name keeping two .old copies,
+// and a file half free and 64 MiB free compacts.
 func productionConfig() config {
 	return config{tables: production, now: time.Now, opts: bolttable.Options{
 		LockWait:  5 * time.Second,

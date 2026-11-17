@@ -80,13 +80,13 @@ func (s *Store) openPass(r *bolttable.ReadTx, src media.SourceID, pass PassID) (
 }
 
 // FinishPass closes src's open pass and returns the distinct owners all of
-// src's overlap rows name (design 5.3). Incomplete, it retires nothing.
-// Complete, in one write, it retires what in scope the pass did not stamp,
-// except under a root in keep, stores next as the cursor, after a whole pass
-// queues Scan work for src's instances outside keep, and expires instances
-// ownerless for more than 30 days. keep, the roots a whole pass could not
-// read, is refused, writing nothing, for a batch, an incomplete pass, or
-// past 32 roots.
+// src's overlap rows name. Incomplete, it retires nothing. Complete, in one
+// write, it retires what in scope the pass did not stamp, except under a
+// root in keep, stores next as the cursor, after a whole pass queues Scan
+// work for src's instances outside keep, and expires instances ownerless for
+// more than 30 days. keep, the roots a whole pass could not read, is
+// refused, writing nothing, for a batch, an incomplete pass, or past 32
+// roots.
 func (s *Store) FinishPass(ctx context.Context, src media.SourceID, pass PassID, complete bool, next mediasource.Cursor, keep []mediasource.NativeRef) ([]media.SourceID, error) {
 	if len(keep) > maxKeep {
 		return nil, fmt.Errorf("statedb: a pass keeps at most %d roots, not %d", maxKeep, len(keep))

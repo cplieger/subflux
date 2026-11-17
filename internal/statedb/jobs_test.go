@@ -14,7 +14,7 @@ import (
 )
 
 // small keeps Total above PerOwner, as DefaultLimits does, at sizes a case
-// fills in a few writes; the contract runs DefaultLimits.
+// fills in a few writes.
 var small = status.JobLimits{PerOwner: 4, Total: 6}
 
 var jobAt = time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)
@@ -95,7 +95,7 @@ func hasKey(t *testing.T, s *Store, owner int64, key string) bool {
 }
 
 func TestPersisterContract(t *testing.T) {
-	statustest.PersisterContract(t, func(t *testing.T) status.Persister { return newStore(t) })
+	statustest.PersisterContract(t, func(t *testing.T) status.Persister { return newStore(t) }, status.JobLimits{PerOwner: 20, Total: 110})
 }
 
 func TestTotalNeverRefusesSystemOwner(t *testing.T) {

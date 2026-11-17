@@ -14,8 +14,8 @@ import (
 	"github.com/cplieger/subflux/internal/skyhook"
 )
 
-// TestMovedCounts pins DECISIONS 40's measured counts: Firefly's DVD order
-// moves 14 regular episodes, Futurama's 138, Game of Thrones' none of 73.
+// TestMovedCounts pins the measured counts: Firefly's DVD order moves 14
+// regular episodes, Futurama's 138, Game of Thrones' none of 73.
 func TestMovedCounts(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -330,8 +330,8 @@ func TestJoinAiredOrderFailureAnswersOwnPlaces(t *testing.T) {
 	}
 }
 
-// hungReason is design 4.4's reason for a Join whose SkyHook requests
-// outlived the join's 30 s budget, and for each Join barred after it.
+// hungReason is the reason for a Join whose SkyHook requests outlived the
+// join's 30 s budget, and for each Join barred after it.
 const hungReason = "SkyHook (skyhook.sonarr.tv) did not answer within 30 seconds; it is asked again 10 minutes later"
 
 func TestJoinHungSkyHookBounded(t *testing.T) {

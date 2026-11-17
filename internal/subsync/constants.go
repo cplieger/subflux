@@ -21,8 +21,8 @@ const (
 	// a float sum of n positive terms errs by under n×1.1e-16 of itself.
 	ratingTie   = 1e-9
 	heldOutGain = 0.10
-	// splitPenaltyPer is decision 28's change cost, × min(n_ref, n_inc), in
-	// rating units.
+	// splitPenaltyPer × min(n_ref, n_inc) is the piecewise fit's change cost,
+	// in rating units.
 	splitPenaltyPer = 0.030
 	// checkpointEvery: the DP keeps its main row and drop-state ring every
 	// this many cues and recomputes each block at traceback.
@@ -42,8 +42,8 @@ const (
 	MaxAudioFrames   = 500_000
 	audioAgreementMs = 500
 
-	referenceGate = 0.6 // decision 28
-	audioGate     = 0.5 // decision 27, on peak × 0.9
+	referenceGate = 0.6
+	audioGate     = 0.5 // on peak × 0.9
 
 	// The coverage guard's thresholds, the corpus gate's loosest values at
 	// zero delivered-and-wrong. edgeGate is under referenceGate: a fit

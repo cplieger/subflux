@@ -13,7 +13,7 @@ import (
 
 // taggedVersion is the Version of a codec holding a tag: own times 2^16 plus
 // language.FormatVersion, so a change to any tag's canonical text changes
-// core's digest and resets it (DECISIONS 4).
+// core's digest and resets it.
 func taggedVersion(own uint16) uint32 { return uint32(own)<<16 | uint32(language.FormatVersion) }
 
 // timedVersion is the Version of a codec holding timing data: own in the top

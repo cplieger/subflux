@@ -13,7 +13,7 @@ import (
 
 // TestClientFollowsTheResolverGetter serves the routes behind
 // clientaddr.Middleware as app mounts them, the resolver read per request
-// from a getter a trusted_proxies Save swaps (platform-auth section 11).
+// from a getter a trusted_proxies Save swaps.
 func TestClientFollowsTheResolverGetter(t *testing.T) {
 	e := newEnv()
 	store := accesstest.NewMemStore()

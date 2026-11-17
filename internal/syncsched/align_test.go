@@ -96,7 +96,7 @@ func TestAlignWithoutReferenceUnverified(t *testing.T) {
 }
 
 func TestReferenceFailureRunsAudio(t *testing.T) {
-	video := episode(2, 200)
+	video := episode(2, 100)
 	payload := srt(shifted(video, -2_000))
 	dur := end(video) + 30_000
 	t.Run("audio verifies after a failed extraction", func(t *testing.T) {
@@ -285,7 +285,8 @@ func displaced(ref []subsync.Span, f float64) []subsync.Span {
 }
 
 // thinnedTo is video displaced until inc's reference fit scores about
-// target, below the gate.
+// target, below the gate: ten halvings, or fewer once a fit lands within
+// 0.01 above target.
 func thinnedTo(t *testing.T, video, inc []subsync.Span, target float64) []subsync.Span {
 	t.Helper()
 	score := func(f float64) float64 {
@@ -295,15 +296,22 @@ func thinnedTo(t *testing.T, video, inc []subsync.Span, target float64) []subsyn
 		}
 		return res.Confidence
 	}
-	lo, hi := 0.0, 1.0
-	for range 20 {
-		if mid := (lo + hi) / 2; score(mid) > target {
-			lo = mid
+	lo, hi, c := 0.0, 1.0, math.NaN()
+	for range 10 {
+		mid := (lo + hi) / 2
+		if s := score(mid); s > target {
+			lo, c = mid, s
+			if s <= target+0.01 {
+				break
+			}
 		} else {
 			hi = mid
 		}
 	}
-	if c := score(lo); c < target-0.1 || c >= 0.6 {
+	if math.IsNaN(c) {
+		c = score(lo)
+	}
+	if c < target-0.1 || c >= 0.6 {
 		t.Fatalf("fixture: reference e2 %.3f, want about %.2f", c, target)
 	}
 	return displaced(video, lo)

@@ -30,10 +30,10 @@ type Harness struct {
 	Query   provider.Query
 }
 
-// Contract is the suite every adapter passes (design 5.1 and 5.3): its
-// recorded search and fetch, a refused credential, a 429 with Retry-After,
-// a 503 and an oversized body, each classified as the failure table says.
-// Every case runs inside a synctest bubble, so retries cost no time.
+// Contract is the suite every adapter passes: its recorded search and fetch,
+// a refused credential, a 429 with Retry-After, a 503 and an oversized body,
+// each classified as the failure table says. Every case runs inside a
+// synctest bubble, so retries cost no time.
 func Contract(t *testing.T, h Harness) { //nolint:gocritic // hugeParam: each adapter's test passes its Harness inline
 	t.Run("recorded", func(t *testing.T) { synctest.Test(t, func(t *testing.T) { h.recorded(t) }) })
 	t.Run("refused", func(t *testing.T) { synctest.Test(t, func(t *testing.T) { h.refused(t) }) })
@@ -75,7 +75,7 @@ func Contract(t *testing.T, h Harness) { //nolint:gocritic // hugeParam: each ad
 }
 
 // backoff is the least RetryAfter a failure answered by a status carries: an
-// Exception entry's hour (design 5.8), else d.
+// Exception entry's hour, else d.
 func (h *Harness) backoff(d time.Duration) time.Duration {
 	if h.Entry.Exception {
 		return max(d, time.Hour)

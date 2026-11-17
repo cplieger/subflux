@@ -1,6 +1,6 @@
 // Package scan runs one loop per configured source: the whole passes and
 // change batches that bring a source's library into statedb through its pass
-// protocol (design 5). It is the one owner of the source:<id> and
+// protocol. It is the one owner of the source:<id> and
 // source_overlap:<id> alerts, so no other reader can disagree about a
 // source's health.
 package scan
@@ -58,8 +58,8 @@ type Deps struct {
 	Schedule mediasource.Schedule
 }
 
-// The fixed parts of the schedule (design 5); the change and whole
-// intervals are the scan section's.
+// The fixed parts of the schedule; the change and whole intervals are the
+// scan section's.
 const (
 	startupDelay   = 30 * time.Second
 	retryMin       = time.Minute

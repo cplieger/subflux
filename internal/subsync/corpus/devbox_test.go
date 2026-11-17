@@ -15,7 +15,7 @@ import (
 // manifest's videos with their own reference track and audio and a track
 // of the same video in another language as the candidate, through the
 // production aligner and the host's ffmpeg, audio_fallback off then on:
-// AC19's fitting-set bars. The candidate is timed to its video, so its own
+// the fitting-set bars. The candidate is timed to its video, so its own
 // times are the truth.
 func TestCorpusDevBox(t *testing.T) {
 	dir := requireEnv(t, "SUBFLUX_CORPUS_DIR", "the dev-box corpus the manifest names")

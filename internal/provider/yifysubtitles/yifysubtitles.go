@@ -1,6 +1,6 @@
 // Package yifysubtitles is the YIFY Subtitles provider: movie subtitles read
 // from yifysubtitles.ch's pages by IMDb id. It scrapes HTML, as the site
-// publishes no API, so its entry is a named Exception (DECISIONS 41).
+// publishes no API, so its entry is a named Exception.
 package yifysubtitles
 
 import (
@@ -27,7 +27,7 @@ const (
 	siteURL  = "https://" + siteHost
 
 	// browserUA passes the site's bot check, which refuses other agents;
-	// DECISIONS 41 (D-UA) keeps it for this exception only.
+	// only an Exception entry may set one (Build).
 	browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 	maxPageBody     = 2 << 20

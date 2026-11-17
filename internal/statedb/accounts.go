@@ -11,9 +11,9 @@ import (
 	"github.com/cplieger/bolttable"
 )
 
-// AccountStore is v7's account.Store over the store's auth namespace
-// (design section 9). Every single-call write and every Update runs through
-// db.Batch, so concurrent sign-ins share one commit; reads run in one View.
+// AccountStore is v7's account.Store over the store's auth namespace. Every
+// single-call write and every Update runs through db.Batch, so concurrent
+// sign-ins share one commit; reads run in one View.
 type AccountStore struct{ s *Store }
 
 // Accounts returns the account store over s's auth namespace.

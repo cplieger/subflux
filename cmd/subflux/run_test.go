@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/app"
+	"github.com/cplieger/subflux/internal/testchild"
 )
 
 func swapRunApp(t *testing.T, f func(context.Context, app.Config) error) {
@@ -73,7 +74,7 @@ func TestHealthHelper(t *testing.T) {
 func TestHealthSubcommand(t *testing.T) {
 	probe := func(addr string) (int, string) {
 		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHealthHelper$")
-		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+addr)
+		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+addr, "GORACE="+testchild.GORACE())
 		var stderr strings.Builder
 		cmd.Stderr = &stderr
 		err := cmd.Run()

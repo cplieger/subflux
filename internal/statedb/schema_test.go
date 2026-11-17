@@ -17,8 +17,8 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// designSilent is design section 4's Silent column.
-var designSilent = []string{
+// silentTables are the tables a write to leaves Rev unchanged.
+var silentTables = []string{
 	"activation", "passes", "cursors", "stamps", "overlaps", "baselines",
 	"ordinals", "intents", "work", "jobs", "credentials", "no_results", "root_evidence", "counts",
 	"session_activity", "passkey_use", "key_use", "tokens", "failures", "secrets", "auth_method_state",
@@ -31,7 +31,7 @@ func allFixtures(t *testing.T) []fixture {
 	return append(coreFixtures(t), authFixtures(t)...)
 }
 
-func TestSilentSetMatchesDesign(t *testing.T) {
+func TestSilentSetMatchesTables(t *testing.T) {
 	db, c := openSchema(t)
 	rev := func() uint64 {
 		t.Helper()
@@ -48,8 +48,8 @@ func TestSilentSetMatchesDesign(t *testing.T) {
 				t.Fatalf("Put: %v", err)
 			}
 			silent := rev() == before
-			if want := slices.Contains(designSilent, f.table); silent != want {
-				t.Errorf("a write to %s left Rev unchanged = %v; the design's Silent column says %v", f.table, silent, want)
+			if want := slices.Contains(silentTables, f.table); silent != want {
+				t.Errorf("a write to %s left Rev unchanged = %v, want %v", f.table, silent, want)
 			}
 		})
 	}

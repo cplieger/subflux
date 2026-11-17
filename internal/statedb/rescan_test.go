@@ -132,7 +132,7 @@ func (r *rescan) step() string {
 
 // pass runs a whole pass or a change batch of src. A complete one
 // retires every sighting in its scope that it did not observe; an
-// incomplete one retires nothing (design 5.3).
+// incomplete one retires nothing.
 func (r *rescan) pass() string {
 	if len(r.act.Sources) == 0 {
 		return "pass: no active source"
@@ -1329,8 +1329,7 @@ func (r *rescan) authRows() map[string]map[string]string {
 	return out
 }
 
-// stampTables are the auth tables a step may change without moving the head
-// (AC1).
+// stampTables are the auth tables a step may change without moving the head.
 var stampTables = []string{"session_activity", "passkey_use", "key_use"}
 
 // checkAuthFeed requires an account step that changed no auth row, and any
