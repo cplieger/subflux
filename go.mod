@@ -10,7 +10,7 @@ require (
 	github.com/cplieger/go/filesafe v1.1.0
 	github.com/cplieger/go/health/v2 v2.0.0
 	github.com/cplieger/go/httpclient v1.2.0
-	github.com/cplieger/go/httpserver v1.5.0-dev.2
+	github.com/cplieger/go/httpserver/v2 v2.0.0-dev.2
 	github.com/cplieger/go/jsonx v1.1.0
 	github.com/cplieger/go/keyenc v1.3.0
 	github.com/cplieger/go/keylock v1.1.0

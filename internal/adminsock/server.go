@@ -12,7 +12,7 @@ import (
 
 	"github.com/cplieger/access"
 	"github.com/cplieger/access/account"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"

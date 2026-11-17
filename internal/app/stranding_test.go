@@ -20,7 +20,7 @@ import (
 	"github.com/cplieger/access"
 	"github.com/cplieger/access/accesshttp"
 	"github.com/cplieger/access/account"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/mediasource"

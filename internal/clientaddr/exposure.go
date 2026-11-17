@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 )
 
 // Reason is why a public client's request counts as exposure.
