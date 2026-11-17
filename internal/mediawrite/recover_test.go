@@ -566,6 +566,9 @@ func TestAlertHoldsWhenTheInstanceTurnsUnreadable(t *testing.T) {
 func TestCountKeepsAnIntentKeptAfterItsRead(t *testing.T) {
 	t.Parallel()
 	l := newLib(t, "E01.mkv")
+	// Landed before the writer runs: a recovery snapshot taken while the
+	// record lands keeps its deliver intent, which the held count never drops.
+	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
 	var rootDown, hold atomic.Bool
 	rootDown.Store(true)
 	held, release := make(chan struct{}), make(chan struct{})
@@ -586,7 +589,6 @@ func TestCountKeepsAnIntentKeptAfterItsRead(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("no count read the pending writes")
 	}
-	rec := landRecord(t, l.store, l.insts[0], l.keys[0], l.path(ep1), srtOf("held"))
 	beginDelete(t, l, &rec)
 	l.w.RootsChanged()
 	for deadline := time.Now().Add(10 * time.Second); mediawrite.Outlived(l.w) != 1; time.Sleep(10 * time.Millisecond) {
