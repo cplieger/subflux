@@ -26,11 +26,13 @@ concurrency:
 
 jobs:
   ci:
-    # The dead-code check uploads its findings to code scanning.
+    # The dead-code check uploads its findings to code scanning, and the
+    # performance gate signs the counts it measured.
     permissions:
       contents: read
+      id-token: write
       security-events: write
-    uses: cplieger/ci/.github/workflows/ci.yaml@d1fde39e63fe016f5d0a36cbee7600bc130e55cc # v3
+    uses: cplieger/ci/.github/workflows/ci.yaml@ca99f336be02e72b8e8effdb46ad333ab8ef363a # v3
     with:
       runner: ${{ vars.CI_RUNNER }}
       go-test-timeout: ${{ vars.GO_TEST_TIMEOUT }}
