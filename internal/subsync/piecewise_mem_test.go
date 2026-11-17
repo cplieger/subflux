@@ -9,7 +9,7 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// maxPiecewiseAlloc is NFR1's bound on one alignment's memory.
+// maxPiecewiseAlloc is the most memory one alignment may allocate.
 const maxPiecewiseAlloc = 96 << 20
 
 // allocated is the bytes f allocates; its caller must not run in parallel.
