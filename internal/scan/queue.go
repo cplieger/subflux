@@ -9,8 +9,8 @@ import (
 	"github.com/cplieger/subflux/internal/status"
 )
 
-// The queue's bounds (architecture NFR4): unstarted slots per source, and
-// per owner and source, so one key cannot fill a source's queue for everyone.
+// The queue's bounds: unstarted slots per source, and per owner and source,
+// so one key cannot fill a source's queue for everyone.
 const (
 	maxQueued         = 16
 	maxQueuedPerOwner = 4

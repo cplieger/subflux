@@ -3,7 +3,6 @@ package testrig
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"testing"
 
@@ -17,22 +16,19 @@ var v093Rules = []string{
 	"SubfluxMediaUnavailable",
 }
 
-// parityRow says what became of one v0.9.3 rule; exactly one of successor,
-// removal and pending is set.
+// parityRow says what became of one v0.9.3 rule; exactly one of successor
+// and removal is set.
 type parityRow struct {
 	old string
 	// successor is the shipped rule that covers it.
 	successor string
 	// removal is why nothing replaces it.
 	removal string
-	// pending is the task that restores it.
-	pending string
 	// dropped is a part of the old rule its successor leaves out, and why.
 	dropped string
 }
 
-// alertParity records what became of each v0.9.3 rule; pendingRows lists the
-// rows still owed.
+// alertParity records what became of each v0.9.3 rule.
 var alertParity = []parityRow{
 	{old: "SubfluxTargetDown", successor: "SubfluxTargetDown"},
 	{old: "SubfluxTargetAbsent", successor: "SubfluxTargetAbsent"},
@@ -42,19 +38,6 @@ var alertParity = []parityRow{
 	{old: "SubfluxMediaUnwritable", removal: "folder level: each video's write problem is reported on its own; the root level is SubfluxMediaUnavailable"},
 	{old: "SubfluxScanStalled", successor: "SubfluxScanStalled"},
 	{old: "SubfluxBackupStale", successor: "SubfluxBackupStale"},
-}
-
-var taskID = regexp.MustCompile(`^[A-Z]{2,4}[0-9]*-[0-9]+[a-z]?$`)
-
-// pendingRows lists each pending row as "<old>: <task>".
-func pendingRows(rows []parityRow) []string {
-	var out []string
-	for _, r := range rows {
-		if r.pending != "" {
-			out = append(out, r.old+": "+r.pending)
-		}
-	}
-	return out
 }
 
 func shippedRules(t *testing.T) []string {
@@ -85,14 +68,8 @@ func TestAlertParityTable(t *testing.T) {
 	var olds []string
 	for _, r := range alertParity {
 		olds = append(olds, r.old)
-		set := 0
-		for _, f := range []string{r.successor, r.removal, r.pending} {
-			if f != "" {
-				set++
-			}
-		}
-		if set != 1 {
-			t.Errorf("%s: set exactly one of successor, removal and pending", r.old)
+		if (r.successor == "") == (r.removal == "") {
+			t.Errorf("%s: set exactly one of successor and removal", r.old)
 		}
 		if r.successor != "" && !slices.Contains(shipped, r.successor) {
 			t.Errorf("%s: successor %s is not a rule in alerts/promql.yaml", r.old, r.successor)
@@ -100,24 +77,10 @@ func TestAlertParityTable(t *testing.T) {
 		if r.dropped != "" && r.successor == "" {
 			t.Errorf("%s: a dropped arm needs a successor", r.old)
 		}
-		if r.pending != "" && !taskID.MatchString(r.pending) {
-			t.Errorf("%s: pending %q is not a task id", r.old, r.pending)
-		}
 	}
 	slices.Sort(olds)
 	want := slices.Sorted(slices.Values(v093Rules))
 	if !slices.Equal(olds, want) {
 		t.Errorf("the table lists %q, want each of v0.9.3's rules once: %q", olds, want)
-	}
-}
-
-func TestPendingRowsListed(t *testing.T) {
-	rows := []parityRow{
-		{old: "A", successor: "A"},
-		{old: "B", pending: "MS2-15"},
-		{old: "C", removal: "gone"},
-	}
-	if got, want := pendingRows(rows), []string{"B: MS2-15"}; !slices.Equal(got, want) {
-		t.Errorf("pendingRows = %q, want %q", got, want)
 	}
 }
