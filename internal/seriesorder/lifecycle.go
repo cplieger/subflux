@@ -83,9 +83,9 @@ func (s *Service) with(id rootID, f func(*rootState)) {
 	f(st)
 }
 
-// dueFetch is design 4.4's fetch rule: a last successful fetch freshFor
-// old, or a list no kept reading agrees with that the list fact does not
-// hold (no reading kept included).
+// dueFetch is the fetch rule: a last successful fetch freshFor old, or a
+// list no kept reading agrees with that the list fact does not hold (no
+// reading kept included).
 func (s *Service) dueFetch(id rootID, l *listing, kept []mediasource.SeriesEvidence, now time.Time) bool {
 	var fact *listFact
 	s.with(id, func(st *rootState) { fact = st.fact })

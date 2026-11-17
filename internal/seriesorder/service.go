@@ -1,7 +1,7 @@
 // Package seriesorder joins a source's episode list to TVDB's aired order
 // through SkyHook's lists of the same series, and keeps the lifecycle of each
 // root's SkyHook evidence, the readings its keys come from, which statedb
-// stores with the root record (media-sources design 4.4).
+// stores with the root record.
 package seriesorder
 
 import (
@@ -66,11 +66,11 @@ func newService(sky shows, store Store, log *slog.Logger) *Service {
 
 // Join answers one Joined per listed episode of q, in order, from the newest
 // reading q's list agrees with, and the evidence the root carries after it,
-// fetching first when design 4.4's rules call for it; it writes nothing.
-// Under another order than aired, a list that agrees with no reading is an
-// error wrapping mediasource.ErrAiredOrderUnavailable, with no evidence, as is
-// ctx's deadline passing in the root's read under any order. A store failure
-// is the store's error and a cancelled ctx its error; SkyHook is asked within
+// fetching first when dueFetch says to; it writes nothing. Under another
+// order than aired, a list that agrees with no reading is an error wrapping
+// mediasource.ErrAiredOrderUnavailable, with no evidence, as is ctx's
+// deadline passing in the root's read under any order. A store failure is
+// the store's error and a cancelled ctx its error; SkyHook is asked within
 // joinBudget, and a passed deadline, ctx's or the budget's, is a failed fetch.
 func (s *Service) Join(ctx context.Context, q mediasource.JoinQuery) ([]mediasource.Joined, *mediasource.RootEvidence, error) { //nolint:gocritic // hugeParam: mediasource.OrderJoin passes the query by value
 	l := newListing(&q)

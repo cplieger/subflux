@@ -12,7 +12,7 @@ import (
 )
 
 // airedOrder is SkyHook's type for TVDB's aired order; absoluteOrder is a
-// numbering, never asked as another order (DECISIONS 40).
+// numbering, never asked as another order.
 const (
 	airedOrder    = "official"
 	absoluteOrder = "absolute"

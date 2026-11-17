@@ -172,7 +172,7 @@ func candidates(items []item, q *provider.Query) []provider.Candidate {
 	return out
 }
 
-// spain matches a word naming Spain's Spanish, case folded: design 5.3's
+// spain matches a word naming Spain's Spanish, case folded: the SubX
 // keywords and "peninsular", which uploaders also write. "Castellano
 // neutro" is neutral Spanish (testdata/README.md), so that phrase is none.
 var (

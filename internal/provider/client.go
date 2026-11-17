@@ -36,7 +36,7 @@ const (
 )
 
 // userAgent is what every entry but an Exception with its own UserAgent
-// sends (DECISIONS 41, D-UA).
+// sends.
 func userAgent() string {
 	return "subflux/" + buildinfo.Version() + " (+https://github.com/cplieger/subflux)"
 }

@@ -33,7 +33,7 @@ func (k FailureKind) String() string {
 }
 
 // Failure is the boundary's one classification of a provider failure.
-type Failure struct { //nolint:errname // design 5 names the boundary's error Failure
+type Failure struct { //nolint:errname // the boundary's one error type, named for what it classifies
 	// ctxErr is context.Canceled or context.DeadlineExceeded when the call's
 	// context ended it, so errors.Is sees the cause without exposing the
 	// unredacted error the Client was handed.

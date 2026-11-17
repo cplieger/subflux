@@ -51,7 +51,7 @@ func assStampText(ms int64) string {
 
 // TestShiftChangesOnlyTimestamps: under a forward shift every byte outside
 // the stamps survives, and each time moves by the shift rounded to the
-// format's unit, halves away from zero (design 3.2).
+// format's unit, halves away from zero.
 func TestShiftChangesOnlyTimestamps(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewPCG(1, 2))

@@ -15,8 +15,8 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// The attempt-row spellings (CR-SE-10). Each holds its candidate in the
-// attempt memory but RefusalFetchFailed and RefusalWriteFailed.
+// The attempt-row spellings. Each holds its candidate in the attempt memory
+// but RefusalFetchFailed and RefusalWriteFailed.
 const (
 	// refusalNone: delivered, or staged and not chosen.
 	refusalNone              = ""

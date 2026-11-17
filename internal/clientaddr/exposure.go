@@ -72,8 +72,8 @@ const (
 
 type episode struct{ since, last time.Time }
 
-// Detector records public clients' requests (DECISIONS 18); its zero value is
-// not usable, NewDetector builds one.
+// Detector records public clients' requests; its zero value is not usable,
+// NewDetector builds one.
 type Detector struct {
 	peers  map[netip.Addr]time.Time
 	seen   [reasonCount]episode

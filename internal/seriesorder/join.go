@@ -14,7 +14,7 @@ const placeholderTitle = "TBA"
 
 type place struct{ season, episode int }
 
-// listing is a JoinQuery prepared for the agreement checks of design 4.4.
+// listing is a JoinQuery prepared for agrees' checks.
 type listing struct {
 	q    *mediasource.JoinQuery
 	lang string // the title language the source's titles are in
@@ -123,7 +123,7 @@ func (ix *readingIndex) titleOK(id uint64, listed string) bool {
 	return listed == placeholderTitle
 }
 
-// agrees is design 4.4's three checks for one listed episode.
+// agrees is the three agreement checks for one listed episode.
 func (ix *readingIndex) agrees(l *listing, e *mediasource.Listed) bool {
 	if !ix.known || (!l.q.Order.Aired && ix.titles == nil) {
 		return false

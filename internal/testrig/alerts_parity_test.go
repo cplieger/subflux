@@ -31,7 +31,8 @@ type parityRow struct {
 	dropped string
 }
 
-// alertParity is promotion's checklist: AUS-1 refuses a pending row.
+// alertParity records what became of each v0.9.3 rule; pendingRows lists the
+// rows still owed.
 var alertParity = []parityRow{
 	{old: "SubfluxTargetDown", successor: "SubfluxTargetDown"},
 	{old: "SubfluxTargetAbsent", successor: "SubfluxTargetAbsent"},

@@ -38,14 +38,14 @@ import (
 // TestMain lets this test binary stand in for ffmpeg and ffprobe.
 func TestMain(m *testing.M) { ffmpegtest.Main(m) }
 
-// The research's fit (reference-sync-research.md section 6): a result fits
-// when at least fitBar of the truth-bearing cues land within fitTolMs.
+// A result fits when at least fitBar of its truth-bearing cues land within
+// fitTolMs.
 const (
 	fitTolMs = 600
 	fitBar   = 0.9
 	// noTruth marks a candidate event its source cannot place.
 	noTruth = int64(-1)
-	// maxWrongShare is AC19's bar on delivered-and-wrong at e2 >= 0.6
+	// maxWrongShare is the bar on delivered-and-wrong at e2 >= 0.6
 	// among a fitting set's same-cut cases.
 	maxWrongShare = 0.03
 )
@@ -546,11 +546,11 @@ func runFitting(t *testing.T, rs []*rig, s *standIn, cases []corpusCase, diag []
 	return runs
 }
 
-// checkFitting asserts AC19's bars common to every fitting set on one run:
+// checkFitting asserts the bars common to every fitting set on one run:
 // no wrong-content result Verified, at most maxWrongShare of the same-cut
 // cases with truth Verified and not fitting, and no cut case delivered at a
 // mapping that misplaces it while a usable reference could judge it; with
-// none usable, nothing can see the cut (G4-23).
+// none usable, nothing can see the cut.
 func checkFitting(t *testing.T, runs []caseRun) {
 	t.Helper()
 	sameCut, wrong := 0, 0

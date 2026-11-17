@@ -13,7 +13,7 @@ type gradeRow struct {
 	class        Class
 }
 
-// gradeTable is the design's case table, then the pairs of the langtag gap
+// gradeTable is the grading case table, then the pairs of the langtag gap
 // study's proximity and precision tables.
 var gradeTable = []gradeRow{
 	{"sr-Latn", "sr-Cyrl", SameLanguage, ManualOnly},

@@ -19,14 +19,14 @@ import (
 // its path before it expires.
 const expireAfter = 30 * 24 * time.Hour
 
-// ObserveItems records what src's open pass saw of root, in one write
-// (design 5.2): the root record and its evidence (deleted when nil), then
-// each item's sighting, claim and stamp in order. It refuses with
-// ErrSourceInactive or ErrPassUnknown, and with a plain error for a root ref
-// of no media kind or no id, evidence failing Validate or naming another
-// TVDB series, an empty or duplicate item id, or a video path neither empty
-// nor absolute and clean, writing nothing. Under a change batch it also
-// queues Import work for every instance an observed item is attached to.
+// ObserveItems records what src's open pass saw of root, in one write: the
+// root record and its evidence (deleted when nil), then each item's
+// sighting, claim and stamp in order. It refuses with ErrSourceInactive or
+// ErrPassUnknown, and with a plain error for a root ref of no media kind or
+// no id, evidence failing Validate or naming another TVDB series, an empty
+// or duplicate item id, or a video path neither empty nor absolute and
+// clean, writing nothing. Under a change batch it also queues Import work
+// for every instance an observed item is attached to.
 func (s *Store) ObserveItems(ctx context.Context, src media.SourceID, pass PassID, root mediasource.Root, items []mediasource.Item) error { //nolint:gocritic // hugeParam: the source facts are the caller's values
 	if err := checkReport(&root, items); err != nil {
 		return err
@@ -82,8 +82,8 @@ func checkNativeRef(r mediasource.NativeRef) error {
 	return nil
 }
 
-// itemKey keys an item (design 5.1): an episode by its series' ids and its
-// aired numbering, a movie by its own ids, each falling back to its root's.
+// itemKey keys an item: an episode by its series' ids and its aired
+// numbering, a movie by its own ids, each falling back to its root's.
 func itemKey(root *mediasource.Root, it *mediasource.Item) (media.Key, bool) {
 	if root.Native.Kind == media.Episode {
 		return media.Choose(media.Episode, root.External, it.Numbering)
@@ -159,8 +159,8 @@ func (o *observation) stamp(ref itemRef) error {
 }
 
 // observeItem stores one item's sighting: a claim that differs from the
-// stored one is released first, then the first of design 5.2's rules that
-// matches decides the new one.
+// stored one is released first, then the first claim rule that matches
+// decides the new one.
 func (o *observation) observeItem(ref itemRef, root *mediasource.Root, it *mediasource.Item) error {
 	old, had, err := o.s.t.sightings.Get(o.r, ref)
 	if err != nil {

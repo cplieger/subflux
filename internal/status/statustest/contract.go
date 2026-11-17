@@ -14,9 +14,14 @@ import (
 )
 
 // PersisterContract runs the behaviour status relies on against a fresh
-// persister from open per case, at DefaultLimits.
-func PersisterContract(t *testing.T, open func(t *testing.T) status.Persister) {
+// persister from open per case, at lim. It fails at once for a lim its cases
+// cannot fill: PerOwner must be even and at least 10, Total above PerOwner,
+// and Total/11+1 below PerOwner.
+func PersisterContract(t *testing.T, open func(t *testing.T) status.Persister, lim status.JobLimits) {
 	t.Helper()
+	if lim.PerOwner%2 != 0 || lim.PerOwner < concurrentRoom || lim.Total <= lim.PerOwner || lim.Total/11+1 >= lim.PerOwner {
+		t.Fatalf("limits %+v: the contract needs an even PerOwner of at least %d, a Total above it and Total/11+1 below it", lim, concurrentRoom)
+	}
 	cases := []struct {
 		run  func(t *testing.T, c *contract)
 		name string
@@ -40,7 +45,7 @@ func PersisterContract(t *testing.T, open func(t *testing.T) status.Persister) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.run(t, &contract{p: open(t), base: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)})
+			tc.run(t, &contract{p: open(t), lim: lim, base: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)})
 		})
 	}
 }
@@ -49,6 +54,7 @@ type contract struct {
 	base time.Time
 	p    status.Persister
 	n    atomic.Int64
+	lim  status.JobLimits
 }
 
 // job is a fresh record of owner, ended at base plus its sequence number in
@@ -74,7 +80,7 @@ func (c *contract) job(owner int64, key string, ended bool) status.Job {
 
 func (c *contract) insert(t *testing.T, j status.Job) status.Job { //nolint:gocritic // hugeParam: InsertJob takes the Job by value
 	t.Helper()
-	got, replayed, err := c.p.InsertJob(t.Context(), j, status.DefaultLimits)
+	got, replayed, err := c.p.InsertJob(t.Context(), j, c.lim)
 	if err != nil || replayed {
 		t.Fatalf("InsertJob(%s owner %d): replayed %v, %v; want stored", j.ID, j.Owner, replayed, err)
 	}
@@ -105,7 +111,7 @@ func (c *contract) present(t *testing.T, id status.JobID) bool {
 
 func (c *contract) refused(t *testing.T, j status.Job, want error) { //nolint:gocritic // hugeParam: InsertJob takes the Job by value
 	t.Helper()
-	if _, _, err := c.p.InsertJob(t.Context(), j, status.DefaultLimits); !errors.Is(err, want) {
+	if _, _, err := c.p.InsertJob(t.Context(), j, c.lim); !errors.Is(err, want) {
 		t.Fatalf("InsertJob(owner %d) = %v, want %v", j.Owner, err, want)
 	}
 	if c.present(t, j.ID) {
@@ -131,7 +137,7 @@ func (c *contract) unfinishedOf(t *testing.T, owner int64) int {
 const owner7 = int64(7)
 
 func endedKeyedRecordsMakeRoom(t *testing.T, c *contract) {
-	old := c.fill(t, owner7, status.DefaultLimits.PerOwner, true, true)
+	old := c.fill(t, owner7, c.lim.PerOwner, true, true)
 	fresh := c.insert(t, c.job(owner7, "fresh", false))
 	if c.present(t, old[0].ID) {
 		t.Error("the oldest-ended keyed record survived a fresh-key start at the bound")
@@ -142,7 +148,7 @@ func endedKeyedRecordsMakeRoom(t *testing.T, c *contract) {
 }
 
 func endedKeylessRecordMakesRoom(t *testing.T, c *contract) {
-	running := c.fill(t, owner7, status.DefaultLimits.PerOwner-1, true, false)
+	running := c.fill(t, owner7, c.lim.PerOwner-1, true, false)
 	ended := c.insert(t, c.job(owner7, "", true))
 	c.insert(t, c.job(owner7, "", false))
 	if c.present(t, ended.ID) {
@@ -154,24 +160,25 @@ func endedKeylessRecordMakesRoom(t *testing.T, c *contract) {
 }
 
 func unfinishedRefuses(t *testing.T, c *contract) {
-	c.fill(t, owner7, status.DefaultLimits.PerOwner/2, true, false)
-	c.fill(t, owner7, status.DefaultLimits.PerOwner/2, false, false)
+	c.fill(t, owner7, c.lim.PerOwner/2, true, false)
+	c.fill(t, owner7, c.lim.PerOwner/2, false, false)
 	c.refused(t, c.job(owner7, "", false), status.ErrJobCapacity)
 	c.refused(t, c.job(owner7, "next", false), status.ErrJobCapacity)
-	if n := c.unfinishedOf(t, owner7); n != status.DefaultLimits.PerOwner {
-		t.Errorf("%d unfinished records after refusals, want %d", n, status.DefaultLimits.PerOwner)
+	if n := c.unfinishedOf(t, owner7); n != c.lim.PerOwner {
+		t.Errorf("%d unfinished records after refusals, want %d", n, c.lim.PerOwner)
 	}
 	c.insert(t, c.job(owner7+1, "", false))
 }
 
-// fillUsers stores Total records across eleven user owners, none at its own
-// bound, the first ended when firstEnded is true.
+// fillUsers stores Total records across user owners from 1, Total/11+1 at
+// most each, so none is at its own bound and owner 11 has room; the first is
+// ended when firstEnded is true.
 func fillUsers(t *testing.T, c *contract, firstEnded bool) []status.Job {
 	t.Helper()
 	var all []status.Job
-	per := status.DefaultLimits.Total/11 + 1
-	for o := int64(1); len(all) < status.DefaultLimits.Total; o++ {
-		n := min(per, status.DefaultLimits.Total-len(all))
+	per := c.lim.Total/11 + 1
+	for o := int64(1); len(all) < c.lim.Total; o++ {
+		n := min(per, c.lim.Total-len(all))
 		ended := firstEnded && len(all) == 0
 		if ended {
 			all = append(all, c.insert(t, c.job(o, "", true)))
@@ -186,7 +193,7 @@ func totalEvictsAnyUsersOldestEnded(t *testing.T, c *contract) {
 	all := fillUsers(t, c, true)
 	c.insert(t, c.job(11, "", false))
 	if c.present(t, all[0].ID) {
-		t.Error("owner 11's start at the full Total kept owner 1's ended record")
+		t.Errorf("owner 11's start at the full Total of %d kept owner 1's ended record", c.lim.Total)
 	}
 }
 
@@ -203,10 +210,10 @@ func systemOwnerOutsideTotal(t *testing.T, c *contract) {
 
 func systemOwnerEvictsItsOwnOldest(t *testing.T, c *contract) {
 	user := c.insert(t, c.job(owner7, "", true))
-	sys := c.fill(t, status.SystemOwner, status.DefaultLimits.PerOwner, false, true)
+	sys := c.fill(t, status.SystemOwner, c.lim.PerOwner, false, true)
 	c.insert(t, c.job(status.SystemOwner, "", false))
 	if c.present(t, sys[0].ID) || !c.present(t, sys[1].ID) {
-		t.Error("the 1,001st system insert did not delete exactly its own oldest ended record")
+		t.Errorf("system insert %d did not delete exactly its own oldest ended record", c.lim.PerOwner+1)
 	}
 	if !c.present(t, user.ID) {
 		t.Error("a system insert deleted a user's older ended record")
@@ -214,22 +221,22 @@ func systemOwnerEvictsItsOwnOldest(t *testing.T, c *contract) {
 }
 
 func systemOwnerUnfinishedRefuses(t *testing.T, c *contract) {
-	c.fill(t, status.SystemOwner, status.DefaultLimits.PerOwner, false, false)
+	c.fill(t, status.SystemOwner, c.lim.PerOwner, false, false)
 	c.refused(t, c.job(status.SystemOwner, "", false), status.ErrJobCapacity)
 }
 
 func keyedResendAtFullTableReplays(t *testing.T, c *contract) {
 	ended := c.insert(t, c.job(owner7, "", true))
 	keyed := c.insert(t, c.job(owner7, "k", false))
-	c.fill(t, owner7, status.DefaultLimits.PerOwner-2, false, false)
+	c.fill(t, owner7, c.lim.PerOwner-2, false, false)
 	resend := c.job(owner7, "k", false)
 	resend.Key.Fingerprint = keyed.Key.Fingerprint
-	got, replayed, err := c.p.InsertJob(t.Context(), resend, status.DefaultLimits)
+	got, replayed, err := c.p.InsertJob(t.Context(), resend, c.lim)
 	if err != nil || !replayed || got.ID != keyed.ID {
 		t.Fatalf("resend = %s replayed %v, %v; want %s replayed", got.ID, replayed, err, keyed.ID)
 	}
 	other := c.job(owner7, "k", false)
-	if _, _, err := c.p.InsertJob(t.Context(), other, status.DefaultLimits); !errors.Is(err, status.ErrKeyReused) {
+	if _, _, err := c.p.InsertJob(t.Context(), other, c.lim); !errors.Is(err, status.ErrKeyReused) {
 		t.Errorf("another fingerprint = %v, want ErrKeyReused", err)
 	}
 	if !c.present(t, ended.ID) {
@@ -242,7 +249,7 @@ func keyedResendAtFullTableReplays(t *testing.T, c *contract) {
 
 func evictedKeyStartsAgain(t *testing.T, c *contract) {
 	first := c.insert(t, c.job(owner7, "k", true))
-	running := c.fill(t, owner7, status.DefaultLimits.PerOwner-1, false, false)
+	running := c.fill(t, owner7, c.lim.PerOwner-1, false, false)
 	c.insert(t, c.job(owner7, "", false))
 	if c.present(t, first.ID) {
 		t.Fatal("the ended keyed record survived a start at the bound")
@@ -254,15 +261,17 @@ func evictedKeyStartsAgain(t *testing.T, c *contract) {
 	}
 	again := c.job(owner7, "k", false)
 	again.Key.Fingerprint = first.Key.Fingerprint
-	got, replayed, err := c.p.InsertJob(t.Context(), again, status.DefaultLimits)
+	got, replayed, err := c.p.InsertJob(t.Context(), again, c.lim)
 	if err != nil || replayed || got.ID != again.ID {
 		t.Errorf("an evicted key's resend = %s replayed %v, %v; want the new job %s stored", got.ID, replayed, err, again.ID)
 	}
 }
 
+const concurrentRoom = 10
+
 func concurrentInsertsStoreExactlyTheBound(t *testing.T, c *contract) {
-	const room, racers = 10, 32
-	c.fill(t, owner7, status.DefaultLimits.PerOwner-room, false, false)
+	const room, racers = concurrentRoom, 32
+	c.fill(t, owner7, c.lim.PerOwner-room, false, false)
 	var wg sync.WaitGroup
 	var stored, refused atomic.Int32
 	for i := range racers {
@@ -272,7 +281,7 @@ func concurrentInsertsStoreExactlyTheBound(t *testing.T, c *contract) {
 		}
 		j := c.job(owner7, key, false)
 		wg.Go(func() {
-			_, _, err := c.p.InsertJob(context.WithoutCancel(t.Context()), j, status.DefaultLimits)
+			_, _, err := c.p.InsertJob(context.WithoutCancel(t.Context()), j, c.lim)
 			switch {
 			case err == nil:
 				stored.Add(1)
@@ -287,8 +296,8 @@ func concurrentInsertsStoreExactlyTheBound(t *testing.T, c *contract) {
 	if stored.Load() != room || refused.Load() != racers-room {
 		t.Errorf("%d stored, %d refused; want %d and %d", stored.Load(), refused.Load(), room, racers-room)
 	}
-	if n := c.unfinishedOf(t, owner7); n != status.DefaultLimits.PerOwner {
-		t.Errorf("%d records stored, want exactly %d", n, status.DefaultLimits.PerOwner)
+	if n := c.unfinishedOf(t, owner7); n != c.lim.PerOwner {
+		t.Errorf("%d records stored, want exactly %d", n, c.lim.PerOwner)
 	}
 }
 
@@ -298,7 +307,7 @@ func concurrentSameKeyOneWins(t *testing.T, c *contract) {
 	var wg sync.WaitGroup
 	for _, j := range []*status.Job{&a, &b} {
 		wg.Go(func() {
-			_, _, err := c.p.InsertJob(context.WithoutCancel(t.Context()), *j, status.DefaultLimits)
+			_, _, err := c.p.InsertJob(context.WithoutCancel(t.Context()), *j, c.lim)
 			errs <- err
 		})
 	}
@@ -323,7 +332,7 @@ func concurrentSameKeyOneWins(t *testing.T, c *contract) {
 func insertExistingIDFails(t *testing.T, c *contract) {
 	j := c.insert(t, c.job(owner7, "", false))
 	j.Key = nil
-	if _, _, err := c.p.InsertJob(t.Context(), j, status.DefaultLimits); err == nil {
+	if _, _, err := c.p.InsertJob(t.Context(), j, c.lim); err == nil {
 		t.Error("inserting an existing id succeeded")
 	}
 }

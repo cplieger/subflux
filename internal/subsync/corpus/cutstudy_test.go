@@ -136,7 +136,7 @@ func TestCorpusCutStudy(t *testing.T) {
 	}
 }
 
-// checkCut asserts AC19's bar for one cut-study run.
+// checkCut asserts the cut bar for one cut-study run.
 func checkCut(t *testing.T, r *caseRun, e cutExpect) {
 	t.Helper()
 	o := &r.out

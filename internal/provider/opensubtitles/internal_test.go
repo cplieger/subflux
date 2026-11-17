@@ -63,7 +63,7 @@ func TestIDParams(t *testing.T) {
 }
 
 // The answer's hearing_impaired and foreign_parts_only flags are independent:
-// languages design 3.2 makes every combination of HI and Forced valid.
+// every combination of HI and Forced is a valid variant.
 func TestCandidateFlags(t *testing.T) {
 	en := mustTag(t, "en")
 	for _, tc := range []struct {

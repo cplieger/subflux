@@ -226,7 +226,7 @@ func (s *Store) verifyDerived(ctx context.Context, repair bool, drift func(*bolt
 // coverageDrift lists, in key order, every key whose stored coverage row
 // differs from the recompute under a: an item record's wanted row, or none
 // for a key with no item record. Items of ownerless instances keep their
-// rows (design section 6), and locks are never touched.
+// rows, and locks are never touched.
 func (s *Store) coverageDrift(r *bolttable.ReadTx, a *activation) ([]rowFix[media.Key, coverageRow], error) {
 	stored := map[media.Key]coverageRow{}
 	if err := s.t.coverage.Scan(r, bolttable.Range{}, func(k media.Key, row *coverageRow) (bool, error) {

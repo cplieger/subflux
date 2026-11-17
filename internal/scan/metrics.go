@@ -8,8 +8,8 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
-// metrics are a Scanner's series (design 5.1). Their names carry no
-// subflux_ prefix: obs's registry adds it.
+// metrics are a Scanner's series. Their names carry no subflux_ prefix:
+// obs's registry adds it.
 type metrics struct {
 	lastComplete  *measure.LabeledGauge
 	wholeInterval *measure.Gauge

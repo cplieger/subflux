@@ -35,10 +35,10 @@ func compareStanding(a, b standing) int {
 	)
 }
 
-// compareRank is design section 4's key, negative when a ranks before b:
-// the standing, then the tie-breaks (rate not differing, the same service,
-// the same cut, one episode before a season pack, provider priority, then
-// id, then the provider's own order).
+// compareRank is the rank key, negative when a ranks before b: the standing,
+// then the tie-breaks (rate not differing, the same service, the same cut,
+// one episode before a season pack, provider priority, then id, then the
+// provider's own order).
 func compareRank(a, b *judged) int {
 	return cmp.Or(
 		compareStanding(a.standing, b.standing),

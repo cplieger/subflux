@@ -12,8 +12,8 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
-// TestAC7 holds the architecture's AC7 storage cases (storage requirement
-// 8), each a subtest here or the per-task test that pins it.
+// TestAC7 holds the storage acceptance cases for instance identity, keys,
+// passes and history, each a subtest here or the test that pins it.
 func TestAC7(t *testing.T) {
 	t.Run("double-episode file stays one instance over two passes", func(t *testing.T) {
 		s, _ := newLibrary(t, "sonarr")
@@ -332,8 +332,9 @@ func TestAC7(t *testing.T) {
 	t.Run("a re-enqueue during a run survives its acknowledgement", TestReenqueueDuringRunSurvivesAck)
 }
 
-// TestAC8 holds the architecture's AC8 storage cases (storage requirement
-// 9), each a subtest here or the per-task test that pins it.
+// TestAC8 holds the storage acceptance cases for coverage, what a write
+// publishes and the stored codecs, each a subtest here or the test that pins
+// it.
 func TestAC8(t *testing.T) {
 	en := policyOf(t, "en")
 	t.Run("embedded English SRT covers en", func(t *testing.T) {

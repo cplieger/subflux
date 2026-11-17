@@ -447,7 +447,7 @@ func TestJimakuEntryBound(t *testing.T) {
 }
 
 // TestJimakuLaterListFails: a file list failing after another was read
-// returns the candidates read with its failure (design 5.1).
+// returns the candidates read with its failure.
 func TestJimakuLaterListFails(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		s := &site{routes: map[string]string{"/api/entries/4464/files": "files-7742.json"}}

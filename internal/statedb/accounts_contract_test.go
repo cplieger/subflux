@@ -13,7 +13,7 @@ import (
 	"github.com/cplieger/bolttable"
 )
 
-// durabilityFault is design 9's BeforePublish: arming it makes the next
+// durabilityFault is the store's BeforePublish hook: arming it makes the next
 // write call claim the fault through its call token, and bolttable asks the
 // hook on every run of that call, so every rerun db.Batch makes fails too.
 type durabilityFault struct {

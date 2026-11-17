@@ -78,8 +78,8 @@ func TestFitOfTable(t *testing.T) {
 	}
 }
 
-// sourceNames holds one movie name per source, by the family the search
-// design's table gives it.
+// sourceNames holds one movie name per source, by the family release
+// classifies it under.
 var sourceNames = map[release.Family][]string{
 	release.Disc: {"Movie.2010.1080p.BluRay.x264-GRP", "Movie.2010.1080p.REMUX-GRP", "Movie.2010.720p.BDRip-GRP", "Movie.2010.BRRip-GRP"},
 	release.Web:  {"Movie.2010.1080p.WEB-DL-GRP", "Movie.2010.1080p.WEBRip-GRP"},

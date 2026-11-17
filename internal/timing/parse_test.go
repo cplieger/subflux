@@ -53,7 +53,7 @@ var srtEvents = []timing.Event{
 	ev(5250, 7000, "See you tomorrow.", ""),
 }
 
-// accepted is every AC2 fixture ParseCues reads, with its format.
+// accepted is every fixture ParseCues reads, with its format.
 var accepted = []struct {
 	file   string
 	format timing.Format
@@ -434,7 +434,7 @@ func TestCueCodecRoundTrip(t *testing.T) {
 	}
 }
 
-// TestCueCodecGolden pins the stored layout and SE-1's Encoding value for
+// TestCueCodecGolden pins the stored layout and the Encoding value for
 // UTF-8 (1): a renumbered Encoding or a layout change fails here.
 func TestCueCodecGolden(t *testing.T) {
 	t.Parallel()

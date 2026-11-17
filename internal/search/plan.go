@@ -232,8 +232,8 @@ func (r *run) readSeries(ctx context.Context, e *Engine) error {
 const rootItemsPage = 500
 
 // heldBack reports whether a run of cause plans nothing for the instance:
-// an automatic one while an item is excluded (CR-MS-5) or the video's
-// directory refuses writes (CR-TS-14); a user's run ignores both.
+// an automatic one while an item is excluded or the video's directory
+// refuses writes; a user's run ignores both.
 func heldBack(cause statedb.WorkCause, items []runItem, unwritable bool) bool {
 	return cause != statedb.Item && (unwritable || slices.ContainsFunc(items, func(it runItem) bool { return it.item.Excluded }))
 }

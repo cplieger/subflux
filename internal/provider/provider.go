@@ -18,7 +18,7 @@ import (
 )
 
 // ProviderID names one provider in settings, state and the wire.
-type ProviderID string //nolint:revive // design 5's name; provider.ID would read as a provider's own id field
+type ProviderID string //nolint:revive // provider.ID would read as a provider's own id field
 
 // Entry is one row of the provider table.
 type Entry struct {
@@ -159,6 +159,6 @@ const maxSkipCause = 120
 // query lacks what it searches by. Cause is one English line naming what it
 // lacks. The wrapper passes it through when no request was sent and makes it
 // Permanent otherwise.
-type Skipped struct{ Cause string } //nolint:errname // design 5 names it Skipped: a search not sent, not a fault
+type Skipped struct{ Cause string } //nolint:errname // a search not sent, not a fault
 
 func (s *Skipped) Error() string { return "skipped: " + s.Cause }

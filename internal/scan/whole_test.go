@@ -16,7 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/status"
 )
 
-// backoffs is design 5.1's whole-pass retry wait: one minute doubling to 30.
+// backoffs is the whole-pass retry wait: one minute doubling to 30.
 var backoffs = []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 30 * time.Minute, 30 * time.Minute}
 
 func TestWholePassFailsOnSourceOutage(t *testing.T) {

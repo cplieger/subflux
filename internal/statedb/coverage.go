@@ -111,10 +111,10 @@ func (s *Store) recomputeInstance(tx *bolttable.Tx, a *activation, id InstanceID
 }
 
 // recomputeKey rewrites k's coverage row from its sighting's languages and
-// its instance's evidence (design section 6), and deletes k's locks on
-// pairs a no longer configures. With inventory, the recompute of a
-// PutExternal or a landed End, it also deletes locks no evidence can serve
-// once the instance's inventory is complete.
+// its instance's evidence, and deletes k's locks on pairs a no longer
+// configures. With inventory, the recompute of a PutExternal or a landed
+// End, it also deletes locks no evidence can serve once the instance's
+// inventory is complete.
 func (s *Store) recomputeKey(tx *bolttable.Tx, a *activation, k media.Key, inventory bool) error {
 	j, found, err := s.judgeKey(tx.Read(), a, k)
 	if err != nil || !found || j.ownerless {

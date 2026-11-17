@@ -17,8 +17,8 @@ type AuthMethodState struct {
 	PasswordLogin    bool
 }
 
-// SignInKeys are the other sign-in settings platform-auth's security-log
-// entries compare. OIDCClientSecret is the secret's SHA-256, zero when it is
+// SignInKeys are the other sign-in settings the security-log entries
+// compare. OIDCClientSecret is the secret's SHA-256, zero when it is
 // empty, never the secret.
 type SignInKeys struct {
 	OIDCClientID, OIDCRedirectURL     string
@@ -90,7 +90,7 @@ func MethodStateOf(ctx context.Context, tx account.Tx) (AuthMethodState, bool, e
 	return AuthMethodState{}, false, errForeignTx
 }
 
-// guardAndWrite is design 5.4's auth step inside x: when next differs from
+// guardAndWrite is the activation's auth step inside x: when next differs from
 // the stored row, guard judges both records whole in x, then the row is
 // written; an equal row writes nothing and calls no guard.
 func guardAndWrite(ctx context.Context, x *accountTx, next *AuthMethodState, guard MethodGuard) error {
@@ -108,11 +108,11 @@ func guardAndWrite(ctx context.Context, x *accountTx, next *AuthMethodState, gua
 	return x.s.a.methodState.Put(x.tx, constKey{}, &row)
 }
 
-// ActivateAuth is the auth half of a boot that is not Active (design 5.4):
-// one Update that calls guard and writes auth as Activate's does with
-// Activation.Auth set, and writes no source, coverage or digest row and
-// installs no activation, so the first Activate after Open still recomputes
-// coverage. An auth equal to table 2B's row commits nothing.
+// ActivateAuth is the auth half of a boot that is not Active: one Update
+// that calls guard and writes auth as Activate's does with Activation.Auth
+// set, and writes no source, coverage or digest row and installs no
+// activation, so the first Activate after Open still recomputes coverage. An
+// auth equal to table 2B's row commits nothing.
 func (s *Store) ActivateAuth(ctx context.Context, auth AuthMethodState, guard MethodGuard) error { //nolint:gocritic // hugeParam: records travel as values, as MethodGuard's do
 	if guard == nil {
 		return errNoGuard

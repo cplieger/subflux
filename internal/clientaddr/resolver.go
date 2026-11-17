@@ -1,7 +1,6 @@
 // Package clientaddr resolves a request's client address against
-// trusted_proxies, decides whether that client is local (DECISIONS 42)
-// and watches for public exposure (DECISIONS 18). It imports no subflux
-// package.
+// trusted_proxies, decides whether that client is local and watches for
+// public exposure. It imports no subflux package.
 package clientaddr
 
 import (
@@ -28,11 +27,11 @@ func (r Resolver) Client(req *http.Request) access.ClientAddr {
 	return addrOf(r.resolve(req))
 }
 
-// Local reports whether c is a local client (DECISIONS 42): it reached
-// subflux directly (ViaDirect), from a loopback or private peer, an
-// IPv4-mapped one read as IPv4, that forwarder does not name as one of the
-// host's own forwarders. A forwarded address is never local, whatever
-// trusted_proxies lists. A nil forwarder makes no client local.
+// Local reports whether c is a local client: it reached subflux directly
+// (ViaDirect), from a loopback or private peer, an IPv4-mapped one read as
+// IPv4, that forwarder does not name as one of the host's own forwarders. A
+// forwarded address is never local, whatever trusted_proxies lists. A nil
+// forwarder makes no client local.
 func Local(c access.ClientAddr, forwarder func(netip.Addr) bool) bool {
 	if c.Via != access.ViaDirect || forwarder == nil {
 		return false

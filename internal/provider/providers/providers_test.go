@@ -24,8 +24,8 @@ import (
 // foreign is a host no entry lists.
 const foreign = "foreign.example.test"
 
-// wantHosts is design 5.4's table with the download-link hosts the
-// 2026-11-06 capture recorded.
+// wantHosts is each provider's allowed hosts, the download-link hosts the
+// 2026-11-06 capture recorded included.
 var wantHosts = map[provider.ProviderID][]string{
 	"animetosho":    {"feed.animetosho.net", "storage.animetosho.net", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"},
 	"assrt":         {"api.assrt.net", "file0.assrt.net"},

@@ -12,7 +12,7 @@ import (
 	"github.com/cplieger/subflux/internal/status"
 )
 
-// The batch's bounds (design 5.2).
+// The batch's bounds.
 const (
 	rootTimeout = 60 * time.Second
 	// batchFailBudget is the consecutive root failures, under a source that

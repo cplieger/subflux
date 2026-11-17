@@ -315,7 +315,7 @@ type FactsDoc struct {
 	PreRelease bool     `json:"pre_release"`
 	SeasonPack bool     `json:"season_pack"`
 	// EpisodeByNumber: a pack member chosen by its number alone, so its
-	// timing ran as the guard (search design 8.11).
+	// timing ran as the guard.
 	EpisodeByNumber bool `json:"episode_by_number"`
 }
 

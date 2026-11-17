@@ -22,7 +22,7 @@ import (
 // TestCorpusOS2024 runs OpenSubtitles2024's multilingual test set (Tiedemann
 // and Luo 2026, LREC; https://www.opensubtitles.org/) in OS2024_DIR, each
 // language's subtitle against the English one of its movie, through the
-// production aligner, audio_fallback off then on: AC19's fitting-set bars.
+// production aligner, audio_fallback off then on: the fitting-set bars.
 // Its sentence alignments, synchronised across every language, stand in for
 // the harness's text oracle.
 func TestCorpusOS2024(t *testing.T) {

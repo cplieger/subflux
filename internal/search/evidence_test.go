@@ -82,7 +82,7 @@ func TestOneProviderEmptyOthersStillAsked(t *testing.T) {
 	})
 }
 
-// attemptKey is CR-SE-7's attempt key of a candidate.
+// attemptKey is a candidate's attempt key: its provider and ref token.
 func attemptKey(id provider.ProviderID, c *provider.Candidate) [32]byte {
 	return sha256.Sum256([]byte(keyenc.Join(string(id), c.Ref.Token())))
 }

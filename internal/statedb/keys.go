@@ -11,9 +11,9 @@ import (
 	"github.com/cplieger/subflux/internal/mediasource"
 )
 
-// Key components (design section 4). Every component is fixed-width or
-// length-prefixed, its last included, so a prefix scan over one component
-// never reaches a longer one: session s1 never prefixes s10.
+// Key components. Every component is fixed-width or length-prefixed, its
+// last included, so a prefix scan over one component never reaches a longer
+// one: session s1 never prefixes s10.
 
 // signFlip maps a signed or time value onto uint64 so big-endian byte order
 // is numeric order: BypassOwner (-1) sorts before SystemOwner (0).

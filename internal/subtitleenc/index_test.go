@@ -26,7 +26,7 @@ type pointerRule struct {
 	written   func(pointer int) bool
 	takesLast map[rune]bool
 	// keepsUnwritten: a character only excluded pointers hold keeps its
-	// first code, where the standard writes it nowhere (design 7).
+	// first code, where the standard writes it nowhere.
 	keepsUnwritten bool
 }
 
@@ -149,8 +149,8 @@ func TestEncodeWritesTheStandardCode(t *testing.T) {
 }
 
 // TestEncodeStandardRows pins codes read off the standard's index files
-// (index-big5.txt and index-jis0208.txt, 2024-09-18) and the departures
-// design 7 records.
+// (index-big5.txt and index-jis0208.txt, 2024-09-18) and the package's
+// recorded departures from them.
 func TestEncodeStandardRows(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {

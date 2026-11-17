@@ -74,7 +74,7 @@ func TestResyncSkipsUnverified(t *testing.T) {
 }
 
 func TestResyncSkipsWhenAudioPlacesNothing(t *testing.T) {
-	video := episode(48, 150)
+	video := episode(48, 60)
 	r := newRig(t)
 	withReference(t, map[int][]byte{2: srt(video)}, japanese)
 	// Speech 400 s late sits past every offset limit.

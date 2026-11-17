@@ -17,8 +17,8 @@ import (
 var errInjected = errors.New("injected commit fault")
 
 // commitFault fails every run of the latest write call whose context
-// carries failThis, the way section 9's durability fault claims a call
-// through its token.
+// carries failThis: it claims the call by its callToken, so bbolt's reruns
+// of that call fail too.
 type commitFault struct {
 	claimed atomic.Pointer[callToken]
 	err     error

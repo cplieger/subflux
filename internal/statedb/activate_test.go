@@ -193,11 +193,11 @@ func getRow[K, V any](t *testing.T, s *Store, tb *bolttable.Table[K, V], k K) (V
 	return v, found
 }
 
-// removalFixture is the library design 5.4's source removal acts on:
-// sonarr's root holds an attached item (k1), a no-video item no one else
-// reports (k2) and a no-video item (k3) radarr reports twice, with a video
-// and without; radarr has overlaps naming sonarr and another owner, and an
-// instance of its own.
+// removalFixture is the library a source removal acts on: sonarr's root
+// holds an attached item (k1), a no-video item no one else reports (k2) and
+// a no-video item (k3) radarr reports twice, with a video and without;
+// radarr has overlaps naming sonarr and another owner, and an instance of
+// its own.
 type removalFixture struct {
 	k1, k2, k3     media.Key
 	sonarrRoot     rootRef

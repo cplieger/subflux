@@ -29,8 +29,7 @@ type importRule struct {
 	production   bool
 }
 
-// importRules is the architecture's confinement table; each row lands with
-// the landing that turns it on.
+// importRules is the package confinement table.
 var importRules = []importRule{
 	releaseRule(modulePath),
 	dialhookRule(modulePath),

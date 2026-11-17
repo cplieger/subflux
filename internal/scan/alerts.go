@@ -14,11 +14,11 @@ import (
 // no longer holds. It leaves source:<id> as it was.
 var errNoVerdict = errors.New("scan: the tick reached no verdict")
 
-// reconcileSource sets source:<id> after a tick (design 5.4): raised while
-// the tick ended on a *SourceError other than Expired, while the latest
-// whole pass failed on one and none has completed since, or while a root
-// waits in the retry set. A tick ending on a storage error or a cancel
-// neither raises nor clears it.
+// reconcileSource sets source:<id> after a tick: raised while the tick ended
+// on a *SourceError other than Expired, while the latest whole pass failed
+// on one and none has completed since, or while a root waits in the retry
+// set. A tick ending on a storage error or a cancel neither raises nor
+// clears it.
 func (l *loop) reconcileSource(tickErr error) {
 	var cause *mediasource.SourceError
 	if tickErr != nil {

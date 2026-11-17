@@ -390,7 +390,7 @@ func TestSiblingPairs(t *testing.T) {
 	})
 }
 
-// TestReadPage pins design 7's refusal step on single pages: a C1 control,
+// TestReadPage pins the refusal step on single pages: a C1 control,
 // KOI8-R's box characters where KOI8-U has letters, and bytes Encode would
 // not write back.
 func TestReadPage(t *testing.T) {

@@ -19,9 +19,8 @@ type cutCase struct {
 
 const noTruth = -1
 
-// The research's fit (reference-sync-research.md section 6): a mapping
-// places a candidate when 90% of its truth-bearing spans land within
-// 600 ms.
+// A mapping places a candidate when at least placedShare of its
+// truth-bearing spans land within placedTolMs.
 const (
 	placedTolMs = 600
 	placedShare = 0.9
@@ -82,7 +81,7 @@ var thinLevels = []float64{0, 0.5, 0.59}
 // refused, or placed unless mustRefuse, and at the reference thinned to each
 // of thinLevels, where a Verified delivery must be placed and anything else
 // is refused or Identity, Unverified: a reference too weak to judge the
-// candidate, G4-23's residual.
+// candidate.
 func guardCut(t *testing.T, c cutCase, mustRefuse bool) {
 	t.Helper()
 	whole, err := AlignReference(t.Context(), c.video, c.inc, MaxModel)

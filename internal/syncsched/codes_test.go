@@ -115,8 +115,8 @@ func (p *refusing) InsertJob(context.Context, status.Job, status.JobLimits) (sta
 }
 
 // TestCodesCoverFailureTable drives each failure arm of the api-called
-// exports and wants the code design section 10 and api's owner table give
-// it; a caller bug (no method, an empty batch) is api's to refuse first.
+// exports and wants the code its sentinel maps to; a caller bug (no method,
+// an empty batch) is api's to refuse first.
 func TestCodesCoverFailureTable(t *testing.T) {
 	type arm struct {
 		run  func(t *testing.T) error

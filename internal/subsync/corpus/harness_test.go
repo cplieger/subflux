@@ -26,7 +26,7 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// The harness bar (AC19): the study's 1,540 of 1,657 truth-defined cases
+// The harness bar: the study's 1,540 of 1,657 truth-defined cases
 // placed at upTo ModelPiecewise, as a share when the rebuilt set defines
 // another count.
 const (
@@ -84,7 +84,7 @@ func digest(b []byte) string {
 
 // TestCorpusHarness runs the reference-sync harness (the study's synthetic
 // kinds over the anime set the manifest pins, in STUDY_DIR) through the
-// production aligner, audio_fallback off then on: AC19's fitting-set bars,
+// production aligner, audio_fallback off then on: the fitting-set bars,
 // and the piecewise model's mapping correct on the harness bar's share.
 func TestCorpusHarness(t *testing.T) {
 	dir := requireEnv(t, "STUDY_DIR", "the harness set's directory, filled from the manifest when empty")

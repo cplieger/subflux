@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/subflux/internal/testchild"
 )
 
 // The cap tests decode hostile headers in a child process: an uncapped
@@ -96,7 +97,7 @@ func runCaps(t *testing.T, name string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), capsCaseEnv+"="+name)
+	cmd.Env = append(os.Environ(), capsCaseEnv+"="+name, "GORACE="+testchild.GORACE())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

@@ -159,7 +159,7 @@ func TestKeyRedactedInErrors(t *testing.T) {
 	}
 }
 
-// TestClassifyDecodeFailureProtocol pins design 4.3's decode row: an
+// TestClassifyDecodeFailureProtocol pins the decode classification: an
 // accepted answer arrapi cannot decode is the server answering outside its
 // API, while a source that never answered stays Unreachable.
 func TestClassifyDecodeFailureProtocol(t *testing.T) {
