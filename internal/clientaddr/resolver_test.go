@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/access"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 )
 
 const proxyAddr = "10.0.0.2"

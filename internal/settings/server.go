@@ -2,11 +2,12 @@ package settings
 
 import (
 	"log/slog"
+	"net/http"
 	"net/netip"
 	"slices"
 	"strings"
 
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/subflux/internal/formschema"
 	"go.yaml.in/yaml/v4"
 )
@@ -170,13 +171,29 @@ func parseProxy(e string) (netip.Prefix, bool) {
 	return netip.Prefix{}, false
 }
 
-// hostPolicy is ParseHostList over entries, answering a refused Host 403
-// host_not_allowed and logging it through processLogger, and the canonical
-// hosts it accepted, once each in file order: the keys its policy matches, a
-// port dropped.
+// hostRemediation is what a refused Host's caller does next.
+const hostRemediation = "Open subflux at a host server.allowed_hosts lists, or add this host to it."
+
+// refuseHost is the host policy's ErrorResponder: httpserver's envelope with
+// subflux's remediation, the request id and X-Request-ID by WriteError's rule.
+func refuseHost(w http.ResponseWriter, r *http.Request, status int, code httpserver.ErrorCode, msg string) {
+	id := httpserver.RequestIDFromContext(r.Context())
+	if id == "" {
+		id = httpserver.NewRequestID()
+	}
+	if w.Header().Get(httpserver.HeaderRequestID) == "" {
+		w.Header().Set(httpserver.HeaderRequestID, id)
+	}
+	httpserver.WriteJSONStatus(w, status, httpserver.ErrorResponse{Code: code, Message: msg, Remediation: hostRemediation, RequestID: id})
+}
+
+// hostPolicy is ParseHostList over entries, answering a refused Host through
+// refuseHost and logging it through processLogger, and the canonical hosts it
+// accepted, once each in file order: the keys its policy matches, a port
+// dropped.
 func hostPolicy(entries []string, loopbackExempt bool) (policy *httpserver.HostPolicy, allowed []string) {
 	policy, _ = httpserver.ParseHostList(entries,
-		httpserver.WithHostAllowlistError("host_not_allowed", "This host is not listed in server.allowed_hosts."),
+		httpserver.WithHostResponder(refuseHost),
 		httpserver.WithHostAllowlistLogger(processLogger),
 		httpserver.WithLoopbackExempt(loopbackExempt))
 	for _, e := range entries {

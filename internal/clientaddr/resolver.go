@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/access"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 )
 
 // Resolver is one trusted-proxy list; its zero value trusts no proxy.

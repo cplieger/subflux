@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	publicAddr   = "203.0.113.7"
+	publicAddr   = "9.9.9.9"
 	exposureWarn = "clientaddr: a public client reached subflux; see docs/hardening.md"
 	peerWarn     = "clientaddr: ignored forwarding headers from a peer not in trusted_proxies"
 )
@@ -54,6 +54,9 @@ func TestExposureDetector(t *testing.T) {
 		{"zoned IPv4-mapped peer inside the list is not a listed TLS proxy", New(listedProxy), request("[::ffff:"+proxyAddr+"%eth0]:80", "X-Forwarded-For", publicAddr, "X-Forwarded-Proto", "https"), []Reason{NoTrustedProxies}},
 		{"private client with no trusted proxies", New(nil), request("192.168.1.5:5000"), nil},
 		{"listed proxy forwarding a private client", New(listedProxy), request(proxyAddr+":80", "X-Forwarded-For", "192.168.1.9"), nil},
+		{"shared-address client with no trusted proxies", New(nil), request("100.64.0.1:5000"), nil},
+		{"documentation-range client with no trusted proxies", New(nil), request("203.0.113.7:5000"), nil},
+		{"unlisted plain proxy forwarding a shared-address client", New(listedProxy), request("172.17.0.1:80", "X-Real-IP", "100.64.0.1"), nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

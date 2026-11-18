@@ -56,9 +56,13 @@ type fakes struct {
 	calls   []string
 	options []statedb.InspectOptions
 	mu      sync.Mutex
+	panics  bool
 }
 
 func (f *fakes) record(format string, a ...any) error {
+	if f.panics {
+		panic("fake: " + format)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, fmt.Sprintf(format, a...))
@@ -217,11 +221,18 @@ func TestServerRefusals(t *testing.T) {
 	t.Run("a backend failure is internal and logged", func(t *testing.T) {
 		path, rec := served(t, &fakes{err: errors.New("disk on fire")})
 		_, err := Call(t.Context(), path, &Request{Command: SetupToken})
-		if e, ok := errors.AsType[*Error](err); !ok || e.Code != "internal" || strings.Contains(e.Message, "disk") {
+		if e, ok := errors.AsType[*Error](err); !ok || e.Code != "internal_error" || strings.Contains(e.Message, "disk") {
 			t.Errorf("Call: %v, want an internal Error naming no cause", err)
 		}
 		if !rec.AttrContains("adminsock: command failed", "error", "disk on fire") {
 			t.Error("the cause was not logged")
+		}
+	})
+	t.Run("a panicking command is httpserver's internal_error", func(t *testing.T) {
+		path, _ := served(t, &fakes{panics: true})
+		_, err := Call(t.Context(), path, &Request{Command: SetupToken})
+		if e, ok := errors.AsType[*Error](err); !ok || e.Code != "internal_error" || e.Message != "internal error" {
+			t.Errorf("Call: %v, want the Recoverer's internal_error envelope", err)
 		}
 	})
 	t.Run("a store refusal is answered with its text", func(t *testing.T) {

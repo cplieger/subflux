@@ -14,8 +14,6 @@ github.com/cplieger/go/health/v2 v2.0.0 h1:WHZiSYIyvmaFvkohJopPptEg9oW4QxRSV5HUx
 github.com/cplieger/go/health/v2 v2.0.0/go.mod h1:Dmp78r+0ZHF2xMfOQqZ7c5pBiZF1el3QhLHA1y9um2A=
 github.com/cplieger/go/httpclient v1.2.0 h1:E+lbIpiNkUkcq3fxdMDYn116cwx6tU1XWmn4mDdBGU0=
 github.com/cplieger/go/httpclient v1.2.0/go.mod h1:couTQSCNdgNwOotbaQREGcM4CjUKZJ4Bdb7FSkNwL8U=
-github.com/cplieger/go/httpserver v1.5.0-dev.2 h1:PXRoXCN/C9CSHG/jx8lX7VNSndNwi4B1PHw4JHxvWzw=
-github.com/cplieger/go/httpserver v1.5.0-dev.2/go.mod h1:MuZxKRRjQG6DAJBO88cTGhVdhSCmBu2PMeA/DWRbiTQ=
 github.com/cplieger/go/httpserver/v2 v2.0.0-dev.2 h1:+2YJgMbhNdKNaoKpH8WUiDU6z7B8m7Wrse7hJstWwWg=
 github.com/cplieger/go/httpserver/v2 v2.0.0-dev.2/go.mod h1:PXbsccAdaii0N0nGgrMfYqEtEBPbCQkbEe32vmEmWIc=
 github.com/cplieger/go/jsonx v1.1.0 h1:/XBHr3vJVqKYVDteO8cZEMAdTgmT3Df/SeyNw1pdak8=

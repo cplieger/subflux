@@ -12,7 +12,7 @@ import (
 
 	"github.com/cplieger/access"
 	"github.com/cplieger/access/account"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/formschema"
@@ -229,7 +229,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, req *Request, err 
 	if r.Context().Err() == nil {
 		s.deps.Logger.Error("adminsock: command failed", "command", req.Command.String(), "error", err)
 	}
-	writeJSON(w, http.StatusInternalServerError, &Error{Code: "internal", Message: "the command failed; the server log names why"})
+	writeJSON(w, http.StatusInternalServerError, &Error{Code: "internal_error", Message: "the command failed; the server log names why"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
