@@ -8,11 +8,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/app"
 	"github.com/cplieger/subflux/internal/testchild"
+	"github.com/cplieger/subflux/internal/testrig"
 )
 
 func swapRunApp(t *testing.T, f func(context.Context, app.Config) error) {
@@ -38,6 +40,14 @@ func TestMainExitsOneOnRunError(t *testing.T) {
 	if got.Paths != app.DefaultPaths {
 		t.Errorf("booted with %+v, want the default paths", got.Paths)
 	}
+	for value, want := range map[string]string{"": ":8375", " 127.0.0.1:9375\t": "127.0.0.1:9375"} {
+		t.Setenv("OPS_LISTEN_ADDR", value)
+		_ = run(nil, nil, &stdout, &stderr)
+		if got.OpsAddr != want {
+			t.Errorf("OPS_LISTEN_ADDR %q booted with OpsAddr %q, want %q", value, got.OpsAddr, want)
+		}
+	}
+	stderr.Reset()
 
 	swapRunApp(t, func(context.Context, app.Config) error { return nil })
 	if code := run(nil, nil, &stdout, &stderr); code != 0 {
@@ -60,21 +70,24 @@ func TestMainExitsOneOnRunError(t *testing.T) {
 }
 
 // TestHealthHelper is the health subcommand's process when the parent test
-// sets SUBFLUX_HEALTH_HELPER to a listen address.
+// sets SUBFLUX_HEALTH_HELPER to a data directory, which it points every path
+// at, and OPS_LISTEN_ADDR to the address to probe.
 func TestHealthHelper(t *testing.T) {
-	addr := os.Getenv("SUBFLUX_HEALTH_HELPER")
-	if addr == "" {
-		t.Skip("run as TestHealthSubcommand's child")
+	dir := os.Getenv("SUBFLUX_HEALTH_HELPER")
+	if dir == "" {
+		t.Skip("run as TestHealthProbe's child")
 	}
-	healthAddr = addr
+	paths = app.Paths{Config: filepath.Join(dir, "config.yaml"), Store: filepath.Join(dir, "subflux.bolt"), SocketDir: dir, Socket: filepath.Join(dir, "admin.sock")}
 	os.Args = []string{"subflux", "health"}
 	main()
 }
 
-func TestHealthSubcommand(t *testing.T) {
-	probe := func(addr string) (int, string) {
+func TestHealthProbe(t *testing.T) {
+	probe := func(t *testing.T, addr string) (int, string) {
+		t.Helper()
+		dir := t.TempDir()
 		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHealthHelper$")
-		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+addr, "GORACE="+testchild.GORACE())
+		cmd.Env = append(os.Environ(), "SUBFLUX_HEALTH_HELPER="+dir, "OPS_LISTEN_ADDR="+addr, "GORACE="+testchild.GORACE())
 		var stderr strings.Builder
 		cmd.Stderr = &stderr
 		err := cmd.Run()
@@ -82,35 +95,55 @@ func TestHealthSubcommand(t *testing.T) {
 		if err != nil && !errors.As(err, &exit) {
 			t.Fatal(err)
 		}
+		if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+			t.Errorf("health touched the data directory: %v, %v", entries, err)
+		}
 		return cmd.ProcessState.ExitCode(), stderr.String()
 	}
-	serve := func(code int) string {
+	t.Run("serving", func(t *testing.T) {
+		r := testrig.Start(t, testrig.Options{})
+		if code, stderr := probe(t, r.OpsAddr); code != 0 || stderr != "" {
+			t.Errorf("health = %d, %q; want 0 and no output", code, stderr)
+		}
+	})
+	t.Run("settings_failed", func(t *testing.T) {
+		r := testrig.Start(t, testrig.Options{Config: []byte("server:\n  log_level: info\n")})
+		if code, stderr := probe(t, r.OpsAddr); code != 1 || !strings.Contains(stderr, "503") {
+			t.Errorf("health = %d, %q; want 1 naming the 503", code, stderr)
+		}
+	})
+	t.Run("draining", func(t *testing.T) {
+		r, release := testrig.StartDraining(t)
+		defer release()
+		if code, stderr := probe(t, r.OpsAddr); code != 1 || !strings.Contains(stderr, "503") {
+			t.Errorf("health while draining = %d, %q; want 1 naming the 503", code, stderr)
+		}
+	})
+	t.Run("closed_listener", func(t *testing.T) {
+		ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		closed := ln.Addr().String()
+		_ = ln.Close()
+		if code, stderr := probe(t, closed); code != 1 || stderr == "" {
+			t.Errorf("health with nothing listening = %d, %q; want 1 with a reason", code, stderr)
+		}
+	})
+	t.Run("address_refused", func(t *testing.T) {
+		if code, stderr := probe(t, "no-port"); code != 1 || !strings.Contains(stderr, `OPS_LISTEN_ADDR "no-port"`) {
+			t.Errorf("health on a bad address = %d, %q; want 1 naming the setting and address", code, stderr)
+		}
+	})
+	t.Run("probes_healthz", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/api/health" {
+			if r.URL.Path != "/healthz" {
 				http.NotFound(w, r)
-				return
 			}
-			w.WriteHeader(code)
 		}))
 		t.Cleanup(srv.Close)
-		return srv.Listener.Addr().String()
-	}
-	if code, stderr := probe(serve(http.StatusOK)); code != 0 || stderr != "" {
-		t.Errorf("health against a 200 = %d, %q; want 0 and no output", code, stderr)
-	}
-	if code, stderr := probe(serve(http.StatusServiceUnavailable)); code != 1 || !strings.Contains(stderr, "503") {
-		t.Errorf("health against a 503 = %d, %q; want 1 naming the status", code, stderr)
-	}
-	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	closed := ln.Addr().String()
-	_ = ln.Close()
-	if code, stderr := probe(closed); code != 1 || stderr == "" {
-		t.Errorf("health with nothing listening = %d, %q; want 1 with a reason", code, stderr)
-	}
-	if code, stderr := probe("no-port"); code != 1 || !strings.Contains(stderr, "health:") {
-		t.Errorf("health on a bad address = %d, %q; want 1 naming the address error", code, stderr)
-	}
+		if code, _ := probe(t, srv.Listener.Addr().String()); code != 0 {
+			t.Errorf("health against a server answering /healthz = %d, want 0", code)
+		}
+	})
 }

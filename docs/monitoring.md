@@ -4,13 +4,13 @@ This page lists what subflux reports about itself and the alert rules that ship 
 
 ## What you get
 
-subflux serves Prometheus metrics at `/metrics` on port 8374, with no login. With `server.allowed_hosts` set, list the host name or address your Prometheus scrapes, such as `subflux` for a scrape of `subflux:8374`, or the scrape is refused with 403. An empty list, the default, answers every host.
+subflux serves Prometheus metrics at `/metrics` on port 8375, its ops port, with no login, such as a scrape of `subflux:8375`. `OPS_LISTEN_ADDR` moves the port. The ops port serves only `/metrics` and `/healthz` and answers every host name, `server.allowed_hosts` aside, since neither holds a secret. To keep it private, set `OPS_LISTEN_ADDR` to `127.0.0.1:8375` or do not publish the port.
 
 The `dev` branch is being rebuilt, so its image exports only the series below. The series for searches, downloads, providers, media roots and the database return with the parts of subflux that own them.
 
 | Metric | Owner | Meaning |
 | --- | --- | --- |
-| `subflux_http_requests_total{method,path,status}` | web server | requests the web server answered, labelled with the matched route |
+| `subflux_http_requests_total{method,path,status}` | web server | requests the web page and API answered on port 8374, labelled with the matched route; scrapes and health probes on port 8375 are not counted |
 | `subflux_http_request_duration_seconds` | web server | how long each request took, in buckets up to 30 seconds |
 | `subflux_panics_total` | web server | request handlers that crashed and were answered with a 500 |
 | `subflux_config_mode{mode}` | settings | 1 for the current state of `config.yaml` (`unconfigured`, `failed` or `active`), 0 for the others |
@@ -34,7 +34,7 @@ subflux writes structured logs to the container log, with UTC timestamps. `serve
 
 ## Knowing the app is alive
 
-The container's healthcheck runs `subflux health`, which asks the web server for `GET /api/health` over loopback, so Docker marks the container unhealthy when the web server stops answering or reports itself unhealthy. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /api/health`. With `server.allowed_hosts` set, list the host name the prober uses too. That endpoint answers without a login: `200` with `{"status":"ok"}` while subflux runs with its settings loaded, and `503` listing a fixed reason for each failing check otherwise: "subflux is starting or shutting down", or "The settings file did not load." With no settings file at all, subflux runs on its defaults and answers `200`.
+The container's healthcheck runs `subflux health`, which asks `GET /healthz` on the ops port over loopback, at `OPS_LISTEN_ADDR`'s port, so Docker marks the container unhealthy when subflux stops answering or reports itself unhealthy. Docker's health state notifies nobody. To be told when subflux is down, load the alert rules below, whose `SubfluxTargetDown` and `SubfluxTargetAbsent` fire when Prometheus cannot scrape it, or point an uptime prober at `GET /healthz` on port 8375. That endpoint answers without a login: `200` with `{"status":"ok"}` while subflux runs with its settings loaded, and `503` listing a fixed reason for each failing check otherwise: "subflux is starting or shutting down", or "The settings file did not load." With no settings file at all, subflux runs on its defaults and answers `200`.
 
 ## Alerting
 

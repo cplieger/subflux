@@ -51,6 +51,9 @@ var DefaultPaths = Paths{
 type Config struct {
 	// Listener, when set, replaces binding the HTTP port (tests).
 	Listener net.Listener
+	// Ops, when set, receives the ops listener's bound address, nil when
+	// OpsAddr is blank (tests).
+	Ops func(net.Addr)
 	// LogOutput is where the process logs; nil is stderr.
 	LogOutput io.Writer
 	// Routes, when set, adds routes to the mux before serving (tests).
@@ -81,7 +84,10 @@ type Config struct {
 	// settings commit after boot, and that apply waits for it to return
 	// (tests).
 	SourcesApply func(context.Context)
-	Paths        Paths
+	// OpsAddr is the ops listener's address (OpsAddr reads it from
+	// OPS_LISTEN_ADDR); blank opens no ops listener.
+	OpsAddr string
+	Paths   Paths
 }
 
 // The HTTP server's bounds; a streaming route clears its own write deadline
@@ -92,13 +98,9 @@ const (
 	maxHeaderBytes    = 64 << 10
 )
 
-// ListenAddr is the HTTP listener's address, which the health subcommand
-// probes on loopback.
-const ListenAddr = ":8374"
-
 // The process's address, budgets and read bound; tests shorten them.
 var (
-	listenAddr = ListenAddr
+	listenAddr = ":8374"
 	// drainBudget is the whole shutdown, both phases, below compose's 10 s
 	// stop grace.
 	drainBudget = 8 * time.Second
@@ -132,6 +134,10 @@ func Run(ctx context.Context, cfg Config) error { //nolint:gocritic // hugeParam
 	snap := settings.Load(cfg.Paths.Config, reg)
 	level, format := setupLogging(snap, cfg.LogOutput)
 	logLoad(snap)
+	if err := checkListenAddrs(cfg.Listener, cfg.OpsAddr); err != nil {
+		slog.Error("app: refused the listener addresses", "error", err)
+		return fmt.Errorf("app: %w", err)
+	}
 	verdict := health.NewStatus()
 	if cfg.Health != nil {
 		cfg.Health(verdict)
@@ -164,8 +170,9 @@ type process struct {
 	format     slogx.Format
 }
 
-// serve builds every component over the open store and binds the HTTP port,
-// returning the supervision Run drains; on an error nothing is running.
+// serve builds every component over the open store and binds the HTTP port
+// and the ops listener, returning the supervision Run drains; on an error
+// nothing is running.
 func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr error) {
 	store := p.store
 	st, err := status.New(ctx, statusPersister(store))
@@ -243,17 +250,17 @@ func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr e
 	loop.server, loop.serverOK = svc.Snapshot().Server()
 	loop.reconcileRestart(svc.Snapshot())
 
-	ln, err := listen(ctx, cfg.Listener)
+	ln, ops, err := bindListeners(ctx, cfg, opsConfig(cfg.OpsAddr, m, healthChecks(p.health, svc)))
 	if err != nil {
 		return nil, err
 	}
-	srv := httpserver.New(handler(m, healthChecks(p.health, svc), svc.Snapshot, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
+	srv := httpserver.New(handler(m, svc.Snapshot, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
 	srv.ReadTimeout = readTimeout
 	srv.ReadHeaderTimeout = readHeaderTimeout
 	srv.WriteTimeout = writeTimeout
 	srv.MaxHeaderBytes = maxHeaderBytes
 	producers := []component{
-		httpProducer(srv, ln),
+		httpProducer(srv, ln, ops),
 		{name: "settings change loop", run: loop.run},
 		{name: "media sources", run: sources.run},
 		{name: "media refresh", run: refresher.Run},
@@ -264,7 +271,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr e
 	if sockLn, ok := bindAdminSocket(ctx, cfg.Paths.SocketDir, cfg.Paths.Socket, st); ok {
 		producers = append(producers, component{name: "admin socket", run: func(ctx context.Context) error { return sock.Serve(ctx, sockLn) }})
 	}
-	slog.Info("HTTP server listening", "addr", ln.Addr().String())
+	slog.Info("HTTP server listening", "addr", ln.Addr().String(), "ops_addr", addrText(ops.Addr()))
 	return &supervision{
 		producers: producers,
 		sinks: []component{
@@ -307,6 +314,45 @@ func listen(ctx context.Context, ln net.Listener) (net.Listener, error) {
 		return nil, fmt.Errorf("app: listen on %s: %w", listenAddr, err)
 	}
 	return ln, nil
+}
+
+// bindListeners binds the HTTP port, then the ops listener of oc; on an error
+// neither is open.
+func bindListeners(ctx context.Context, cfg *Config, oc httpserver.OpsConfig) (net.Listener, *httpserver.Ops, error) { //nolint:gocritic // hugeParam: oc is built inline and read once
+	ln, err := listen(ctx, cfg.Listener)
+	if err != nil {
+		return nil, nil, err
+	}
+	ops, err := httpserver.ListenOps(ctx, oc)
+	if err != nil {
+		slog.Error("app: could not bind the ops port", "error", err)
+		return nil, nil, errors.Join(fmt.Errorf("app: %w", err), ln.Close())
+	}
+	if cfg.Ops != nil {
+		cfg.Ops(ops.Addr())
+	}
+	return ln, ops, nil
+}
+
+// checkListenAddrs refuses an ops address that would share the HTTP
+// listener's socket (ln's address when set, listenAddr otherwise).
+func checkListenAddrs(ln net.Listener, opsAddr string) error {
+	addr := listenAddr
+	if ln != nil {
+		addr = ln.Addr().String()
+	}
+	return httpserver.CheckListenAddrs(
+		httpserver.ListenSetting{Name: "the HTTP listener", Addr: addr},
+		httpserver.ListenSetting{Name: OpsAddrSetting, Addr: opsAddr},
+	)
+}
+
+// addrText is a's text, "" for none.
+func addrText(a net.Addr) string {
+	if a == nil {
+		return ""
+	}
+	return a.String()
 }
 
 // bindAdminSocket binds the admin socket at path in dir. A failure logs

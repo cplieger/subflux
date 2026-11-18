@@ -35,14 +35,14 @@ var usage = func() string {
 }()
 
 // run dispatches every command but health, which main hands to
-// health.RunProbe, and answers the exit code: 0, 1 on a failure, 2 on a
+// app.ProbeHealth, and answers the exit code: 0, 1 on a failure, 2 on a
 // usage error. Asked-for help goes to stdout with 0.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	switch {
 	case len(args) == 0:
-		if err := runApp(ctx, app.Config{Paths: paths}); err != nil {
+		if err := runApp(ctx, app.Config{Paths: paths, OpsAddr: app.OpsAddr(os.Getenv(app.OpsAddrSetting))}); err != nil {
 			_, _ = fmt.Fprintln(stderr, "subflux: "+textsafe.SanitizeSingleLine(err.Error()))
 			return 1
 		}
