@@ -53,7 +53,7 @@ List the proxy before you expose subflux. A proxy that is not listed and adds no
 
 ## Blocking DNS rebinding
 
-`server.allowed_hosts` lists the exact host names or addresses subflux answers for, each with an optional port. A request whose `Host` header is not on the list is refused with 403 `host_not_allowed` before it reaches any page, `/metrics` and `/api/health` included:
+`server.allowed_hosts` lists the exact host names or addresses subflux answers for, each with an optional port. A request whose `Host` header is not on the list is refused with 403 `host_not_allowed` before it reaches any page or API route. Port 8375, which serves only `/healthz` and `/metrics`, runs no `Host` check, since neither holds a secret; to keep it private, set `OPS_LISTEN_ADDR` to `127.0.0.1:8375` or do not publish the port:
 
 ```yaml
 server:
@@ -62,7 +62,7 @@ server:
     - 192.0.2.5
 ```
 
-This closes a gap the cross-origin check leaves open. In a DNS rebinding attack, a malicious page makes its own host name resolve to subflux's address. The browser's request then carries the attacker's name in both `Origin` and `Host`, they agree, and the cross-origin check lets it through. Only an exact `Host` check stops it. A request from inside the container to a loopback address, such as `http://127.0.0.1:8374`, passes while the server settings load. Leave `server.allowed_hosts` empty, the default, to accept any `Host`. A `server.allowed_hosts` entry that does not parse is refused when the settings load. Until a save fixes it, only the entries that did parse are admitted, and a list with none admits no `Host`, so a typo never opens the list to every host.
+This closes a gap the cross-origin check leaves open. In a DNS rebinding attack, a malicious page makes its own host name resolve to subflux's address. The browser's request then carries the attacker's name in both `Origin` and `Host`, they agree, and the cross-origin check lets it through. Only an exact `Host` check stops it. A request from inside the container to a loopback address, such as `http://127.0.0.1:8374`, passes while the server settings load, and no loopback request passes while they do not. The image's healthcheck GETs `/healthz` on port 8375 over loopback, which answers in every settings state. Leave `server.allowed_hosts` empty, the default, to accept any `Host`. A `server.allowed_hosts` entry that does not parse is refused when the settings load. Until a save fixes it, only the entries that did parse are admitted, and a list with none admits no `Host`, so a typo never opens the list to every host.
 
 ## Passkeys
 
@@ -94,10 +94,10 @@ subflux is built for your own network. If you expose it to the internet anyway:
 - **Put it behind a reverse proxy that serves HTTPS only, and set HSTS there.** subflux serves plain HTTP and does not send `Strict-Transport-Security` itself, so set that header at the proxy and redirect plain HTTP to HTTPS.
 - **List the proxy in `server.trusted_proxies` before exposing it**, and set `server.allowed_hosts` to the public host name.
 - **Create the admin account before you expose it.** Until one exists, a visitor with the setup token from the log can create it, and the token never leaves the log.
-- **Prefer OIDC, or a forward-auth gate at the proxy**, such as Authelia or Authentik, so a sign-in passes your identity provider's own protections first. With `auth.oidc_auto_provision`, only people whose `groups` claim holds one of `auth.oidc_allowed_groups` get an account; keep that list short. A forward-auth gate must let Prometheus reach `/metrics` another way, such as on the local network.
+- **Prefer OIDC, or a forward-auth gate at the proxy**, such as Authelia or Authentik, so a sign-in passes your identity provider's own protections first. With `auth.oidc_auto_provision`, only people whose `groups` claim holds one of `auth.oidc_allowed_groups` get an account; keep that list short. Prometheus scrapes `/metrics` on port 8375, which stays outside the proxy.
 - **Use passkeys** for the accounts that have no OIDC, with `auth.passkey_origins` set to the public address.
 - **Shorten the session timeouts**, such as `auth.session_idle_timeout: 1h` and `auth.session_absolute_timeout: 24h`, so a stolen session cookie stops working sooner.
-- **Know what answers without a login.** `/api/health`, `/metrics`, the web page's own files and the sign-in endpoints under `/api/auth` (setup, password and passkey sign-in, sign-out, the OIDC start and callback, recovery and invite links) are public. Block `/metrics` at the proxy unless Prometheus scrapes it from outside. The rate limits above apply to the sign-in endpoints.
+- **Know what answers without a login.** On port 8375, `/healthz` and `/metrics`; never route that port through the proxy. On port 8374, the web page's own files and the sign-in endpoints under `/api/auth` (setup, password and passkey sign-in, sign-out, the OIDC start and callback, recovery and invite links) are public. The rate limits above apply to the sign-in endpoints.
 
 subflux watches for exposure it can see. When a client with a public address reaches it over plain HTTP, through a proxy `server.trusted_proxies` does not list, or with that list empty, admins see a warning in Settings, under Access, for 24 hours after the last such request, and subflux logs it at most once an hour per reason. A save that changes the `server` section clears the warning, so it returns only if the cause remains.
 

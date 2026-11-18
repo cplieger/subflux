@@ -37,11 +37,26 @@ import (
 	"go.yaml.in/yaml/v4"
 )
 
+// get asks the product listener for path; ops asks the ops listener.
 func get(t *testing.T, r *Rig, path string) (int, string) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, r.URL+path, http.NoBody)
+	return fetch(t, r, r.URL+path, "")
+}
+
+func ops(t *testing.T, r *Rig, path string) (int, string) {
+	t.Helper()
+	return fetch(t, r, r.OpsURL+path, "")
+}
+
+// fetch GETs url, with Host host when set.
+func fetch(t *testing.T, r *Rig, url, host string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if host != "" {
+		req.Host = host
 	}
 	resp, err := r.Client.Do(req)
 	if err != nil {
@@ -57,20 +72,20 @@ func get(t *testing.T, r *Rig, path string) (int, string) {
 
 func metric(t *testing.T, r *Rig, line string) bool {
 	t.Helper()
-	_, body := get(t, r, "/metrics")
+	_, body := ops(t, r, "/metrics")
 	return strings.Contains(body, line+"\n")
 }
 
 func TestRequestRecordedByRoute(t *testing.T) {
 	r := Start(t, Options{})
-	const series = `subflux_http_requests_total{method="GET",path="/api/health",status="200"}`
-	_, before := get(t, r, "/metrics")
-	if code, _ := get(t, r, "/api/health"); code != http.StatusOK {
-		t.Fatalf("/api/health = %d", code)
+	const series = `subflux_http_requests_total{method="GET",path="/{$}",status="200"}`
+	_, before := ops(t, r, "/metrics")
+	if code, _ := get(t, r, "/"); code != http.StatusOK {
+		t.Fatalf("/ = %d", code)
 	}
-	_, after := get(t, r, "/metrics")
+	_, after := ops(t, r, "/metrics")
 	if count(before, series)+1 != count(after, series) {
-		t.Errorf("the health request did not raise %s by one:\n%s", series, after)
+		t.Errorf("the page request did not raise %s by one:\n%s", series, after)
 	}
 	if !strings.Contains(after, "subflux_http_request_duration_seconds_count ") {
 		t.Errorf("no duration observed:\n%s", after)
@@ -185,7 +200,7 @@ func TestConfigModeFollowsSave(t *testing.T) {
 		}
 		return true
 	}) {
-		_, body := get(t, r, "/metrics")
+		_, body := ops(t, r, "/metrics")
 		t.Errorf("after a save the mode gauge reads:\n%s", body)
 	}
 }
@@ -218,50 +233,6 @@ func TestPlaceholderHasNoScript(t *testing.T) {
 	if code, _ := get(t, r, "/elsewhere"); code != http.StatusNotFound {
 		t.Errorf("/elsewhere = %d, want 404", code)
 	}
-}
-
-func TestPublicHealthAndMetrics(t *testing.T) {
-	r := Start(t, Options{Config: []byte("server:\n  allowed_hosts: [nas.lan]\n" + mediaLanguages)})
-	if code, body := get(t, r, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"ok"`) {
-		t.Errorf("/api/health = %d %q", code, body)
-	}
-	if code, body := get(t, r, "/metrics"); code != http.StatusOK || !strings.Contains(body, "subflux_build_info{") {
-		t.Errorf("/metrics = %d, body lacks build_info", code)
-	}
-	if err := r.Stop(); err != nil {
-		t.Errorf("Stop = %v", err)
-	}
-	if resp, err := r.Client.Do(mustGet(t, r.URL+"/api/health")); err == nil {
-		_ = resp.Body.Close()
-		t.Error("the rig still serves after Stop")
-	}
-}
-
-// TestHealthNamesAFailedSettingsFile: a settings file that did not load
-// answers 503 naming it, so the image's healthcheck and an uptime probe see
-// a subflux that cannot do its job; no file at all is healthy.
-func TestHealthNamesAFailedSettingsFile(t *testing.T) {
-	failed := Start(t, Options{Config: []byte("server:\n  log_level: info\n")})
-	code, body := get(t, failed, "/api/health")
-	if code != http.StatusServiceUnavailable || !strings.Contains(body, "The settings file did not load.") {
-		t.Errorf("/api/health over a failed file = %d %q, want 503 naming the settings file", code, body)
-	}
-	if strings.Contains(body, "languages") {
-		t.Errorf("/api/health %q quotes the load error; it answers with no sign-in", body)
-	}
-	unconfigured := Start(t, Options{})
-	if code, body := get(t, unconfigured, "/api/health"); code != http.StatusOK || !strings.Contains(body, `"status":"ok"`) {
-		t.Errorf("/api/health with no file = %d %q, want 200", code, body)
-	}
-}
-
-func mustGet(t *testing.T, url string) *http.Request {
-	t.Helper()
-	req, err := http.NewRequestWithContext(context.WithoutCancel(t.Context()), http.MethodGet, url, http.NoBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return req
 }
 
 func eventually(cond func() bool) bool { return within(readyBudget, cond) }
@@ -421,11 +392,11 @@ func TestRigBootWithArrDown(t *testing.T) {
 	r, sc, _ := sourceRig(t, closedURL(t), "  change_interval: 10s\n")
 	sc.PassNow()
 	if !eventually(func() bool { return metric(t, r, `subflux_alerts_active{id="tv",kind="source"} 1`) }) {
-		_, body := get(t, r, "/metrics")
+		_, body := ops(t, r, "/metrics")
 		t.Errorf("an unreachable source raised no source alert:\n%s", body)
 	}
-	if code, _ := get(t, r, "/api/health"); code != http.StatusOK {
-		t.Errorf("/api/health = %d with the source down, want 200", code)
+	if code, _ := ops(t, r, "/healthz"); code != http.StatusOK {
+		t.Errorf("/healthz = %d with the source down, want 200", code)
 	}
 }
 

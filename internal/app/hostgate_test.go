@@ -105,7 +105,7 @@ func TestHostGateReadsSnapshotPerRequest(t *testing.T) {
 	var snap atomic.Pointer[settings.Snapshot]
 	listed, open := loaded(t, "server:\n  allowed_hosts: [nas.lan]\n"+validLanguages), loaded(t, validLanguages)
 	snap.Store(&listed)
-	h := handler(obs.New(), nil, func() settings.Snapshot { return *snap.Load() }, nil)
+	h := handler(obs.New(), func() settings.Snapshot { return *snap.Load() }, nil)
 	if code := ask(h, remotePeer, "other.lan", "/").Code; code != http.StatusForbidden {
 		t.Fatalf("before the save = %d, want 403", code)
 	}
@@ -118,10 +118,10 @@ func TestHostGateReadsSnapshotPerRequest(t *testing.T) {
 func TestHostGateCoversEveryRoute(t *testing.T) {
 	listed := loaded(t, "server:\n  allowed_hosts: [nas.lan]\n"+validLanguages)
 	m := obs.New()
-	h := handler(m, nil, func() settings.Snapshot { return listed }, func(mux *http.ServeMux) {
+	h := handler(m, func() settings.Snapshot { return listed }, func(mux *http.ServeMux) {
 		mux.HandleFunc("GET /api/probe", func(http.ResponseWriter, *http.Request) {})
 	})
-	for _, path := range []string{"/", "/api/health", "/metrics", "/api/probe", "/elsewhere"} {
+	for _, path := range []string{"/", "/api/probe", "/elsewhere"} {
 		if code := ask(h, remotePeer, "other.lan", path).Code; code != http.StatusForbidden {
 			t.Errorf("%s from an unlisted host = %d, want 403", path, code)
 		}
@@ -144,7 +144,7 @@ func TestHostGateCoversEveryRoute(t *testing.T) {
 	}
 }
 
-func TestBootSnapshotRefusalLogsThroughTheProcessLogger(t *testing.T) {
+func TestBootSnapshotRefusalLogsThroughTheInstalledLogger(t *testing.T) {
 	out := &syncBuffer{}
 	b := boot(t, "server:\n  allowed_hosts: [nas.lan]\n  log_level: warn\n"+validLanguages, func(c *Config) { c.LogOutput = out })
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+b.addr+"/", http.NoBody)

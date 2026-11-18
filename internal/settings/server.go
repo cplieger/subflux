@@ -187,13 +187,11 @@ func refuseHost(w http.ResponseWriter, r *http.Request, status int, code httpser
 }
 
 // hostPolicy is ParseHostList over entries, answering a refused Host through
-// refuseHost and logging it through processLogger, and the canonical hosts it
-// accepted, once each in file order: the keys its policy matches, a port
-// dropped.
+// refuseHost, and the canonical hosts it accepted, once each in file order:
+// the keys its policy matches, a port dropped.
 func hostPolicy(entries []string, loopbackExempt bool) (policy *httpserver.HostPolicy, allowed []string) {
 	policy, _ = httpserver.ParseHostList(entries,
 		httpserver.WithHostResponder(refuseHost),
-		httpserver.WithHostAllowlistLogger(processLogger),
 		httpserver.WithLoopbackExempt(loopbackExempt))
 	for _, e := range entries {
 		if h := httpserver.CanonicalHost(strings.TrimSpace(e)); h != "" && !slices.Contains(allowed, h) {

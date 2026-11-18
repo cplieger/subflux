@@ -136,7 +136,7 @@ Subtitle files named the way other tools name them still count. `movie.pb.srt` r
 | Key | Default | Description |
 | --- | --- | --- |
 | `server.trusted_proxies` | `[]` | Your reverse proxies, each an address or a CIDR range, whose `X-Forwarded-For` subflux believes. See [Security](hardening.md#running-behind-a-reverse-proxy) |
-| `server.allowed_hosts` | `[]` | The host names or addresses subflux answers for, each with an optional port, such as `subflux.example.com` or `192.0.2.5:8374`. Leave empty to accept any. A set list must also name the host your Prometheus scrapes, since `/metrics` is refused to any other. A host listed here also lets the first admin account be created from your network without the setup token |
+| `server.allowed_hosts` | `[]` | The host names or addresses subflux answers for, each with an optional port, such as `subflux.example.com` or `192.0.2.5:8374`. Leave empty to accept any. `/healthz` and `/metrics`, on port 8375, answer every host. A host listed here also lets the first admin account be created from your network without the setup token |
 | `server.log_level` | `info` | `debug`, `info`, `warn` or `error` |
 | `server.log_format` | `json` | `json` or `text`. A change takes effect at the next restart |
 
@@ -185,7 +185,7 @@ Only `SUBFLUX_*` names are read, so a file cannot read the container's other var
 
 ## Command line
 
-With no arguments, `subflux` runs the server. `subflux health` is the probe the image's `HEALTHCHECK` runs: it GETs `/api/health` from the server on `127.0.0.1:8374` and exits 0 on a `2xx` answer and 1 otherwise, writing the reason to stderr. `subflux --help` prints the usage line.
+With no arguments, `subflux` runs the server. `subflux health` is the probe the image's `HEALTHCHECK` runs: it GETs `/healthz` from the server on `127.0.0.1` at `OPS_LISTEN_ADDR`'s port, 8375 by default, and exits 0 on a `2xx` answer and 1 otherwise, writing the reason to stderr. `subflux --help` prints the usage line.
 
 The other commands ask the running server to act, through a socket only processes inside the container can open. Run each with `docker exec -it subflux subflux <command>`. Each acts as the admin socket, which the security log names as the actor. A refused command prints a one-line JSON error and exits 1, and a command line that is not one of these exits 2 after printing its usage.
 

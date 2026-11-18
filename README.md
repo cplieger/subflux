@@ -9,7 +9,7 @@ subflux finds, downloads and times subtitles for the shows and movies in your So
 
 subflux is under active development and has not reached version 1.0. Any update can change the config format, the saved state, the API or the behavior. Pin a specific image tag instead of `latest`, and read the release notes before you upgrade.
 
-The `dev` branch is mid-rebuild. Its image serves a placeholder page, `/api/health` and `/metrics`, and does none of the work below until the rebuild lands. Run a released `main` tag.
+The `dev` branch is mid-rebuild. Its image serves a placeholder page on port 8374 and `/healthz` and `/metrics` on port 8375, and does none of the work below until the rebuild lands. Run a released `main` tag.
 
 ## What it does
 
@@ -68,7 +68,10 @@ services:
     user: "${PUID:-1000}:${PGID:-1000}"
 
     ports:
-      - "8374:8374"
+      - "8374:8374"  # the web page and the API
+      # /healthz and /metrics, for an uptime prober and Prometheus. They answer
+      # every host name, so publish this port only where those reach it.
+      - "8375:8375"
 
     volumes:
       - "/opt/appdata/subflux:/config"  # settings and saved state
@@ -106,7 +109,7 @@ Every setting is in the web page's Settings dialog and is saved to `/config/conf
 | `post_processing.strip_hi` | `false` | Remove hearing-impaired annotations such as `[music]` and speaker labels such as `JOHN:`. Overlapping annotations end at the first closing bracket, so `(a[b)c]` keeps `c]`, and a speaker label never takes the next line |
 | `post_processing.strip_tags` | `true` | Remove `<i>`, `<b>`, `<u>`, `<s>` and `<font>` tags. Any other tag, such as `<iframe>`, stays as text |
 | `server.trusted_proxies` | `[]` | Your reverse proxy's address, so the real client address is logged and rate-limited. List it before exposing subflux |
-| `server.allowed_hosts` | `[]` | The host names subflux answers for, `/metrics` included; any other is refused with 403. Leave empty to accept any |
+| `server.allowed_hosts` | `[]` | The host names the web page and the API answer for; any other is refused with 403. Leave empty to accept any |
 | `server.log_level` | `info` | `debug`, `info`, `warn` or `error` |
 | `auth.passkey_origins` | `[]` | The `https` addresses passkeys sign in from. Empty turns passkeys off |
 | `backup.enabled` | `false` | Write a copy of the database to `/config/backups` every 24 hours |
@@ -116,6 +119,7 @@ Every other setting, the command line and environment references in `config.yaml
 | Variable | Description | Default |
 | --- | --- | --- |
 | `PUID`, `PGID` | The user and group the container runs as, read by `compose.yaml` | `1000` |
+| `OPS_LISTEN_ADDR` | The address `/healthz` and `/metrics` listen on, such as `127.0.0.1:8375` to keep them inside the container. It cannot use port 8374 | `:8375` |
 
 | Mount | Description |
 | --- | --- |
@@ -124,11 +128,12 @@ Every other setting, the command line and environment references in `config.yaml
 
 | Port | Description |
 | --- | --- |
-| `8374` | The web page, the API and `/metrics` |
+| `8374` | The web page and the API |
+| `8375` | `/healthz` and `/metrics`, for an uptime prober and Prometheus |
 
 ## Security
 
-Create the admin account right after the first start. Until one exists, a browser on your own network that connects directly at an IP address creates it, and any other visitor, one coming through your reverse proxy included, needs the one-time setup token subflux writes to `docker logs subflux`. Behind a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md), list the proxy in `server.trusted_proxies` before you expose subflux: until then, setup through a proxy that adds no `X-Forwarded-For` header looks like a direct visit from your network and needs no token. Keep port 8374 on your own network, or put the proxy with HTTPS in front of it and set `server.allowed_hosts`. `/metrics` and `/api/health` answer without a login.
+Create the admin account right after the first start. Until one exists, a browser on your own network that connects directly at an IP address creates it, and any other visitor, one coming through your reverse proxy included, needs the one-time setup token subflux writes to `docker logs subflux`. Behind a [reverse proxy](https://github.com/cplieger/docs/blob/main/docs/reverse-proxy.md), list the proxy in `server.trusted_proxies` before you expose subflux: until then, setup through a proxy that adds no `X-Forwarded-For` header looks like a direct visit from your network and needs no token. Keep port 8374 on your own network, or put the proxy with HTTPS in front of it and set `server.allowed_hosts`. `/healthz` and `/metrics` answer without a login. Port 8375 answers every host name, since `/healthz` and `/metrics` hold no secret. To keep it private, set `OPS_LISTEN_ADDR` to `127.0.0.1:8375` or do not publish the port.
 
 Logins use passwords, passkeys or OIDC, and an admin can create API keys for scripts. Saved site passwords and API keys are never sent back to the browser. Passkeys work only at the addresses `auth.passkey_origins` lists. Setting `auth.disable_auth` turns login off and treats every request as an admin.
 
@@ -136,7 +141,7 @@ The image has no shell and runs as the user in `compose.yaml`. subflux checks ea
 
 ## Troubleshooting
 
-The healthcheck runs `subflux health`, which asks the web server for `/api/health` and passes while subflux is running with its settings loaded, set up or not. A settings file that does not load makes it fail until you fix the file. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/api/health`, and with `server.allowed_hosts` set, list the host name the prober uses too.
+The healthcheck runs `subflux health`, which asks `/healthz` on port 8375 and passes while subflux is running with its settings loaded, set up or not. A settings file that does not load makes it fail until you fix the file. Docker checks every 30 seconds after a 15-second start period and marks the container unhealthy after 3 failures in a row. A wrong API key or an unreachable Sonarr instance keeps it healthy, so you can fix it on the web page. Docker's health state notifies nobody: to hear that subflux is down, load the alert rules below or point an uptime prober at `/healthz` on port 8375.
 
 - An alert says subtitles cannot be written in a folder. subflux pauses work there and retries every 5 minutes. Make the folder writable for the container user.
 - An alert says a media root is unavailable. The folder is missing, empty or cannot be opened. Mount it, or fix the root folder in Sonarr or Radarr or the source's `path_mappings`.
@@ -147,7 +152,7 @@ The healthcheck runs `subflux health`, which asks the web server for `/api/healt
 
 ## Monitoring
 
-subflux serves Prometheus metrics at `/metrics` and writes JSON logs. Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
+subflux serves Prometheus metrics at `/metrics` on port 8375 and writes JSON logs. Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). [Monitoring and alerts](docs/monitoring.md) lists the metrics and the rules and shows how to load them.
 
 ## Documentation
 

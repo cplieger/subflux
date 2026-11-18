@@ -11,7 +11,10 @@ services:
     user: "${PUID:-1000}:${PGID:-1000}"
 
     ports:
-      - "8374:8374"
+      - "8374:8374"  # the web page and the API
+      # /healthz and /metrics, for an uptime prober and Prometheus. They answer
+      # every host name, so publish this port only where those reach it.
+      - "8375:8375"
 
     volumes:
       - "/opt/appdata/subflux:/config"  # settings and saved state

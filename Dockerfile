@@ -201,6 +201,7 @@ COPY --from=builder /out/usr/share/licenses /usr/share/licenses
 # distroless nonroot uid/gid.
 COPY --from=builder --chown=65532:65532 /config-skel /config
 USER nonroot:nonroot
+EXPOSE 8374 8375
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
     CMD ["/subflux", "health"]
 ENTRYPOINT ["/subflux"]

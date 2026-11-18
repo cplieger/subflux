@@ -165,7 +165,7 @@ func (b *booted) wait(t *testing.T) error {
 	}
 }
 
-// healthy reports the process's own verdict, the one GET /api/health reads
+// healthy reports the process's own verdict, the one GET /healthz reads
 // first.
 func (b *booted) healthy() bool { return b.health.Healthy() }
 
@@ -197,6 +197,57 @@ func TestRunReturnsBindError(t *testing.T) {
 	err = Run(t.Context(), Config{Paths: paths, LogOutput: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), held.Addr().String()) {
 		t.Errorf("Run = %v, want an error naming %s", err, held.Addr())
+	}
+	storeReleased(t, paths)
+}
+
+func TestRunRefusesOpsAddrOnTheProductPort(t *testing.T) {
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	t.Run("default_product_port", func(t *testing.T) {
+		paths := testPaths(t, t.TempDir())
+		err := Run(t.Context(), Config{Paths: paths, LogOutput: io.Discard, OpsAddr: " :8374"})
+		if err == nil || !strings.Contains(err.Error(), "OPS_LISTEN_ADDR") || !strings.Contains(err.Error(), "one socket at port 8374") {
+			t.Errorf("Run = %v, want the address check naming OPS_LISTEN_ADDR and port 8374", err)
+		}
+		if _, statErr := os.Stat(paths.Store); !os.IsNotExist(statErr) {
+			t.Errorf("the store exists after the refusal (%v); it is refused before any boot work", statErr)
+		}
+	})
+	t.Run("given_listener", func(t *testing.T) {
+		ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ln.Close()
+		_, port, _ := net.SplitHostPort(ln.Addr().String())
+		err = Run(t.Context(), Config{Paths: testPaths(t, t.TempDir()), Listener: ln, LogOutput: io.Discard, OpsAddr: ":" + port})
+		if err == nil || !strings.Contains(err.Error(), "OPS_LISTEN_ADDR") || !strings.Contains(err.Error(), "one socket at port "+port) {
+			t.Errorf("Run = %v, want the address check naming OPS_LISTEN_ADDR and port %s", err, port)
+		}
+	})
+}
+
+func TestRunReturnsOpsBindError(t *testing.T) {
+	held, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	paths := testPaths(t, t.TempDir())
+	err = Run(t.Context(), Config{Paths: paths, Listener: ln, LogOutput: io.Discard, OpsAddr: held.Addr().String()})
+	if err == nil || !strings.Contains(err.Error(), "OPS_LISTEN_ADDR") || !strings.Contains(err.Error(), held.Addr().String()) {
+		t.Errorf("Run = %v, want an error naming OPS_LISTEN_ADDR and %s", err, held.Addr())
+	}
+	if c, dialErr := (&net.Dialer{}).DialContext(t.Context(), "tcp", ln.Addr().String()); dialErr == nil {
+		_ = c.Close()
+		t.Error("the product listener is still open after the ops bind failed")
 	}
 	storeReleased(t, paths)
 }
