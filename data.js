@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794351561986,
-  "repoUrl": "https://github.com/cplieger/subflux",
+  "lastUpdate": 1794960949007,
+  "repoUrl": "https://github.com/cplieger/ci",
   "entries": {
     "Benchmark": [
       {
@@ -31148,6 +31148,910 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkWorstCaseAtTheClamp/ma_",
             "value": 1951767,
             "range": "± 6809.0",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "tribble-trouble[bot]",
+            "username": "tribble-trouble[bot]",
+            "email": "338123824+tribble-trouble[bot]@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1a1cd0abda34b43c32b00ff977c7f8297d4c72e3",
+          "message": "chore(deps): update cplieger/ci digest to 3b145f1 (#1156)\n\nCo-authored-by: tribble-trouble[bot] <338123824+tribble-trouble[bot]@users.noreply.github.com>",
+          "timestamp": "2026-11-17T23:23:06Z",
+          "url": "https://github.com/cplieger/ci/commit/1a1cd0abda34b43c32b00ff977c7f8297d4c72e3"
+        },
+        "date": 1794960948606,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkActivatePolicyChange - B/op",
+            "value": 1489879996,
+            "range": "± 56352",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkActivatePolicyChange - allocs/op",
+            "value": 19268424.5,
+            "range": "± 332",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkActivatePolicyChange",
+            "value": 4389533495.5,
+            "range": "± 29289293",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFirefly - B/op",
+            "value": 569629.5,
+            "range": "± 635",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFirefly - allocs/op",
+            "value": 3910,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFirefly",
+            "value": 1106083,
+            "range": "± 19875",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFuturamaSeason - B/op",
+            "value": 6301129.5,
+            "range": "± 5699.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFuturamaSeason - allocs/op",
+            "value": 51647,
+            "range": "± 1.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkAssignFuturamaSeason",
+            "value": 19726898,
+            "range": "± 124915",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/after_the_advance - B/op",
+            "value": 16,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/after_the_advance - allocs/op",
+            "value": 2,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/after_the_advance",
+            "value": 23842,
+            "range": "± 35",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/before_the_advance - B/op",
+            "value": 2284490,
+            "range": "± 6",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/before_the_advance - allocs/op",
+            "value": 50,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkChangesQuietAfterBurst/before_the_advance",
+            "value": 1259142,
+            "range": "± 39565",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/16MiB - B/op",
+            "value": 169793576,
+            "range": "± 18.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/16MiB - allocs/op",
+            "value": 426139,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/16MiB",
+            "value": 468095053,
+            "range": "± 18050819.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/1MiB - B/op",
+            "value": 9749946,
+            "range": "± 79",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/1MiB - allocs/op",
+            "value": 26802,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/1MiB",
+            "value": 29606795.5,
+            "range": "± 852490",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/4MiB - B/op",
+            "value": 41815608,
+            "range": "± 6",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/4MiB - allocs/op",
+            "value": 106768,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCleanSize/4MiB",
+            "value": 117405718.5,
+            "range": "± 1146129.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/16_concurrent - B/op",
+            "value": 117805805,
+            "range": "± 4602.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/16_concurrent - allocs/op",
+            "value": 4159,
+            "range": "± 25.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/16_concurrent",
+            "value": 159681986,
+            "range": "± 3379310",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/1_concurrent - B/op",
+            "value": 7371400.5,
+            "range": "± 580.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/1_concurrent - allocs/op",
+            "value": 314.5,
+            "range": "± 1.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCountCommit/1_concurrent",
+            "value": 29848618,
+            "range": "± 144773",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000 - B/op",
+            "value": 10378,
+            "range": "± 5314",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Asymmetric_5000x50000",
+            "value": 3926206.5,
+            "range": "± 41231.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000 - B/op",
+            "value": 201444.5,
+            "range": "± 110379",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Long_100000",
+            "value": 17629479.5,
+            "range": "± 775908",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000 - B/op",
+            "value": 2531.5,
+            "range": "± 1438",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Medium_10000",
+            "value": 1880587.5,
+            "range": "± 142431",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000 - B/op",
+            "value": 105,
+            "range": "± 8.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000 - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCrossCorrelateEdges/Short_1000",
+            "value": 131719.5,
+            "range": "± 4612",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDetectorLLR - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDetectorLLR - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkDetectorLLR",
+            "value": 1226,
+            "range": "± 3.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/1024",
+            "value": 16487,
+            "range": "± 276.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/256",
+            "value": 3566,
+            "range": "± 16",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkFFT/4096",
+            "value": 80510,
+            "range": "± 462.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkGetOrFetch - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkGetOrFetch - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkGetOrFetch",
+            "value": 111.35,
+            "range": "± 16.05",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkItemsPage - B/op",
+            "value": 5149372,
+            "range": "± 1452.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkItemsPage - allocs/op",
+            "value": 75604,
+            "range": "± 6",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkItemsPage",
+            "value": 13016657.5,
+            "range": "± 595818.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLogTrim - B/op",
+            "value": 73679.5,
+            "range": "± 561.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLogTrim - allocs/op",
+            "value": 348,
+            "range": "± 2.0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkLogTrim",
+            "value": 10711893.5,
+            "range": "± 28938.0",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse - B/op",
+            "value": 3702937,
+            "range": "± 286836",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse - allocs/op",
+            "value": 220351.5,
+            "range": "± 1586",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse",
+            "value": 386784976.5,
+            "range": "± 9744395",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/-x - B/op",
+            "value": 77043,
+            "range": "± 5049.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/-x - allocs/op",
+            "value": 1086,
+            "range": "± 0.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/-x",
+            "value": 51088429,
+            "range": "± 1456708.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/Special. - B/op",
+            "value": 12496.5,
+            "range": "± 686.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/Special. - allocs/op",
+            "value": 364,
+            "range": "± 0.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/Special.",
+            "value": 5175124,
+            "range": "± 103935",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/[a - B/op",
+            "value": 42124.5,
+            "range": "± 1058.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/[a - allocs/op",
+            "value": 299,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/[a",
+            "value": 5557371.5,
+            "range": "± 58880",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/a- - B/op",
+            "value": 76599,
+            "range": "± 3437.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/a- - allocs/op",
+            "value": 1084,
+            "range": "± 0.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/a-",
+            "value": 50478987,
+            "range": "± 843102",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/ma - B/op",
+            "value": 42332.5,
+            "range": "± 2177.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/ma - allocs/op",
+            "value": 300.5,
+            "range": "± 1.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/ma",
+            "value": 11160013,
+            "range": "± 54567",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/www. - B/op",
+            "value": 20513,
+            "range": "± 824",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/www. - allocs/op",
+            "value": 298,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParseWorstCase/www.",
+            "value": 5370232.5,
+            "range": "± 71735",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPruneFailures - B/op",
+            "value": 66795945.5,
+            "range": "± 6433.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPruneFailures - allocs/op",
+            "value": 809235.5,
+            "range": "± 9",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPruneFailures",
+            "value": 149911647.5,
+            "range": "± 5051037.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPublishFailures - B/op",
+            "value": 21136,
+            "range": "± 446.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPublishFailures - allocs/op",
+            "value": 168.5,
+            "range": "± 5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPublishFailures",
+            "value": 10553380,
+            "range": "± 58007.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_1_item - B/op",
+            "value": 83712,
+            "range": "± 222.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_1_item - allocs/op",
+            "value": 608,
+            "range": "± 1",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_1_item",
+            "value": 458114,
+            "range": "± 7126.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_2000_items - B/op",
+            "value": 25691027,
+            "range": "± 4451",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_2000_items - allocs/op",
+            "value": 254945,
+            "range": "± 9.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/lock_toggle_2000_items",
+            "value": 77414073.5,
+            "range": "± 728739",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/recount_2000_items - B/op",
+            "value": 26763848.5,
+            "range": "± 8695.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/recount_2000_items - allocs/op",
+            "value": 285458.5,
+            "range": "± 25.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkRecountLargestRoot/recount_2000_items",
+            "value": 77744842,
+            "range": "± 7172342.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSignInBurst - B/op",
+            "value": 323598.5,
+            "range": "± 610",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSignInBurst - allocs/op",
+            "value": 4733.5,
+            "range": "± 4",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSignInBurst",
+            "value": 42862092,
+            "range": "± 167873.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSince20000Changes - B/op",
+            "value": 5594302,
+            "range": "± 40",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSince20000Changes - allocs/op",
+            "value": 140555,
+            "range": "± 0.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSince20000Changes",
+            "value": 8866660.5,
+            "range": "± 81917",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSingleRowCommit - B/op",
+            "value": 13788.5,
+            "range": "± 10.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSingleRowCommit - allocs/op",
+            "value": 114,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSingleRowCommit",
+            "value": 212881.5,
+            "range": "± 7090",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSweep - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSweep - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkSweep",
+            "value": 6494519,
+            "range": "± 165279",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkViewDuringBackup - B/op",
+            "value": 2086071336,
+            "range": "± 38162840",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkViewDuringBackup - allocs/op",
+            "value": 26637066,
+            "range": "± 876741.5",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkViewDuringBackup",
+            "value": 1511620263.5,
+            "range": "± 143719140.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a - B/op",
+            "value": 15,
+            "range": "± 185.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a",
+            "value": 5831785.5,
+            "range": "± 13517",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a#01 - B/op",
+            "value": 324.5,
+            "range": "± 560",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a#01 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/a#01",
+            "value": 16888072,
+            "range": "± 61510",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ab - B/op",
+            "value": 10,
+            "range": "± 142",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ab - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ab",
+            "value": 2970495,
+            "range": "± 12700.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ma_ - B/op",
+            "value": 52,
+            "range": "± 94.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ma_ - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkWorstCaseAtTheClamp/ma_",
+            "value": 2864379,
+            "range": "± 8854.5",
             "unit": "ns/op",
             "extra": "10 samples, median"
           }
