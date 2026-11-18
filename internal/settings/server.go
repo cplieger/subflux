@@ -171,7 +171,6 @@ func parseProxy(e string) (netip.Prefix, bool) {
 	return netip.Prefix{}, false
 }
 
-// hostRemediation is what a refused Host's caller does next.
 const hostRemediation = "Open subflux at a host server.allowed_hosts lists, or add this host to it."
 
 // refuseHost is the host policy's ErrorResponder: httpserver's envelope with

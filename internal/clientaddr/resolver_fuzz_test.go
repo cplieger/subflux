@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/access"
-	"github.com/cplieger/go/ssrf"
 )
 
 // FuzzLocal_untrustedHeadersNeverLocalize: whatever forwarding headers a
@@ -18,9 +17,10 @@ func FuzzLocal_untrustedHeadersNeverLocalize(f *testing.F) {
 	f.Add(public4, "127.0.0.1, 10.0.0.2", "", "", "")
 	f.Add(public6, "::1", "fd00::1", `for="[::1]:80"`, "")
 	f.Add(public4, "[::ffff:192.168.1.9]", "unknown", "for=_hidden;proto=https", "https")
+	f.Add([]byte{100, 64, 0, 1}, "127.0.0.1", "10.0.0.2", "for=127.0.0.1", "")
 	f.Fuzz(func(t *testing.T, peerBytes []byte, xff, realIP, forwarded, proto string) {
 		peer, ok := netip.AddrFromSlice(peerBytes)
-		if !ok || !ssrf.IsPublicAddr(peer) {
+		if !ok || !peer.IsGlobalUnicast() || peer.IsPrivate() {
 			t.Skip()
 		}
 		peer = peer.Unmap()
