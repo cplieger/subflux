@@ -115,12 +115,12 @@ const healthProbeTimeout = 4 * time.Second
 // The ops listener's setting and its address when that setting is blank.
 const (
 	OpsAddrSetting = "OPS_LISTEN_ADDR"
-	DefaultOpsAddr = ":8375"
+	defaultOpsAddr = ":8375"
 )
 
 // OpsAddr is the ops listener's address from OPS_LISTEN_ADDR's raw value:
-// httpserver.ListenAddr's edge trim, and DefaultOpsAddr when blank.
-func OpsAddr(value string) string { return httpserver.ListenAddr(value, DefaultOpsAddr) }
+// httpserver.ListenAddr's edge trim, and defaultOpsAddr when blank.
+func OpsAddr(value string) string { return httpserver.ListenAddr(value, defaultOpsAddr) }
 
 // ProbeHealth is the health subcommand: it GETs /healthz on addr, the ops
 // listener's address, over loopback and exits 0 on a 2xx answer, 1
