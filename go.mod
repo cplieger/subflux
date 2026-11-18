@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/cplieger/access v1.0.0-dev.12
-	github.com/cplieger/animap/mapread v0.3.2
+	github.com/cplieger/animap/mapread v0.3.3
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.18
 	github.com/cplieger/bolttable v1.2.0-dev.6
 	github.com/cplieger/go/filesafe v1.2.0-dev.1
@@ -14,7 +14,7 @@ require (
 	github.com/cplieger/go/jsonx v1.1.0
 	github.com/cplieger/go/keyenc v1.3.0
 	github.com/cplieger/go/keylock v1.1.0
-	github.com/cplieger/go/measure/v2 v2.0.0
+	github.com/cplieger/go/measure/v2 v2.1.0-dev.1
 	github.com/cplieger/go/slogx v1.1.0
 	github.com/cplieger/go/ssrf v1.1.0
 	github.com/cplieger/go/textsafe v1.1.0
