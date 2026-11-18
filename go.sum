@@ -2,8 +2,8 @@ github.com/coreos/go-oidc/v3 v3.21.0 h1:wZo4Q9Pum8dYEj0eMUPrqR+kvuGkeUplbLpNCkBq
 github.com/coreos/go-oidc/v3 v3.21.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
 github.com/cplieger/access v1.0.0-dev.12 h1:7tYwe9JFGIRzFQIjIy2Ddxkz7e1wtITGzo63csK1Hoo=
 github.com/cplieger/access v1.0.0-dev.12/go.mod h1:xYyhwhkl/KdaaCjIoNaT8QaB2UfpbURnxZ86x+6gOto=
-github.com/cplieger/animap/mapread v0.3.2 h1:oBS2esAwE3WSMWb9ypUGw2vAAV/lHWDKlObYZ8AWUQQ=
-github.com/cplieger/animap/mapread v0.3.2/go.mod h1:/KLtoKslemgqFHUACjfaCz7F78WQpd3FDjQJ4oY8lic=
+github.com/cplieger/animap/mapread v0.3.3 h1:XnS20I/ixfByqGAIOkIutobnSCEviKlafOE8QRwN1Vk=
+github.com/cplieger/animap/mapread v0.3.3/go.mod h1:5MCQ30ymux0zORYhhfbNOgfKEZiqv8VX7f8sfWPppaI=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.18 h1:e1UY46Ywgv6ZG7VpCCMTL7UMYJW8XY0WvXyr1DZt7cc=
 github.com/cplieger/arrapi/v3 v3.2.0-dev.18/go.mod h1:48eoSNuIblVN7HHvUQSfoJrkNk1xaHzsk0lN63+Tlwk=
 github.com/cplieger/bolttable v1.2.0-dev.6 h1:/xTdaoLZYmzuytiQ5S9YgGLnuXWN1yP0TrpK0mq6nlQ=
@@ -22,8 +22,8 @@ github.com/cplieger/go/keyenc v1.3.0 h1:v0zvHSY4ZOZapGNYGAkghEXPz1SeifT/Trg0b9A8
 github.com/cplieger/go/keyenc v1.3.0/go.mod h1:EI1v4Q6FU1Y9hUWTE6kp1n3Mozrm0ws5GOT+Vt/x1+w=
 github.com/cplieger/go/keylock v1.1.0 h1:yjY1RVKMdpiLDUTG4C1ESNANVHC3NNgZQo7aQOI8OuY=
 github.com/cplieger/go/keylock v1.1.0/go.mod h1:6SVZHsMB3trTMYj0x6lVkHqPDI2Np2rrw/biMUzPBxM=
-github.com/cplieger/go/measure/v2 v2.0.0 h1:QsVroWatxnaS3JWJdm84Rt5RDw26uLpEYFANy6/z72s=
-github.com/cplieger/go/measure/v2 v2.0.0/go.mod h1:gG4hr0jum0sVWiAppZwHPdvHNIVPBbryOCxzCoPSo84=
+github.com/cplieger/go/measure/v2 v2.1.0-dev.1 h1:YV0IKDITW9IZr0uOaLzdx5OlNBw/C/zVQ9DQAQ4t4Vo=
+github.com/cplieger/go/measure/v2 v2.1.0-dev.1/go.mod h1:gG4hr0jum0sVWiAppZwHPdvHNIVPBbryOCxzCoPSo84=
 github.com/cplieger/go/slogx v1.1.0 h1:whWmZcNmLuWGFM33SYFR+alUTfEodzBjKju44DHNgPY=
 github.com/cplieger/go/slogx v1.1.0/go.mod h1:N88y5LJZ1aVp++cLFqzEV4WsalaX5YKXoRtXT29Ngkw=
 github.com/cplieger/go/ssrf v1.1.0 h1:gyP7pYm1415RkHmIdod1YCvuX+I1xD1dXiRa8tvz8Bg=
