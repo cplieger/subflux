@@ -8,7 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
+	"github.com/cplieger/go/ssrf"
 )
 
 // Reason is why a public client's request counts as exposure.
@@ -119,7 +120,8 @@ func (d *Detector) Reset() {
 // observe records req, resolved by r as res. A public client is the resolved
 // address, or an address in a forwarding header the walk ignored.
 func (d *Detector) observe(r Resolver, req *http.Request, res httpserver.ClientResolution) {
-	public := isPublic(res.IP) || res.IgnoredPublic
+	// ssrf.IsPublicAddr is the rule httpserver judges IgnoredPublic by.
+	public := ssrf.IsPublicAddr(res.IP) || res.IgnoredPublic
 	if !public && !res.UntrustedForwarding {
 		return
 	}
@@ -178,8 +180,4 @@ func (d *Detector) warnPeer(now time.Time, peer netip.Addr) {
 	d.peers[peer] = now
 	slog.Warn("clientaddr: ignored forwarding headers from a peer not in trusted_proxies",
 		"peer", peer.String())
-}
-
-func isPublic(ip netip.Addr) bool {
-	return ip.IsGlobalUnicast() && !ip.IsPrivate()
 }

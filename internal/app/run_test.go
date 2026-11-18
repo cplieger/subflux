@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/health/v2"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/subflux/internal/accounts"
 	"github.com/cplieger/subflux/internal/adminsock"
@@ -972,7 +972,7 @@ func TestExposureResetOnServerSave(t *testing.T) {
 	expose := func() {
 		h := clientaddr.Middleware(func() clientaddr.Resolver { return clientaddr.New(nil) }, det)(http.NotFoundHandler())
 		r := httptest.NewRequest(http.MethodGet, "http://nas.example/", nil)
-		r.RemoteAddr = "203.0.113.7:40000"
+		r.RemoteAddr = "9.9.9.9:40000"
 		h.ServeHTTP(httptest.NewRecorder(), r)
 		if !seen() {
 			t.Fatal("a public client over plain HTTP recorded no exposure")

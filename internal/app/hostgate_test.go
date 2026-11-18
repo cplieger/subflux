@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider/providers"
 	"github.com/cplieger/subflux/internal/settings"
@@ -88,8 +88,14 @@ func TestHostGate(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
 			}
-			if body.Code != "host_not_allowed" || !strings.Contains(body.Error, "server.allowed_hosts") {
-				t.Errorf("body %+v, want host_not_allowed naming server.allowed_hosts", body)
+			if body.Code != "host_not_allowed" || body.Message != "host not allowed" {
+				t.Errorf("code %q message %q, want host_not_allowed and host not allowed", body.Code, body.Message)
+			}
+			if !strings.Contains(body.Remediation, "server.allowed_hosts") {
+				t.Errorf("remediation %q, want it to name server.allowed_hosts", body.Remediation)
+			}
+			if id := rec.Header().Get(httpserver.HeaderRequestID); body.RequestID == "" || body.RequestID != id {
+				t.Errorf("request_id %q, X-Request-ID %q, want one non-empty id", body.RequestID, id)
 			}
 		})
 	}
@@ -127,6 +133,14 @@ func TestHostGateCoversEveryRoute(t *testing.T) {
 	m.Handler()(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	if !strings.Contains(rec.Body.String(), `status="403"`) {
 		t.Errorf("no refusal recorded in http_requests_total:\n%s", rec.Body.String())
+	}
+	refused := ask(h, remotePeer, "other.lan", "/")
+	var body httpserver.ErrorResponse
+	if err := json.Unmarshal(refused.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if id := refused.Header().Get(httpserver.HeaderRequestID); id == "" || body.RequestID != id {
+		t.Errorf("request_id %q, want the access log's X-Request-ID %q", body.RequestID, id)
 	}
 }
 

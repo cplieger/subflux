@@ -17,7 +17,7 @@ const maxReply = 1 << 20
 // names no secret.
 type Error struct {
 	Code    string `json:"code"`
-	Message string `json:"error"`
+	Message string `json:"message"`
 }
 
 func (e *Error) Error() string { return e.Message }
