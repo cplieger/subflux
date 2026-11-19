@@ -22,8 +22,8 @@ github.com/cplieger/go/keyenc v1.3.0 h1:v0zvHSY4ZOZapGNYGAkghEXPz1SeifT/Trg0b9A8
 github.com/cplieger/go/keyenc v1.3.0/go.mod h1:EI1v4Q6FU1Y9hUWTE6kp1n3Mozrm0ws5GOT+Vt/x1+w=
 github.com/cplieger/go/keylock v1.1.0 h1:yjY1RVKMdpiLDUTG4C1ESNANVHC3NNgZQo7aQOI8OuY=
 github.com/cplieger/go/keylock v1.1.0/go.mod h1:6SVZHsMB3trTMYj0x6lVkHqPDI2Np2rrw/biMUzPBxM=
-github.com/cplieger/go/measure/v2 v2.1.0-dev.1 h1:YV0IKDITW9IZr0uOaLzdx5OlNBw/C/zVQ9DQAQ4t4Vo=
-github.com/cplieger/go/measure/v2 v2.1.0-dev.1/go.mod h1:gG4hr0jum0sVWiAppZwHPdvHNIVPBbryOCxzCoPSo84=
+github.com/cplieger/go/measure/v2 v2.1.0-dev.2 h1:Y0zNUFSubYyBdMqS1MpDX5x2qc7Rdr3dnQf/isRAWvI=
+github.com/cplieger/go/measure/v2 v2.1.0-dev.2/go.mod h1:gG4hr0jum0sVWiAppZwHPdvHNIVPBbryOCxzCoPSo84=
 github.com/cplieger/go/slogx v1.1.0 h1:whWmZcNmLuWGFM33SYFR+alUTfEodzBjKju44DHNgPY=
 github.com/cplieger/go/slogx v1.1.0/go.mod h1:N88y5LJZ1aVp++cLFqzEV4WsalaX5YKXoRtXT29Ngkw=
 github.com/cplieger/go/ssrf v1.1.0 h1:gyP7pYm1415RkHmIdod1YCvuX+I1xD1dXiRa8tvz8Bg=
@@ -46,8 +46,8 @@ github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPE
 github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/go-webauthn/webauthn v0.18.2 h1:0BeftmEHU7i3Dv0VFwBtidy/ba37Vcdjvqst9EYu8Sk=
 github.com/go-webauthn/webauthn v0.18.2/go.mod h1:hEXaOuLxvZ3zG9miZe3ehlyeVso9AtklXG+kTn36k+A=
-github.com/go-webauthn/x v0.4.0 h1:ApyCuyPMqYWLfcim8/nbLxuy5nxcL7y7pfOLH+/WItg=
-github.com/go-webauthn/x v0.4.0/go.mod h1:8MN6mqQWQzNSwJdw8j7nvkrGl2rACldz91oqKsImQQ8=
+github.com/go-webauthn/x v0.4.1 h1:zOZMFgQIHg3gHOHiGCEkFhc9ZYbDnMw+d4XXq+rpoIA=
+github.com/go-webauthn/x v0.4.1/go.mod h1:8MN6mqQWQzNSwJdw8j7nvkrGl2rACldz91oqKsImQQ8=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/google/go-tpm v0.9.8 h1:slArAR9Ft+1ybZu0lBwpSmpwhRXaa85hWtMinMyRAWo=
