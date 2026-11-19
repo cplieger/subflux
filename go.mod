@@ -6,11 +6,11 @@ require (
 	github.com/cplieger/access v1.0.0-dev.12
 	github.com/cplieger/animap/mapread v0.3.3
 	github.com/cplieger/arrapi/v3 v3.2.0-dev.18
-	github.com/cplieger/bolttable v1.2.0-dev.13
+	github.com/cplieger/bolttable v1.2.0-dev.14
 	github.com/cplieger/go/filesafe v1.2.0-dev.2
 	github.com/cplieger/go/health/v2 v2.0.0
 	github.com/cplieger/go/httpclient v1.2.0
-	github.com/cplieger/go/httpserver/v2 v2.0.0-dev.10
+	github.com/cplieger/go/httpserver/v2 v2.0.0-dev.11
 	github.com/cplieger/go/jsonx v1.1.0
 	github.com/cplieger/go/keyenc v1.3.0
 	github.com/cplieger/go/keylock v1.1.0
