@@ -1,1 +1,10 @@
-{ "extends": ["github>cplieger/.github:two-branch"] }
+{
+  "extends": ["github>cplieger/.github:two-branch"],
+  "packageRules": [
+    {
+      "description": "github.com/cplieger/access gets its own PR instead of joining the Go dependencies group. Its dev line changes subflux's account store and passkey contracts (account.Tx, the passkey row), so its bump is porting work done by the sign-in units, and inside the group it kept every other Go update red.",
+      "matchPackageNames": ["github.com/cplieger/access"],
+      "groupName": "access"
+    }
+  ]
+}
