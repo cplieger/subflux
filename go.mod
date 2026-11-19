@@ -14,7 +14,7 @@ require (
 	github.com/cplieger/go/jsonx v1.1.0
 	github.com/cplieger/go/keyenc v1.3.0
 	github.com/cplieger/go/keylock v1.1.0
-	github.com/cplieger/go/measure/v2 v2.1.0-dev.1
+	github.com/cplieger/go/measure/v2 v2.1.0-dev.2
 	github.com/cplieger/go/slogx v1.1.0
 	github.com/cplieger/go/ssrf v1.1.0
 	github.com/cplieger/go/textsafe v1.1.0
@@ -39,7 +39,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.9 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/webauthn v0.18.2 // indirect
-	github.com/go-webauthn/x v0.4.0 // indirect
+	github.com/go-webauthn/x v0.4.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
