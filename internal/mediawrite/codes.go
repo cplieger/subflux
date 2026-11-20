@@ -1,22 +1,28 @@
 package mediawrite
 
-import (
-	"slices"
+import "github.com/cplieger/go/httpwire"
 
-	"github.com/cplieger/subflux/internal/timing"
-)
-
-// Codes is every sentinel the api-called exports return (List, Current,
-// Retime, Delete, OpenVideo, DecodeRef, ValidName), timing's passed on, with
-// the code api answers for it. ErrNameContended is absent: only Deliver
-// returns it, and only search calls Deliver.
-var Codes = slices.Concat([]struct {
-	Err  error
-	Code string
-}{
-	{ErrInvalidRef, "param_invalid"},
-	{ErrExpectation, "file_changed"},
-	{ErrPathPending, "write_pending"},
-	{ErrOutsideRoot, "outside_root"},
-	{ErrRootUnavailable, "media_root_unavailable"},
-}, timing.Codes)
+// Owner maps every sentinel the API-called exports return (List, Current,
+// Retime, Delete, OpenVideo, DecodeRef, ValidName) to the code the API answers
+// for it; timing's, which they pass on, are timing.Owner's.
+var Owner = &httpwire.Owner{
+	Name: "mediawrite",
+	Sentinels: map[string]error{
+		"ErrInvalidRef":      ErrInvalidRef,
+		"ErrExpectation":     ErrExpectation,
+		"ErrPathPending":     ErrPathPending,
+		"ErrNameContended":   ErrNameContended,
+		"ErrOutsideRoot":     ErrOutsideRoot,
+		"ErrRootUnavailable": ErrRootUnavailable,
+	},
+	Outside: map[string]string{
+		"ErrNameContended": "only Deliver returns it, and only search calls Deliver",
+	},
+	Codes: []httpwire.OwnerCode{
+		{Err: ErrInvalidRef, Code: "not_found"},
+		{Err: ErrExpectation, Code: "stale_version"},
+		{Err: ErrPathPending, Code: "write_pending"},
+		{Err: ErrOutsideRoot, Code: "outside_root"},
+		{Err: ErrRootUnavailable, Code: "media_root_unavailable"},
+	},
+}

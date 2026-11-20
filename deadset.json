@@ -74,7 +74,6 @@
       "go://github.com/cplieger/subflux/internal/rank#MatchedBy.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/rank#Tri.MarshalText",
       "go://github.com/cplieger/subflux/internal/rank#Tri.UnmarshalText",
-      "go://github.com/cplieger/subflux/internal/scan#Codes",
       "go://github.com/cplieger/subflux/internal/scan#ErrScanCapacity",
       "go://github.com/cplieger/subflux/internal/scan#Request",
       "go://github.com/cplieger/subflux/internal/scan#Request.*",
@@ -83,7 +82,6 @@
       "go://github.com/cplieger/subflux/internal/search#Annotated.*",
       "go://github.com/cplieger/subflux/internal/search#Answer.MarshalText",
       "go://github.com/cplieger/subflux/internal/search#Answer.UnmarshalText",
-      "go://github.com/cplieger/subflux/internal/search#Codes",
       "go://github.com/cplieger/subflux/internal/search#DownloadCauses",
       "go://github.com/cplieger/subflux/internal/search#Engine.Candidates",
       "go://github.com/cplieger/subflux/internal/search#Engine.Download",
@@ -99,11 +97,9 @@
       "go://github.com/cplieger/subflux/internal/seriesorder#Service.Evidence",
       "go://github.com/cplieger/subflux/internal/settings#Active.Search",
       "go://github.com/cplieger/subflux/internal/settings#Active.Timing",
-      "go://github.com/cplieger/subflux/internal/settings#Codes",
       "go://github.com/cplieger/subflux/internal/settings#Mode.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/settings#SectionSchema*",
       "go://github.com/cplieger/subflux/internal/settings#Service.Merge",
-      "go://github.com/cplieger/subflux/internal/statedb#Codes",
       "go://github.com/cplieger/subflux/internal/statedb#Coverage",
       "go://github.com/cplieger/subflux/internal/statedb#Coverage.MarshalText",
       "go://github.com/cplieger/subflux/internal/statedb#Coverage.UnmarshalText",
@@ -133,7 +129,6 @@
       "go://github.com/cplieger/subflux/internal/statedb#Store.Unidentified",
       "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow",
       "go://github.com/cplieger/subflux/internal/statedb#UnidentifiedRow.*",
-      "go://github.com/cplieger/subflux/internal/status#Codes",
       "go://github.com/cplieger/subflux/internal/status#ErrNotCancellable",
       "go://github.com/cplieger/subflux/internal/status#ErrUnknownJob",
       "go://github.com/cplieger/subflux/internal/status#Health.MarshalText",
@@ -159,7 +154,6 @@
       "go://github.com/cplieger/subflux/internal/syncsched#*",
       "go://github.com/cplieger/subflux/internal/timing#Action.MarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Action.UnmarshalText",
-      "go://github.com/cplieger/subflux/internal/timing#Codes",
       "go://github.com/cplieger/subflux/internal/timing#Format.MarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Format.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Method.MarshalText",
@@ -169,7 +163,8 @@
       "go://github.com/cplieger/subflux/internal/timing#SkipReason.UnmarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Verdict.MarshalText",
       "go://github.com/cplieger/subflux/internal/timing#Verdict.UnmarshalText",
-      "go://github.com/cplieger/subflux/internal/wirespec#*"
+      "go://github.com/cplieger/subflux/internal/wirespec#*",
+      "go://github.com/cplieger/subflux/internal/wirespec#FileTag"
     ]
   }
 }

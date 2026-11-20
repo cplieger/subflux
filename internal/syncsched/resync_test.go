@@ -113,8 +113,8 @@ func TestResyncReadsAtTurn(t *testing.T) {
 	r.subtitle(t, "Show S01E01.en.srt", users)
 	r.startRun()
 	job := r.wait(t, (<-started).ID)
-	if !ended(&job, status.Partial, "file_changed") {
-		t.Errorf("job %+v, want Partial, file_changed", job)
+	if !ended(&job, status.Partial, "stale_version") {
+		t.Errorf("job %+v, want Partial, stale_version", job)
 	}
 	if !bytes.Equal(r.read(t, edited), users) {
 		t.Error("the batch overwrote the user's edit")

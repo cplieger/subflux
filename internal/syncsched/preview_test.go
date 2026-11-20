@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/httpwire"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/rank"
 	"github.com/cplieger/subflux/internal/statedb"
+	"github.com/cplieger/subflux/internal/status"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg/ffmpegtest"
 	"github.com/cplieger/subflux/internal/syncsched"
 	"github.com/cplieger/subflux/internal/timing"
@@ -113,21 +115,25 @@ func TestPreviewErrorsAreInCodes(t *testing.T) {
 			t.Errorf("%s: %v, %v; want %v", name, ok, err, tc.want)
 		}
 		if !coded(err) {
-			t.Errorf("%s: %v matches no entry of syncsched.Codes", name, err)
+			t.Errorf("%s: %v matches no code of the preview row's owners", name, err)
 		}
 	}
 }
 
-// coded reports whether err matches an entry of syncsched.Codes.
+// coded reports whether err matches a code of the sync rows' owners.
 func coded(err error) bool {
 	_, ok := codeOf(err)
 	return ok
 }
 
+// codeOf is the code the sync rows answer for err through their owners, in
+// their order: syncsched's, then those it passes on.
 func codeOf(err error) (string, bool) {
-	for _, c := range syncsched.Codes {
-		if errors.Is(err, c.Err) {
-			return c.Code, true
+	for _, o := range []*httpwire.Owner{syncsched.Owner, status.Owner, mediawrite.Owner, timing.Owner} {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code, true
+			}
 		}
 	}
 	return "", false

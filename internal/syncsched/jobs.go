@@ -160,7 +160,7 @@ func causeOf(err error) string {
 	case errors.Is(err, ffmpeg.ErrUnavailable):
 		return causeFFmpegUnavailable
 	}
-	for _, c := range mediawrite.Codes {
+	for _, c := range passedCodes {
 		if errors.Is(err, c.Err) {
 			return c.Code
 		}

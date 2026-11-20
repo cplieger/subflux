@@ -188,20 +188,6 @@ func TestHexText(t *testing.T) {
 			}
 		})
 	}
-
-	sum := strings.Repeat("ab", 32)
-	var s wirespec.SHA256
-	if err := s.UnmarshalText([]byte(sum)); err != nil {
-		t.Fatalf("SHA256 UnmarshalText = %v", err)
-	}
-	if b, _ := s.MarshalText(); string(b) != sum {
-		t.Errorf("SHA256 MarshalText = %q", b)
-	}
-	for _, in := range []string{strings.ToUpper(sum), sum[:62], sum + "ab"} {
-		if err := new(wirespec.SHA256).UnmarshalText([]byte(in)); err == nil {
-			t.Errorf("SHA256 UnmarshalText(%q) accepted it", in)
-		}
-	}
 }
 
 type textEnum interface {

@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"AP-1h", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
+	"AP-1i", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
 
@@ -77,7 +77,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/rank#MatchedBy.UnmarshalText", "AP-1"},
 	{"internal/rank#Tri.MarshalText", "AP-1"},
 	{"internal/rank#Tri.UnmarshalText", "AP-1"},
-	{"internal/scan#Codes", "AP-1"},
 	{"internal/scan#ErrScanCapacity", "AP-1"},
 	{"internal/scan#Request", "AP-1"},
 	{"internal/scan#Request.*", "AP-1"},
@@ -86,7 +85,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/search#Annotated.*", "AP-1"},
 	{"internal/search#Answer.MarshalText", "AP-1"},
 	{"internal/search#Answer.UnmarshalText", "AP-1"},
-	{"internal/search#Codes", "AP-1"},
 	{"internal/search#DownloadCauses", "AP-1"},
 	{"internal/search#Engine.Candidates", "AP-1"},
 	{"internal/search#Engine.Download", "AP-1"},
@@ -102,11 +100,9 @@ var retained = []struct{ pattern, until string }{
 	{"internal/seriesorder#Service.Evidence", "AP-1"},
 	{"internal/settings#Active.Search", "AP-1"},
 	{"internal/settings#Active.Timing", "AP-1"},
-	{"internal/settings#Codes", "AP-1"},
 	{"internal/settings#Mode.UnmarshalText", "AP-1"},
 	{"internal/settings#SectionSchema*", "AP-1"},
 	{"internal/settings#Service.Merge", "AP-1"},
-	{"internal/statedb#Codes", "AP-1"},
 	{"internal/statedb#Coverage", "AP-1"},
 	{"internal/statedb#Coverage.MarshalText", "AP-1"},
 	{"internal/statedb#Coverage.UnmarshalText", "AP-1"},
@@ -136,7 +132,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/statedb#Store.Unidentified", "AP-1b"},
 	{"internal/statedb#UnidentifiedRow", "AP-1b"},
 	{"internal/statedb#UnidentifiedRow.*", "AP-1b"},
-	{"internal/status#Codes", "AP-1"},
 	{"internal/status#ErrNotCancellable", "AP-1"},
 	{"internal/status#ErrUnknownJob", "AP-1"},
 	{"internal/status#Health.MarshalText", "AP-1"},
@@ -162,7 +157,6 @@ var retained = []struct{ pattern, until string }{
 	{"internal/syncsched#*", "AP-1"},
 	{"internal/timing#Action.MarshalText", "AP-1"},
 	{"internal/timing#Action.UnmarshalText", "AP-1"},
-	{"internal/timing#Codes", "AP-1"},
 	{"internal/timing#Format.MarshalText", "AP-1"},
 	{"internal/timing#Format.UnmarshalText", "AP-1"},
 	{"internal/timing#Method.MarshalText", "AP-1"},
@@ -172,7 +166,8 @@ var retained = []struct{ pattern, until string }{
 	{"internal/timing#SkipReason.UnmarshalText", "AP-1"},
 	{"internal/timing#Verdict.MarshalText", "AP-1"},
 	{"internal/timing#Verdict.UnmarshalText", "AP-1"},
-	{"internal/wirespec#*", "AP-1h"},
+	{"internal/wirespec#*", "AP-1i"},
+	{"internal/wirespec#FileTag", "AP-1b"},
 }
 
 func TestRetainedSetMatchesDeadset(t *testing.T) {

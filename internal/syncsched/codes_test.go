@@ -3,16 +3,12 @@ package syncsched_test
 import (
 	"context"
 	"errors"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/status"
 	"github.com/cplieger/subflux/internal/status/statustest"
@@ -21,87 +17,8 @@ import (
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-// code is the element type of syncsched.Codes.
-type code = struct {
-	Err  error
-	Code string
-}
-
-// sentinels names every exported Err* var of the package; a new sentinel
-// must be added here and to Codes or exempt.
-var sentinels = map[string]error{
-	"ErrSyncFailed":      syncsched.ErrSyncFailed,
-	"ErrDifferentCut":    syncsched.ErrDifferentCut,
-	"ErrSyncCapacity":    syncsched.ErrSyncCapacity,
-	"ErrBatchTooLarge":   syncsched.ErrBatchTooLarge,
-	"ErrPreviewCapacity": syncsched.ErrPreviewCapacity,
-	"ErrPreviewRange":    syncsched.ErrPreviewRange,
-}
-
-// exempt lists sentinels deliberately left out of Codes, with the reason.
-var exempt = map[string]string{
-	"ErrSyncFailed":   "only Align returns it; only search calls Align",
-	"ErrDifferentCut": "only Align returns it; jobs report the different_cut cause",
-}
-
-// Go cannot enumerate package vars by reflect, so the source is parsed.
-func TestEverySentinelCoded(t *testing.T) {
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var declared []string
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
-			continue
-		}
-		file, err := parser.ParseFile(token.NewFileSet(), e.Name(), nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, decl := range file.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.VAR {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				for _, id := range spec.(*ast.ValueSpec).Names {
-					if id.IsExported() && strings.HasPrefix(id.Name, "Err") {
-						declared = append(declared, id.Name)
-					}
-				}
-			}
-		}
-	}
-	if len(declared) == 0 {
-		t.Fatal("found no exported Err* var; the parse is broken")
-	}
-	for _, name := range declared {
-		v, ok := sentinels[name]
-		if !ok {
-			t.Errorf("%s is missing from this test's sentinels table", name)
-			continue
-		}
-		_, isExempt := exempt[name]
-		coded := slices.ContainsFunc(syncsched.Codes, func(c code) bool { return c.Err == v })
-		if coded == isExempt {
-			t.Errorf("%s: in Codes %v, exempt %v; want exactly one", name, coded, isExempt)
-		}
-	}
-	for name := range sentinels {
-		if !slices.Contains(declared, name) {
-			t.Errorf("sentinels names %s, which the package does not declare", name)
-		}
-	}
-	passed := slices.Concat(status.StartCodes, mediawrite.Codes)
-	for _, c := range passed {
-		if !slices.Contains(syncsched.Codes, c) {
-			t.Errorf("%v (%s) is not passed on", c.Err, c.Code)
-		}
-	}
-	if want := len(sentinels) - len(exempt) + len(passed); len(syncsched.Codes) != want {
-		t.Errorf("Codes holds %d entries, want syncsched's %d plus the %d passed on", len(syncsched.Codes), len(sentinels)-len(exempt), len(passed))
-	}
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, syncsched.Owner)
 }
 
 // refusing is a persister whose inserts fail with err.
@@ -140,7 +57,7 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			f := r.subtitle(t, "Show S01E01.en.srt", payload)
 			r.subtitle(t, "Show S01E01.en.srt", srt(episode(61, 30)))
 			return propose(r, f, nil)
-		}, "file_changed"},
+		}, "stale_version"},
 		"Propose: an unknown instance": {func(t *testing.T) error {
 			r := newRig(t)
 			f := r.subtitle(t, "Show S01E01.en.srt", payload)
@@ -149,7 +66,7 @@ func TestCodesCoverFailureTable(t *testing.T) {
 				t.Fatal(err)
 			}
 			return propose(r, syncsched.Target{File: ref, Expect: f.Expect}, nil)
-		}, "param_invalid"},
+		}, "not_found"},
 		"Propose: an unreadable subtitle": {func(t *testing.T) error {
 			r := newRig(t)
 			return propose(r, r.subtitle(t, "Show S01E01.en.srt", []byte("no cues")), nil)
@@ -198,7 +115,7 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			r := newRig(t)
 			f := r.subtitle(t, "Show S01E01.en.srt", payload)
 			return resync(r, nil, slices.Repeat([]syncsched.Target{f}, syncsched.MaxBatch+1)...)
-		}, "body_invalid"},
+		}, "bad_body"},
 		"Resync: a reused key": {func(t *testing.T) error {
 			r := newRig(t)
 			f := r.subtitle(t, "Show S01E01.en.srt", payload)

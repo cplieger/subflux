@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/access"
 	"github.com/cplieger/access/accesshttp"
 	"github.com/cplieger/access/accesstest"
+	"github.com/cplieger/subflux/internal/clientaddr"
 )
 
 // TestClientFollowsTheResolverGetter serves the routes behind
@@ -29,10 +30,43 @@ func TestClientFollowsTheResolverGetter(t *testing.T) {
 		t.Fatalf("setup from loopback with no token = %d %s, want 200", w.Code, w.Body)
 	}
 
-	const proxy, client, other = "10.0.0.2", "198.51.100.7", "198.51.100.8"
-	e.set(func(e *env) { e.trusted = []netip.Prefix{netip.MustParsePrefix(proxy + "/32")} })
+	e.set(func(e *env) { e.trusted = []netip.Prefix{netip.MustParsePrefix(listedProxy + "/32")} })
+	checkForwardedClient(t, st, store, origin)
+}
+
+// TestClientIsTheMiddlewares serves the routes behind a clientaddr.Middleware
+// trusting the proxy while the service's own resolver trusts none, as after a
+// trusted_proxies Save mid-request: only an address read through
+// clientaddr.From names the forwarded client.
+func TestClientIsTheMiddlewares(t *testing.T) {
+	e := newEnv()
+	store := accesstest.NewMemStore()
+	d := e.deps()
+	s, err := compose(t.Context(), &d, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.shutdown(t.Context()) })
+	listed := clientaddr.New([]netip.Prefix{netip.MustParsePrefix(listedProxy + "/32")})
+	st := mountVia(t, s, func() clientaddr.Resolver { return listed })
+	const origin = "http://127.0.0.1:8374"
+	setup := accesshttp.SetupPasswordRequest{Username: "ada", Password: testPassword}
+	if w := newBrowser(t, origin, "127.0.0.1").call(t, st, "authSetupPassword", setup); w.Code != http.StatusOK {
+		t.Fatalf("setup from loopback = %d %s, want 200", w.Code, w.Body)
+	}
+	checkForwardedClient(t, st, store, origin)
+}
+
+// listedProxy is the proxy checkForwardedClient's requests arrive from.
+const listedProxy = "10.0.0.2"
+
+// checkForwardedClient signs ada in through listedProxy and checks that the
+// session's LastIP and the sign-in limiter's key are the forwarded client.
+func checkForwardedClient(t *testing.T, st *site, store *accesstest.MemStore, origin string) {
+	t.Helper()
+	const client, other = "198.51.100.7", "198.51.100.8"
 	via := func(forwarded, password string) int {
-		b := newBrowser(t, origin, proxy)
+		b := newBrowser(t, origin, listedProxy)
 		w := b.sendWith(st, http.MethodPost, st.path(t, routeLoginPassword), `{"username":"ada","password":"`+password+`"}`,
 			http.Header{"X-Forwarded-For": {forwarded}})
 		return w.Code

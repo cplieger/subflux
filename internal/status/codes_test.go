@@ -3,10 +3,10 @@ package status_test
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/sentineltest"
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/status"
 	"github.com/cplieger/subflux/internal/status/statustest"
 )
@@ -16,6 +16,19 @@ type codeArm struct {
 	call func() error
 	name string
 	want string
+}
+
+// codeOf is the code of the first entry of owners' Codes that err matches by
+// errors.Is, "" when none does: the lookup httpwire's answer mapping makes.
+func codeOf(err error, owners ...*httpwire.Owner) string {
+	for _, o := range owners {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code
+			}
+		}
+	}
+	return ""
 }
 
 // startArms reach every refusal of Keyed and Begin.
@@ -50,34 +63,7 @@ func startArms(t *testing.T) []codeArm {
 	}
 }
 
-func TestStartCodesAreKeyedAndBeginCodes(t *testing.T) {
-	want := map[error]string{
-		status.ErrKeyReused:     "idempotency_key_reused",
-		status.ErrJobCapacity:   "job_capacity",
-		status.ErrJobUnrecorded: "job_unrecorded",
-	}
-	if len(status.StartCodes) != len(want) {
-		t.Errorf("StartCodes holds %d entries, want %d", len(status.StartCodes), len(want))
-	}
-	for _, c := range status.StartCodes {
-		if code, ok := want[c.Err]; !ok || code != c.Code {
-			t.Errorf("StartCodes pairs %v with %q; want only %v", c.Err, c.Code, want)
-		}
-	}
-	for _, arm := range startArms(t) {
-		t.Run(arm.name, func(t *testing.T) {
-			if got := sentineltest.CodeOf(status.StartCodes, arm.call()); got != arm.want {
-				t.Errorf("code %q, want %q", got, arm.want)
-			}
-		})
-	}
-}
-
 func TestCodesCoverFailureTable(t *testing.T) {
-	if n := len(status.StartCodes); len(status.Codes) < n || !slices.Equal(status.Codes[:n], status.StartCodes) {
-		t.Errorf("Codes %v does not begin with StartCodes %v", status.Codes, status.StartCodes)
-	}
-
 	s := open(t, statustest.NewMemPersister())
 	done := begin(t, s, 7, nil, func() {})
 	finish(s, done.ID, status.Succeeded)
@@ -87,17 +73,13 @@ func TestCodesCoverFailureTable(t *testing.T) {
 	)
 	for _, arm := range arms {
 		t.Run(arm.name, func(t *testing.T) {
-			if got := sentineltest.CodeOf(status.Codes, arm.call()); got != arm.want {
+			if got := codeOf(arm.call(), status.Owner); got != arm.want {
 				t.Errorf("code %q, want %q", got, arm.want)
 			}
 		})
 	}
+}
 
-	sentineltest.Placed(t, status.Codes, map[string]error{
-		"ErrJobUnrecorded":  status.ErrJobUnrecorded,
-		"ErrKeyReused":      status.ErrKeyReused,
-		"ErrJobCapacity":    status.ErrJobCapacity,
-		"ErrNotCancellable": status.ErrNotCancellable,
-		"ErrUnknownJob":     status.ErrUnknownJob,
-	}, nil)
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, status.Owner)
 }

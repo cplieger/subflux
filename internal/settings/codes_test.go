@@ -2,9 +2,11 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/sentineltest"
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/go/httpwire/httpwiretest"
 )
 
 func TestCodesCoverFailureTable(t *testing.T) {
@@ -31,19 +33,30 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			s := serve(fixture(t, ""), nil, nil)
 			_, _, err := s.Save(t.Context(), node(t, text), "a revision never read")
 			return err
-		}, "Save from another revision", "settings_conflict"},
+		}, "Save from another revision", "stale_version"},
 	}
 	for _, arm := range arms {
 		t.Run(arm.name, func(t *testing.T) {
-			if got := sentineltest.CodeOf(Codes, arm.call(t)); got != arm.want {
+			if got := codeOf(arm.call(t), Owner); got != arm.want {
 				t.Errorf("code %q, want %q", got, arm.want)
 			}
 		})
 	}
+}
 
-	sentineltest.Placed(t, Codes, map[string]error{
-		"ErrActivation": ErrActivation,
-		"ErrClosed":     ErrClosed,
-		"ErrConflict":   ErrConflict,
-	}, nil)
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, Owner)
+}
+
+// codeOf is the code of the first entry of owners' Codes that err matches by
+// errors.Is, "" when none does: the lookup httpwire's answer mapping makes.
+func codeOf(err error, owners ...*httpwire.Owner) string {
+	for _, o := range owners {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code
+			}
+		}
+	}
+	return ""
 }
