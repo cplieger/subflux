@@ -14,8 +14,10 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/media"
 	"github.com/cplieger/subflux/internal/mediawrite"
@@ -681,5 +683,77 @@ func TestCallsWaitForRecovery(t *testing.T) {
 		}
 		close(back.release)
 		eventually(t, "the root to recover", func() bool { return list(t.Context()) == nil })
+	})
+}
+
+func TestShutdownCutRecoveryLogsNothing(t *testing.T) {
+	t.Parallel()
+	a := filepath.Join(t.TempDir(), "a")
+	writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+	store := openStore(t)
+	ended, cancel := context.WithCancel(t.Context())
+	cancel()
+	t.Run("Run on an ended context", func(t *testing.T) {
+		log, rec := capture.New()
+		w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(a), Logger: log}, nil)
+		if err := w.Run(ended); err != nil {
+			t.Fatalf("Run = %v", err)
+		}
+		if n := rec.Count("pending writes"); n != 0 {
+			t.Errorf("logged %q, want nothing for the passes the ended context cut", rec.Messages())
+		}
+	})
+	t.Run("a recovery on an ended context", func(t *testing.T) {
+		log, rec := capture.New()
+		w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(a), Logger: log}, nil)
+		run(t, w)
+		before := rec.Len()
+		if !mediawrite.RecoverNow(ended, w, a) {
+			t.Fatal("RecoverNow found no root or a running attempt")
+		}
+		if n := rec.Count("pending writes"); n != 0 || rec.Len() != before {
+			t.Errorf("logged %q, want nothing for the recovery the ended context cut", rec.Messages())
+		}
+	})
+}
+
+func TestRunWaitsOnRecoveryOutstanding(t *testing.T) {
+	t.Parallel()
+	a := filepath.Join(t.TempDir(), "a")
+	writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+	store := openStore(t)
+	synctest.Test(t, func(t *testing.T) {
+		held, release := make(chan struct{}), make(chan struct{})
+		var once sync.Once
+		w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(a)}, func(f *mediawrite.Faults) {
+			step := f.Step
+			f.Step = func(s string) {
+				step(s)
+				if s == "recover-snapshot" {
+					once.Do(func() { close(held) })
+					<-release
+				}
+			}
+		})
+		ctx, stop := context.WithCancel(context.Background())
+		returned := make(chan error, 1)
+		go func() { returned <- w.Run(ctx) }()
+		<-held
+		stop()
+		synctest.Wait()
+		if returnedYet(t, returned) {
+			t.Fatal("Run returned while the root's recovery was still running")
+		}
+		if got := w.Outstanding(); !slices.Equal(got, []string{a}) {
+			t.Errorf("Outstanding = %q while Run waits on the recovery, want [%s]", got, a)
+		}
+		close(release)
+		synctest.Wait()
+		if !returnedYet(t, returned) {
+			t.Fatal("Run did not return once the recovery did")
+		}
+		if got := w.Outstanding(); len(got) != 0 {
+			t.Errorf("Outstanding = %q after Run returned, want none", got)
+		}
 	})
 }

@@ -57,12 +57,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlert",
-      "path": "internal/status/sources.go",
-      "reason": "Retained until MS-3 (internal/status#MediaServerAlert): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#MaxAlertSource",
       "path": "internal/status/sources.go",
       "reason": "The bound every constructed alert source keeps, declared in the architecture's status contract (C10) for its callers."
@@ -122,10 +116,28 @@
       "reason": "Each read exception row carries its evidence of common use as data, which TestExceptionRows requires; no production path reads it."
     },
     {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver#Result.Err",
+      "path": "internal/mediaserver/set.go",
+      "reason": "Retained until MS-3b (internal/mediaserver#Result.*): its first reader, the server sinks, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver#Result.Server",
+      "path": "internal/mediaserver/set.go",
+      "reason": "Retained until MS-3b (internal/mediaserver#Result.*): its first reader, the server sinks, lands there."
+    },
+    {
+      "code": "DS1301",
+      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver#Result.Transient",
+      "path": "internal/mediaserver/set.go",
+      "reason": "Retained until MS-3b (internal/mediaserver#Result.*): its first reader, the server sinks, lands there."
+    },
+    {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver#Label",
-      "path": "internal/mediaserver/label.go",
-      "reason": "Retained until AP-1 (internal/mediaserver#*): its first caller outside the package, api's item document, lands there."
+      "symbol": "go://github.com/cplieger/subflux/internal/mediaserver/plex#Kind",
+      "path": "internal/mediaserver/plex/plex.go",
+      "reason": "Retained until MS-3b (internal/mediaserver/plex#Kind): its first caller outside the package, app's media server registry, lands there."
     },
     {
       "code": "DS1301",
@@ -623,7 +635,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/status#MediaServerAlerts",
       "path": "internal/status/sources.go",
-      "reason": "Retained until MS-3 (internal/status#MediaServerAlerts): its first caller outside the package, the media server alerts, lands there."
+      "reason": "Retained until MS-3b (internal/status#MediaServerAlerts): its first caller outside the package, the media server alerts, lands there."
     },
     {
       "code": "DS1301",

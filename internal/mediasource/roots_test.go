@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/formschema"
@@ -211,5 +212,54 @@ func TestMediaRootsFailedFillRootless(t *testing.T) {
 	}
 	if rec.Count("root folders unread") != 1 {
 		t.Errorf("WARNs %q, want one for the failed fill", rec.Messages())
+	}
+}
+
+func TestCloseJoinsFill(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var exited atomic.Bool
+		s := &script{caps: allCaps, folders: func(ctx context.Context) ([]string, error) {
+			defer exited.Store(true)
+			<-ctx.Done()
+			return nil, &mediasource.SourceError{Cause: mediasource.Unreachable, Err: ctx.Err()}
+		}}
+		set, rec := oneSet(t, s, mediasource.Config{})
+		answered := make(chan []string)
+		go func() { answered <- set.MediaRoots(t.Context()) }()
+		synctest.Wait()
+		if exited.Load() {
+			t.Fatal("the fill returned before Close; the test holds nothing")
+		}
+		start := time.Now()
+		set.Close()
+		if !exited.Load() {
+			t.Error("Close returned while the fill was still running")
+		}
+		if waited := time.Since(start); waited != 0 {
+			t.Errorf("Close took %v, want it to end the fill at once rather than wait out its deadline", waited)
+		}
+		if got := <-answered; len(got) != 0 {
+			t.Errorf("the caller waiting on the closed fill got %q, want nothing", got)
+		}
+		if rec.Len() != 0 {
+			t.Errorf("logged %q at Close, want nothing: a closed Set's fill is not unread", rec.Messages())
+		}
+	})
+}
+
+func TestClosedSetStartsNoFill(t *testing.T) {
+	s := &script{caps: allCaps, folders: folders("/tv")}
+	set, _ := oneSet(t, s, mediasource.Config{})
+	set.Close()
+	if got := set.MediaRoots(t.Context()); len(got) != 0 {
+		t.Errorf("a closed Set with no roots read answered %q, want nothing", got)
+	}
+	if n := s.calls.Load(); n != 0 {
+		t.Errorf("%d RootFolders calls after Close, want none", n)
+	}
+	mapped, _ := oneSet(t, &script{caps: allCaps}, mediasource.Config{PathMappings: []mediasource.PathMapping{{From: "/tv", To: "/media/tv"}}})
+	mapped.Close()
+	if got := mapped.MediaRoots(t.Context()); !slices.Equal(got, []string{"/media/tv"}) {
+		t.Errorf("a closed Set's mapped roots %q, want [/media/tv]", got)
 	}
 }

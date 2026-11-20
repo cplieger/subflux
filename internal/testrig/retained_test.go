@@ -13,7 +13,7 @@ import (
 // rollouts are the subflux landings a retained row may wait for. Library
 // landings are absent: only a subflux landing gives subflux code a caller.
 var rollouts = []string{
-	"AP-1i", "AP-1b", "AP-1", "PA-2b", "MS-3", "SE-3", "WC-1a", "WC-1b",
+	"AP-1i", "AP-1b", "AP-1", "PA-2b", "MS-3b", "SE-3", "WC-1a", "WC-1b",
 	"WC-1", "UX-1b", "UX-1", "AUS-1",
 }
 
@@ -56,6 +56,11 @@ var retained = []struct{ pattern, until string }{
 	{"internal/media#RootKey.MarshalText", "AP-1"},
 	{"internal/media#Scheme.MarshalText", "AP-1"},
 	{"internal/mediaserver#*", "AP-1"},
+	{"internal/mediaserver#NewSet", "MS-3b"},
+	{"internal/mediaserver#ParseConfigs", "MS-3b"},
+	{"internal/mediaserver#Result.*", "MS-3b"},
+	{"internal/mediaserver#Set.*", "MS-3b"},
+	{"internal/mediaserver/plex#Kind", "MS-3b"},
 	{"internal/mediasource#Capabilities.Posters", "AP-1"},
 	{"internal/mediasource#Set.LocalPath", "AP-1"},
 	{"internal/mediasource#Set.Ping", "AP-1"},
@@ -139,8 +144,7 @@ var retained = []struct{ pattern, until string }{
 	{"internal/status#JobID.MarshalText", "AP-1"},
 	{"internal/status#Kind.MarshalText", "AP-1"},
 	{"internal/status#Kind.UnmarshalText", "AP-1"},
-	{"internal/status#MediaServerAlert", "MS-3"},
-	{"internal/status#MediaServerAlerts", "MS-3"},
+	{"internal/status#MediaServerAlerts", "MS-3b"},
 	{"internal/status#Outcome.MarshalText", "AP-1"},
 	{"internal/status#Outcome.UnmarshalText", "AP-1"},
 	{"internal/status#OwnerOf", "AP-1"},

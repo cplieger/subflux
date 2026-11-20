@@ -1,0 +1,1257 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "allowSync": true,
+  "identifier": "com.plexapp.plugins.library",
+  "librarySectionID": 1,
+  "librarySectionTitle": "Movies",
+  "librarySectionUUID": "00000000-0000-4000-8000-000000000001",
+  "mediaTagPrefix": "/system/bundle/media/flags/",
+  "mediaTagVersion": 1786914632,
+  "Metadata": [
+   {
+    "ratingKey": "677294",
+    "key": "/library/metadata/677294",
+    "guid": "plex://movie/5d776824a091de001f2e6020",
+    "slug": "2001-a-space-odyssey",
+    "studio": "Stanley Kubrick Productions",
+    "type": "movie",
+    "title": "2001: A Space Odyssey",
+    "librarySectionTitle": "Movies",
+    "librarySectionID": 1,
+    "librarySectionKey": "/library/sections/1",
+    "contentRating": "G",
+    "contentRatingAge": 12,
+    "summary": "When a mysterious artifact is uncovered on the Moon, a spacecraft manned by two scientists and one supercomputer is dispatched to Jupiter to find its origins.",
+    "rating": 9.0,
+    "audienceRating": 8.8,
+    "viewCount": 1,
+    "lastViewedAt": 1662235082,
+    "year": 1968,
+    "tagline": "An epic drama of adventure and exploration.",
+    "thumb": "/library/metadata/677294/thumb/1787019465",
+    "art": "/library/metadata/677294/art/1787019465",
+    "duration": 8929280,
+    "originallyAvailableAt": "1968-04-11",
+    "addedAt": 1768273861,
+    "updatedAt": 1787019465,
+    "audienceRatingImage": "rottentomatoes://image.rating.upright",
+    "chapterSource": "media",
+    "loudnessAnalysisVersion": "0.02",
+    "primaryExtraKey": "/library/metadata/677295",
+    "ratingImage": "rottentomatoes://image.rating.ripe",
+    "Media": [
+     {
+      "id": 832998,
+      "duration": 8929280,
+      "bitrate": 21543,
+      "width": 1920,
+      "height": 872,
+      "aspectRatio": 2.2,
+      "audioChannels": 6,
+      "audioCodec": "eac3",
+      "videoCodec": "hevc",
+      "videoResolution": "1080",
+      "container": "mkv",
+      "videoFrameRate": "24p",
+      "videoProfile": "main 10",
+      "hasVoiceActivity": true,
+      "Part": [
+       {
+        "id": 965908,
+        "key": "/library/parts/965908/1768273847/file.mkv",
+        "duration": 8929280,
+        "file": "/media/movies/2001 A Space Odyssey (1968) {imdb-tt0062622}/2001 A Space Odyssey (1968) {imdb-tt0062622} - [Bluray-1080p][EAC3 5.1][DV HDR10][x265]-CtrlHD.mkv",
+        "size": 24045053528,
+        "container": "mkv",
+        "indexes": "sd",
+        "videoProfile": "main 10",
+        "Stream": [
+         {
+          "id": 4239439,
+          "streamType": 1,
+          "default": true,
+          "codec": "hevc",
+          "index": 0,
+          "bitrate": 19303,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "DOVIBLCompatID": 1,
+          "DOVIBLPresent": true,
+          "DOVIELPresent": false,
+          "DOVILevel": 3,
+          "DOVIPresent": true,
+          "DOVIProfile": 8,
+          "DOVIRPUPresent": true,
+          "DOVIVersion": "1.0",
+          "bitDepth": 10,
+          "chromaLocation": "topleft",
+          "chromaSubsampling": "4:2:0",
+          "codedHeight": 872,
+          "codedWidth": 1920,
+          "colorPrimaries": "bt2020",
+          "colorRange": "tv",
+          "colorSpace": "bt2020nc",
+          "colorTrc": "smpte2084",
+          "frameRate": 23.976,
+          "height": 872,
+          "level": 153,
+          "profile": "main 10",
+          "refFrames": 1,
+          "width": 1920,
+          "displayTitle": "1080p DoVi/HDR10",
+          "extendedDisplayTitle": "1080p DoVi/HDR10 (HEVC Main 10)"
+         },
+         {
+          "id": 4239440,
+          "streamType": 2,
+          "canNormalizeLoudness": true,
+          "selected": true,
+          "default": true,
+          "codec": "eac3",
+          "index": 1,
+          "channels": 6,
+          "bitrate": 1024,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "audioChannelLayout": "5.1(side)",
+          "gainOffset": "1.37",
+          "loudness": "-17.63",
+          "loudnessAnalysisVersion": "0.02",
+          "lra": "22.00",
+          "peak": "0.04",
+          "samplingRate": 48000,
+          "threshold": "-30.42",
+          "title": "Restored and Re-mixed",
+          "displayTitle": "English (EAC3 5.1)",
+          "extendedDisplayTitle": "Restored and Re-mixed (English EAC3 5.1)"
+         },
+         {
+          "id": 4239441,
+          "streamType": 2,
+          "canNormalizeLoudness": true,
+          "codec": "eac3",
+          "index": 2,
+          "channels": 6,
+          "bitrate": 1024,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "audioChannelLayout": "5.1(side)",
+          "gainOffset": "0.66",
+          "loudness": "-17.49",
+          "loudnessAnalysisVersion": "0.02",
+          "lra": "22.90",
+          "peak": "0.00",
+          "samplingRate": 48000,
+          "threshold": "-30.47",
+          "title": "Original 1968 Theatrical Audio",
+          "displayTitle": "English (EAC3 5.1)",
+          "extendedDisplayTitle": "Original 1968 Theatrical Audio (English EAC3 5.1)"
+         },
+         {
+          "id": 4239442,
+          "streamType": 2,
+          "canNormalizeLoudness": true,
+          "codec": "ac3",
+          "index": 3,
+          "channels": 2,
+          "bitrate": 192,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "audioChannelLayout": "stereo",
+          "gainOffset": "0.44",
+          "loudness": "-29.53",
+          "loudnessAnalysisVersion": "0.02",
+          "lra": "10.10",
+          "peak": "-10.44",
+          "samplingRate": 48000,
+          "threshold": "-40.68",
+          "title": "Commentary by Keir Dullea and Gary Lockwood",
+          "displayTitle": "English (AC3 Stereo)",
+          "extendedDisplayTitle": "Commentary by Keir Dullea and Gary Lockwood (English AC3 Stereo)"
+         },
+         {
+          "id": 4239443,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "srt",
+          "index": 4,
+          "bitrate": 0,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "hearingImpaired": true,
+          "title": "English (SRT)",
+          "displayTitle": "English SDH",
+          "extendedDisplayTitle": "English (SRT) (SDH)"
+         },
+         {
+          "id": 4239444,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "srt",
+          "index": 5,
+          "bitrate": 0,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "hearingImpaired": true,
+          "title": "English SDH (SRT)",
+          "displayTitle": "English SDH",
+          "extendedDisplayTitle": "English SDH (SRT)"
+         },
+         {
+          "id": 4239445,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 6,
+          "bitrate": 15,
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "hearingImpaired": true,
+          "title": "English SDH",
+          "displayTitle": "English SDH",
+          "extendedDisplayTitle": "English SDH (PGS)"
+         },
+         {
+          "id": 4239446,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 7,
+          "bitrate": 7,
+          "language": "العربية",
+          "languageTag": "ar",
+          "languageCode": "ara",
+          "title": "Arabic",
+          "displayTitle": "العربية",
+          "extendedDisplayTitle": "Arabic (العربية PGS)"
+         },
+         {
+          "id": 4239447,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 8,
+          "bitrate": 12,
+          "language": "中文",
+          "languageTag": "zh",
+          "languageCode": "zho",
+          "title": "Chinese (Simplified)",
+          "displayTitle": "中文",
+          "extendedDisplayTitle": "Chinese (Simplified) (中文 PGS)"
+         },
+         {
+          "id": 4239448,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 9,
+          "bitrate": 13,
+          "language": "中文",
+          "languageTag": "zh",
+          "languageCode": "zho",
+          "title": "Chinese (Traditional)",
+          "displayTitle": "中文",
+          "extendedDisplayTitle": "Chinese (Traditional) (中文 PGS)"
+         },
+         {
+          "id": 4239449,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 10,
+          "bitrate": 13,
+          "language": "Hrvatski",
+          "languageTag": "hr",
+          "languageCode": "hrv",
+          "title": "Croatian",
+          "displayTitle": "Hrvatski",
+          "extendedDisplayTitle": "Croatian (Hrvatski PGS)"
+         },
+         {
+          "id": 4239450,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 11,
+          "bitrate": 12,
+          "language": "Čeština",
+          "languageTag": "cs",
+          "languageCode": "ces",
+          "title": "Czech",
+          "displayTitle": "Čeština",
+          "extendedDisplayTitle": "Czech (Čeština PGS)"
+         },
+         {
+          "id": 4239451,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 12,
+          "bitrate": 10,
+          "language": "Dansk",
+          "languageTag": "da",
+          "languageCode": "dan",
+          "title": "Danish",
+          "displayTitle": "Dansk",
+          "extendedDisplayTitle": "Danish (Dansk PGS)"
+         },
+         {
+          "id": 4239452,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 13,
+          "bitrate": 11,
+          "language": "Nederlands",
+          "languageTag": "nl",
+          "languageCode": "nld",
+          "title": "Dutch",
+          "displayTitle": "Nederlands",
+          "extendedDisplayTitle": "Dutch (Nederlands PGS)"
+         },
+         {
+          "id": 4239453,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 14,
+          "bitrate": 10,
+          "language": "Suomi",
+          "languageTag": "fi",
+          "languageCode": "fin",
+          "title": "Finnish",
+          "displayTitle": "Suomi",
+          "extendedDisplayTitle": "Finnish (Suomi PGS)"
+         },
+         {
+          "id": 4239454,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 15,
+          "bitrate": 12,
+          "language": "Français",
+          "languageTag": "fr",
+          "languageCode": "fra",
+          "title": "French",
+          "displayTitle": "Français",
+          "extendedDisplayTitle": "French (Français PGS)"
+         },
+         {
+          "id": 4239455,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 16,
+          "bitrate": 16,
+          "language": "Deutsch",
+          "languageTag": "de",
+          "languageCode": "deu",
+          "title": "German",
+          "displayTitle": "Deutsch",
+          "extendedDisplayTitle": "German (Deutsch PGS)"
+         },
+         {
+          "id": 4239456,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 17,
+          "bitrate": 12,
+          "language": "Ελληνικά",
+          "languageTag": "el",
+          "languageCode": "ell",
+          "title": "Greek",
+          "displayTitle": "Ελληνικά",
+          "extendedDisplayTitle": "Greek (Ελληνικά PGS)"
+         },
+         {
+          "id": 4239457,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 18,
+          "bitrate": 8,
+          "language": "עברית",
+          "languageTag": "he",
+          "languageCode": "heb",
+          "title": "Hebrew",
+          "displayTitle": "עברית",
+          "extendedDisplayTitle": "Hebrew (עברית PGS)"
+         },
+         {
+          "id": 4239458,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 19,
+          "bitrate": 13,
+          "language": "magyar",
+          "languageTag": "hu",
+          "languageCode": "hun",
+          "title": "Hungarian",
+          "displayTitle": "magyar",
+          "extendedDisplayTitle": "Hungarian (magyar PGS)"
+         },
+         {
+          "id": 4239459,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 20,
+          "bitrate": 15,
+          "language": "Italiano",
+          "languageTag": "it",
+          "languageCode": "ita",
+          "title": "Italian",
+          "displayTitle": "Italiano",
+          "extendedDisplayTitle": "Italian (Italiano PGS)"
+         },
+         {
+          "id": 4239460,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 21,
+          "bitrate": 12,
+          "language": "日本語",
+          "languageTag": "ja",
+          "languageCode": "jpn",
+          "title": "Japanese",
+          "displayTitle": "日本語",
+          "extendedDisplayTitle": "Japanese (日本語 PGS)"
+         },
+         {
+          "id": 4239461,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 22,
+          "bitrate": 10,
+          "language": "한국어",
+          "languageTag": "ko",
+          "languageCode": "kor",
+          "title": "Korean",
+          "displayTitle": "한국어",
+          "extendedDisplayTitle": "Korean (한국어 PGS)"
+         },
+         {
+          "id": 4239462,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 23,
+          "bitrate": 10,
+          "language": "norsk",
+          "languageTag": "no",
+          "languageCode": "nor",
+          "title": "Norwegian",
+          "displayTitle": "norsk",
+          "extendedDisplayTitle": "Norwegian (norsk PGS)"
+         },
+         {
+          "id": 4239463,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 24,
+          "bitrate": 11,
+          "language": "polski",
+          "languageTag": "pl",
+          "languageCode": "pol",
+          "title": "Polish",
+          "displayTitle": "polski",
+          "extendedDisplayTitle": "Polish (polski PGS)"
+         },
+         {
+          "id": 4239464,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 25,
+          "bitrate": 13,
+          "language": "Português",
+          "languageTag": "pt-BR",
+          "languageCode": "por",
+          "title": "Portuguese (Brazil)",
+          "displayTitle": "Português",
+          "extendedDisplayTitle": "Portuguese (Brazil) (Português PGS)"
+         },
+         {
+          "id": 4239465,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 26,
+          "bitrate": 15,
+          "language": "Português",
+          "languageTag": "pt",
+          "languageCode": "por",
+          "title": "Portuguese (Portugal)",
+          "displayTitle": "Português",
+          "extendedDisplayTitle": "Portuguese (Portugal) (Português PGS)"
+         },
+         {
+          "id": 4239466,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 27,
+          "bitrate": 11,
+          "language": "română",
+          "languageTag": "ro",
+          "languageCode": "ron",
+          "title": "Romanian",
+          "displayTitle": "română",
+          "extendedDisplayTitle": "Romanian (română PGS)"
+         },
+         {
+          "id": 4239467,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 28,
+          "bitrate": 14,
+          "language": "Русский",
+          "languageTag": "ru",
+          "languageCode": "rus",
+          "title": "Russian",
+          "displayTitle": "Русский",
+          "extendedDisplayTitle": "Russian (Русский PGS)"
+         },
+         {
+          "id": 4239468,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 29,
+          "bitrate": 13,
+          "language": "Español",
+          "languageTag": "es",
+          "languageCode": "spa",
+          "title": "Spanish (Castilian)",
+          "displayTitle": "Español",
+          "extendedDisplayTitle": "Spanish (Castilian) (Español PGS)"
+         },
+         {
+          "id": 4239469,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 30,
+          "bitrate": 12,
+          "language": "Español",
+          "languageTag": "es",
+          "languageCode": "spa",
+          "title": "Spanish (Latin)",
+          "displayTitle": "Español",
+          "extendedDisplayTitle": "Spanish (Latin) (Español PGS)"
+         },
+         {
+          "id": 4239470,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 31,
+          "bitrate": 9,
+          "language": "Svenska",
+          "languageTag": "sv",
+          "languageCode": "swe",
+          "title": "Swedish",
+          "displayTitle": "Svenska",
+          "extendedDisplayTitle": "Swedish (Svenska PGS)"
+         },
+         {
+          "id": 4239471,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 32,
+          "bitrate": 13,
+          "language": "ไทย",
+          "languageTag": "th",
+          "languageCode": "tha",
+          "title": "Thai",
+          "displayTitle": "ไทย",
+          "extendedDisplayTitle": "Thai (ไทย PGS)"
+         },
+         {
+          "id": 4239472,
+          "streamType": 3,
+          "canAutoSync": false,
+          "codec": "pgs",
+          "index": 33,
+          "bitrate": 13,
+          "language": "Türkçe",
+          "languageTag": "tr",
+          "languageCode": "tur",
+          "title": "Turkish",
+          "displayTitle": "Türkçe",
+          "extendedDisplayTitle": "Turkish (Türkçe PGS)"
+         },
+         {
+          "id": 4549038,
+          "key": "/library/streams/4549038",
+          "streamType": 3,
+          "canAutoSync": true,
+          "selected": true,
+          "codec": "srt",
+          "language": "English",
+          "languageTag": "en",
+          "languageCode": "eng",
+          "format": "srt",
+          "displayTitle": "English",
+          "extendedDisplayTitle": "English (SRT External)"
+         },
+         {
+          "id": 4549039,
+          "key": "/library/streams/4549039",
+          "streamType": 3,
+          "canAutoSync": true,
+          "codec": "srt",
+          "language": "Français",
+          "languageTag": "fr",
+          "languageCode": "fra",
+          "format": "srt",
+          "displayTitle": "Français",
+          "extendedDisplayTitle": "Français (SRT External)"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "Image": [
+     {
+      "alt": "2001: A Space Odyssey",
+      "type": "coverPoster",
+      "url": "/library/metadata/677294/thumb/1787019465"
+     },
+     {
+      "alt": "2001: A Space Odyssey",
+      "type": "background",
+      "url": "/library/metadata/677294/art/1787019465"
+     },
+     {
+      "alt": "2001: A Space Odyssey",
+      "type": "clearLogo",
+      "url": "/library/metadata/677294/clearLogo/1787019465"
+     },
+     {
+      "alt": "2001: A Space Odyssey",
+      "type": "backgroundSquare",
+      "url": "/library/metadata/677294/squareArt/1787019465"
+     }
+    ],
+    "UltraBlurColors": {
+     "topLeft": "0c304c",
+     "topRight": "46191c",
+     "bottomRight": "130311",
+     "bottomLeft": "2f628b"
+    },
+    "Genre": [
+     {
+      "id": 691,
+      "filter": "genre=691",
+      "tag": "Science Fiction"
+     },
+     {
+      "id": 1040,
+      "filter": "genre=1040",
+      "tag": "Mystery"
+     },
+     {
+      "id": 242,
+      "filter": "genre=242",
+      "tag": "Adventure"
+     }
+    ],
+    "Country": [
+     {
+      "id": 1143190,
+      "filter": "country=1143190",
+      "tag": "United Kingdom"
+     },
+     {
+      "id": 706,
+      "filter": "country=706",
+      "tag": "United States of America"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0062622"
+     },
+     {
+      "id": "tmdb://62"
+     },
+     {
+      "id": "tvdb://242"
+     }
+    ],
+    "Rating": [
+     {
+      "image": "imdb://image.rating",
+      "value": 8.3,
+      "type": "audience"
+     },
+     {
+      "image": "rottentomatoes://image.rating.ripe",
+      "value": 9.0,
+      "type": "critic"
+     },
+     {
+      "image": "rottentomatoes://image.rating.upright",
+      "value": 8.8,
+      "type": "audience"
+     },
+     {
+      "image": "themoviedb://image.rating",
+      "value": 8.0,
+      "type": "audience"
+     }
+    ],
+    "Collection": [
+     {
+      "id": 1421453,
+      "filter": "collection=1421453",
+      "tag": "IMDB — Top 250",
+      "guid": "collection://d4a2e461-f3a3-4db2-b2bd-d7dae301134c"
+     },
+     {
+      "id": 1421455,
+      "filter": "collection=1421455",
+      "tag": "1001 Movies You Must See Before You Die",
+      "guid": "collection://5dac30df-1e34-4be0-bba6-822ccb2d8b80"
+     }
+    ],
+    "Director": [
+     {
+      "id": 1388848,
+      "filter": "director=1388848",
+      "tag": "Stanley Kubrick",
+      "tagKey": "tagkey-1",
+      "thumb": "https://metadata-static.plex.tv/8/people/87f8ac976e16065010e434344b08bd1e.jpg"
+     }
+    ],
+    "Writer": [
+     {
+      "id": 1388849,
+      "filter": "writer=1388849",
+      "tag": "Arthur C. Clarke",
+      "tagKey": "tagkey-2",
+      "thumb": "https://metadata-static.plex.tv/9/people/95ee7fc4d08b9e30b9cedf1683ed3f26.jpg"
+     },
+     {
+      "id": 1388850,
+      "filter": "writer=1388850",
+      "tag": "Stanley Kubrick",
+      "tagKey": "tagkey-1",
+      "thumb": "https://metadata-static.plex.tv/8/people/87f8ac976e16065010e434344b08bd1e.jpg"
+     }
+    ],
+    "Role": [
+     {
+      "id": 1267691,
+      "filter": "actor=1267691",
+      "tag": "Keir Dullea",
+      "tagKey": "tagkey-3",
+      "role": "Dr. David Bowman",
+      "thumb": "https://metadata-static.plex.tv/e/people/ec16e427a8944a8a5650b3f198e1b308.jpg"
+     },
+     {
+      "id": 1291197,
+      "filter": "actor=1291197",
+      "tag": "Gary Lockwood",
+      "tagKey": "tagkey-4",
+      "role": "Dr. Frank Poole",
+      "thumb": "https://metadata-static.plex.tv/1/people/1b1970d2b345fe85d63b5f88a246fc8e.jpg"
+     },
+     {
+      "id": 1388851,
+      "filter": "actor=1388851",
+      "tag": "William Sylvester",
+      "tagKey": "tagkey-5",
+      "role": "Dr. Heywood Floyd",
+      "thumb": "https://metadata-static.plex.tv/9/people/9f33a77ee7cb5d44f04ac8d37d472862.jpg"
+     },
+     {
+      "id": 1388852,
+      "filter": "actor=1388852",
+      "tag": "Douglas Rain",
+      "tagKey": "tagkey-6",
+      "role": "HAL 9000 (voice)",
+      "thumb": "https://metadata-static.plex.tv/e/people/e909cdc9fc8ca6c54c68fcb87e037fe1.jpg"
+     },
+     {
+      "id": 1388853,
+      "filter": "actor=1388853",
+      "tag": "Daniel Richter",
+      "tagKey": "tagkey-7",
+      "role": "Moonwatcher",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6141.jpg"
+     },
+     {
+      "id": 1388854,
+      "filter": "actor=1388854",
+      "tag": "Leonard Rossiter",
+      "tagKey": "tagkey-8",
+      "role": "Dr. Andrei Smyslov",
+      "thumb": "https://metadata-static.plex.tv/8/people/85651a2400b6a75356b4b5cf4e7c8580.jpg"
+     },
+     {
+      "id": 1388855,
+      "filter": "actor=1388855",
+      "tag": "Margaret Tyzack",
+      "tagKey": "tagkey-9",
+      "role": "Elena",
+      "thumb": "https://metadata-static.plex.tv/f/people/f466c7cc4e97ed9611a5c127b1472804.jpg"
+     },
+     {
+      "id": 1388856,
+      "filter": "actor=1388856",
+      "tag": "Robert Beatty",
+      "tagKey": "tagkey-10",
+      "role": "Dr. Ralph Halvorsen",
+      "thumb": "https://metadata-static.plex.tv/d/people/d715c5300446ca09248e3ec3fd76ec53.jpg"
+     },
+     {
+      "id": 1388857,
+      "filter": "actor=1388857",
+      "tag": "Sean Sullivan",
+      "tagKey": "tagkey-11",
+      "role": "Dr. Roy Michaels"
+     },
+     {
+      "id": 1388858,
+      "filter": "actor=1388858",
+      "tag": "Frank W. Miller",
+      "tagKey": "tagkey-12",
+      "role": "Mission Controller (voice)"
+     },
+     {
+      "id": 1388859,
+      "filter": "actor=1388859",
+      "tag": "Bill Weston",
+      "tagKey": "tagkey-13",
+      "role": "Astronaut"
+     },
+     {
+      "id": 1347301,
+      "filter": "actor=1347301",
+      "tag": "Ed Bishop",
+      "tagKey": "tagkey-14",
+      "role": "Aries-1B Lunar Shuttle Captain",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6146.jpg"
+     },
+     {
+      "id": 1388860,
+      "filter": "actor=1388860",
+      "tag": "Glenn Beck",
+      "tagKey": "tagkey-15",
+      "role": "Astronaut",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6153.jpg"
+     },
+     {
+      "id": 1388861,
+      "filter": "actor=1388861",
+      "tag": "Alan Gifford",
+      "tagKey": "tagkey-16",
+      "role": "Poole's Father",
+      "thumb": "https://metadata-static.plex.tv/f/cc68393fae/people/f57d40fd78f347053e8fb7fb88cfefbf.jpg"
+     },
+     {
+      "id": 1388862,
+      "filter": "actor=1388862",
+      "tag": "Ann Gillis",
+      "tagKey": "tagkey-17",
+      "role": "Poole's Mother",
+      "thumb": "https://metadata-static.plex.tv/4/people/4839acf10df976aa60560f0381f33d60.jpg"
+     },
+     {
+      "id": 1388863,
+      "filter": "actor=1388863",
+      "tag": "Edwina Carroll",
+      "tagKey": "tagkey-18",
+      "role": "Aries-1B Stewardess",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6147.jpg"
+     },
+     {
+      "id": 1388864,
+      "filter": "actor=1388864",
+      "tag": "Penny Brahms",
+      "tagKey": "tagkey-19",
+      "role": "Stewardess",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6149.jpg"
+     },
+     {
+      "id": 1388865,
+      "filter": "actor=1388865",
+      "tag": "Heather Downham",
+      "tagKey": "tagkey-20",
+      "role": "Stewardess"
+     },
+     {
+      "id": 1388866,
+      "filter": "actor=1388866",
+      "tag": "John Ashley",
+      "tagKey": "tagkey-21",
+      "role": "Ape"
+     },
+     {
+      "id": 1388867,
+      "filter": "actor=1388867",
+      "tag": "Jimmy Bell",
+      "tagKey": "tagkey-22",
+      "role": "Ape"
+     },
+     {
+      "id": 1388868,
+      "filter": "actor=1388868",
+      "tag": "David Charkham",
+      "tagKey": "tagkey-23",
+      "role": "Ape",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6157.jpg"
+     },
+     {
+      "id": 1388869,
+      "filter": "actor=1388869",
+      "tag": "Simon Davis",
+      "tagKey": "tagkey-24",
+      "role": "Ape"
+     },
+     {
+      "id": 1388870,
+      "filter": "actor=1388870",
+      "tag": "Jonathan Daw",
+      "tagKey": "tagkey-25",
+      "role": "Ape"
+     },
+     {
+      "id": 1388871,
+      "filter": "actor=1388871",
+      "tag": "Péter Delmár",
+      "tagKey": "tagkey-26",
+      "role": "Ape"
+     },
+     {
+      "id": 1388872,
+      "filter": "actor=1388872",
+      "tag": "Terry Duggan",
+      "tagKey": "tagkey-27",
+      "role": "Ape Attacked by Leopard"
+     },
+     {
+      "id": 1388873,
+      "filter": "actor=1388873",
+      "tag": "David Fleetwood",
+      "tagKey": "tagkey-28",
+      "role": "Ape"
+     },
+     {
+      "id": 1388874,
+      "filter": "actor=1388874",
+      "tag": "Danny Grover",
+      "tagKey": "tagkey-29",
+      "role": "Ape"
+     },
+     {
+      "id": 1388875,
+      "filter": "actor=1388875",
+      "tag": "Brian Hawley",
+      "tagKey": "tagkey-30",
+      "role": "Ape"
+     },
+     {
+      "id": 1388876,
+      "filter": "actor=1388876",
+      "tag": "David Hines",
+      "tagKey": "tagkey-31",
+      "role": "Ape"
+     },
+     {
+      "id": 1388877,
+      "filter": "actor=1388877",
+      "tag": "Anthony Jackson",
+      "tagKey": "tagkey-32",
+      "role": "Ape"
+     },
+     {
+      "id": 1388878,
+      "filter": "actor=1388878",
+      "tag": "John Jordan",
+      "tagKey": "tagkey-33",
+      "role": "Ape"
+     },
+     {
+      "id": 1388879,
+      "filter": "actor=1388879",
+      "tag": "Scott MacKee",
+      "tagKey": "tagkey-34",
+      "role": "Ape"
+     },
+     {
+      "id": 1388880,
+      "filter": "actor=1388880",
+      "tag": "Laurence Marchant",
+      "tagKey": "tagkey-35",
+      "role": "Ape"
+     },
+     {
+      "id": 1388881,
+      "filter": "actor=1388881",
+      "tag": "Darryl Paes",
+      "tagKey": "tagkey-36",
+      "role": "Ape"
+     },
+     {
+      "id": 1388882,
+      "filter": "actor=1388882",
+      "tag": "Joe Refalo",
+      "tagKey": "tagkey-37",
+      "role": "Ape"
+     },
+     {
+      "id": 1388883,
+      "filter": "actor=1388883",
+      "tag": "Andy Wallace",
+      "tagKey": "tagkey-38",
+      "role": "Ape"
+     },
+     {
+      "id": 1388884,
+      "filter": "actor=1388884",
+      "tag": "Bob Wilyman",
+      "tagKey": "tagkey-39",
+      "role": "Ape"
+     },
+     {
+      "id": 1388885,
+      "filter": "actor=1388885",
+      "tag": "Richard Woods",
+      "tagKey": "tagkey-40",
+      "role": "Ape Killed by Moon-Watcher"
+     },
+     {
+      "id": 1388886,
+      "filter": "actor=1388886",
+      "tag": "Maggie London",
+      "tagKey": "tagkey-41",
+      "role": "Hostess in Elevator (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/1/people/1b0c8624b50a1f207243862ae450e03b.jpg"
+     },
+     {
+      "id": 1388887,
+      "filter": "actor=1388887",
+      "tag": "Chela Matthison",
+      "tagKey": "tagkey-42",
+      "role": "Receptionist (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e614b.jpg"
+     },
+     {
+      "id": 1596179,
+      "filter": "actor=1596179",
+      "tag": "Judy Keirn",
+      "tagKey": "tagkey-43",
+      "role": "Voice Print Identification Girl (uncredited)"
+     },
+     {
+      "id": 1388889,
+      "filter": "actor=1388889",
+      "tag": "Vivian Kubrick",
+      "tagKey": "tagkey-44",
+      "role": "Floyd's Daughter (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e614f.jpg"
+     },
+     {
+      "id": 1388890,
+      "filter": "actor=1388890",
+      "tag": "Kenneth Kendall",
+      "tagKey": "tagkey-45",
+      "role": "BBC-12 Announcer (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6150.jpg"
+     },
+     {
+      "id": 1388891,
+      "filter": "actor=1388891",
+      "tag": "Kevin Scott",
+      "tagKey": "tagkey-46",
+      "role": "Miller (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/people/5d776826a091de001f2e6151.jpg"
+     },
+     {
+      "id": 1388892,
+      "filter": "actor=1388892",
+      "tag": "Mike Lovell",
+      "tagKey": "tagkey-47",
+      "role": "Interviewer (uncredited)"
+     },
+     {
+      "id": 1388893,
+      "filter": "actor=1388893",
+      "tag": "S. Newton Anderson",
+      "tagKey": "tagkey-48",
+      "role": "Young Man (uncredited)"
+     },
+     {
+      "id": 1388894,
+      "filter": "actor=1388894",
+      "tag": "Sheraton Blount",
+      "tagKey": "tagkey-49",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388895,
+      "filter": "actor=1388895",
+      "tag": "Ann Bormann",
+      "tagKey": "tagkey-50",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388896,
+      "filter": "actor=1388896",
+      "tag": "Julie Croft",
+      "tagKey": "tagkey-51",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388897,
+      "filter": "actor=1388897",
+      "tag": "Penny Francis",
+      "tagKey": "tagkey-52",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388898,
+      "filter": "actor=1388898",
+      "tag": "Marcella Markham",
+      "tagKey": "tagkey-53",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388899,
+      "filter": "actor=1388899",
+      "tag": "Irena Marr",
+      "tagKey": "tagkey-54",
+      "role": "Russian Scientist (uncredited)"
+     },
+     {
+      "id": 1388900,
+      "filter": "actor=1388900",
+      "tag": "Krystyna Marr",
+      "tagKey": "tagkey-55",
+      "role": "Russian Scientist (uncredited)"
+     },
+     {
+      "id": 1388901,
+      "filter": "actor=1388901",
+      "tag": "Kim Neil",
+      "tagKey": "tagkey-56",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388902,
+      "filter": "actor=1388902",
+      "tag": "Jane Pearl",
+      "tagKey": "tagkey-57",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1388903,
+      "filter": "actor=1388903",
+      "tag": "Penny Pearl",
+      "tagKey": "tagkey-58",
+      "role": "(uncredited)"
+     },
+     {
+      "id": 1207252,
+      "filter": "actor=1207252",
+      "tag": "Burnell Tucker",
+      "tagKey": "tagkey-59",
+      "role": "TMA-1 Site Photographer (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/a/people/a805d4758a94fa2b4325e7f96c6dd2b2.jpg"
+     },
+     {
+      "id": 1388904,
+      "filter": "actor=1388904",
+      "tag": "John Swindells",
+      "tagKey": "tagkey-60",
+      "role": "TMA-1 Site Technician #1 (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/e/people/e4eff945967276755d6d7a39d4b3e8c2.jpg"
+     },
+     {
+      "id": 1388905,
+      "filter": "actor=1388905",
+      "tag": "John Clifford",
+      "tagKey": "tagkey-61",
+      "role": "TMA-1 Site Technician #2 (uncredited)"
+     },
+     {
+      "id": 1388906,
+      "filter": "actor=1388906",
+      "tag": "Stanley Kubrick",
+      "tagKey": "tagkey-1",
+      "role": "Astronaut Breathing (voice) (uncredited)",
+      "thumb": "https://metadata-static.plex.tv/8/people/87f8ac976e16065010e434344b08bd1e.jpg"
+     },
+     {
+      "id": 1214821,
+      "filter": "actor=1214821",
+      "tag": "Harry Fielder",
+      "tagKey": "tagkey-62",
+      "role": "Moonwalker (uncredited)"
+     }
+    ],
+    "Producer": [
+     {
+      "id": 1388907,
+      "filter": "producer=1388907",
+      "tag": "Victor Lyndon",
+      "tagKey": "tagkey-63"
+     },
+     {
+      "id": 1388908,
+      "filter": "producer=1388908",
+      "tag": "Stanley Kubrick",
+      "tagKey": "tagkey-1",
+      "thumb": "https://metadata-static.plex.tv/8/people/87f8ac976e16065010e434344b08bd1e.jpg"
+     }
+    ],
+    "Label": [
+     {
+      "id": 1577112,
+      "filter": "label=1577112",
+      "tag": "Agregarr-stale"
+     }
+    ],
+    "CommonSenseMedia": [
+     {
+      "id": 1022210,
+      "oneLiner": "Kubrick's sci-fi masterpiece is still relevant.",
+      "AgeRating": [
+       {
+        "type": "official",
+        "rating": 5,
+        "age": 12
+       }
+      ]
+     }
+    ],
+    "Field": [
+     {
+      "locked": true,
+      "name": "collection"
+     }
+    ]
+   }
+  ]
+ }
+}

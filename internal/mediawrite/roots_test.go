@@ -15,6 +15,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/status"
@@ -257,47 +258,26 @@ func runBlockedProbe(t *testing.T, store *statedb.Store, root string) *blockedPr
 	return p
 }
 
-func TestRunWaitsForItsProbes(t *testing.T) {
+func TestRunWaitsForItsWriteProbe(t *testing.T) {
 	t.Parallel()
-	t.Run("until the probe returns", func(t *testing.T) {
-		t.Parallel()
-		a := filepath.Join(t.TempDir(), "a")
-		writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
-		store := openStore(t)
-		synctest.Test(t, func(t *testing.T) {
-			p := runBlockedProbe(t, store, a)
-			p.stop()
-			synctest.Wait()
-			if len(p.done) != 0 {
-				t.Error("Run returned while its write probe was still writing")
-			}
-			close(p.release)
-			if err := <-p.done; err != nil {
-				t.Errorf("Run: %v", err)
-			}
-			if !p.wrote.Load() {
-				t.Error("Run returned before its write probe's write did")
-			}
-		})
-	})
-	t.Run("until the probe turns overdue", func(t *testing.T) {
-		t.Parallel()
-		a := filepath.Join(t.TempDir(), "a")
-		writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
-		store := openStore(t)
-		synctest.Test(t, func(t *testing.T) {
-			p := runBlockedProbe(t, store, a)
-			defer close(p.release)
-			p.stop()
-			time.Sleep(mediawrite.RootProbeTimeout)
-			synctest.Wait()
-			if len(p.done) == 0 {
-				t.Fatal("Run still waits on a probe past its overdue deadline")
-			}
-			if err := <-p.done; err != nil {
-				t.Errorf("Run: %v", err)
-			}
-		})
+	a := filepath.Join(t.TempDir(), "a")
+	writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+	store := openStore(t)
+	synctest.Test(t, func(t *testing.T) {
+		p := runBlockedProbe(t, store, a)
+		p.stop()
+		time.Sleep(mediawrite.RootProbeTimeout)
+		synctest.Wait()
+		if len(p.done) != 0 {
+			t.Error("Run returned while its write probe was still writing, past its overdue deadline")
+		}
+		close(p.release)
+		if err := <-p.done; err != nil {
+			t.Errorf("Run: %v", err)
+		}
+		if !p.wrote.Load() {
+			t.Error("Run returned before its write probe's write did")
+		}
 	})
 }
 
@@ -492,6 +472,60 @@ func TestCallBeforeRunWaits(t *testing.T) {
 		run(t, w)
 		if err := <-got; err != nil {
 			t.Errorf("OpenVideo after the first probe: %v", err)
+		}
+	})
+}
+
+func TestRunJoinsHungProbe(t *testing.T) {
+	t.Parallel()
+	a := filepath.Join(t.TempDir(), "a")
+	writeFile(t, filepath.Join(a, "Show", "S01E01.mkv"), "video")
+	store := openStore(t)
+	synctest.Test(t, func(t *testing.T) {
+		h := &hangingStat{path: a, release: make(chan struct{})}
+		h.hang.Store(true)
+		var probeReturned atomic.Bool
+		log, rec := capture.New()
+		w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(a), Logger: log}, func(f *mediawrite.Faults) {
+			h.inject(f)
+			hung := f.Stat
+			f.Stat = func(p string) (fs.FileInfo, error) {
+				if p == a {
+					defer probeReturned.Store(true)
+				}
+				return hung(p)
+			}
+		})
+		stop, returned := startRun(t, w)
+		stop()
+		synctest.Wait()
+		if returnedYet(t, returned) {
+			t.Fatal("Run returned while its probe was still in its syscall")
+		}
+		if got := w.Outstanding(); !slices.Equal(got, []string{a}) {
+			t.Errorf("Outstanding = %q while Run waits on the hung probe, want [%s]", got, a)
+		}
+		h.hang.Store(false)
+		close(h.release)
+		synctest.Wait()
+		if !returnedYet(t, returned) {
+			t.Fatal("Run did not return once its probe did")
+		}
+		if got := w.Outstanding(); len(got) != 0 {
+			t.Errorf("Outstanding = %q after Run returned, want none", got)
+		}
+		if !probeReturned.Load() {
+			t.Error("Run returned before its probe")
+		}
+		if n := rec.Count("pending writes"); n != 0 {
+			t.Errorf("logged %q, want no WARN for the recovery Run's end cut", rec.Messages())
+		}
+		if !mediawrite.ProbeNow(t.Context(), w, a) {
+			t.Error("a probe asked for after Run answered unavailable, want nothing learnt")
+		}
+		synctest.Wait()
+		if got := h.calls.Load(); got != 1 {
+			t.Errorf("stats of the root = %d, want only the boot probe's: a probe started after Run", got)
 		}
 	})
 }

@@ -34,10 +34,14 @@ github.com/cplieger/go/textsafe v1.1.0 h1:D+p7ZDBQmABv/empI2TNMZfvhMXNlfii8E2e5V
 github.com/cplieger/go/textsafe v1.1.0/go.mod h1:x29RmZpMO2yjPt1zRbjtcXWVdkekukl+jA5FN1wXUlI=
 github.com/cplieger/go/urlform v1.2.0 h1:AQkwiRasHq1e57dzpFyrSRZWgp503XNPJ0DikXQLt1E=
 github.com/cplieger/go/urlform v1.2.0/go.mod h1:o7cRPRmslS3o05jpTJHqGKebD4eawAV7rIOB4AdGLao=
+github.com/cplieger/go/xmlx v1.0.0 h1:a/Nkx3BifSykDOCDz7sdCXjgQHq53XieMp+jMB0pk6s=
+github.com/cplieger/go/xmlx v1.0.0/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
 github.com/cplieger/go/yamlenv v1.1.0 h1:vNaxHJnJMmg7MfRhqTBDaFPhMylEzzEtNefCvqU9ZPc=
 github.com/cplieger/go/yamlenv v1.1.0/go.mod h1:2kEi6iiRSxaaAusNrPoC6l0BUqvVVskkR1Cdpt15nUg=
 github.com/cplieger/langtag/v3 v3.2.0 h1:HqJQOgfVrI5eNtxo1DbOw33wsLt6shKAWxd1y6e3xjs=
 github.com/cplieger/langtag/v3 v3.2.0/go.mod h1:LnW2uXqaqUVWNZ3gnLhWhdjSfipA/87DuPHcyyNsNFc=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.14 h1:Z/cK1mX4Wvlk/CowWSjEjbcaNgtUc8wHZLMXtNWgi7U=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.14/go.mod h1:jX4Epf2ZoxVQJ71MVDrEf61ez/GwzAhbZ13iYZkFdyU=
 github.com/dlclark/regexp2/v2 v2.13.1 h1:fKrNTrQmgpsM3vLIJXzJn8iCIdwSelX+l2G1EPBmTX0=
 github.com/dlclark/regexp2/v2 v2.13.1/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/fxamacker/cbor/v2 v2.10.0 h1:HVF3T5vYwLqO81ebPirWEPNv2SMrUMD3HLnKgEr6uWE=

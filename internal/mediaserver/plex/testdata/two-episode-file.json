@@ -1,0 +1,256 @@
+{
+ "MediaContainer": {
+  "size": 2,
+  "allowSync": true,
+  "art": "/:/resources/show-fanart.jpg",
+  "identifier": "com.plexapp.plugins.library",
+  "librarySectionID": 2,
+  "librarySectionTitle": "TV Shows",
+  "librarySectionUUID": "00000000-0000-4000-8000-000000000001",
+  "mediaTagPrefix": "/system/bundle/media/flags/",
+  "mediaTagVersion": 1786914632,
+  "nocache": true,
+  "thumb": "/:/resources/show.png",
+  "title1": "TV Shows",
+  "title2": "All Shows",
+  "viewGroup": "show",
+  "viewMode": 65592,
+  "Metadata": [
+   {
+    "ratingKey": "634951",
+    "key": "/library/metadata/634951",
+    "parentRatingKey": "634945",
+    "grandparentRatingKey": "634442",
+    "guid": "plex://episode/5d9c12e308fddd001f31bcd3",
+    "parentGuid": "plex://season/602e689db59d8d002d12ce37",
+    "grandparentGuid": "plex://show/5d9c086fffd9ef001e994da8",
+    "grandparentSlug": "30-rock",
+    "type": "episode",
+    "title": "Hey, Baby, What's Wrong? (1)",
+    "grandparentKey": "/library/metadata/634442",
+    "parentKey": "/library/metadata/634945",
+    "grandparentTitle": "30 Rock",
+    "parentTitle": "Season 6",
+    "contentRating": "TV-14",
+    "summary": "Criss and Liz decide to celebrate Valentine's Day, but they need to buy a dining room table first. Jack entertains his mother-in-law, Diana, as Jenna frantically looks to Pete to fill in last-minute as the producer of her first live performance on \"America's Kidz Got Singing.\" Back at the office, Tracy and Frank try to help Lutz find someone to spend Valentine's with.",
+    "index": 6,
+    "parentIndex": 6,
+    "audienceRating": 7.5,
+    "year": 2012,
+    "thumb": "/library/metadata/634951/thumb/1769609104",
+    "art": "/library/metadata/634945/art/1771449126",
+    "parentThumb": "/library/metadata/634945/thumb/1771449126",
+    "grandparentThumb": "/library/metadata/634442/thumb/1790135858",
+    "grandparentArt": "/library/metadata/634442/art/1790135858",
+    "grandparentTheme": "/library/metadata/634442/theme/1790135858",
+    "duration": 2537035,
+    "originallyAvailableAt": "2012-02-09",
+    "addedAt": 1767154570,
+    "updatedAt": 1769609104,
+    "audienceRatingImage": "themoviedb://image.rating",
+    "Media": [
+     {
+      "id": 791724,
+      "duration": 2537035,
+      "bitrate": 14891,
+      "width": 1920,
+      "height": 1080,
+      "aspectRatio": 1.78,
+      "audioChannels": 6,
+      "audioCodec": "eac3",
+      "videoCodec": "h264",
+      "videoResolution": "1080",
+      "container": "mkv",
+      "videoFrameRate": "24p",
+      "videoProfile": "high",
+      "hasVoiceActivity": true,
+      "Part": [
+       {
+        "id": 924633,
+        "key": "/library/parts/924633/1767154323/file.mkv",
+        "duration": 2537035,
+        "file": "/media/tv/30 Rock (2006) {imdb-tt0496424}/Season 06/30 Rock (2006) - S06E06-E07 - Hey Baby Whats Wrong [AMZN][WEBRip-1080p][EAC3 5.1][x264]-NTb.mkv",
+        "size": 4722395747,
+        "container": "mkv",
+        "indexes": "sd",
+        "videoProfile": "high"
+       }
+      ]
+     }
+    ],
+    "Image": [
+     {
+      "alt": "Hey, Baby, What's Wrong? (1)",
+      "type": "coverPoster",
+      "url": "/library/metadata/634442/thumb/1790135858"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (1)",
+      "type": "snapshot",
+      "url": "/library/metadata/634951/thumb/1769609104"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (1)",
+      "type": "background",
+      "url": "/library/metadata/634945/art/1771449126"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (1)",
+      "type": "clearLogo",
+      "url": "/library/metadata/634442/clearLogo/1790135858"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (1)",
+      "type": "backgroundSquare",
+      "url": "/library/metadata/634442/squareArt/1790135858"
+     }
+    ],
+    "UltraBlurColors": {
+     "topLeft": "4b1e1a",
+     "topRight": "1b1b1c",
+     "bottomRight": "2f2f34",
+     "bottomLeft": "4656a2"
+    },
+    "Director": [
+     {
+      "tag": "Michael Engler"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Kay Cannon"
+     }
+    ],
+    "Role": [
+     {
+      "tag": "Tina Fey"
+     },
+     {
+      "tag": "Alec Baldwin"
+     },
+     {
+      "tag": "Tracy Morgan"
+     }
+    ]
+   },
+   {
+    "ratingKey": "634952",
+    "key": "/library/metadata/634952",
+    "parentRatingKey": "634945",
+    "grandparentRatingKey": "634442",
+    "guid": "plex://episode/5d9c12e308fddd001f31bccb",
+    "parentGuid": "plex://season/602e689db59d8d002d12ce37",
+    "grandparentGuid": "plex://show/5d9c086fffd9ef001e994da8",
+    "grandparentSlug": "30-rock",
+    "type": "episode",
+    "title": "Hey, Baby, What's Wrong? (2)",
+    "grandparentKey": "/library/metadata/634442",
+    "parentKey": "/library/metadata/634945",
+    "grandparentTitle": "30 Rock",
+    "parentTitle": "Season 6",
+    "contentRating": "TV-14",
+    "summary": "Criss and Liz decide to celebrate Valentine's Day, but they need to buy a dining room table first. Jack entertains his mother-in-law, Diana, as Jenna frantically looks to Pete to fill in last-minute as the producer of her first live performance on \"America's Kidz Got Singing.\" Back at the office, Tracy and Frank try to help Lutz find someone to spend Valentine's with.",
+    "index": 7,
+    "parentIndex": 6,
+    "audienceRating": 7.5,
+    "year": 2012,
+    "thumb": "/library/metadata/634952/thumb/1767154578",
+    "art": "/library/metadata/634945/art/1771449126",
+    "parentThumb": "/library/metadata/634945/thumb/1771449126",
+    "grandparentThumb": "/library/metadata/634442/thumb/1790135858",
+    "grandparentArt": "/library/metadata/634442/art/1790135858",
+    "grandparentTheme": "/library/metadata/634442/theme/1790135858",
+    "duration": 2537035,
+    "originallyAvailableAt": "2012-02-09",
+    "addedAt": 1767154570,
+    "updatedAt": 1767154578,
+    "audienceRatingImage": "themoviedb://image.rating",
+    "Media": [
+     {
+      "id": 791725,
+      "duration": 2537035,
+      "bitrate": 14891,
+      "width": 1920,
+      "height": 1080,
+      "aspectRatio": 1.78,
+      "audioChannels": 6,
+      "audioCodec": "eac3",
+      "videoCodec": "h264",
+      "videoResolution": "1080",
+      "container": "mkv",
+      "videoFrameRate": "24p",
+      "displayOffset": 50,
+      "videoProfile": "high",
+      "hasVoiceActivity": true,
+      "Part": [
+       {
+        "id": 924634,
+        "key": "/library/parts/924634/1767154323/file.mkv",
+        "duration": 2537035,
+        "file": "/media/tv/30 Rock (2006) {imdb-tt0496424}/Season 06/30 Rock (2006) - S06E06-E07 - Hey Baby Whats Wrong [AMZN][WEBRip-1080p][EAC3 5.1][x264]-NTb.mkv",
+        "size": 4722395747,
+        "container": "mkv",
+        "indexes": "sd",
+        "videoProfile": "high"
+       }
+      ]
+     }
+    ],
+    "Image": [
+     {
+      "alt": "Hey, Baby, What's Wrong? (2)",
+      "type": "coverPoster",
+      "url": "/library/metadata/634442/thumb/1790135858"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (2)",
+      "type": "snapshot",
+      "url": "/library/metadata/634952/thumb/1767154578"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (2)",
+      "type": "background",
+      "url": "/library/metadata/634945/art/1771449126"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (2)",
+      "type": "clearLogo",
+      "url": "/library/metadata/634442/clearLogo/1790135858"
+     },
+     {
+      "alt": "Hey, Baby, What's Wrong? (2)",
+      "type": "backgroundSquare",
+      "url": "/library/metadata/634442/squareArt/1790135858"
+     }
+    ],
+    "UltraBlurColors": {
+     "topLeft": "2c1572",
+     "topRight": "43318c",
+     "bottomRight": "39317e",
+     "bottomLeft": "3f1873"
+    },
+    "Director": [
+     {
+      "tag": "Michael Engler"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Kay Cannon"
+     }
+    ],
+    "Role": [
+     {
+      "tag": "Tina Fey"
+     },
+     {
+      "tag": "Alec Baldwin"
+     },
+     {
+      "tag": "Tracy Morgan"
+     }
+    ]
+   }
+  ]
+ }
+}

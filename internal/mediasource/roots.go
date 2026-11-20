@@ -11,12 +11,14 @@ import (
 )
 
 // rootCache is an unmapped source's last successful RootFolders answer.
-// fill is closed when the Set's one first fill ends; nil before it starts.
+// fill is closed when the Set's one first fill ends, and cancel ends it;
+// both nil before it starts.
 type rootCache struct {
-	fill chan struct{}
-	last []string
-	mu   sync.Mutex
-	ok   bool
+	fill   chan struct{}
+	cancel context.CancelFunc
+	last   []string
+	mu     sync.Mutex
+	ok     bool
 }
 
 func (c *rootCache) store(folders []string) {
@@ -34,10 +36,12 @@ func (c *rootCache) load() ([]string, bool) {
 // MediaRoots answers, deduped and sorted, each source's mapping targets, or
 // for an unmapped source its last successful root folders. An empty cache
 // is filled once per Set on a context no caller cancels, bounded by
-// rootFoldersWait; each caller waits for it at most until its own deadline.
+// rootFoldersWait and ended by Close; each caller waits for it at most
+// until its own deadline. A closed Set starts no fill.
 func (s *Set) MediaRoots(ctx context.Context) []string {
 	var out []string
 	var waits []*source
+	var fills []chan struct{}
 	for _, id := range s.ids {
 		src := s.byID[id]
 		if len(src.cfg.PathMappings) > 0 {
@@ -50,12 +54,13 @@ func (s *Set) MediaRoots(ctx context.Context) []string {
 			out = append(out, last...)
 			continue
 		}
-		s.startFill(ctx, src)
-		waits = append(waits, src)
+		if fill := s.startFill(ctx, src); fill != nil {
+			waits, fills = append(waits, src), append(fills, fill)
+		}
 	}
-	for _, src := range waits {
+	for i, src := range waits {
 		select {
-		case <-src.roots.fill:
+		case <-fills[i]:
 		case <-ctx.Done():
 			return sortedSet(out)
 		}
@@ -65,22 +70,49 @@ func (s *Set) MediaRoots(ctx context.Context) []string {
 	return sortedSet(out)
 }
 
-func (s *Set) startFill(ctx context.Context, src *source) {
+// startFill starts src's one fill unless it started already, and answers
+// the channel closed at its end; nil when the Set closed before any fill.
+func (s *Set) startFill(ctx context.Context, src *source) chan struct{} {
+	s.lifeMu.Lock()
+	defer s.lifeMu.Unlock()
 	src.roots.mu.Lock()
 	defer src.roots.mu.Unlock()
-	if src.roots.fill != nil {
-		return
+	if src.roots.fill != nil || s.closed {
+		return src.roots.fill
 	}
 	done := make(chan struct{})
-	src.roots.fill = done
 	fillCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rootFoldersWait)
-	go func() {
+	src.roots.fill, src.roots.cancel = done, cancel
+	s.fills.Go(func() {
 		defer close(done)
 		defer cancel()
-		if _, err := s.RootFolders(fillCtx, src.id); err != nil {
+		if _, err := s.RootFolders(fillCtx, src.id); err != nil && !s.isClosed() {
 			s.log.Warn("source root folders unread; its roots are unknown until a probe reads them", "source", src.id, "err", err)
 		}
-	}()
+	})
+	return done
+}
+
+// Close ends the root-folder fills the Set runs and returns once each has
+// returned; after it MediaRoots answers only what the Set already holds.
+func (s *Set) Close() {
+	s.lifeMu.Lock()
+	s.closed = true
+	for _, src := range s.byID {
+		src.roots.mu.Lock()
+		if src.roots.cancel != nil {
+			src.roots.cancel()
+		}
+		src.roots.mu.Unlock()
+	}
+	s.lifeMu.Unlock()
+	s.fills.Wait()
+}
+
+func (s *Set) isClosed() bool {
+	s.lifeMu.Lock()
+	defer s.lifeMu.Unlock()
+	return s.closed
 }
 
 func sortedSet(s []string) []string {
@@ -133,7 +165,7 @@ func (s *Set) LocalPath(src media.SourceID, remote string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	local, err := a.src.m.toLocal(remote)
+	local, err := a.src.m.Map(remote)
 	if err != nil {
 		return "", a.refuse("folder %q %w", quote(remote), err)
 	}

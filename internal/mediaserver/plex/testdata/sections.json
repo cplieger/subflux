@@ -1,0 +1,190 @@
+{
+ "MediaContainer": {
+  "size": 7,
+  "allowSync": false,
+  "title1": "Plex Library",
+  "Directory": [
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "1",
+    "type": "movie",
+    "title": "Movies",
+    "agent": "tv.plex.agents.movie",
+    "scanner": "Plex Movie",
+    "language": "en-US",
+    "metadataAgentProviderGroupId": 1,
+    "uuid": "00000000-0000-4000-8000-000000000001",
+    "updatedAt": 1792229698,
+    "createdAt": 1659632944,
+    "scannedAt": 1792198910,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 30561121,
+    "hidden": 0,
+    "Location": [
+     {
+      "id": 40,
+      "path": "/media/animemovies"
+     },
+     {
+      "id": 23,
+      "path": "/media/movies"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "9",
+    "type": "show",
+    "title": "Anime",
+    "agent": "tv.plex.agents.series",
+    "scanner": "Plex TV Series",
+    "language": "en-US",
+    "uuid": "00000000-0000-4000-8000-000000000002",
+    "updatedAt": 1792251060,
+    "createdAt": 1693355410,
+    "scannedAt": 1792198904,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 30561143,
+    "hidden": 0,
+    "Location": [
+     {
+      "id": 25,
+      "path": "/media/anime"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "2",
+    "type": "show",
+    "title": "TV Shows",
+    "agent": "tv.plex.agents.series",
+    "scanner": "Plex TV Series",
+    "language": "en-US",
+    "uuid": "00000000-0000-4000-8000-000000000003",
+    "updatedAt": 1792198976,
+    "createdAt": 1659632959,
+    "scannedAt": 1792198919,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 30558337,
+    "hidden": 0,
+    "Location": [
+     {
+      "id": 24,
+      "path": "/media/tv"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "15",
+    "type": "artist",
+    "title": "Audiobooks",
+    "agent": "tv.plex.agents.music",
+    "scanner": "Plex Music",
+    "language": "en-US",
+    "uuid": "00000000-0000-4000-8000-000000000004",
+    "updatedAt": 1792198960,
+    "createdAt": 1746905740,
+    "scannedAt": 1792198905,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 19787250,
+    "hidden": 1,
+    "Location": [
+     {
+      "id": 39,
+      "path": "/data/media/audio"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "13",
+    "type": "movie",
+    "title": "Home videos",
+    "agent": "tv.plex.agents.none",
+    "scanner": "Plex Video Files",
+    "language": "en-US",
+    "uuid": "00000000-0000-4000-8000-000000000005",
+    "updatedAt": 1792198960,
+    "createdAt": 1744290512,
+    "scannedAt": 1792198905,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 19500958,
+    "hidden": 1,
+    "Location": [
+     {
+      "id": 36,
+      "path": "/media/homevideo/familykids"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "12",
+    "type": "movie",
+    "title": "Family Video Archive",
+    "agent": "tv.plex.agents.none",
+    "scanner": "Plex Video Files",
+    "language": "ko-KR",
+    "uuid": "00000000-0000-4000-8000-000000000006",
+    "updatedAt": 1792198960,
+    "createdAt": 1729375492,
+    "scannedAt": 1792198905,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 17814280,
+    "hidden": 0,
+    "Location": [
+     {
+      "id": 35,
+      "path": "/media/homevideo/familytapes"
+     }
+    ]
+   },
+   {
+    "allowSync": true,
+    "filters": true,
+    "refreshing": false,
+    "key": "17",
+    "type": "movie",
+    "title": "Family VHS archive",
+    "agent": "tv.plex.agents.none",
+    "scanner": "Plex Video Files",
+    "language": "fr-FR",
+    "metadataAgentProviderGroupId": 4,
+    "uuid": "00000000-0000-4000-8000-000000000007",
+    "updatedAt": 1792198960,
+    "createdAt": 1783715364,
+    "scannedAt": 1792198911,
+    "content": true,
+    "directory": true,
+    "contentChangedAt": 29160645,
+    "hidden": 2,
+    "Location": [
+     {
+      "id": 42,
+      "path": "/media/homevideo/familyvhs"
+     }
+    ]
+   }
+  ]
+ }
+}

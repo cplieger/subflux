@@ -101,7 +101,7 @@ func (a *answer) items(r NativeRef, in []Item, excluded map[TagRef]struct{}) ([]
 		}
 		ids[it.Native] = struct{}{}
 		if it.VideoPath != "" {
-			local, err := a.src.m.toLocal(it.VideoPath)
+			local, err := a.src.m.Map(it.VideoPath)
 			if err != nil {
 				return nil, a.refuse("root %s: item %s: video path %q %w", r.ID, it.Native, quote(it.VideoPath), err)
 			}

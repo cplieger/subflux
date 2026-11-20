@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -12,11 +13,13 @@ import (
 // becomes when it returns. A producer's stop, when set, ends what its
 // context's cancellation does not (HTTP shutdown); the drain calls it, then
 // waits for that producer's return with no deadline of its own, so the stop
-// bounds its producer.
+// bounds its producer. A sink's outstanding, when set, names what its run
+// is still waiting for; a drain overrun reports it.
 type component struct {
-	run  func(ctx context.Context) error
-	stop func(ctx context.Context) error
-	name string
+	run         func(ctx context.Context) error
+	stop        func(ctx context.Context) error
+	outstanding func() []string
+	name        string
 }
 
 // supervision is what supervise runs and drains. closeProviders and
@@ -70,7 +73,9 @@ func supervise(ctx context.Context, sv *supervision) error {
 	phase2, cancel2 := context.WithDeadline(context.Background(), deadline)
 	defer cancel2()
 	if !awaitAll(phase2, sinks) {
-		drainErrs = append(drainErrs, errors.New("app: sinks overran the drain budget"))
+		if held := stillRunning(sv.sinks, sinks); len(held) > 0 {
+			drainErrs = append(drainErrs, fmt.Errorf("app: sinks overran the drain budget: %s", strings.Join(held, "; ")))
+		}
 	}
 	if sv.closeProviders != nil {
 		if err := sv.closeProviders(phase2); err != nil {
@@ -145,6 +150,27 @@ func start(ctx context.Context, cs []component, exits chan<- exit) []<-chan stru
 		}()
 	}
 	return done
+}
+
+// stillRunning names each of cs whose done channel is open, with what its
+// outstanding lists.
+func stillRunning(cs []component, done []<-chan struct{}) []string {
+	held := make([]string, 0, len(cs))
+	for i, c := range cs {
+		select {
+		case <-done[i]:
+			continue
+		default:
+		}
+		h := c.name
+		if c.outstanding != nil {
+			if on := c.outstanding(); len(on) > 0 {
+				h += " (on " + strings.Join(on, ", ") + ")"
+			}
+		}
+		held = append(held, h)
+	}
+	return held
 }
 
 func awaitAll(ctx context.Context, done []<-chan struct{}) bool {

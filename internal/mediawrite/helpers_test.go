@@ -339,6 +339,34 @@ func run(t *testing.T, w *mediawrite.Writer) {
 	}
 }
 
+// startRun runs w until stop, waiting for every root's first probe;
+// returned receives Run's error once it returns.
+func startRun(t *testing.T, w *mediawrite.Writer) (stop context.CancelFunc, returned <-chan error) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	done := make(chan error, 1)
+	go func() { done <- w.Run(ctx) }()
+	if err := mediawrite.Settled(t.Context(), w); err != nil {
+		t.Fatal(err)
+	}
+	return cancel, done
+}
+
+// returnedYet reports whether returned has a value, failing on a Run error.
+func returnedYet(t *testing.T, returned <-chan error) bool {
+	t.Helper()
+	select {
+	case err := <-returned:
+		if err != nil {
+			t.Errorf("Run: %v", err)
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 func readAll(t *testing.T, f *os.File) string {
 	t.Helper()
 	b, err := io.ReadAll(f)

@@ -3,10 +3,13 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/cplieger/go/slogx/capture"
 )
 
 // waitBudget bounds every wait in these tests; a supervisor that misses a
@@ -271,19 +274,29 @@ func TestSuperviseFirstCause(t *testing.T) {
 	})
 	t.Run("sink_overrun", func(t *testing.T) {
 		j := &journal{}
+		rec := capture.Default(t)
 		release := make(chan struct{})
 		t.Cleanup(func() { close(release) })
 		ctx, cancel := context.WithCancel(t.Context())
 		sv := base(j)
 		sv.drainBudget = 50 * time.Millisecond
-		sv.sinks = []component{{name: "stuck", run: func(context.Context) error {
+		hung := func(context.Context) error {
 			<-release
 			return nil
-		}}}
+		}
+		sv.sinks = []component{blocker(j, "status"), {name: "job records", run: hung}, {
+			name:        "media writer",
+			run:         hung,
+			outstanding: func() []string { return []string{"/mnt/a", "/mnt/b"} },
+		}}
 		done := superviseAsync(ctx, sv)
 		cancel()
-		if err := result(t, done); err == nil || !strings.Contains(err.Error(), "sinks overran") {
-			t.Errorf("supervise = %v, want a sink overrun", err)
+		const want = "app: sinks overran the drain budget: job records; media writer (on /mnt/a, /mnt/b)"
+		if err := result(t, done); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("supervise = %v, want an overrun naming the held sinks alone, each with what it waits for", err)
+		}
+		if got, _ := rec.AttrValue("leaving the store open", "error"); rec.CountLevel(slog.LevelError, "leaving the store open") != 1 || !strings.Contains(got, want) {
+			t.Errorf("drain ERROR error = %q, want it to contain %q", got, want)
 		}
 		if j.index("store closed") >= 0 {
 			t.Error("the store closed after an overrun")
