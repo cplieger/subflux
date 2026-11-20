@@ -8,6 +8,8 @@ package mediawrite
 import (
 	"context"
 	"log/slog"
+	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -72,13 +74,15 @@ type Writer struct {
 	kick       chan struct{}               // a pending request for a probe pass
 	recoverReq chan struct{}               // a pending request to start recovery attempts
 	paths      map[string]*rootState       // by configured path; guarded by mu
-	probes     map[*probeRun]struct{}      // probes whose goroutine has not returned, a gone root's included; guarded by mu
 	outlived   map[statedb.Intent]struct{} // intents a pass left pending, until a count finds them settled; guarded by mu
+	busy       map[string]int              // by root path, its probes, folder checks and recoveries running; guarded by mu
 	modes      publishModes
 	recoveries sync.WaitGroup
-	countMu    sync.Mutex // serializes countPending
+	rootCalls  sync.WaitGroup // every probe and folder check; Add only under mu while !closed
+	countMu    sync.Mutex     // serializes countPending
 	mu         sync.Mutex
 	orphaning  bool // an orphan pass is running; guarded by mu
+	closed     bool // Run has ended, so no probe or check starts; guarded by mu
 }
 
 // New returns a Writer over d, whose post_processing section is the zero
@@ -105,8 +109,8 @@ func New(d Deps) *Writer {
 		kick:       make(chan struct{}, 1),
 		recoverReq: make(chan struct{}, 1),
 		paths:      map[string]*rootState{},
-		probes:     map[*probeRun]struct{}{},
 		outlived:   map[statedb.Intent]struct{}{},
+		busy:       map[string]int{},
 	}
 	w.cfg.Store(&Config{})
 	return w
@@ -114,15 +118,12 @@ func New(d Deps) *Writer {
 
 // Run reads the root set and probes every root at once, then every 5
 // minutes and after each RootsChanged, until ctx ends; it returns nil
-// once the recovery attempts it started have returned and every probe has
-// returned or turned overdue. Each probe runs in its own goroutine, one
-// outstanding per root: an overdue one, stuck in a hung mount's syscall,
-// outlives Run and is discarded when it returns. After each probe the
-// root's pending writes are recovered, and a call under a root that
-// returned waits for or fails during that recovery.
+// once every probe, folder check and recovery attempt has returned, a
+// probe stuck in a hung mount's syscall included, and none starts after.
+// Each probe runs in its own goroutine, one outstanding per root. After
+// each probe the root's pending writes are recovered, and a call under a
+// root that returned waits for or fails during that recovery.
 func (w *Writer) Run(ctx context.Context) error {
-	// Deferred first so it runs last: a recovery's failed write may start a probe.
-	defer w.awaitProbes()
 	defer w.recoveries.Wait()
 	w.probePass(ctx)
 	close(w.started)
@@ -131,6 +132,10 @@ func (w *Writer) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			w.mu.Lock()
+			w.closed = true
+			w.mu.Unlock()
+			w.rootCalls.Wait()
 			return nil
 		case <-w.recoverReq:
 			w.startRecoveries(ctx)
@@ -149,6 +154,33 @@ func (w *Writer) RootsChanged() {
 	select {
 	case w.kick <- struct{}{}:
 	default:
+	}
+}
+
+// Outstanding returns, sorted, the roots with a probe, folder check or
+// recovery still running: what Run's end is waiting for.
+func (w *Writer) Outstanding() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Sorted(maps.Keys(w.busy))
+}
+
+// goRootLocked runs f in wg under the root at path, counted in Outstanding
+// until it returns.
+func (w *Writer) goRootLocked(wg *sync.WaitGroup, path string, f func()) {
+	w.busy[path]++
+	wg.Go(func() {
+		defer w.leaveRoot(path)
+		f()
+	})
+}
+
+func (w *Writer) leaveRoot(path string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.busy[path]--
+	if w.busy[path] == 0 {
+		delete(w.busy, path)
 	}
 }
 

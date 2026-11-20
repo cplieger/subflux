@@ -109,13 +109,21 @@ func (l *liveSources) publish(set *mediasource.Set) {
 
 func (l *liveSources) load() *mediasource.Set { return l.set.Load() }
 
-// MediaRoots is the live Set's media roots; none before the first Set.
+// MediaRoots is the live Set's media roots; none before the first Set. A
+// read the Set's replacement overtook is read again from the replacement:
+// closing the replaced Set cuts its root-folder fills, so its answer may
+// lack a root the writer would then take for unconfigured.
 func (l *liveSources) MediaRoots(ctx context.Context) []string {
-	set := l.load()
-	if set == nil {
-		return nil
+	for {
+		set := l.load()
+		if set == nil {
+			return nil
+		}
+		roots := set.MediaRoots(ctx)
+		if l.load() == set || ctx.Err() != nil {
+			return roots
+		}
 	}
-	return set.MediaRoots(ctx)
 }
 
 // mediaSources builds and rebuilds the Set it publishes to live, and runs
@@ -150,8 +158,9 @@ func newMediaSources(a *settings.Active, kinds []mediasource.AdapterKind, deps m
 // reloadSources publishes a Set rebuilt from cur's sources when they differ
 // from old's, inheriting each entry's caches CompareEntry allows before
 // publishing, so an unchanged source keeps its roots while its arr is down,
-// then hands it to the Scanner. A NewSet refusal, which a parsed
-// configuration cannot reach, keeps the old Set and logs ERROR.
+// then hands it to the Scanner and closes the replaced Set. A NewSet
+// refusal, which a parsed configuration cannot reach, keeps the old Set and
+// logs ERROR.
 func (m *mediaSources) reloadSources(old, cur *settings.Active) {
 	if reflect.DeepEqual(old.Sources, cur.Sources) {
 		return
@@ -161,10 +170,12 @@ func (m *mediaSources) reloadSources(old, cur *settings.Active) {
 		m.log.Error("media sources: the rebuilt set was refused; the previous one stays live", "err", err)
 		return
 	}
-	set.Inherit(m.live.load())
+	prev := m.live.load()
+	set.Inherit(prev)
 	m.live.publish(set)
 	changed, rekeyed := changedSources(m.kinds, old.Sources, cur.Sources)
 	m.scan.Reload(set, changed, rekeyed)
+	prev.Close()
 }
 
 // reloadSchedule hands a changed scan section to the Scanner, which
@@ -289,8 +300,10 @@ func (l *sourcesLoop) apply() error {
 }
 
 // run runs the Scanner once the sources are built and applies each wake
-// until ctx ends, then waits for the Scanner's return.
+// until ctx ends, then waits for the Scanner's return and closes the live
+// Set.
 func (l *sourcesLoop) run(ctx context.Context) error {
+	defer l.closeSet()
 	scanned := make(chan error, 1)
 	running := false
 	for {
@@ -314,5 +327,11 @@ func (l *sourcesLoop) run(ctx context.Context) error {
 				return err
 			}
 		}
+	}
+}
+
+func (l *sourcesLoop) closeSet() {
+	if l.cur != nil {
+		l.cur.live.load().Close()
 	}
 }

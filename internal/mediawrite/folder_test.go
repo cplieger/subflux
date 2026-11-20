@@ -219,3 +219,56 @@ func TestFolderStateText(t *testing.T) {
 		}
 	}
 }
+
+func TestRunJoinsFolderCheck(t *testing.T) {
+	t.Parallel()
+	a := filepath.Join(t.TempDir(), "a")
+	if err := os.MkdirAll(filepath.Join(a, "Show"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t)
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		var lstats atomic.Int32
+		var checkReturned atomic.Bool
+		w := newWriter(t, mediawrite.Deps{Store: store, Roots: rootsOf(a)}, func(f *mediawrite.Faults) {
+			lstat := f.Lstat
+			f.Lstat = func(root *os.Root, name string) (fs.FileInfo, error) {
+				defer checkReturned.Store(true)
+				lstats.Add(1)
+				<-release
+				return lstat(root, name)
+			}
+		})
+		stop, returned := startRun(t, w)
+		show := filepath.Join(a, "Show")
+		if s := w.FolderState(t.Context(), show); s != mediawrite.FolderUnavailable {
+			t.Fatalf("a check held past its deadline answered %v, want unavailable", s)
+		}
+		stop()
+		synctest.Wait()
+		if returnedYet(t, returned) {
+			t.Fatal("Run returned while a folder check was still in its syscall")
+		}
+		if got := w.Outstanding(); len(got) != 1 || got[0] != a {
+			t.Errorf("Outstanding = %q while Run waits on the folder check, want [%s]", got, a)
+		}
+		close(release)
+		synctest.Wait()
+		if !returnedYet(t, returned) {
+			t.Fatal("Run did not return once the folder check did")
+		}
+		if got := w.Outstanding(); len(got) != 0 {
+			t.Errorf("Outstanding = %q after Run returned, want none", got)
+		}
+		if !checkReturned.Load() {
+			t.Error("Run returned before the folder check")
+		}
+		if s := w.FolderState(t.Context(), show); s != mediawrite.FolderUnavailable {
+			t.Errorf("a check after Run answered %v, want unavailable", s)
+		}
+		if got := lstats.Load(); got != 1 {
+			t.Errorf("Lstats = %d, want only the one before Run ended: a check started after it", got)
+		}
+	})
+}

@@ -91,12 +91,36 @@ type sourcesRig struct {
 
 var rigSchedule = mediasource.Schedule{Change: time.Minute, Whole: 24 * time.Hour}
 
+// newSourcesRig is newIdleSourcesRig over the plain fake with its Scanner
+// running until the test ends.
 func newSourcesRig(t *testing.T) *sourcesRig {
+	t.Helper()
+	r := newIdleSourcesRig(t, nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- r.m.scan.Run(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("Run = %v", err)
+		}
+	})
+	synctest.Wait()
+	return r
+}
+
+// newIdleSourcesRig is the rig with its Scanner not running; wrap, when
+// set, is the adapter each entry gets in place of the fake it is handed.
+func newIdleSourcesRig(t *testing.T, wrap func(*sourcetest.Fake) mediasource.Adapter) *sourcesRig {
 	t.Helper()
 	lib := &sourcetest.Library{}
 	lib.SetFolders([]string{"/media"})
 	f := sourcetest.NewFake(lib, mediasource.Capabilities{Kinds: []media.Kind{media.Movie}, Changes: true})
 	kinds := []mediasource.AdapterKind{sourcetest.FakeKind("fake", f)}
+	if wrap != nil {
+		ad := wrap(f)
+		kinds[0].New = func(mediasource.Config, mediasource.Deps) (mediasource.Adapter, error) { return ad, nil }
+	}
 	db, err := statedb.Open(filepath.Join(t.TempDir(), "subflux.bolt"))
 	if err != nil {
 		t.Fatal(err)
@@ -122,16 +146,6 @@ func newSourcesRig(t *testing.T) *sourcesRig {
 		t.Fatal(err)
 	}
 	r.reg.MustRegister(r.m.scan.Collectors()...)
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan error, 1)
-	go func() { done <- r.m.scan.Run(ctx) }()
-	t.Cleanup(func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Errorf("Run = %v", err)
-		}
-	})
-	synctest.Wait()
 	return r
 }
 
@@ -384,4 +398,89 @@ func TestSourceEditsReachScanner(t *testing.T) {
 	if !eventually(func() bool { return len(gathered(t, gather, lastComplete)) == 0 }) {
 		t.Errorf("a removed source kept its series: %s %v", lastComplete, gathered(t, gather, lastComplete))
 	}
+}
+
+// heldFolders is a fake whose RootFolders calls wait for their context's
+// end while hold is set, and answer the fake's otherwise, counting the
+// calls made and those returned.
+type heldFolders struct {
+	*sourcetest.Fake
+	calls, returned atomic.Int32
+	hold            atomic.Bool
+}
+
+func (h *heldFolders) RootFolders(ctx context.Context) ([]string, error) {
+	h.calls.Add(1)
+	defer h.returned.Add(1)
+	if !h.hold.Load() {
+		return h.Fake.RootFolders(ctx)
+	}
+	<-ctx.Done()
+	return nil, &mediasource.SourceError{Cause: mediasource.Unreachable, Err: ctx.Err()}
+}
+
+// TestMediaRootsRereadsAReplacedSet: a writer probe waiting on the live
+// Set's first fill when a reload replaces and closes it gets the new Set's
+// roots, not the closed Set's cut answer with the source rootless.
+func TestMediaRootsRereadsAReplacedSet(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		held := &heldFolders{}
+		held.hold.Store(true)
+		r := newIdleSourcesRig(t, func(f *sourcetest.Fake) mediasource.Adapter { held.Fake = f; return held })
+		got := make(chan []string, 1)
+		go func() { got <- r.m.live.MediaRoots(t.Context()) }()
+		synctest.Wait()
+		held.hold.Store(false)
+		r.apply(t, r.edit(t, "[{id: a, type: fake, url: 'http://a', token: t1}, {id: b, type: fake, url: 'http://b', token: t9}]", rigSchedule))
+		if roots := <-got; !slices.Equal(roots, []string{"/media"}) {
+			t.Errorf("MediaRoots across the reload = %v, want the new Set's [/media]", roots)
+		}
+		r.m.live.load().Close()
+	})
+}
+
+func TestReloadClosesReplacedSet(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		held := &heldFolders{}
+		held.hold.Store(true)
+		r := newIdleSourcesRig(t, func(f *sourcetest.Fake) mediasource.Adapter { held.Fake = f; return held })
+		old := r.m.live.load()
+		go old.MediaRoots(t.Context())
+		synctest.Wait()
+		if n := held.calls.Load(); n != 2 {
+			t.Fatalf("%d root-folder fills running, want one per source", n)
+		}
+		r.apply(t, r.edit(t, "[{id: a, type: fake, url: 'http://a', token: t1}, {id: b, type: fake, url: 'http://b', token: t9}]", rigSchedule))
+		if r.m.live.load() == old {
+			t.Fatal("the edit published no new Set")
+		}
+		if n := held.returned.Load(); n != 2 {
+			t.Errorf("%d of the replaced Set's 2 fills returned after the reload, want both: the replaced Set was not closed", n)
+		}
+		r.m.live.load().Close()
+	})
+}
+
+func TestSourcesLoopClosesSetAtExit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		held := &heldFolders{}
+		held.hold.Store(true)
+		r := newIdleSourcesRig(t, func(f *sourcetest.Fake) mediasource.Adapter { held.Fake = f; return held })
+		l := &sourcesLoop{wake: make(chan struct{}, 1), cur: r.m}
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- l.run(ctx) }()
+		go r.m.live.load().MediaRoots(t.Context())
+		synctest.Wait()
+		if n := held.calls.Load(); n < 2 {
+			t.Fatalf("%d root-folder calls running, want at least the two fills", n)
+		}
+		cancel()
+		if err := <-done; err != nil {
+			t.Fatalf("run = %v", err)
+		}
+		if calls, returned := held.calls.Load(), held.returned.Load(); returned != calls {
+			t.Errorf("%d of %d root-folder calls returned when run did, want all: the live Set was not closed at exit", returned, calls)
+		}
+	})
 }

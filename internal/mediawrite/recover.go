@@ -46,7 +46,7 @@ func (w *Writer) startRecoveries(ctx context.Context) {
 	for _, rs := range w.paths {
 		if rs.wantRecovery && !rs.recovering {
 			rs.wantRecovery, rs.recovering = false, true
-			w.recoveries.Go(func() { w.recoverRoot(ctx, rs) })
+			w.goRootLocked(&w.recoveries, rs.path, func() { w.recoverRoot(ctx, rs) })
 		}
 	}
 }
@@ -71,7 +71,9 @@ func (w *Writer) recoverRoot(ctx context.Context, rs *rootState) {
 	}()
 	kept, err := w.recoverIntents(ctx, rs, h)
 	if err != nil {
-		w.log.Warn("mediawrite: reading the pending writes for recovery failed", "root", rs.path, "err", err)
+		if ctx.Err() == nil {
+			w.log.Warn("mediawrite: reading the pending writes for recovery failed", "root", rs.path, "err", err)
+		}
 		return
 	}
 	read = true
@@ -389,7 +391,9 @@ func (w *Writer) startOrphansLocked(ctx context.Context) {
 func (w *Writer) settleOrphans(ctx context.Context) (kept []statedb.Intent, ok bool) {
 	intents, err := w.store.PendingWrites(ctx)
 	if err != nil {
-		w.log.Warn("mediawrite: reading the pending writes failed", "err", err)
+		if ctx.Err() == nil {
+			w.log.Warn("mediawrite: reading the pending writes failed", "err", err)
+		}
 		return nil, false
 	}
 	for i := range intents {
@@ -450,7 +454,9 @@ func (w *Writer) countPending(ctx context.Context) {
 	w.mu.Unlock()
 	intents, err := w.store.PendingWrites(ctx)
 	if err != nil {
-		w.log.Warn("mediawrite: reading the pending writes to count them failed", "err", err)
+		if ctx.Err() == nil {
+			w.log.Warn("mediawrite: reading the pending writes to count them failed", "err", err)
+		}
 		return
 	}
 	w.fs.Pause("pending-read")

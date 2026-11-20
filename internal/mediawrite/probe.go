@@ -39,25 +39,25 @@ type probeResult struct {
 }
 
 // startProbeLocked starts rs's probe, writing when write is set; the caller
-// checked that none is outstanding. The probe outlives ctx's cancellation,
-// so a shutdown never reads as an unavailable root.
+// checked that none is outstanding and that Run has not ended. The probe
+// outlives ctx's cancellation, so a shutdown never reads as an unavailable
+// root, and Run's end waits for it.
 func (w *Writer) startProbeLocked(ctx context.Context, rs *rootState, write bool) *probeRun {
 	r := &probeRun{settled: make(chan struct{}), write: write}
 	rs.probe = r
-	w.probes[r] = struct{}{}
 	cur := rs.cur
 	if cur != nil {
 		cur.borrows++
 	}
 	overdue := time.AfterFunc(rootProbeTimeout, func() { w.overdue(rs, r) })
 	detached := context.WithoutCancel(ctx)
-	go func() {
+	w.goRootLocked(&w.rootCalls, rs.path, func() {
 		pctx, cancel := context.WithTimeout(detached, rootProbeTimeout)
 		defer cancel()
 		res := w.probeRoot(pctx, rs.path, cur, write)
 		overdue.Stop()
 		w.finishProbe(rs, r, cur, res)
-	}()
+	})
 	return r
 }
 
@@ -123,7 +123,6 @@ func (w *Writer) listsEntry(root *os.Root) error {
 func (w *Writer) finishProbe(rs *rootState, r *probeRun, borrowed *rootHandle, res probeResult) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	delete(w.probes, r)
 	if borrowed != nil {
 		borrowed.releaseLocked()
 	}
@@ -145,19 +144,6 @@ func (w *Writer) finishProbe(rs *rootState, r *probeRun, borrowed *rootHandle, r
 		r.settleLocked(true)
 	}
 	w.wantRecoveryLocked(rs)
-}
-
-// awaitProbes waits until every probe has returned or turned overdue.
-func (w *Writer) awaitProbes() {
-	w.mu.Lock()
-	settled := make([]chan struct{}, 0, len(w.probes))
-	for r := range w.probes {
-		settled = append(settled, r.settled)
-	}
-	w.mu.Unlock()
-	for _, ch := range settled {
-		<-ch
-	}
 }
 
 // overdue marks rs unavailable when r has not settled by its deadline; r's
@@ -208,9 +194,9 @@ func (w *Writer) availableLocked(rs *rootState, res probeResult) {
 
 // probeAndWait runs or joins a probe of rs that writes when write is set,
 // and reports whether it found the root available; true when ctx ends
-// first, since nothing was learnt against the root. A probe already
-// outstanding that does not write is waited out first; an overdue one still
-// stuck in its syscall answers false at once.
+// first or Run has ended, since nothing was learnt against the root. A
+// probe already outstanding that does not write is waited out first; an
+// overdue one still stuck in its syscall answers false at once.
 func (w *Writer) probeAndWait(ctx context.Context, rs *rootState, write bool) bool {
 	for {
 		w.mu.Lock()
@@ -219,6 +205,9 @@ func (w *Writer) probeAndWait(ctx context.Context, rs *rootState, write bool) bo
 		case rs.gone, r != nil && r.done:
 			w.mu.Unlock()
 			return false
+		case r == nil && w.closed:
+			w.mu.Unlock()
+			return true
 		case r == nil:
 			r = w.startProbeLocked(ctx, rs, write)
 		}

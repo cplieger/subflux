@@ -8,21 +8,24 @@ import (
 	"strings"
 )
 
-// mapper holds a source's mappings sorted by From length, longest first, so
-// the first match by component is the longest.
-type mapper struct{ maps []PathMapping }
+// Mapper maps a path from the From side of its mappings to the To side.
+type Mapper struct{ maps []PathMapping }
 
-func newMapper(ms []PathMapping) mapper {
+// NewMapper sorts a copy of ms by From length, longest first, so the first
+// match by component is the longest.
+func NewMapper(ms []PathMapping) Mapper {
 	sorted := slices.Clone(ms)
 	slices.SortStableFunc(sorted, func(a, b PathMapping) int { return cmp.Compare(len(b.From), len(a.From)) })
-	return mapper{maps: sorted}
+	return Mapper{maps: sorted}
 }
 
 var errPathRule = errors.New("is not an absolute, clean, single-line UTF-8 path of at most 4096 bytes")
 
-// toLocal maps a reported path under the longest From containing it by
-// component; an unmatched path passes through unless a To contains it.
-func (m mapper) toLocal(reported string) (string, error) {
+// Map maps a reported path under the longest From containing it by
+// component; an unmatched path passes through unless a To contains it, which
+// is an *AliasedPathError. A path breaking the path rule, given or mapped,
+// is refused.
+func (m Mapper) Map(reported string) (string, error) {
 	if !validPath(reported) {
 		return "", errPathRule
 	}
@@ -53,11 +56,11 @@ func under(root, p string) (string, bool) {
 	return rel, true
 }
 
-// injective answers the index of the first mapping whose To range overlaps
+// Injective answers the index of the first mapping whose To range overlaps
 // an earlier one's by component, unless the two nest exactly (one From
 // under the other, by the same relative path as their To values); -1 when
-// none does, so no two reported paths map to one local path.
-func injective(ms []PathMapping) int {
+// none does, so no two From paths map to one To path.
+func Injective(ms []PathMapping) int {
 	for j := range ms {
 		for i := range j {
 			if overlaps(ms[i].To, ms[j].To) && !nestsExactly(ms[i], ms[j]) {

@@ -83,7 +83,7 @@ func parseEntry(e *yaml.Node, kinds []AdapterKind) (Config, bool, []formschema.F
 		enabled = b
 	}
 	var merrs, terrs []formschema.FieldError
-	cfg.PathMappings, merrs = parseMappings(envelope[keyPathMappings])
+	cfg.PathMappings, merrs = ParseMappings(envelope[keyPathMappings])
 	cfg.ExcludeTags, terrs = parseExcludeTags(envelope[keyExcludeTags])
 	errs = append(append(errs, merrs...), terrs...)
 	for _, v := range envelope {
@@ -157,7 +157,10 @@ func parseType(v *yaml.Node, kinds []AdapterKind) (*AdapterKind, *formschema.Fie
 	return nil, &formschema.FieldError{Path: keyType, Message: "must be one of " + strings.Join(known, ", ")}
 }
 
-func parseMappings(v *yaml.Node) ([]PathMapping, []formschema.FieldError) {
+// ParseMappings reads an entry's path_mappings, nil or null being none: at
+// most 32 {from, to}, both meeting the path rule, no repeated from, and
+// Injective; errors are relative to the entry.
+func ParseMappings(v *yaml.Node) ([]PathMapping, []formschema.FieldError) {
 	if v == nil || formschema.IsNull(v) {
 		return nil, nil
 	}
@@ -187,7 +190,7 @@ func parseMappings(v *yaml.Node) ([]PathMapping, []formschema.FieldError) {
 	if len(errs) > 0 {
 		return nil, errs
 	}
-	if j := injective(out); j >= 0 {
+	if j := Injective(out); j >= 0 {
 		return nil, []formschema.FieldError{{Path: fmt.Sprintf("%s[%d].to", keyPathMappings, j), Message: "overlaps an earlier mapping's to without nesting exactly under it, so two source paths would map to one local path"}}
 	}
 	return out, nil

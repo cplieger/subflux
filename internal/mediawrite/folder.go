@@ -52,7 +52,8 @@ func (s *FolderState) UnmarshalText(b []byte) error {
 // after it) within rootProbeTimeout. Each root runs one check at a time,
 // its open and Lstat included: a call that cannot take the root's slot or
 // finish its check in time answers FolderUnavailable, and an overrun check
-// keeps the slot until its syscall returns.
+// keeps the slot until its syscall returns. Once Run has ended every call
+// answers FolderUnavailable.
 func (w *Writer) FolderState(ctx context.Context, path string) FolderState {
 	ctx, cancel := context.WithTimeout(ctx, rootProbeTimeout)
 	defer cancel()
@@ -71,10 +72,17 @@ func (w *Writer) FolderState(ctx context.Context, path string) FolderState {
 		return FolderUnavailable
 	}
 	answer := make(chan FolderState, 1)
-	go func() {
+	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		<-rs.check
+		return FolderUnavailable
+	}
+	w.goRootLocked(&w.rootCalls, rs.path, func() {
 		defer func() { <-rs.check }()
 		answer <- w.checkFolder(rs, rel)
-	}()
+	})
+	w.mu.Unlock()
 	select {
 	case s := <-answer:
 		return s

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"sync"
 
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/media"
@@ -67,18 +68,21 @@ type Deps struct {
 }
 
 // Set is the configured sources behind one check of every answer. It is
-// safe for concurrent use.
+// safe for concurrent use; its owner calls Close when it is done with it.
 type Set struct {
 	orders OrderJoin
 	byID   map[media.SourceID]*source
 	log    *slog.Logger
 	ids    []media.SourceID
+	fills  sync.WaitGroup
+	lifeMu sync.Mutex // guards closed; taken before any source's roots.mu
+	closed bool
 }
 
 type source struct {
 	adapter Adapter
 	labels  map[string]struct{}
-	m       mapper
+	m       Mapper
 	id      media.SourceID
 	schema  formschema.Schema
 	cfg     Config
@@ -115,7 +119,7 @@ func NewSet(kinds []AdapterKind, cfgs []Config, deps Deps, orders OrderJoin) (*S
 		}
 		src := &source{
 			id: cfg.ID, cfg: cfg, schema: kinds[i].Schema, adapter: ad,
-			caps: ad.Capabilities(), m: newMapper(cfg.PathMappings), labels: labelSet(cfg.ExcludeTags),
+			caps: ad.Capabilities(), m: NewMapper(cfg.PathMappings), labels: labelSet(cfg.ExcludeTags),
 		}
 		src.caps.Kinds = slices.Clone(src.caps.Kinds)
 		if !src.caps.Tags && hasConfiguredLabel(src.labels) {

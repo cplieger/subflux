@@ -275,7 +275,9 @@ func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr e
 	return &supervision{
 		producers: producers,
 		sinks: []component{
-			{name: "job records", run: st.Run}, {name: "media writer", run: writer.Run}, {name: "accounts", run: accts.Run},
+			{name: "job records", run: st.Run},
+			{name: "media writer", run: writer.Run, outstanding: writer.Outstanding},
+			{name: "accounts", run: accts.Run},
 		},
 		shutdownSettings: svc.Shutdown,
 		closeProviders:   p.providers.Close,

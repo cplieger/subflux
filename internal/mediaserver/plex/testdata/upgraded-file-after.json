@@ -1,0 +1,130 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "allowSync": true,
+  "art": "/:/resources/show-fanart.jpg",
+  "identifier": "com.plexapp.plugins.library",
+  "librarySectionID": 2,
+  "librarySectionTitle": "TV Shows",
+  "librarySectionUUID": "00000000-0000-4000-8000-000000000001",
+  "mediaTagPrefix": "/system/bundle/media/flags/",
+  "mediaTagVersion": 1786914632,
+  "nocache": true,
+  "thumb": "/:/resources/show.png",
+  "title1": "TV Shows",
+  "title2": "All Shows",
+  "viewGroup": "show",
+  "viewMode": 65592,
+  "Metadata": [
+   {
+    "ratingKey": "724218",
+    "key": "/library/metadata/724218",
+    "parentRatingKey": "724217",
+    "grandparentRatingKey": "647730",
+    "guid": "plex://episode/6a68a0ac1186b53dbd99a8f1",
+    "parentGuid": "plex://season/6a8cdec4fb69dfcf5cd921a4",
+    "grandparentGuid": "plex://show/5d9c086c02391c001f5891bb",
+    "grandparentSlug": "greys-anatomy",
+    "type": "episode",
+    "title": "Collide",
+    "grandparentKey": "/library/metadata/647730",
+    "parentKey": "/library/metadata/724217",
+    "grandparentTitle": "Grey's Anatomy",
+    "parentTitle": "Season 23",
+    "contentRating": "TV-14",
+    "summary": "After a collision at Sea-Tac sends a surge of critically injured patients to Grey Sloan, the unveiling of its controversial new VIP floor is thrown into chaos as doctors race to save lives amid impossible choices.",
+    "index": 1,
+    "parentIndex": 23,
+    "audienceRating": 10.0,
+    "year": 2026,
+    "thumb": "/library/metadata/724218/thumb/1792289582",
+    "art": "/library/metadata/647730/art/1792200536",
+    "parentThumb": "/library/metadata/724217/thumb/1792110061",
+    "grandparentThumb": "/library/metadata/647730/thumb/1792200536",
+    "grandparentArt": "/library/metadata/647730/art/1792200536",
+    "grandparentTheme": "/library/metadata/647730/theme/1792200536",
+    "duration": 2585500,
+    "originallyAvailableAt": "2026-10-15",
+    "addedAt": 1792110060,
+    "updatedAt": 1792289582,
+    "audienceRatingImage": "themoviedb://image.rating",
+    "chapterSource": "media",
+    "loudnessAnalysisVersion": "0.02",
+    "Media": [
+     {
+      "id": 914579,
+      "duration": 2585500,
+      "bitrate": 5958,
+      "width": 1920,
+      "height": 1080,
+      "aspectRatio": 1.78,
+      "audioChannels": 6,
+      "audioCodec": "eac3",
+      "videoCodec": "h264",
+      "videoResolution": "1080",
+      "container": "mkv",
+      "videoFrameRate": "24p",
+      "videoProfile": "high",
+      "hasVoiceActivity": true,
+      "Part": [
+       {
+        "id": 1047514,
+        "key": "/library/parts/1047514/1792289562/file.mkv",
+        "duration": 2585500,
+        "file": "/media/tv/Grey's Anatomy (2005) {imdb-tt0413573}/Season 23/Greys Anatomy (2005) - S23E01 - Collide [DSNP][WEBDL-1080p][EAC3 5.1][h264]-NTb.mkv",
+        "size": 1925515969,
+        "container": "mkv",
+        "indexes": "sd",
+        "videoProfile": "high"
+       }
+      ]
+     }
+    ],
+    "Image": [
+     {
+      "alt": "Collide",
+      "type": "coverPoster",
+      "url": "/library/metadata/647730/thumb/1792200536"
+     },
+     {
+      "alt": "Collide",
+      "type": "snapshot",
+      "url": "/library/metadata/724218/thumb/1792289582"
+     },
+     {
+      "alt": "Collide",
+      "type": "background",
+      "url": "/library/metadata/647730/art/1792200536"
+     },
+     {
+      "alt": "Collide",
+      "type": "clearLogo",
+      "url": "/library/metadata/647730/clearLogo/1792200536"
+     },
+     {
+      "alt": "Collide",
+      "type": "backgroundSquare",
+      "url": "/library/metadata/647730/squareArt/1792200536"
+     }
+    ],
+    "UltraBlurColors": {
+     "topLeft": "192c52",
+     "topRight": "252225",
+     "bottomRight": "222530",
+     "bottomLeft": "24667f"
+    },
+    "Role": [
+     {
+      "tag": "Ellen Pompeo"
+     },
+     {
+      "tag": "Chandra Wilson"
+     },
+     {
+      "tag": "James Pickens Jr."
+     }
+    ]
+   }
+  ]
+ }
+}
