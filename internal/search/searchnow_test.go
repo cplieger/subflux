@@ -9,6 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/provider"
@@ -71,11 +73,14 @@ func (r *rig) searchNow(e *search.Engine, inst statedb.InstanceID, idem *status.
 	return j
 }
 
-// codeOf is the code search.Codes answers for err, "" for none.
+// codeOf is the code a job-start row answers for err through its owners,
+// search.Owner then status.Owner, "" for none.
 func codeOf(err error) string {
-	for _, c := range search.Codes {
-		if errors.Is(err, c.Err) {
-			return c.Code
+	for _, o := range []*httpwire.Owner{search.Owner, status.Owner} {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code
+			}
 		}
 	}
 	return ""
@@ -151,19 +156,28 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			err := arm.run()
 			code := codeOf(err)
 			if err == nil || code == "" {
-				t.Errorf("%s = %v, which no entry of Codes answers", arm.name, err)
+				t.Errorf("%s = %v, which no owner code answers", arm.name, err)
 			}
 			covered[code] = true
 		}
-		for _, c := range search.Codes {
+		for _, c := range search.Owner.Codes {
 			if !covered[c.Code] {
-				t.Errorf("Codes holds %s, which no arm returns", c.Code)
+				t.Errorf("search.Owner.Codes holds %s, which no arm returns", c.Code)
 			}
 		}
-		if len(search.Codes) != 8 {
-			t.Errorf("Codes holds %d entries, want search's five and status's three start codes", len(search.Codes))
+		for _, code := range []string{"idempotency_key_reused", "job_capacity", "job_unrecorded"} {
+			if !covered[code] {
+				t.Errorf("no arm returns status's start code %s", code)
+			}
+		}
+		if len(search.Owner.Codes) != 5 {
+			t.Errorf("search.Owner.Codes holds %d entries, want search's five", len(search.Owner.Codes))
 		}
 	})
+}
+
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, search.Owner)
 }
 
 func TestSearchNowSettles(t *testing.T) {

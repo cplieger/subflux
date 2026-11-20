@@ -11,9 +11,12 @@ import (
 	"testing"
 
 	"github.com/cplieger/go/httpserver/v2"
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/subflux/internal/clientaddr"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider/providers"
 	"github.com/cplieger/subflux/internal/settings"
+	"github.com/cplieger/subflux/internal/wirecodes"
 )
 
 // loaded is the snapshot settings.Load gives config text.
@@ -68,7 +71,7 @@ func TestHostGate(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			h := hostGate(func() settings.Snapshot { return c.snap }, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			h := hostGate(func() settings.Snapshot { return c.snap })(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusTeapot)
 			}))
 			rec := ask(h, c.peer, c.host, "/")
@@ -84,15 +87,15 @@ func TestHostGate(t *testing.T) {
 			if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 				t.Errorf("Content-Type %q, want JSON", ct)
 			}
-			var body httpserver.ErrorResponse
-			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			body, err := httpwire.DecodeEnvelope(rec.Body.Bytes())
+			if err != nil {
 				t.Fatal(err)
 			}
 			if body.Code != "host_not_allowed" || body.Message != "host not allowed" {
 				t.Errorf("code %q message %q, want host_not_allowed and host not allowed", body.Code, body.Message)
 			}
-			if !strings.Contains(body.Remediation, "server.allowed_hosts") {
-				t.Errorf("remediation %q, want it to name server.allowed_hosts", body.Remediation)
+			if spec, _ := wirecodes.Catalog.Lookup("host_not_allowed"); body.Remediation != spec.Remediation {
+				t.Errorf("remediation %q, want the catalog's %q", body.Remediation, spec.Remediation)
 			}
 			if id := rec.Header().Get(httpserver.HeaderRequestID); body.RequestID == "" || body.RequestID != id {
 				t.Errorf("request_id %q, X-Request-ID %q, want one non-empty id", body.RequestID, id)
@@ -105,7 +108,7 @@ func TestHostGateReadsSnapshotPerRequest(t *testing.T) {
 	var snap atomic.Pointer[settings.Snapshot]
 	listed, open := loaded(t, "server:\n  allowed_hosts: [nas.lan]\n"+validLanguages), loaded(t, validLanguages)
 	snap.Store(&listed)
-	h := handler(obs.New(), func() settings.Snapshot { return *snap.Load() }, nil)
+	h := handler(obs.New(), func() settings.Snapshot { return *snap.Load() }, clientaddr.NewDetector(), nil)
 	if code := ask(h, remotePeer, "other.lan", "/").Code; code != http.StatusForbidden {
 		t.Fatalf("before the save = %d, want 403", code)
 	}
@@ -118,7 +121,7 @@ func TestHostGateReadsSnapshotPerRequest(t *testing.T) {
 func TestHostGateCoversEveryRoute(t *testing.T) {
 	listed := loaded(t, "server:\n  allowed_hosts: [nas.lan]\n"+validLanguages)
 	m := obs.New()
-	h := handler(m, func() settings.Snapshot { return listed }, func(mux *http.ServeMux) {
+	h := handler(m, func() settings.Snapshot { return listed }, clientaddr.NewDetector(), func(mux *http.ServeMux) {
 		mux.HandleFunc("GET /api/probe", func(http.ResponseWriter, *http.Request) {})
 	})
 	for _, path := range []string{"/", "/api/probe", "/elsewhere"} {
@@ -135,8 +138,8 @@ func TestHostGateCoversEveryRoute(t *testing.T) {
 		t.Errorf("no refusal recorded in http_requests_total:\n%s", rec.Body.String())
 	}
 	refused := ask(h, remotePeer, "other.lan", "/")
-	var body httpserver.ErrorResponse
-	if err := json.Unmarshal(refused.Body.Bytes(), &body); err != nil {
+	body, err := httpwire.DecodeEnvelope(refused.Body.Bytes())
+	if err != nil {
 		t.Fatal(err)
 	}
 	if id := refused.Header().Get(httpserver.HeaderRequestID); id == "" || body.RequestID != id {

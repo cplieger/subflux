@@ -5,9 +5,10 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/mediasource"
 	"github.com/cplieger/subflux/internal/scan"
-	"github.com/cplieger/subflux/internal/sentineltest"
 	"github.com/cplieger/subflux/internal/status"
 )
 
@@ -44,7 +45,7 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			{start(sourceFull, refetch(17, 17)), "Start past the source's queue bound", "scan_capacity"},
 			{start(keyed, scan.Request{Owner: 1, Source: src, Key: key(2)}), "Start with a used key and another request", "idempotency_key_reused"},
 		} {
-			if got := sentineltest.CodeOf(scan.Codes, arm.err); got != arm.want {
+			if got := codeOf(arm.err, scan.Owner, status.Owner); got != arm.want {
 				t.Errorf("%s: code %q, want %q", arm.name, got, arm.want)
 			}
 		}
@@ -53,10 +54,25 @@ func TestCodesCoverFailureTable(t *testing.T) {
 		if _, ok := errors.AsType[*mediasource.SourceError](err); !ok {
 			t.Errorf("Start naming an unknown source = %v, want a *SourceError", err)
 		}
-		if got := sentineltest.CodeOf(scan.Codes, err); got != "" {
-			t.Errorf("the *SourceError matched Codes as %q, want it left to Owner.Typed", got)
+		if got := codeOf(err, scan.Owner, status.Owner); got != "" {
+			t.Errorf("the *SourceError matched an owner code %q, want it left to the handler", got)
 		}
 	})
+}
 
-	sentineltest.Placed(t, scan.Codes, map[string]error{"ErrScanCapacity": scan.ErrScanCapacity}, nil)
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, scan.Owner)
+}
+
+// codeOf is the code of the first entry of owners' Codes that err matches by
+// errors.Is, "" when none does: the lookup httpwire's answer mapping makes.
+func codeOf(err error, owners ...*httpwire.Owner) string {
+	for _, o := range owners {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code
+			}
+		}
+	}
+	return ""
 }

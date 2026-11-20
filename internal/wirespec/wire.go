@@ -1,5 +1,5 @@
 // Package wirespec holds subflux's wire types and their bounds. A bounded
-// type declares its bound by method (Range, MaxBytes, Pattern, Count).
+// type declares its bound by method (Range, MaxBytes, Count).
 package wirespec
 
 import (
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cplieger/go/httpwire"
 	"github.com/cplieger/subflux/internal/clientaddr"
 	"github.com/cplieger/subflux/internal/formschema"
 	"github.com/cplieger/subflux/internal/language"
@@ -30,15 +31,6 @@ func (h Hex16) MarshalText() ([]byte, error) { return hexText(h[:]), nil }
 
 // UnmarshalText refuses anything but 32 lowercase hex characters.
 func (h *Hex16) UnmarshalText(b []byte) error { return unhexText(h[:], "Hex16", b) }
-
-// SHA256 is a digest on the wire as 64 lowercase hex characters.
-type SHA256 [32]byte
-
-// MarshalText answers 64 lowercase hex characters.
-func (s SHA256) MarshalText() ([]byte, error) { return hexText(s[:]), nil }
-
-// UnmarshalText refuses anything but 64 lowercase hex characters.
-func (s *SHA256) UnmarshalText(b []byte) error { return unhexText(s[:], "SHA256", b) }
 
 func hexText(b []byte) []byte { return hex.AppendEncode(nil, b) }
 
@@ -115,12 +107,6 @@ type RescanQuery struct {
 	Source *media.SourceID `json:"source,omitempty"`
 }
 
-// DeleteQuery is the expectation a file delete must match.
-type DeleteQuery struct {
-	Generation uint64 `json:"generation"`
-	SHA256     SHA256 `json:"sha256"`
-}
-
 // LockRequest sets or clears an instance's lock.
 type LockRequest struct {
 	Locked bool `json:"locked"`
@@ -138,8 +124,8 @@ type DownloadRequest struct {
 }
 
 // UploadRequest is files.upload's body: Bytes is the file or
-// archive in base64, 1 byte to provider.MaxBody decoded; Name is one line
-// of 1 to 255 bytes. Either refused is body_invalid at its field.
+// archive in base64, 1 byte to UploadMax decoded; Name is one line of 1 to
+// 255 bytes. Either refused is bad_body at its field.
 type UploadRequest struct {
 	Name    UploadName       `json:"name"`
 	Target  language.Tag     `json:"target"`
@@ -153,27 +139,26 @@ type UploadRequest struct {
 type TimingRequest struct {
 	Timing   *TimingWire   `json:"timing,omitempty"`
 	Proposal *status.JobID `json:"proposal,omitempty"`
-	Expect   ExpectDoc     `json:"expect"`
 }
 
 // RenderRequest renders a timing preview. FromMs is the overlaid
 // preview's from_ms: RenderVTT renders that window shifted to start at 0, as the preview's timestamps do.
 type RenderRequest struct {
-	Timing TimingWire `json:"timing"`
-	Expect ExpectDoc  `json:"expect"`
-	FromMs FromMs     `json:"from_ms,omitempty"`
+	Timing  TimingWire   `json:"timing"`
+	FromMs  FromMs       `json:"from_ms,omitempty"`
+	Version httpwire.Tag `json:"version"`
 }
 
 // SyncRequest proposes a timing for one file by Method.
 type SyncRequest struct {
-	Expect ExpectDoc     `json:"expect"`
-	Method timing.Method `json:"method"` // reference or audio
+	Method  timing.Method `json:"method"` // reference or audio
+	Version httpwire.Tag  `json:"version"`
 }
 
 // ResyncFile is one file of a resync batch with the state the caller saw.
 type ResyncFile struct {
-	Ref    FileRefDoc `json:"ref"`
-	Expect ExpectDoc  `json:"expect"`
+	Ref     FileRefDoc   `json:"ref"`
+	Version httpwire.Tag `json:"version"`
 }
 
 // ResyncRequest syncs a batch of files by Method.
@@ -297,13 +282,6 @@ type FileRefDoc struct {
 	InstanceID statedb.InstanceID `json:"instance_id"`
 }
 
-// ExpectDoc is the state of a file a caller saw: generation 0 for an
-// unmanaged file, and the bytes' SHA-256.
-type ExpectDoc struct {
-	Generation uint64 `json:"generation"`
-	SHA256     SHA256 `json:"sha256"`
-}
-
 // FactsDoc is rank.Facts.
 type FactsDoc struct {
 	Hash       bool     `json:"hash"`
@@ -354,7 +332,7 @@ type FileDoc struct {
 	Ref        FileRefDoc     `json:"ref"`
 	TagName    string         `json:"tag_name"`
 	Tag        language.Tag   `json:"tag"`
-	Expect     ExpectDoc      `json:"expect"`
+	Version    httpwire.Tag   `json:"version"`
 	Ordinal    int            `json:"ordinal,omitempty"`
 	Flags      FlagsDoc       `json:"flags"`
 	Managed    bool           `json:"managed"`
@@ -409,7 +387,7 @@ type ProposalDoc struct {
 	File    FileRefDoc   `json:"file"`
 	Job     status.JobID `json:"job"`
 	Timing  TimingWire   `json:"timing"`
-	Expect  ExpectDoc    `json:"expect"`
+	Version httpwire.Tag `json:"version"`
 	Outcome OutcomeDoc   `json:"outcome"`
 }
 

@@ -61,6 +61,12 @@ func newSite(t *testing.T, e *env, store account.Store, edit func(*Deps)) *site 
 
 func mount(t *testing.T, s *Service) *site {
 	t.Helper()
+	return mountVia(t, s, s.deps.Resolver)
+}
+
+// mountVia mounts s's routes behind clientaddr.Middleware over current.
+func mountVia(t *testing.T, s *Service, current func() clientaddr.Resolver) *site {
+	t.Helper()
 	routes, err := s.Routes(writeError)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +77,7 @@ func mount(t *testing.T, s *Service) *site {
 		mux.Handle(r.Method+" "+r.Path, r.Handler)
 		byName[r.Name] = r
 	}
-	return &site{s: s, h: clientaddr.Middleware(s.deps.Resolver, clientaddr.NewDetector())(mux), routes: byName}
+	return &site{s: s, h: clientaddr.Middleware(current, clientaddr.NewDetector())(mux), routes: byName}
 }
 
 func (st *site) path(t *testing.T, name string) string {

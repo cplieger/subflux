@@ -1,11 +1,13 @@
 package statedb
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/cplieger/go/httpwire"
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/language"
 	"github.com/cplieger/subflux/internal/mediasource"
-	"github.com/cplieger/subflux/internal/sentineltest"
 )
 
 func TestCodesCoverFailureTable(t *testing.T) {
@@ -34,23 +36,26 @@ func TestCodesCoverFailureTable(t *testing.T) {
 	}
 	for _, arm := range arms {
 		t.Run(arm.name, func(t *testing.T) {
-			if got := sentineltest.CodeOf(Codes, arm.call()); got != arm.want {
+			if got := codeOf(arm.call(), Owner); got != arm.want {
 				t.Errorf("code %q, want %q", got, arm.want)
 			}
 		})
 	}
+}
 
-	sentineltest.Placed(t, Codes, map[string]error{
-		"ErrCorrupt":        ErrCorrupt,
-		"ErrCursorInvalid":  ErrCursorInvalid,
-		"ErrNotLockable":    ErrNotLockable,
-		"ErrLocked":         ErrLocked,
-		"ErrPassUnknown":    ErrPassUnknown,
-		"ErrSourceInactive": ErrSourceInactive,
-	}, map[string]string{
-		"ErrCorrupt":        "a store that does not decode is subflux's own failure, never a client's code",
-		"ErrLocked":         "only Open returns it",
-		"ErrPassUnknown":    "only BeginPass, ObserveItems and FinishPass return it, and no endpoint calls them",
-		"ErrSourceInactive": "only BeginPass, ObserveItems and FinishPass return it, and no endpoint calls them",
-	})
+func TestOwnerSentinels(t *testing.T) {
+	httpwiretest.Sentinels(t, Owner)
+}
+
+// codeOf is the code of the first entry of owners' Codes that err matches by
+// errors.Is, "" when none does: the lookup httpwire's answer mapping makes.
+func codeOf(err error, owners ...*httpwire.Owner) string {
+	for _, o := range owners {
+		for _, c := range o.Codes {
+			if errors.Is(err, c.Err) {
+				return c.Code
+			}
+		}
+	}
+	return ""
 }

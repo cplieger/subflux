@@ -254,7 +254,7 @@ func serve(ctx context.Context, cfg *Config, p *process) (_ *supervision, rerr e
 	if err != nil {
 		return nil, err
 	}
-	srv := httpserver.New(handler(m, svc.Snapshot, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
+	srv := httpserver.New(handler(m, svc.Snapshot, det, cfg.Routes), httpserver.WithSlogErrorLog(slog.LevelWarn))
 	srv.ReadTimeout = readTimeout
 	srv.ReadHeaderTimeout = readHeaderTimeout
 	srv.WriteTimeout = writeTimeout

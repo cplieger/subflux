@@ -99,12 +99,6 @@
     },
     {
       "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/settings#Codes",
-      "path": "internal/settings/codes.go",
-      "reason": "Retained until AP-1 (internal/settings#Codes): its first caller outside the package lands there."
-    },
-    {
-      "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/language#EnglishName",
       "path": "internal/language/names.go",
       "reason": "Retained until AP-1 (internal/language#EnglishName): its first caller outside the package lands there."
@@ -192,12 +186,6 @@
       "symbol": "go://github.com/cplieger/subflux/internal/statedb#CoverageCount.Locked",
       "path": "internal/statedb/counts.go",
       "reason": "Retained until AP-1b (internal/statedb#CoverageCount.*): its first reader lands there."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/statedb#Codes",
-      "path": "internal/statedb/codes.go",
-      "reason": "Retained until AP-1 (internal/statedb#Codes): its first caller outside the package lands there."
     },
     {
       "code": "DS1501",
@@ -647,19 +635,7 @@
       "code": "DS1501",
       "symbol": "go://github.com/cplieger/subflux/internal/wirespec#AttemptRefusal",
       "path": "internal/wirespec/wire.go",
-      "reason": "Retained until AP-1h (internal/wirespec#*): HistoryDoc's refusal type, which the generated client names when history.list lands on httpwire's page."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/wirespec#FileName.MaxBytes",
-      "path": "internal/wirespec/bounds.go",
-      "reason": "Retained until AP-1h (internal/wirespec#*): the binder and the OpenAPI generator read each bound through its MaxBytes method."
-    },
-    {
-      "code": "DS1501",
-      "symbol": "go://github.com/cplieger/subflux/internal/wirespec#UploadName.MaxBytes",
-      "path": "internal/wirespec/bounds.go",
-      "reason": "Retained until AP-1h (internal/wirespec#*): the binder and the OpenAPI generator read each bound through its MaxBytes method."
+      "reason": "Retained until AP-1i (internal/wirespec#*): HistoryDoc's refusal type, which history.list answers once server.New binds the table."
     }
   ]
 }

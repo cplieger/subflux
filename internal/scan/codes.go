@@ -1,18 +1,12 @@
 package scan
 
-import (
-	"slices"
+import "github.com/cplieger/go/httpwire"
 
-	"github.com/cplieger/subflux/internal/status"
-)
-
-// Codes is every sentinel Start returns, status's passed on, with the code
-// api answers for it. Start's *mediasource.SourceError is typed, not a
-// sentinel, so api lists its codes through Owner.Typed. The element type is
-// unnamed, so scan never imports api's wirespec.
-var Codes = slices.Concat([]struct {
-	Err  error
-	Code string
-}{
-	{ErrScanCapacity, "scan_capacity"},
-}, status.StartCodes)
+// Owner maps every sentinel Start returns to the code the API answers for it.
+// Start's *mediasource.SourceError is typed, not a sentinel: the handler
+// answers it as its own *httpwire.Error.
+var Owner = &httpwire.Owner{
+	Name:      "scan",
+	Sentinels: map[string]error{"ErrScanCapacity": ErrScanCapacity},
+	Codes:     []httpwire.OwnerCode{{Err: ErrScanCapacity, Code: "scan_capacity"}},
+}

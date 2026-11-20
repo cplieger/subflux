@@ -4,9 +4,10 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/cplieger/go/httpwire"
 	"github.com/cplieger/subflux/internal/mediawrite"
-	"github.com/cplieger/subflux/internal/status"
 	"github.com/cplieger/subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/timing"
 )
 
 var (
@@ -29,20 +30,34 @@ var (
 	ErrPreviewRange = errors.New("syncsched: preview start out of range")
 )
 
-// Codes is every sentinel the api-called exports return (Propose, Proposal,
-// Resync, Preview), status.StartCodes' and mediawrite's passed on, with the
-// code api answers for it. ErrSyncFailed and ErrDifferentCut are absent:
-// only Align returns them, only search calls Align, and jobs report causes
-// instead.
-var Codes = slices.Concat([]struct {
-	Err  error
-	Code string
-}{
-	{ErrSyncCapacity, "sync_capacity"},
-	{ErrBatchTooLarge, "body_invalid"},
-	{ErrPreviewCapacity, "preview_capacity"},
-	{ErrPreviewRange, "preview_range"},
-}, status.StartCodes, mediawrite.Codes)
+// Owner maps every sentinel the API-called exports (Propose, Proposal,
+// Resync, Preview) return to the code the API answers for it; status's and
+// mediawrite's, which they pass on, are those packages' owners.
+var Owner = &httpwire.Owner{
+	Name: "syncsched",
+	Sentinels: map[string]error{
+		"ErrSyncFailed":      ErrSyncFailed,
+		"ErrDifferentCut":    ErrDifferentCut,
+		"ErrSyncCapacity":    ErrSyncCapacity,
+		"ErrBatchTooLarge":   ErrBatchTooLarge,
+		"ErrPreviewCapacity": ErrPreviewCapacity,
+		"ErrPreviewRange":    ErrPreviewRange,
+	},
+	Outside: map[string]string{
+		"ErrSyncFailed":   "only Align returns it, only search calls Align, and jobs report causes instead",
+		"ErrDifferentCut": "only Align returns it; jobs report the different_cut cause",
+	},
+	Codes: []httpwire.OwnerCode{
+		{Err: ErrSyncCapacity, Code: "sync_capacity"},
+		{Err: ErrBatchTooLarge, Code: "bad_body"},
+		{Err: ErrPreviewCapacity, Code: "preview_capacity"},
+		{Err: ErrPreviewRange, Code: "preview_range"},
+	},
+}
+
+// passedCodes are the owner codes a file's read, video open or write passes
+// on, in the order a cause is matched.
+var passedCodes = slices.Concat(mediawrite.Owner.Codes, timing.Owner.Codes)
 
 // The causes a sync job ends with besides mediawrite's codes.
 const (
@@ -56,18 +71,14 @@ const (
 )
 
 // Causes is every cause a sync job ends with, in its wire spelling: its
-// own, then the codes of mediawrite.Codes, which a file's read, video open
-// or write passes on.
+// own, then the codes of mediawrite's and timing's owners, which a file's
+// read, video open or write passes on.
 var Causes = append([]string{
 	causeDifferentCut, causeFFmpegUnavailable, causeNoReference, causeNoAudio,
 	causeUnverified, causeWriteFailed, causeSyncFailed,
-}, codesOf(mediawrite.Codes)...)
+}, codesOf(passedCodes)...)
 
-func codesOf(codes []struct {
-	Err  error
-	Code string
-},
-) []string {
+func codesOf(codes []httpwire.OwnerCode) []string {
 	out := make([]string, len(codes))
 	for i, c := range codes {
 		out[i] = c.Code

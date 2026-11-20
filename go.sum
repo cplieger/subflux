@@ -16,6 +16,8 @@ github.com/cplieger/go/httpclient v1.2.0 h1:E+lbIpiNkUkcq3fxdMDYn116cwx6tU1XWmn4
 github.com/cplieger/go/httpclient v1.2.0/go.mod h1:couTQSCNdgNwOotbaQREGcM4CjUKZJ4Bdb7FSkNwL8U=
 github.com/cplieger/go/httpserver/v2 v2.0.0-dev.11 h1:H5T6wcOxEleWVTe5yT1F4feCqCjR71zMFswMGBxM3WQ=
 github.com/cplieger/go/httpserver/v2 v2.0.0-dev.11/go.mod h1:IUzAOZzxsi24r2nK1aTp2uIMi3Y1+67hBcng8bcQj6w=
+github.com/cplieger/go/httpwire v1.0.0-dev.3 h1:vIyRXgrM8REDAxDoAjjXvaO0XXfhWCth4LL5z4xnGx4=
+github.com/cplieger/go/httpwire v1.0.0-dev.3/go.mod h1:69ckU3vd1xrnxjJo47xGeMLDZUAqu4BbF3OFYPCYxF8=
 github.com/cplieger/go/jsonx v1.1.0 h1:/XBHr3vJVqKYVDteO8cZEMAdTgmT3Df/SeyNw1pdak8=
 github.com/cplieger/go/jsonx v1.1.0/go.mod h1:ry6co0JYAadIhjHtkktBSK3to4YdtEak1P7mdmQlr7U=
 github.com/cplieger/go/keyenc v1.3.0 h1:v0zvHSY4ZOZapGNYGAkghEXPz1SeifT/Trg0b9A8IBU=

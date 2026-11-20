@@ -12,17 +12,25 @@ import (
 	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/health/v2/probe"
 	"github.com/cplieger/go/httpserver/v2"
+	"github.com/cplieger/subflux/internal/clientaddr"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/settings"
+	"github.com/cplieger/subflux/internal/wirecodes"
 )
 
 //go:embed placeholder.html
 var placeholder []byte
 
-// handler is the product listener's: the page and routes behind the host
-// gate, inside the logger and the recoverer, so a refused host is logged and
-// counted. /healthz and /metrics are the ops listener's (opsConfig).
-func handler(m *obs.Metrics, snapshot func() settings.Snapshot, routes func(*http.ServeMux)) http.Handler {
+// csp is every product answer's Content-Security-Policy.
+const csp = "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+// handler is the product listener's chain over the page and routes. The
+// address middleware is outermost, so the access log and every later reader
+// see one client address; the headers are set before anything below answers,
+// so a refused host and a recovered panic carry them; the host gate is inside
+// the logger, so a refusal is logged and counted. /healthz and /metrics are
+// the ops listener's (opsConfig).
+func handler(m *obs.Metrics, snapshot func() settings.Snapshot, det *clientaddr.Detector, routes func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -32,8 +40,29 @@ func handler(m *obs.Metrics, snapshot func() settings.Snapshot, routes func(*htt
 	if routes != nil {
 		routes(mux)
 	}
+	resolver := func() clientaddr.Resolver {
+		srv, _ := snapshot().Server()
+		return clientaddr.New(srv.TrustedProxies())
+	}
 	logOpt, recoverOpt := httpMetrics(m)
-	return httpserver.Chain(hostGate(snapshot, mux), httpserver.Logging(logOpt), httpserver.Recoverer(recoverOpt))
+	return httpserver.Chain(mux,
+		clientaddr.Middleware(resolver, det),
+		httpserver.Logging(logOpt, httpserver.WithClientIPFunc(clientIP)),
+		httpserver.SecurityHeaders(httpserver.WithCSP(csp), httpserver.WithReferrerPolicy("no-referrer")),
+		httpserver.NoStore(),
+		httpserver.Recoverer(recoverOpt, httpserver.WithRecoverResponder(wirecodes.Catalog.Responder())),
+		hostGate(snapshot),
+		httpserver.Gzip(),
+	)
+}
+
+// clientIP is the address clientaddr.Middleware resolved for r.
+func clientIP(r *http.Request) string {
+	a, ok := clientaddr.From(r.Context())
+	if !ok {
+		return ""
+	}
+	return a.IP().String()
 }
 
 // opsConfig is the ops listener on addr: GET /healthz over checks and GET
@@ -44,6 +73,7 @@ func opsConfig(addr string, m *obs.Metrics, checks []health.Check) httpserver.Op
 	return httpserver.OpsConfig{
 		Metrics: m.Handler(),
 		Healthz: health.CheckHandler(checks...),
+		Errors:  wirecodes.Catalog.Responder(),
 		Setting: OpsAddrSetting,
 		Addr:    addr,
 	}
@@ -52,11 +82,13 @@ func opsConfig(addr string, m *obs.Metrics, checks []health.Check) httpserver.Op
 // hostGate serves next behind the host policy of the server section in
 // force, read per request so a save changing allowed_hosts applies to the
 // next request; the policy answers a refused Host 403 host_not_allowed.
-func hostGate(snapshot func() settings.Snapshot, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		srv, _ := snapshot().Server()
-		srv.Hosts().Middleware()(next).ServeHTTP(w, r)
-	})
+func hostGate(snapshot func() settings.Snapshot) httpserver.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			srv, _ := snapshot().Server()
+			srv.Hosts().Middleware()(next).ServeHTTP(w, r)
+		})
+	}
 }
 
 func httpMetrics(m *obs.Metrics) (httpserver.LogOption, httpserver.RecoverOption) {

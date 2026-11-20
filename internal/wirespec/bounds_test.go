@@ -3,12 +3,10 @@ package wirespec_test
 import (
 	"encoding/base64"
 	"errors"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/mediawrite"
-	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/wirespec"
 )
 
@@ -46,7 +44,6 @@ func TestFileNameRefuses(t *testing.T) {
 		}
 	})
 
-	pattern := regexp.MustCompile(wirespec.FileName("").Pattern())
 	accepted := map[string]string{
 		"a Unicode name":          "Épisode 1.fr.srt",
 		"a CJK name":              "番組.ja.ass",
@@ -64,18 +61,13 @@ func TestFileNameRefuses(t *testing.T) {
 			if string(n) != in {
 				t.Errorf("name = %q, want %q", n, in)
 			}
-			if !pattern.MatchString(in) {
-				t.Errorf("Pattern refuses %q, which UnmarshalText accepts", in)
+			if b, err := n.MarshalText(); err != nil || string(b) != in {
+				t.Errorf("MarshalText = %q, %v; want %q", b, err, in)
 			}
 		})
 	}
 	if n := len(accepted["255 bytes of multi-byte"]); n != 255 {
 		t.Fatalf("the multi-byte fixture is %d bytes, want 255", n)
-	}
-	for _, in := range []string{".", "..", "sub/episode.srt", `sub\episode.srt`, "episode"} {
-		if pattern.MatchString(in) {
-			t.Errorf("Pattern accepts %q", in)
-		}
 	}
 }
 
@@ -102,19 +94,22 @@ func TestUploadNameRefuses(t *testing.T) {
 		if err := n.UnmarshalText([]byte(in)); err != nil || string(n) != in {
 			t.Errorf("UnmarshalText(%q) = %q, %v", in, n, err)
 		}
+		if b, err := n.MarshalText(); err != nil || string(b) != in {
+			t.Errorf("MarshalText = %q, %v; want %q", b, err, in)
+		}
 	}
 }
 
 func TestUploadBytes(t *testing.T) {
 	enc := base64.StdEncoding.EncodeToString
 	refused := map[string]string{
-		"empty":                   "",
-		"not base64":              "@@@@",
-		"unpadded":                "YQ",
-		"URL alphabet":            "-_8=",
-		"trailing bits set":       "YR==",
-		"one byte over MaxBody":   enc(make([]byte, provider.MaxBody+1)),
-		"over the base64 MaxBody": strings.Repeat("A", wirespec.UploadBytes(nil).MaxBytes()+4),
+		"empty":                 "",
+		"not base64":            "@@@@",
+		"unpadded":              "YQ",
+		"URL alphabet":          "-_8=",
+		"trailing bits set":     "YR==",
+		"one byte over the cap": enc(make([]byte, 10_000_001)),
+		"over the base64 cap":   strings.Repeat("A", wirespec.UploadBytes(nil).MaxBytes()+4),
 	}
 	for name, in := range refused {
 		t.Run(name, func(t *testing.T) {
@@ -132,38 +127,20 @@ func TestUploadBytes(t *testing.T) {
 		if err := u.UnmarshalText([]byte("YWJj")); err != nil || string(u) != "abc" {
 			t.Errorf("UnmarshalText = %q, %v", u, err)
 		}
+		if b, err := u.MarshalText(); err != nil || string(b) != "YWJj" {
+			t.Errorf("MarshalText = %q, %v; want YWJj", b, err)
+		}
 	})
-	t.Run("accepts exactly MaxBody", func(t *testing.T) {
-		in := enc(make([]byte, provider.MaxBody))
+	t.Run("accepts exactly the cap", func(t *testing.T) {
+		in := enc(make([]byte, 10_000_000))
 		if len(in) > wirespec.UploadBytes(nil).MaxBytes() {
-			t.Fatalf("MaxBody encodes to %d bytes, over MaxBytes %d", len(in), wirespec.UploadBytes(nil).MaxBytes())
+			t.Fatalf("the cap encodes to %d bytes, over MaxBytes %d", len(in), wirespec.UploadBytes(nil).MaxBytes())
 		}
 		var u wirespec.UploadBytes
-		if err := u.UnmarshalText([]byte(in)); err != nil || len(u) != provider.MaxBody {
+		if err := u.UnmarshalText([]byte(in)); err != nil || len(u) != 10_000_000 {
 			t.Errorf("UnmarshalText = %d bytes, %v", len(u), err)
 		}
 	})
-	t.Run("its body cap holds MaxBody in base64", func(t *testing.T) {
-		if got, want := wirespec.BodyCap("files.upload"), int64(wirespec.UploadBytes(nil).MaxBytes()); got <= want {
-			t.Errorf("BodyCap = %d, not above the base64 bound %d", got, want)
-		}
-	})
-}
-
-func TestBodyCap(t *testing.T) {
-	for name, want := range map[string]int64{
-		"files.setTiming": 256 << 10,
-		"files.render":    256 << 10,
-		"resyncs.start":   1 << 20,
-		"settings.save":   1 << 20,
-		"settings.test":   1 << 20,
-		"files.upload":    14 << 20,
-		"downloads.start": 64 << 10,
-	} {
-		if got := wirespec.BodyCap(name); got != want {
-			t.Errorf("BodyCap(%q) = %d, want %d", name, got, want)
-		}
-	}
 }
 
 func TestBoundsDeclared(t *testing.T) {

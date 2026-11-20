@@ -3,29 +3,22 @@ package mediawrite_test
 import (
 	"crypto/sha256"
 	"errors"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
+	"github.com/cplieger/go/httpwire/httpwiretest"
 	"github.com/cplieger/subflux/internal/mediawrite"
 	"github.com/cplieger/subflux/internal/statedb"
 	"github.com/cplieger/subflux/internal/timing"
 )
 
-type code = struct {
-	Err  error
-	Code string
-}
-
-// failureArm is one way an api-called export refuses.
+// failureArm is one way an api-called export refuses, and the code api
+// answers for it.
 type failureArm struct {
 	call func() error
 	name string
+	want string
 }
 
 // failureArms builds a library with one root of each state and drives
@@ -83,35 +76,47 @@ func failureArms(t *testing.T) []failureArm {
 		}
 	}
 	return []failureArm{
-		{name: "OpenVideo unknown instance", call: openVideo(insts[1] + 100)},
-		{name: "OpenVideo outside every root", call: openVideo(insts[0])},
-		{name: "OpenVideo root unavailable", call: openVideo(insts[1])},
-		{name: "List unknown instance", call: list(insts[1] + 100)},
-		{name: "List outside every root", call: list(insts[0])},
-		{name: "List root unavailable", call: list(insts[1])},
-		{name: "DecodeRef zero instance", call: func() error { _, err := mediawrite.DecodeRef(0, "a.en.srt"); return err }},
-		{name: "DecodeRef bad name", call: func() error { _, err := mediawrite.DecodeRef(insts[0], "../a.en.srt"); return err }},
-		{name: "ValidName", call: func() error { return mediawrite.ValidName("a.vtt") }},
-		{name: "Retime zero reference", call: retime(mediawrite.FileRef{}, hashed, shift)},
-		{name: "Retime outside every root", call: retime(ref(insts[0], "S01E01.en.srt"), hashed, shift)},
-		{name: "Retime root unavailable", call: retime(ref(insts[1], "S01E02.en.srt"), hashed, shift)},
-		{name: "Retime zero expectation", call: retime(en, mediawrite.Expectation{}, shift)},
-		{name: "Retime invalid timing", call: retime(en, hashed, timing.Shift{Ms: 7 * 3_600_000})},
-		{name: "Retime pending", call: retime(pending, hashed, shift)},
-		{name: "Retime .sub", call: retime(sub, subHash, shift)},
-		{name: "Delete zero reference", call: del(mediawrite.FileRef{}, hashed)},
-		{name: "Delete outside every root", call: del(ref(insts[0], "S01E01.en.srt"), hashed)},
-		{name: "Delete root unavailable", call: del(ref(insts[1], "S01E02.en.srt"), hashed)},
-		{name: "Delete zero expectation", call: del(en, mediawrite.Expectation{})},
-		{name: "Delete pending", call: del(pending, hashed)},
-		{name: "Delete .sub", call: del(sub, subHash)},
-		{name: "Current zero reference", call: current(mediawrite.FileRef{}, hashed)},
-		{name: "Current outside every root", call: current(ref(insts[0], "S01E01.en.srt"), hashed)},
-		{name: "Current root unavailable", call: current(ref(insts[1], "S01E02.en.srt"), hashed)},
-		{name: "Current zero expectation", call: current(en, mediawrite.Expectation{})},
-		{name: "Current pending", call: current(pending, hashed)},
-		{name: "Current .sub", call: current(sub, subHash)},
+		{name: "OpenVideo unknown instance", call: openVideo(insts[1] + 100), want: "not_found"},
+		{name: "OpenVideo outside every root", call: openVideo(insts[0]), want: "outside_root"},
+		{name: "OpenVideo root unavailable", call: openVideo(insts[1]), want: "media_root_unavailable"},
+		{name: "List unknown instance", call: list(insts[1] + 100), want: "not_found"},
+		{name: "List outside every root", call: list(insts[0]), want: "outside_root"},
+		{name: "List root unavailable", call: list(insts[1]), want: "media_root_unavailable"},
+		{name: "DecodeRef zero instance", call: func() error { _, err := mediawrite.DecodeRef(0, "a.en.srt"); return err }, want: "not_found"},
+		{name: "DecodeRef bad name", call: func() error { _, err := mediawrite.DecodeRef(insts[0], "../a.en.srt"); return err }, want: "not_found"},
+		{name: "ValidName", call: func() error { return mediawrite.ValidName("a.vtt") }, want: "not_found"},
+		{name: "Retime zero reference", call: retime(mediawrite.FileRef{}, hashed, shift), want: "not_found"},
+		{name: "Retime outside every root", call: retime(ref(insts[0], "S01E01.en.srt"), hashed, shift), want: "outside_root"},
+		{name: "Retime root unavailable", call: retime(ref(insts[1], "S01E02.en.srt"), hashed, shift), want: "media_root_unavailable"},
+		{name: "Retime zero expectation", call: retime(en, mediawrite.Expectation{}, shift), want: "stale_version"},
+		{name: "Retime invalid timing", call: retime(en, hashed, timing.Shift{Ms: 7 * 3_600_000}), want: "timing_invalid"},
+		{name: "Retime pending", call: retime(pending, hashed, shift), want: "write_pending"},
+		{name: "Retime .sub", call: retime(sub, subHash, shift), want: "format_unsupported"},
+		{name: "Delete zero reference", call: del(mediawrite.FileRef{}, hashed), want: "not_found"},
+		{name: "Delete outside every root", call: del(ref(insts[0], "S01E01.en.srt"), hashed), want: "outside_root"},
+		{name: "Delete root unavailable", call: del(ref(insts[1], "S01E02.en.srt"), hashed), want: "media_root_unavailable"},
+		{name: "Delete zero expectation", call: del(en, mediawrite.Expectation{}), want: "stale_version"},
+		{name: "Delete pending", call: del(pending, hashed), want: "write_pending"},
+		{name: "Delete .sub", call: del(sub, subHash), want: "format_unsupported"},
+		{name: "Current zero reference", call: current(mediawrite.FileRef{}, hashed), want: "not_found"},
+		{name: "Current outside every root", call: current(ref(insts[0], "S01E01.en.srt"), hashed), want: "outside_root"},
+		{name: "Current root unavailable", call: current(ref(insts[1], "S01E02.en.srt"), hashed), want: "media_root_unavailable"},
+		{name: "Current zero expectation", call: current(en, mediawrite.Expectation{}), want: "stale_version"},
+		{name: "Current pending", call: current(pending, hashed), want: "write_pending"},
+		{name: "Current .sub", call: current(sub, subHash), want: "format_unsupported"},
 	}
+}
+
+// codeOf is the code of the first entry of mediawrite's, then timing's,
+// Owner.Codes that err matches by errors.Is, "" when none does: the lookup
+// httpwire's answer mapping makes for a row whose owners are those two.
+func codeOf(err error) string {
+	for _, c := range slices.Concat(mediawrite.Owner.Codes, timing.Owner.Codes) {
+		if errors.Is(err, c.Err) {
+			return c.Code
+		}
+	}
+	return ""
 }
 
 func TestCodesCoverFailureTable(t *testing.T) {
@@ -122,74 +127,13 @@ func TestCodesCoverFailureTable(t *testing.T) {
 			t.Errorf("%s: succeeded, want a refusal", arm.name)
 			continue
 		}
-		if !slices.ContainsFunc(mediawrite.Codes, func(c code) bool { return errors.Is(err, c.Err) }) {
-			t.Errorf("%s: %v is no entry of mediawrite.Codes", arm.name, err)
+		if got := codeOf(err); got != arm.want {
+			t.Errorf("%s: %v answers code %q, want %q", arm.name, err, got, arm.want)
 		}
 	}
 }
 
-var sentinels = map[string]error{
-	"ErrInvalidRef":      mediawrite.ErrInvalidRef,
-	"ErrExpectation":     mediawrite.ErrExpectation,
-	"ErrPathPending":     mediawrite.ErrPathPending,
-	"ErrNameContended":   mediawrite.ErrNameContended,
-	"ErrOutsideRoot":     mediawrite.ErrOutsideRoot,
-	"ErrRootUnavailable": mediawrite.ErrRootUnavailable,
-}
-
-// exempt lists sentinels deliberately left out of Codes, with the reason.
-var exempt = map[string]string{
-	"ErrNameContended": "only Deliver returns it, and only search calls Deliver",
-}
-
-// Go cannot enumerate package vars by reflect, so the source is parsed.
-func TestEverySentinelCoded(t *testing.T) {
+func TestOwnerSentinels(t *testing.T) {
 	t.Parallel()
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var declared []string
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
-			continue
-		}
-		file, err := parser.ParseFile(token.NewFileSet(), e.Name(), nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, decl := range file.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.VAR {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				for _, id := range spec.(*ast.ValueSpec).Names {
-					if id.IsExported() && strings.HasPrefix(id.Name, "Err") {
-						declared = append(declared, id.Name)
-					}
-				}
-			}
-		}
-	}
-	if len(declared) == 0 {
-		t.Fatal("found no exported Err* var; the parse is broken")
-	}
-	for _, name := range declared {
-		v, ok := sentinels[name]
-		if !ok {
-			t.Errorf("%s is missing from this test's sentinels table", name)
-			continue
-		}
-		_, isExempt := exempt[name]
-		coded := slices.ContainsFunc(mediawrite.Codes, func(c code) bool { return c.Err == v })
-		if coded == isExempt {
-			t.Errorf("%s: coded %v, exempt %v; want exactly one", name, coded, isExempt)
-		}
-	}
-	for name := range sentinels {
-		if !slices.Contains(declared, name) {
-			t.Errorf("sentinels names %s, which the package does not declare", name)
-		}
-	}
+	httpwiretest.Sentinels(t, mediawrite.Owner)
 }

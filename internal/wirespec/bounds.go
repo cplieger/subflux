@@ -8,8 +8,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/cplieger/subflux/internal/mediawrite"
-	"github.com/cplieger/subflux/internal/provider"
 )
+
+// UploadMax is files.upload's decoded cap: a decimal 10 MB, the figure a
+// client prints for it.
+const UploadMax = 10_000_000
 
 // FromMs is a preview's start in milliseconds.
 type FromMs int64
@@ -35,15 +38,14 @@ func (FileName) MaxBytes() int { return 255 }
 // MaxBytes bounds the release name an upload records.
 func (UploadName) MaxBytes() int { return 255 }
 
-// MaxBytes is the base64 length of provider.MaxBody decoded bytes.
-func (UploadBytes) MaxBytes() int { return (provider.MaxBody + 2) / 3 * 4 }
+// MaxBytes is the base64 length of UploadMax decoded bytes.
+func (UploadBytes) MaxBytes() int { return (UploadMax + 2) / 3 * 4 }
 
 // Count bounds one resync batch.
 func (ResyncFiles) Count() (lo, hi int) { return 1, 500 }
 
-// Pattern is a superset of the names UnmarshalText accepts, for the schema:
-// one path element ending in an extension. UnmarshalText is authoritative.
-func (FileName) Pattern() string { return `^[^/\\\x00]*\.[^./\\\x00]+$` }
+// MarshalText answers the name as UnmarshalText took it.
+func (n FileName) MarshalText() ([]byte, error) { return []byte(n), nil }
 
 // UnmarshalText refuses more than MaxBytes bytes, then anything
 // mediawrite.ValidName refuses, so a bad name is refused before a handler
@@ -58,6 +60,9 @@ func (n *FileName) UnmarshalText(b []byte) error {
 	*n = FileName(b)
 	return nil
 }
+
+// MarshalText answers the name as UnmarshalText took it.
+func (n UploadName) MarshalText() ([]byte, error) { return []byte(n), nil }
 
 // UnmarshalText refuses an empty name, more than MaxBytes bytes, invalid
 // UTF-8 and any control character (a line break included), so the name is
@@ -80,8 +85,13 @@ func (n *UploadName) UnmarshalText(b []byte) error {
 	return nil
 }
 
+// MarshalText answers standard padded base64, the form UnmarshalText takes.
+func (u UploadBytes) MarshalText() ([]byte, error) {
+	return base64.StdEncoding.AppendEncode(nil, u), nil
+}
+
 // UnmarshalText decodes standard padded base64, refusing an empty file and
-// more than provider.MaxBody decoded bytes.
+// more than UploadMax decoded bytes.
 func (u *UploadBytes) UnmarshalText(b []byte) error {
 	if len(b) > UploadBytes(nil).MaxBytes() {
 		return fmt.Errorf("wirespec: upload of %d base64 bytes, over %d", len(b), UploadBytes(nil).MaxBytes())
@@ -94,26 +104,9 @@ func (u *UploadBytes) UnmarshalText(b []byte) error {
 	switch {
 	case n == 0:
 		return errors.New("wirespec: empty upload")
-	case n > provider.MaxBody:
-		return fmt.Errorf("wirespec: upload of %d bytes, over %d", n, provider.MaxBody)
+	case n > UploadMax:
+		return fmt.Errorf("wirespec: upload of %d bytes, over %d", n, UploadMax)
 	}
 	*u = UploadBytes(out[:n])
 	return nil
-}
-
-// BodyCap is an endpoint's request-body bound: 256 KiB for timing bodies,
-// 1 MiB for resync bodies and settings documents, 14 MiB for files.upload,
-// 64 KiB otherwise. 500 resync files with 255-byte names reach about 817 KB
-// under encoding/json's HTML escaping, so 512 KiB would refuse a valid
-// batch.
-func BodyCap(name string) int64 {
-	switch name {
-	case "files.setTiming", "files.render":
-		return 256 << 10
-	case "resyncs.start", "settings.save", "settings.test":
-		return 1 << 20
-	case "files.upload":
-		return 14 << 20 // provider.MaxBody in base64, with room for the other fields
-	}
-	return 64 << 10
 }

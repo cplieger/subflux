@@ -1,6 +1,10 @@
 package timing
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/cplieger/go/httpwire"
+)
 
 var (
 	// ErrTimingInvalid is a Timing outside Validate's rules, or timing bytes
@@ -10,13 +14,16 @@ var (
 	ErrFormatUnsupported = errors.New("unsupported subtitle format")
 )
 
-// Codes is every sentinel timing's exported calls return, with the code api
-// answers for it. The element type is unnamed, so timing never imports api's
-// wirespec.
-var Codes = []struct {
-	Err  error
-	Code string
-}{
-	{ErrTimingInvalid, "timing_invalid"},
-	{ErrFormatUnsupported, "format_unsupported"},
+// Owner maps every sentinel timing's exported calls return to the code the
+// API answers for it.
+var Owner = &httpwire.Owner{
+	Name: "timing",
+	Sentinels: map[string]error{
+		"ErrTimingInvalid":     ErrTimingInvalid,
+		"ErrFormatUnsupported": ErrFormatUnsupported,
+	},
+	Codes: []httpwire.OwnerCode{
+		{Err: ErrTimingInvalid, Code: "timing_invalid"},
+		{Err: ErrFormatUnsupported, Code: "format_unsupported"},
+	},
 }
