@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1795561920429,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/subflux",
   "entries": {
     "Benchmark": [
       {
@@ -32069,10 +32069,10 @@ window.BENCHMARK_DATA = {
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "e1240fbce166e4e35c5bcfec8003c2e615e40deb",
-          "message": "chore(deps): update cplieger/ci digest to f266d61 (#1243)\n\nCo-authored-by: tribble-trouble[bot] <338123824+tribble-trouble[bot]@users.noreply.github.com>",
-          "timestamp": "2026-11-24T19:22:54Z",
-          "url": "https://github.com/cplieger/ci/commit/e1240fbce166e4e35c5bcfec8003c2e615e40deb"
+          "id": "3bba8f9a26c400892aa0b70978b79afca0bc67e2",
+          "message": "chore(sync): synced file(s) with cplieger/ci (#1702)\n\nCo-authored-by: tribble-trouble[bot] <338123824+tribble-trouble[bot]@users.noreply.github.com>",
+          "timestamp": "2026-11-24T19:56:04Z",
+          "url": "https://github.com/cplieger/subflux/commit/3bba8f9a26c400892aa0b70978b79afca0bc67e2"
         },
         "date": 1795561920111,
         "tool": "customSmallerIsBetter",
